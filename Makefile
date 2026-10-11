@@ -97,3 +97,24 @@ francois_BINARY=$(shell which francois)
 install:
 	GOWORK=off go build -o ./dist/francois ./cmd/francois && \
 		cp ./dist/francois $(francois_BINARY)
+
+.PHONY: web-build web-check web-test package-local
+web-build:
+	pnpm build
+
+web-check:
+	pnpm check
+
+web-test:
+	pnpm test
+
+# Node remains a runtime dependency. The archive contains the worker and its
+# locked dependency manifest; install with pnpm install --prod --frozen-lockfile.
+package-local:
+	GOWORK=off go generate ./...
+	mkdir -p dist/francois-local/worker/dist
+	GOWORK=off go build -o dist/francois-local/francois ./cmd/francois
+	cp worker/dist/main.js dist/francois-local/worker/dist/main.js
+	cp package.json pnpm-lock.yaml README.md dist/francois-local/
+	cp -R examples dist/francois-local/
+	tar -czf dist/francois-local.tar.gz -C dist francois-local

@@ -5,7 +5,25 @@ import "regexp"
 var roomName = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,47}$`)
 var topicName = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,47}$`)
 
+func (h *Host) personFor(artifact string) any {
+	a, err := h.Store.Get(h.ctx, artifact)
+	if err != nil {
+		return nil
+	}
+	if _, ok := a.Manifest["user"]; ok {
+		return h.Owner
+	}
+	return nil
+}
 func (h *Host) roomBroadcast(artifact string) {
+	a, err := h.Store.Get(h.ctx, artifact)
+	if err != nil {
+		return
+	}
+	if _, ok := a.Manifest["room"]; !ok {
+		return
+	}
+	by := h.personFor(artifact)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, target := range h.views {
@@ -27,10 +45,10 @@ func (h *Host) roomBroadcast(artifact string) {
 				v.mu.Lock()
 				if v.connected && v.rooms[room] {
 					data := map[string]any{}
-					for k, val := range v.presence {
+					for k, val := range v.presence[room] {
 						data[k] = val
 					}
-					peers = append(peers, map[string]any{"peer": v.ID, "by": h.Owner, "isMe": true, "sameTab": v.ID == target.ID, "kind": "viewer", "guest": false, "presence": data})
+					peers = append(peers, map[string]any{"peer": v.ID, "by": by, "isMe": true, "sameTab": v.ID == target.ID, "kind": "viewer", "guest": false, "presence": data})
 				}
 				v.mu.Unlock()
 			}

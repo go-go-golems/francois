@@ -25,6 +25,9 @@ func (h *Host) routes(m *http.ServeMux, artifact string) {
 		case "runtime.js":
 			data = web.Runtime
 			mime = "text/javascript"
+		case "icon.svg":
+			data = web.Icon
+			mime = "image/svg+xml"
 		case "style.css":
 			data = web.Style
 			mime = "text/css"
@@ -83,7 +86,11 @@ func (h *Host) routes(m *http.ServeMux, artifact string) {
 				}
 			}
 		}
-		boot, _ := json.Marshal(map[string]any{"artifactId": artifact, "version": a.Version, "manifest": available, "owner": h.Owner, "models": h.Backend.Models()})
+		var owner any
+		if _, ok := a.Manifest["user"]; ok {
+			owner = h.Owner
+		}
+		boot, _ := json.Marshal(map[string]any{"artifactId": artifact, "version": a.Version, "manifest": available, "owner": owner, "models": h.Backend.Models()})
 		injected := []byte(`<script type="application/json" id="francois-view">` + string(boot) + `</script><script src="/static/runtime.js"></script>`)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(inject(source, injected))
@@ -106,7 +113,7 @@ func (h *Host) routes(m *http.ServeMux, artifact string) {
 			return
 		}
 		ctx, cancel := contextForView(h.ctx)
-		v := &View{ID: id("v_"), Artifact: artifact, Version: loaded.Version, ctx: ctx, cancel: cancel, events: make(chan any, 128), calls: map[string]*call{}, subscriptions: map[string]json.RawMessage{}, presence: map[string]any{}, rooms: map[string]bool{"": true}}
+		v := &View{ID: id("v_"), Artifact: artifact, Version: loaded.Version, ctx: ctx, cancel: cancel, events: make(chan any, 128), calls: map[string]*call{}, subscriptions: map[string]json.RawMessage{}, presence: map[string]map[string]any{}, rooms: map[string]bool{"": true}}
 		h.mu.Lock()
 		h.views[v.ID] = v
 		h.mu.Unlock()

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Capability playground</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Capability playground</strong
+      ><span>Local runtime verification</span>
+    </header>
+    <main>
+      <h1>Shared board</h1>
+      <p>Open two tabs to see shared state and presence.</p>
+      <form class="form" id="add">
+        <label>Task title<input id="title" required /></label
+        ><button class="primary">Add task</button>
+      </form>
+      <section class="panel">
+        <ul id="tasks"></ul>
+        <p id="peers">Connecting…</p>
+        <div class="row">
+          <button id="react">React</button><button id="comment">Comment</button
+          ><button id="download">Export JSON</button>
+        </div>
+        <p id="reactions"></p>
+      </section>
+      <p id="error" class="error" hidden></p>
+    </main>
+    <script>
+      (async () => {
+        const [db, user, room, comments, downloads] = await Promise.all(
+          ["db", "user", "room", "comments", "downloads"].map((n) =>
+            claude.use(n),
+          ),
+        );
+        const fail = (e) => {
+          const out = document.getElementById("error");
+          out.hidden = false;
+          out.textContent = e.code + ": " + e.message;
+        };
+        const tasks = db.collection("tasks").orderBy("created");
+        let current = [];
+        tasks.onSnapshot((s) => {
+          current = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+          document.getElementById("tasks").replaceChildren(
+            ...current.map((t) => {
+              const li = document.createElement("li");
+              li.textContent = t.title;
+              return li;
+            }),
+          );
+        }, fail);
+        document.getElementById("add").onsubmit = async (e) => {
+          e.preventDefault();
+          const title = document.getElementById("title");
+          try {
+            await tasks.add({
+              title: title.value,
+              created: Date.now(),
+              by: await user.id(),
+            });
+            title.value = "";
+          } catch (e) {
+            fail(e);
+          }
+        };
+        room.onPeers(
+          (e) =>
+            (document.getElementById("peers").textContent =
+              e.peers.length + " tabs here"),
+          fail,
+        );
+        room.presence({ view: "board" });
+        document.getElementById("react").onclick = () =>
+          room.emit("reaction", { emoji: "wave" }).catch(fail);
+        let reactions = 0;
+        room.on(
+          "reaction",
+          () =>
+            (document.getElementById("reactions").textContent =
+              ++reactions + " reactions"),
+          fail,
+        );
+        document.getElementById("comment").onclick = () =>
+          comments
+            .openComposer({ element: document.getElementById("tasks") })
+            .catch(fail);
+        document.getElementById("download").onclick = () =>
+          downloads
+            .save({
+              filename: "tasks.json",
+              data: JSON.stringify(current, null, 2),
+            })
+            .catch(fail);
+        window.playground = { db, user, room, comments, downloads };
+      })().catch((e) => console.error(e));
+    </script>
+  </body>
+</html>

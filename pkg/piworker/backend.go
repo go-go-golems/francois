@@ -7,12 +7,13 @@ import (
 )
 
 type Model struct {
-	Provider  string `json:"provider"`
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Reasoning bool   `json:"reasoning"`
-	Images    bool   `json:"images"`
-	Tier      string `json:"tier,omitempty"`
+	Provider       string   `json:"provider"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Reasoning      bool     `json:"reasoning"`
+	ThinkingLevels []string `json:"thinkingLevels,omitempty"`
+	Images         bool     `json:"images"`
+	Tier           string   `json:"tier,omitempty"`
 }
 type Tool struct {
 	Name        string          `json:"name"`
@@ -24,18 +25,23 @@ type Options struct {
 	Model     string `json:"model,omitempty"`
 	Effort    string `json:"effort,omitempty"`
 }
+type Image struct {
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"`
+}
 type Request struct {
+	Images  []Image         `json:"images,omitempty"`
 	CallID  string          `json:"callId"`
 	Input   json.RawMessage `json:"input"`
 	Options Options         `json:"options"`
 	Tools   []Tool          `json:"tools,omitempty"`
 }
 type Result struct {
-	FinalText        string `json:"finalText,omitempty"`
-	Text             string `json:"text"`
-	Truncated        bool   `json:"truncated"`
-	ModelTierApplied string `json:"modelTierApplied"`
-	ModelApplied     string `json:"modelApplied,omitempty"`
+	FinalText        *string `json:"finalText,omitempty"`
+	Text             string  `json:"text"`
+	Truncated        bool    `json:"truncated"`
+	ModelTierApplied string  `json:"modelTierApplied"`
+	ModelApplied     string  `json:"modelApplied,omitempty"`
 }
 type Failure struct {
 	Code    string `json:"code"`

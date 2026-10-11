@@ -231,3 +231,74 @@ Browser verification used a tmux server with backend fake, library at 127.0.0.1:
 ### Generation checkpoint correction
 
 After the initial tests/lint passed, logcopter generation added the host package logger. The subsequent build reported `pkg/host/logcopter.go:7:5: log already declared through import of package log`. The milestone commit raced that final build result. I removed the redundant zerolog/log import and used the generated package logger, reran the affected build/tests, and amended the unpushed milestone. This failure shows why generation must precede final code validation.
+
+## Step 5: Complete the tested local capability surface and package it
+
+The Pi-backed browser test streamed a real response and executed one actual POLIS eval that changed the tower height from 6 to 7. The remaining local capability checks then verified shared document updates, optimistic snapshots, durable assets/comments, rooted files, room presence, and subscriber cancellation. The TypeScript source was formatted for review, and a local package target now includes the worker and its dependency manifest.
+
+### Prompt Context
+
+See Step 3 for the implementation request and Step 4 for the model-selection question.
+**Commit (preceding milestone):** 0085786 — Implement local artifact host and Pi browser tool runtime.
+
+### What I did
+
+- Verified real Pi text streaming with openai-codex/gpt-6-luna: four text events and final text `Francois connected`.
+- Verified a named-model tool round: the model invoked eval exactly once, patched `height: 6` to `height: 7`, and returned a final confirmation with modelApplied set.
+- Added pending-write snapshots and rollback, query ordering/identity checks, bounded call queueing (two active/eight waiting), partial text for cancelled subscribers, and throttled text callbacks.
+- Added image preprocessing: declared JPEG/PNG/WebP/GIF inputs, four-image/eight-MiB budget, roughly 1.2 MP resizing, JPEG re-encoding, source-byte cache hashes, and provider image messages.
+- Added Pi selector thinking suffixes and safe supported-thinking-level metadata. Explicit effort takes precedence over the selector; `off` is mapped to absent provider reasoning.
+- Kept lobby and named-room presence independent; removed null fields via actual null patches rather than silently leaving old state behind.
+- Fixed project downloads to stream the whole file after confirmation instead of saving only one 25-MiB range read.
+- Added a capability playground fixture and manifest.
+- Added private worker protocol tests for tool-result exchange, cancellation, and invalid frames.
+- Added Node/pnpm CI, frontend generation, local packaging, license comments in bundles, and a current README/support matrix.
+
+### Why
+
+The broad local API needs actual browser/state evidence, not just method names. The richer model-selection request fits Pi's existing resolver rather than requiring a second provider catalog or credential configuration system. Host packaging must include its Node worker instead of pretending the Go executable alone performs inference.
+
+### What worked
+
+- TypeScript check and four contract tests passed, including rejected optimistic-write rollback.
+- Go tests and race-enabled tests passed across host/store/worker/commands. Worker pipe tests do not require live credentials.
+- Lint passed with zero issues. Generation and build succeeded; make package-local produced the expected binary/worker/manifest/examples archive.
+- Browser document data was frozen and nested updates preserved both fields. Pending snapshots were observed.
+- Two same-origin browser documents received shared writes and represented two peers for one local identity. Root events had sameTab true; the second document had sameTab false and saw updated presence.
+- Cancelling one shared sample subscriber preserved `first ` as partial text while its sibling completed `first second third`. JSON parsing and cached replay returned `{ok:true}`. Same-block abort rejected without a model call.
+- Upload/list/fetch returned the stored text asset; data and comments survived a server restart. Rooted file reads returned size and content revision metadata.
+- The comments shell opened a composer from the artifact, posted a comment through its UI, and displayed the persisted thread.
+- A generated 1800×1200 PNG was sent as JPEG with dimensions 1342×894 (1,199,748 pixels).
+- Named-room presence contained `{table:2}` while lobby presence contained `{lobby:1,view:'board'}`.
+- Saved and visually inspected `reference/02-francois-library.png`; the white panels, fine borders, muted canvas and blue controls match the reference's visual language.
+
+### What didn't work
+
+- The first optimistic-query test expected reordered rows from a mock that did not declare orderBy. The runtime now enforces default ID ordering, so the fixture was corrected to order by rank; the test then passed.
+- A broad source replacement for tool-schema validation also matched `c.names`, producing `c.if` and a Go syntax error. A focused patch restored the call registry loop while keeping validation in validateSample; build/tests passed afterward.
+- The initial screenshot destination `/tmp/francois-library.png` was rejected by the browser tool's allowed roots. The screenshot was saved under the ticket instead.
+- The sandbox pnpm launcher itself uses Node 20 and prints an engine warning even when its child PATH selects Node 24. Direct version verification returned v24.18.0; builds/checks/tests succeeded. The runtime/CI requirement remains Node 24.
+
+### What I learned
+
+Pi model selectors can express richer thinking levels without expanding the standard effort enum. A final-round empty string must remain distinguishable from missing finalText so sample.json never parses earlier tool-round prose. Range reads and downloads are different operations; sharing their implementation without a full-file path truncates exports.
+
+### What was tricky to build
+
+A cancelled subscriber must not cancel siblings sharing the same provider request. Optimistic snapshots need local overlays and a definitive refresh after success or rollback. Room presence requires separate server state per named room and null deletion patches. The browser owns binary transformations and callbacks; Go validates the wire budget and routes complete tool results.
+
+### What warrants a second pair of eyes
+
+Review origin/Host checks, lifecycle cleanup, and the renderer's terminal callback paths. The host is a single-owner localhost service; real organization identity, multi-account roles, original Claude shell/session semantics, and runtime definitions omitted from the downloaded guides are not claimed. SVG upload/custom anchors/files-form publish/MCP remain explicit follow-ups.
+
+### What should be done in the future
+
+Resolve the precise files-form publish and permissions type definitions before enabling them. Add SVG sanitization, custom comment anchors, and genuine conversation/MCP handoff only with concrete contracts. Production release infrastructure remains separate from this local package.
+
+### Code review instructions
+
+Review ui/src/runtime.ts and its capability modules, worker/src/main.ts, pkg/host/files.go and rooms.go, and pkg/piworker/client_test.go. Run pnpm check/test, go generate, go test -race, make lint, and make package-local. Compare the screenshot with Factory Twin tokens in pkg/web/static/style.css.
+
+### Technical details
+
+All manually created test databases live under /tmp. The real model smoke used explicit model mappings and the existing Pi auth configuration; credential values were not emitted. The local archive contains no credentials or test database. Unsupported methods are documented rather than shimmed under deprecated names.

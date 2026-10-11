@@ -78,10 +78,11 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 			return nil, err
 		}
 		if !h.readable(args.Path) {
-			return store.Document{Path: args.Path, Exists: false}, nil
+			return store.Document{ID: args.Path[strings.LastIndex(args.Path, "/")+1:], Path: args.Path, Exists: false}, nil
 		}
 		return h.Store.Document(ctx, v.Artifact, args.Path)
 	case "db.query":
+		args.Query.Owner = h.Owner
 		docs, err := h.Store.Query(ctx, v.Artifact, args.Query)
 		if err != nil {
 			return nil, err
@@ -135,8 +136,12 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 		return map[string]int64{"version": version}, nil
 	case "room.presence":
 		v.mu.Lock()
+		if !v.rooms[args.Room] {
+			v.mu.Unlock()
+			return nil, errors.New("Room not joined")
+		}
 		copyPatch := map[string]any{}
-		for k, val := range v.presence {
+		for k, val := range v.presence[args.Room] {
 			copyPatch[k] = val
 		}
 		for k, val := range args.Patch {
@@ -151,7 +156,7 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 			v.mu.Unlock()
 			return nil, errors.New("Presence exceeds 4 KiB")
 		}
-		v.presence = copyPatch
+		v.presence[args.Room] = copyPatch
 		v.mu.Unlock()
 		h.roomBroadcast(v.Artifact)
 		return map[string]bool{"ok": true}, nil
@@ -168,6 +173,7 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 			v.rooms[args.Room] = true
 		} else {
 			delete(v.rooms, args.Room)
+			delete(v.presence, args.Room)
 		}
 		v.mu.Unlock()
 		h.roomBroadcast(v.Artifact)
@@ -186,6 +192,7 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 		if !joined {
 			return nil, errors.New("Room not joined")
 		}
+		by := h.personFor(v.Artifact)
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		for _, peer := range h.views {
@@ -196,7 +203,7 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 			joined := peer.rooms[args.Room]
 			peer.mu.Unlock()
 			if joined {
-				peer.emit(map[string]any{"type": "room_event", "room": args.Room, "topic": args.Topic, "data": args.Data, "peer": v.ID, "by": h.Owner, "isMe": true, "sameTab": peer.ID == v.ID, "kind": "viewer", "guest": false})
+				peer.emit(map[string]any{"type": "room_event", "room": args.Room, "topic": args.Topic, "data": args.Data, "peer": v.ID, "by": by, "isMe": true, "sameTab": peer.ID == v.ID, "kind": "viewer", "guest": false})
 			}
 		}
 		return map[string]bool{"ok": true}, nil

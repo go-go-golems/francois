@@ -53,7 +53,7 @@ func Start(ctx context.Context, node, worker, agentDir, cwd string, tiers map[st
 	group.Go(func() error {
 		defer close(c.done)
 		scan := bufio.NewScanner(out)
-		scan.Buffer(make([]byte, 65536), 2<<20)
+		scan.Buffer(make([]byte, 65536), 16<<20)
 		for scan.Scan() {
 			var event Event
 			if err := json.Unmarshal(scan.Bytes(), &event); err != nil {

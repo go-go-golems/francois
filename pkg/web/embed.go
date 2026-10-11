@@ -14,3 +14,6 @@ var Runtime []byte
 
 //go:embed static/style.css
 var Style []byte
+
+//go:embed static/icon.svg
+var Icon []byte

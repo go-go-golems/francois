@@ -1,18 +1,32 @@
 {
-  "name": "francois", "private": true, "type": "module",
+  "name": "francois",
+  "private": true,
+  "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --import tsx tests/contracts.test.ts",
+    "fmt": "prettier --write ui/src worker/src tests scripts/*.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
     "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@reduxjs/toolkit": "^2.9.0",
-    "react": "^19.1.1", "react-dom": "^19.1.1", "react-redux": "^9.2.0"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-redux": "^9.2.0"
   },
   "devDependencies": {
-    "@types/node": "^24.5.0", "@types/react": "^19.1.13", "@types/react-dom": "^19.1.9",
-    "esbuild": "^0.28.1", "typescript": "^5.9.2", "tsx": "^4.20.5"
+    "@types/node": "^24.5.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "esbuild": "^0.28.1",
+    "prettier": "3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=24"
   }
 }

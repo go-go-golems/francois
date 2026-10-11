@@ -4,12 +4,14 @@ package host
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,7 +42,7 @@ type View struct {
 	events        chan any
 	calls         map[string]*call
 	subscriptions map[string]json.RawMessage
-	presence      map[string]any
+	presence      map[string]map[string]any
 	rooms         map[string]bool
 }
 type call struct {
@@ -61,6 +63,7 @@ type Host struct {
 	servers     []*http.Server
 	artifacts   map[string]string
 	active      chan struct{}
+	queued      chan struct{}
 }
 
 func New(ctx context.Context, s *store.Store, b piworker.Backend, root string) (*Host, error) {
@@ -70,7 +73,7 @@ func New(ctx context.Context, s *store.Store, b piworker.Backend, root string) (
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
-	return &Host{Store: s, Backend: b, Owner: owner, ProjectRoot: root, ctx: ctx, cancel: cancel, group: g, views: map[string]*View{}, artifacts: map[string]string{}, active: make(chan struct{}, 2)}, nil
+	return &Host{Store: s, Backend: b, Owner: owner, ProjectRoot: root, ctx: ctx, cancel: cancel, group: g, views: map[string]*View{}, artifacts: map[string]string{}, active: make(chan struct{}, 2), queued: make(chan struct{}, 10)}, nil
 }
 func (h *Host) Run(listen string) error {
 	defer func() {
@@ -177,7 +180,7 @@ func (h *Host) Handler(artifact, address string) http.Handler {
 	})
 }
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<20)
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(dst); err != nil {
 		return err
@@ -257,6 +260,16 @@ func (h *Host) sample(w http.ResponseWriter, r *http.Request, artifact string) {
 		fail(w, 400, "invalid_request", err.Error())
 		return
 	}
+	if len(req.Images) > 0 {
+		var declaration struct {
+			Images bool `json:"images"`
+		}
+		_ = json.Unmarshal(a.Manifest["sample"], &declaration)
+		if !declaration.Images {
+			fail(w, 400, "images_unavailable", "Images are not declared")
+			return
+		}
+	}
 	if req.CallID == "" || len(req.CallID) > 100 {
 		fail(w, 400, "invalid_request", "Invalid call id")
 		return
@@ -266,9 +279,9 @@ func (h *Host) sample(w http.ResponseWriter, r *http.Request, artifact string) {
 		return
 	}
 	select {
-	case h.active <- struct{}{}:
+	case h.queued <- struct{}{}:
 	default:
-		fail(w, 429, "rate_limited", "Two model calls are already active")
+		fail(w, 429, "rate_limited", "The model request queue is full")
 		return
 	}
 	ctx, cancel := context.WithTimeout(v.ctx, 5*time.Minute)
@@ -280,14 +293,21 @@ func (h *Host) sample(w http.ResponseWriter, r *http.Request, artifact string) {
 	if !v.connected || v.calls[req.CallID] != nil {
 		v.mu.Unlock()
 		cancel()
-		<-h.active
+		<-h.queued
 		fail(w, 409, "invalid_request", "View disconnected or call id already active")
 		return
 	}
 	v.calls[req.CallID] = c
 	v.mu.Unlock()
 	h.group.Go(func() error {
-		defer func() { cancel(); <-h.active; v.mu.Lock(); delete(v.calls, req.CallID); v.mu.Unlock() }()
+		defer func() { cancel(); <-h.queued; v.mu.Lock(); delete(v.calls, req.CallID); v.mu.Unlock() }()
+		select {
+		case h.active <- struct{}{}:
+			defer func() { <-h.active }()
+		case <-ctx.Done():
+			v.emit(piworker.Event{Type: "error", CallID: req.CallID, Error: &piworker.Failure{Code: "cancelled", Message: "Stopped while queued"}})
+			return nil
+		}
 		settled := false
 		emit := func(e piworker.Event) {
 			if settled {
@@ -338,7 +358,24 @@ func (h *Host) sample(w http.ResponseWriter, r *http.Request, artifact string) {
 	w.WriteHeader(http.StatusAccepted)
 	respond(w, map[string]string{"callId": req.CallID})
 }
+
+var toolName = regexp.MustCompile(`^[-A-Za-z0-9_]{1,128}$`)
+
 func validateSample(r piworker.Request) error {
+	if len(r.Images) > 4 {
+		return errors.New("At most four images")
+	}
+	total := 0
+	for _, image := range r.Images {
+		raw, err := base64.StdEncoding.DecodeString(image.Data)
+		if err != nil || image.MimeType != "image/jpeg" || len(raw) == 0 {
+			return errors.New("Invalid prepared image")
+		}
+		total += len(raw)
+	}
+	if total > 8<<20 {
+		return errors.New("Prepared images exceed 8 MiB")
+	}
 	var text string
 	if json.Unmarshal(r.Input, &text) != nil {
 		var turns []struct {
@@ -364,13 +401,22 @@ func validateSample(r piworker.Request) error {
 	if r.Options.ModelTier != "quick" && r.Options.ModelTier != "default" && r.Options.ModelTier != "complex" {
 		return errors.New("Invalid model tier")
 	}
+	if r.Options.Effort != "" && r.Options.Effort != "low" && r.Options.Effort != "medium" && r.Options.Effort != "high" {
+		return errors.New("Invalid effort")
+	}
 	if len(r.Tools) > 16 {
 		return errors.New("At most 16 tools")
 	}
 	names := map[string]bool{}
 	for _, t := range r.Tools {
-		if t.Name == "" || len(t.Name) > 128 || names[t.Name] || len(t.Description) > 1024 || len(t.InputSchema) > 4096 {
+		if !toolName.MatchString(t.Name) || names[t.Name] || len(t.Description) > 1024 || len(t.InputSchema) > 4096 {
 			return errors.New("Invalid tool descriptor")
+		}
+		if len(t.InputSchema) > 0 {
+			var schema map[string]any
+			if json.Unmarshal(t.InputSchema, &schema) != nil || schema["type"] != "object" {
+				return errors.New("Tool schema must describe an object")
+			}
 		}
 		names[t.Name] = true
 	}

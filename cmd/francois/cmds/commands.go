@@ -175,7 +175,7 @@ func (m *Models) RunIntoGlazeProcessor(ctx context.Context, p *values.Values, ou
 	}
 	defer func() { _ = b.Close() }()
 	for _, model := range b.Models() {
-		if err = out.AddRow(ctx, types.NewRow(types.MRP("provider", model.Provider), types.MRP("id", model.ID), types.MRP("name", model.Name), types.MRP("tier", model.Tier), types.MRP("reasoning", model.Reasoning), types.MRP("images", model.Images))); err != nil {
+		if err = out.AddRow(ctx, types.NewRow(types.MRP("provider", model.Provider), types.MRP("id", model.ID), types.MRP("name", model.Name), types.MRP("tier", model.Tier), types.MRP("reasoning", model.Reasoning), types.MRP("images", model.Images), types.MRP("thinking_levels", model.ThinkingLevels))); err != nil {
 			return err
 		}
 	}

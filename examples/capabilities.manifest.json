@@ -1,0 +1,21 @@
+{
+  "sample": {
+    "images": true
+  },
+  "db": {},
+  "user": {
+    "scopes": ["profile"]
+  },
+  "room": {
+    "topics": {
+      "reaction": "interact"
+    }
+  },
+  "comments": {},
+  "downloads": true,
+  "assets": {},
+  "artifact": {},
+  "files": {
+    "project": "local"
+  }
+}

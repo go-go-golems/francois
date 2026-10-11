@@ -175,3 +175,32 @@ func TestRootedFilesDenyTraversalAndSymlink(t *testing.T) {
 		t.Fatalf("wrong range: %s", data)
 	}
 }
+
+func TestProjectDownloadStreamsBeyondReadChunkLimit(t *testing.T) {
+	h, server := setup(t)
+	dir := t.TempDir()
+	h.ProjectRoot = dir
+	f, err := os.Create(filepath.Join(dir, "large.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const size = int64(25<<20) + 3
+	if err = f.Truncate(size); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	response, err := server.Client().Get(server.URL + "/api/files?path=large.txt&download=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	count, err := io.Copy(io.Discard, response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != size {
+		t.Fatalf("download truncated: %d, want %d", count, size)
+	}
+}

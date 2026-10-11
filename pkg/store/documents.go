@@ -25,6 +25,7 @@ type Filter struct {
 	Value any    `json:"value"`
 }
 type Query struct {
+	Owner     string   `json:"-"`
 	Path      string   `json:"path"`
 	Filters   []Filter `json:"filters"`
 	Order     string   `json:"order"`
@@ -144,6 +145,12 @@ func (s *Store) Query(ctx context.Context, artifact string, q Query) ([]Document
 		var body string
 		if err = rows.Scan(&d.Path, &body, &d.Version); err != nil {
 			return nil, err
+		}
+		if q.Owner != "" && strings.HasPrefix(d.Path, "data/users/") {
+			parts := strings.Split(d.Path, "/")
+			if len(parts) < 3 || parts[2] != q.Owner {
+				continue
+			}
 		}
 		if !strings.HasPrefix(d.Path, q.Path+"/") {
 			continue

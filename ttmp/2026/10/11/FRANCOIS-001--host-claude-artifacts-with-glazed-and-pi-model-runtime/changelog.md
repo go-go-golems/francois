@@ -15,3 +15,7 @@ Initialized francois from local go-template revision 5bf14bfd; captured four API
 ## 2026-10-11
 
 Implemented local host commands, isolated artifact origins, embedded minimalist library, view event transport, and Pi worker; verified the actual POLIS browser eval round trip with deterministic backend. Persistent capability coverage and real inference validation continue.
+
+## 2026-10-11
+
+Verified real Pi streaming and POLIS scene edits; completed the tested localhost capability surface, image preprocessing, shared cancellation, persistent state, rooms/comments, CI, and local worker packaging. Platform-specific and underspecified extensions remain explicit open follow-ups.

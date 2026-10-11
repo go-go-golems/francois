@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -142,6 +143,21 @@ func (h *Host) readFile(w http.ResponseWriter, r *http.Request, artifact string)
 	before, err := f.Stat()
 	if err != nil || !before.Mode().IsRegular() || before.Size() > 512<<20 {
 		fail(w, 400, "bad_request", "Not a readable regular file")
+		return
+	}
+	if r.URL.Query().Get("meta") == "1" {
+		respond(w, map[string]any{"filename": path.Base(name), "size": before.Size()})
+		return
+	}
+	if r.URL.Query().Get("download") == "1" {
+		switch strings.ToLower(path.Ext(name)) {
+		case ".exe", ".js", ".bat", ".sh", ".cmd", ".ps1", ".msi":
+			fail(w, 400, "bad_request", "Program downloads are not enabled")
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(name)}))
+		_, _ = io.Copy(w, f)
 		return
 	}
 	// Hash the opened inode so revision identifies the full byte sequence across chunks.
