@@ -5,8 +5,8 @@
 - [x] Capture four latest Markdown API guides and POLIS source with hashes <!-- t:9d1a -->
 - [x] Write detailed analysis design and intern implementation guide <!-- t:s4rd -->
 - [x] Upload guide to reMarkable <!-- t:8br1 -->
-- [ ] Phase 1: Implement Glazed serve/import/models commands and lifecycle <!-- t:zi83 -->
-- [ ] Phase 2: Serve POLIS with embedded runtime and deterministic browser tool bridge <!-- t:ztdd -->
+- [x] Phase 1: Implement Glazed serve/import/models commands and lifecycle <!-- t:zi83 -->
+- [x] Phase 2: Serve POLIS with embedded runtime and deterministic browser tool bridge <!-- t:ztdd -->
 - [ ] Phase 3: Implement pinned Pi worker and real streaming tool rounds <!-- t:8qod -->
 - [ ] Phase 4: Complete sample contract and isolate multi-artifact origins <!-- t:ve1h -->
 - [ ] Phase 5: Implement SQLite documents rules subscriptions leases and publishing <!-- t:fsir -->

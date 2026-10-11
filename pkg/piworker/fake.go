@@ -1,0 +1,40 @@
+package piworker
+
+import (
+	"context"
+	"encoding/json"
+)
+
+// Fake is an explicitly selected deterministic backend for offline verification.
+type Fake struct{}
+
+var _ Backend = (*Fake)(nil)
+
+func (f *Fake) Models() []Model {
+	return []Model{{Provider: "test", ID: "fake", Name: "Deterministic test model", Tier: "all"}}
+}
+func (f *Fake) Close() error { return nil }
+func (f *Fake) Sample(ctx context.Context, r Request, emit func(Event), execute ExecuteTool) error {
+	text := "Francois is connected."
+	if len(r.Tools) > 0 {
+		args := json.RawMessage(`{}`)
+		if r.Tools[0].Name == "eval" {
+			args = json.RawMessage(`{"code":"ide.presets.save('Francois test', ide.code()); return {saved: 'Francois test'};"}`)
+		}
+		result, err := execute(ctx, Event{Type: "tool", CallID: r.CallID, ToolCallID: "fake-tool", Name: r.Tools[0].Name, Input: args})
+		if err != nil {
+			return err
+		}
+		if result.IsError {
+			text = "The browser tool reported an error."
+		} else {
+			text = "The browser tool completed successfully."
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	emit(Event{Type: "text", CallID: r.CallID, Text: text, Delta: text})
+	emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier}})
+	return nil
+}

@@ -19,3 +19,8 @@ dist/
 .env
 .envrc
 .history
+node_modules/
+var/
+worker/dist/
+coverage/
+.playwright-mcp/

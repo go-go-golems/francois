@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-go-golems/francois/cmd/francois/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/logging"
 	"github.com/go-go-golems/glazed/pkg/help"
 	help_cmd "github.com/go-go-golems/glazed/pkg/help/cmd"
@@ -26,6 +27,9 @@ func run(ctx context.Context) error {
 		return errors.Wrap(err, "configure logging")
 	}
 	help_cmd.SetupCobraRootCommand(help.NewHelpSystem(), root)
+	if err := cmds.Register(root); err != nil {
+		return errors.Wrap(err, "register commands")
+	}
 	return root.ExecuteContext(ctx)
 }
 

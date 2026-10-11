@@ -162,3 +162,72 @@ Use the baseline commit for comparison. Subsequent diary entries describe actual
 ### Technical details
 
 Go owns HTTP/storage; TypeScript owns the Pi worker and browser runtime; React/Redux/RTK Query own the host UI. All static resources are served under /static/.
+
+## Step 4: Implement the local host and prove POLIS browser tools
+
+The repository now has a functioning artifact library, isolated artifact origins, persistent imports/versions, view-owned SSE calls, a pinned Pi worker, and an embedded React UI styled from Factory Twin. A browser experiment opened the actual POLIS source and executed its eval callback through Go, saving a new preset before receiving the final model result.
+
+### Prompt Context
+
+See Step 3 for the implementation request. The user also asked: “how could we map the claude sample API to allow the richer model selection, or would that already be possible?” Existing `sample(...,{model,effort})` supports Pi provider/model selectors; tier flags remain the fallback. `/api/models` supplies safe picker metadata.
+**Commit (previous baseline):** ccde05d — Initialize Francois template and artifact host research ticket.
+
+### What I did
+
+- Added Glazed serve, import, and models-list commands with tagged settings and structured model output.
+- Added SQLite artifacts, immutable source versions, document operations, leases, assets, and comment records.
+- Added loopback-only HTTP listeners: the library and each artifact have distinct ports, with Host and Origin validation.
+- Implemented runtime injection before authored scripts, shared SSE transport, browser-owned tools, cancellation, cache/JSON helpers, capability namespaces, and a comments shell.
+- Added a TypeScript Node worker using Pi ModelRuntime 0.85.1, its settings/model resolver, and complete provider continuation messages. No coding-agent bash/read/write/edit tools are loaded.
+- Added React/Redux/RTK Query library and import UI with reference-derived CSS tokens.
+- Added deterministic backend and tests for the call/tool boundary, storage conflicts/durability, rooted file ranges, and browser contract helpers.
+
+### Why
+
+The first milestone must exercise an actual page callback rather than stop at a text proxy. One event stream per view and a private NDJSON worker pipe keep callback ownership and provider authentication explicit. Separate artifact ports preserve localStorage isolation without changing imported application code.
+
+### What worked
+
+- Go tests passed, including an SSE/tool-result integration test.
+- TypeScript check and browser bundles passed. Direct `node --import tsx tests/contracts.test.ts` reported three passing contract tests.
+- Lint passed with zero issues after addressing unchecked Close calls, an unused type, and a predeclared name.
+- The actual POLIS page rendered its scene, reported sample tools available, and executed the fake model's eval exactly once. `PolisIDE.presets.list()` then contained `Francois test`; the model result was “The browser tool completed successfully.”
+- Real Pi model discovery succeeded using existing config/auth, without a paid inference request. The enabled scope selected openai-codex/gpt-6-astra for all tiers in the no-override configuration. This is visible model selection, not an assumption that tier labels imply distinct Claude models.
+
+### What didn't work
+
+- TypeScript initially rejected agent thinking level `off` as a model-stream reasoning level. Recovery maps off to undefined and marks worker initialization explicitly.
+- A new view response referred to the removed variable `a`; Go reported `pkg/host/routes.go:129:56: undefined: a`. Recovery returns the actual loaded version and binds publishing to that baseline.
+- A path test incorrectly treated `../bad` as an invalid JSON-document path. Document path segments allow dots and do not access the filesystem; the test was corrected, while project files continue to reject traversal.
+- The first command-output test captured Cobra's writer, but Glazed serialized to stdout, leaving an empty JSON buffer. The test now captures stdout explicitly.
+- Socket tests failed under the sandbox with `listen tcp6 [::1]:0: socket: operation not permitted`; the same authorized integration tests passed with loopback access.
+- Initial lint found unchecked Close calls and an unused config type. Those findings were fixed together, then lint passed.
+- The template baseline contained trailing whitespace in three workflow files. It was recorded by diff-check and removed in this implementation milestone.
+
+### What I learned
+
+Pi's stream type does not use the coding agent's `off` string. The model catalog exposes reasoning and image capabilities but does not expose a general tool-support boolean, so provider/tool behavior still needs real integration verification.
+
+### What was tricky to build
+
+The SSE handler must register a view before its call arrives, and tool results must resolve only that call's waiters. Page versions are supplied from the injected bootstrap, not replaced with the newest database version when creating a view. Tool children must be cancelled before waiting for their goroutines on terminal provider events.
+
+### What warrants a second pair of eyes
+
+Review cancellation/partial-text semantics, subscription optimism, same-person/different-tab room stamps, and initial versus reconnect view cleanup. Later phases still need browser acceptance evidence; presence of methods is not proof that every supplied contract detail is complete.
+
+### What should be done in the future
+
+Run real-provider streaming/tool smoke tests, add persistent capability fixtures and multi-tab tests, finish distribution/CI help, and update the support matrix to tested behavior. Image sampling, SVG upload, artifact files-form publish, custom comment anchors, and Claude-session/MCP integration remain explicitly unavailable.
+
+### Code review instructions
+
+Start with `pkg/host/server.go`, `pkg/host/routes.go`, `pkg/piworker/client.go`, `worker/src/main.ts`, and `ui/src/runtime.ts`. Review store transactions in `pkg/store`, then inspect the embedded host UI and browser helper tests. Run Go tests with writable cache and loopback access, plus pnpm check/build/test and lint.
+
+### Technical details
+
+Browser verification used a tmux server with backend fake, library at 127.0.0.1:8080, and POLIS at its persisted loopback port. All test data is under /tmp. Paid requests were not used for this milestone. Source snapshots remain immutable.
+
+### Generation checkpoint correction
+
+After the initial tests/lint passed, logcopter generation added the host package logger. The subsequent build reported `pkg/host/logcopter.go:7:5: log already declared through import of package log`. The milestone commit raced that final build result. I removed the redundant zerolog/log import and used the generated package logger, reran the affected build/tests, and amended the unpushed milestone. This failure shows why generation must precede final code validation.
