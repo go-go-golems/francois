@@ -51,6 +51,21 @@ Explicit `effort` takes precedence. `/api/models` includes supported thinking le
 Unavailable explicit models fall back to the tier; `modelApplied` identifies a
 successful explicit selection. The owner’s Pi account pays for all model calls.
 
+## POLIS model selection
+
+`examples/polis.html` is the editable POLIS application with model and thinking
+selectors. The ticket's imported HTML remains an unchanged source snapshot.
+Import this example with `--manifest examples/polis.manifest.json`.
+The model selector offers `lunaroute/glm-5.3-flash` (low/medium/high) and
+`lunaroute/deepseek-4.1-flash` (low/high/xhigh), persisting both choices in the
+artifact's localStorage. It sends the selected thinking level as a Pi model suffix.
+The configured gateway maps GLM medium to high and DeepSeek xhigh to high.
+
+The worker registers LunaRoute's provider using Pi's cached `models-store.json`
+catalog and existing Pi credentials, including its OAuth-stored gateway key.
+Log in and refresh the catalog through Pi first; Francois does not load the
+LunaRoute extension's MCP, web tools, settings UI, or login workflow.
+
 ## Capabilities
 
 Import accepts `--manifest capabilities.json`, or a manifest in the library UI.

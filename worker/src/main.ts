@@ -1,3 +1,4 @@
+import { registerLunaroute } from "./lunaroute";
 import { createInterface } from "node:readline";
 import { join } from "node:path";
 import {
@@ -58,6 +59,7 @@ async function init(config: Init) {
     allowModelNetwork: false,
     signal: AbortSignal.timeout(15_000),
   });
+  await registerLunaroute(runtime, config.agentDir);
   const settings = SettingsManager.create(config.cwd, config.agentDir);
   const configuredThinking = settings.getDefaultThinkingLevel();
   baseline = configuredThinking === "off" ? undefined : configuredThinking;

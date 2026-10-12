@@ -357,3 +357,60 @@ Inspect Client.Models, the host's pre-call readiness check, and the invalid-fram
 ### Technical details
 
 Preview runs in tmux session francois-preview on 127.0.0.1:8080 with Node 24 and explicit openai-codex/gpt-6-luna tier mappings. Artifact ports and SQLite identity are persisted in var/francois. No secret values or var data are committed.
+
+## Step 7: Add POLIS LunaRoute model and thinking selection
+
+POLIS now has separate model and thinking selectors for the requested LunaRoute models. The editable application is `examples/polis.html`; the original imported source snapshot is unchanged. The locally imported POLIS application was advanced from version 1 to version 2, preserving its existing port, identity, and original HTML version.
+
+Validation exposed that LunaRoute's cached models and OAuth credential require provider registration normally supplied by its Pi extension. The worker now registers only the provider's cached catalog and key semantics, without loading extension commands, MCP, web tools, or login UI. Both requested models completed real browser requests with their exact selectors reported in `modelApplied`.
+
+### Prompt Context
+**User prompt (verbatim):** "add selection model for polis ide which is lunaroute / glm-5.3-flash low / medium / high thinking, and also deepseek4.1 low / high / xhigh (i think)"
+**Assistant interpretation:** Add persistent browser controls for these two authenticated models and their specified thinking levels, and verify actual provider selection.
+**Inferred user intent:** Choose the model used by POLIS's assistant directly rather than using Claude-branded tier names.
+
+### What I did
+- Added model/thinking state, persisted settings, valid-level normalization on model changes, and two selectors to `examples/polis.html`.
+- Send the selected thinking level in the existing Pi model selector suffix; show applied model metadata on completed replies.
+- Added `worker/src/lunaroute.ts` and invoked its provider registration before discovering available models.
+- Used Pi's existing cached model catalog, provider base URL, and SDK credential resolution. OAuth access-key and no-op refresh behavior follow installed `@lunaroute/pi-extension` 0.7.2 `src/login.ts`.
+- Published the editable HTML to the existing local POLIS artifact; restarted the preview in tmux with GLM quick/default and DeepSeek complex mappings.
+- Documented setup and thinking mappings in README.
+
+### Why
+The original POLIS interface selected generic tiers and labeled them Haiku/Sonnet/Opus. Explicit provider/model suffixes already exist in Francois, so this change uses that path without changing the sampling contract. LunaRoute registration is necessary for the SDK to interpret its OAuth-stored gateway key and restore its dynamic catalog.
+
+### What worked
+- Inline HTML scripts passed Node syntax checks.
+- `pnpm check`, `pnpm test` (four passing contracts), and `pnpm build` succeeded.
+- Browser controls expose GLM low/medium/high and DeepSeek low/high/xhigh. Switching from GLM medium to DeepSeek normalizes to low, and reload restored DeepSeek xhigh.
+- Live request `lunaroute/glm-5.3-flash:low` returned `connected` and the identical `modelApplied`.
+- Live request `lunaroute/deepseek-4.1-flash:xhigh` returned `connected` and the identical `modelApplied`.
+- Preview startup reports lunaroute GLM quick/default and DeepSeek complex; listener is 127.0.0.1:8080 and POLIS remains on port 33921.
+
+### What didn't work
+- Initial `go run ./cmd/francois models list --format json` under restricted access failed with `EROFS: read-only file system, mkdir '/home/manuel/.pi/agent/auth.json.lock'`. The authorized retry allowed SDK lock creation.
+- The initial authenticated catalog contained no available lunaroute models. Direct ModelRuntime diagnostics showed only older static lunaroute entries and `available: []`. Reading cached catalog metadata established that the new models depend on the extension provider registration; the focused registration resolved this.
+- An attempted new tmux preview exited because the existing preview was already running. Inspected the active listener, stopped it using `lsof-who -p 8080 -k`, and restarted the existing preview session.
+- pnpm warns its launcher uses Node 20 although the runtime server explicitly uses Node 24. TypeScript/build/contracts succeeded; live calls used Node 24.
+
+### What I learned
+Pi model cache presence does not alone establish provider availability. Extension-defined OAuth providers need their provider registration even when authentication and catalog files already exist.
+
+### What was tricky to build
+GLM medium maps to provider high; DeepSeek xhigh also maps to high in the user's cached gateway model metadata. The controls retain the requested Pi levels while the existing SDK performs that mapping. Model changes must normalize a previously saved thinking level before the next sample.
+
+### What warrants a second pair of eyes
+Review provider registration against the installed extension's current key semantics if LunaRoute changes its authentication format. This integration intentionally restores the existing catalog offline; refresh and login remain Pi operations.
+
+### What should be done in the future
+Refresh the catalog in Pi when gateway models change. Additional model UI choices can use the same existing selector contract.
+
+### Code review instructions
+Start with `examples/polis.html` at MODELS, selectedThinking, sendToAgent, and Agent. Then review `worker/src/lunaroute.ts` and initialization in `worker/src/main.ts`. Compare the editable HTML against the unchanged ticket source to see the bounded application changes. Verify dropdown persistence at http://127.0.0.1:33921.
+
+### Technical details
+- Selectors: `lunaroute/glm-5.3-flash:<low|medium|high>` and `lunaroute/deepseek-4.1-flash:<low|high|xhigh>`.
+- Persisted fields: `model` and `thinking` within the existing `polis-ide.v1` localStorage record.
+- Provider catalog: `~/.pi/agent/models-store.json`; credential lookup remains private to Pi ModelRuntime.
+- No credential values or local database contents were added to tracked files.
