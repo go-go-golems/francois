@@ -37,6 +37,7 @@ type Request struct {
 	Tools   []Tool          `json:"tools,omitempty"`
 }
 type Result struct {
+	Thinking         string  `json:"thinking,omitempty"`
 	FinalText        *string `json:"finalText,omitempty"`
 	Text             string  `json:"text"`
 	Truncated        bool    `json:"truncated"`

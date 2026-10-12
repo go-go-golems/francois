@@ -414,3 +414,59 @@ Start with `examples/polis.html` at MODELS, selectedThinking, sendToAgent, and A
 - Persisted fields: `model` and `thinking` within the existing `polis-ide.v1` localStorage record.
 - Provider catalog: `~/.pi/agent/models-store.json`; credential lookup remains private to Pi ModelRuntime.
 - No credential values or local database contents were added to tracked files.
+
+## Step 8: Stream provider thinking into the POLIS UI
+
+Provider thinking now travels independently of answer text from Pi's worker through Go's event stream into POLIS. A collapsible panel opens when thinking arrives, updates during generation, auto-scrolls within its bounded height, and remains available after the answer finishes.
+
+The browser extension adds `onThinking({text, delta})` and a separate `result.thinking` value. Thinking is not inserted into user-visible answer text, JSON parsing input, or the conversation history sent by POLIS. Shared requests and memory cache replay carry the thinking channel as well.
+
+### Prompt Context
+**User prompt (verbatim):** "stream the thinking in the UI as well so I can see it"
+**Assistant interpretation:** Expose model-emitted thinking as a live, distinct UI stream and preserve it alongside completed replies.
+**Inferred user intent:** Observe model progress and reasoning output while waiting for POLIS's assistant response.
+
+### What I did
+- Forwarded SDK `thinking_delta` events as cumulative `thinking` frames with deltas in `worker/src/main.ts`; separate rounds use blank-line separators.
+- Added the terminal thinking field to Go's worker result structure. Existing host/client event forwarding carries the new frame type unchanged.
+- Added validated browser `onThinking` callbacks, 200 ms coalescing, terminal/tool/cancellation flushing, shared-flight replay, and cached thinking replay in `ui/src/runtime.ts`.
+- Rendered an expandable thinking section using plain React text, with automatic scrolling and separate answer content in `examples/polis.html`.
+- Added a private-pipe test verifying that thinking events and terminal thinking survive transport without changing answer text.
+- Published local POLIS version 3 and restarted the Node 24 preview.
+
+### Why
+Pi already emits typed thinking deltas. A distinct channel keeps answer streaming, JSON extraction, and tool-call positions intact; concatenating thinking into answer text would change those semantics. Callback throttling bounds rendering frequency while flushing preserves the final partial chunk.
+
+### What worked
+- TypeScript check, four existing Node contracts, browser build, and focused worker tests passed.
+- Inline POLIS scripts passed Node syntax validation.
+- A real DeepSeek low request rendered both a thinking panel and a separate final answer.
+- A real GLM high request produced 44 observed chat DOM updates, with thinking updates while the Stop button was present. Its thinking panel retained 2,000 characters after completion and its answer remained separate.
+- Clicking the thinking summary collapsed the panel without affecting the final answer.
+- Non-host packages passed the broad Go run; host tests were retried with authorized loopback access after the sandbox listener denial.
+
+### What didn't work
+`GOCACHE=/tmp/francois-go-cache GOWORK=off go test ./...` could not run host integration listeners under restricted access: `httptest: failed to listen on a port: listen tcp6 [::1]:0: socket: operation not permitted`. This was an environment restriction, not an application assertion failure; the focused host suite was retried with socket access and passed (`ok github.com/go-go-golems/francois/pkg/host`).
+
+A short arithmetic request completed too quickly to demonstrate a visible intermediate thinking state. A longer GLM request established that the panel changes while generation is active rather than appearing only at completion.
+
+### What I learned
+Both configured gateway models emit Pi thinking events. Very short responses can arrive within one UI coalescing interval, so a completed panel alone is insufficient evidence of live rendering.
+
+### What was tricky to build
+Thinking needs its own buffer, timer, and replay state alongside text. New subscribers to a shared flight must receive the existing thinking prefix, and terminal/cancel/tool transitions must flush pending callbacks before settling the call.
+
+### What warrants a second pair of eyes
+Review callback propagation and shared-flight replay in `ui/src/runtime.ts`, especially cancellation flushing. Providers that do not emit thinking deltas naturally leave the panel absent.
+
+### What should be done in the future
+No additional feature is required for this request. Future provider integrations should preserve typed thinking events rather than parsing them from answer strings.
+
+### Code review instructions
+Start with `worker/src/main.ts` at thinking_delta, `pkg/piworker/backend.go` Result, `ui/src/runtime.ts` rawCall/invoke, and the Thinking component in `examples/polis.html`. Run `pnpm check`, `pnpm test`, and `go test ./pkg/piworker`; browser validation used http://127.0.0.1:33921.
+
+### Technical details
+- Event frame: `{type:"thinking", callId, text, delta}`.
+- Browser callback: `onThinking({text, delta})`; result field: `thinking`.
+- UI: open collapsible details, 260 px maximum content height, plain text with preserved whitespace.
+- No new SDK dependency, provider option, credential exposure, or thinking-history persistence was added.

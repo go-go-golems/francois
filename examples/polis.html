@@ -1,4 +1,7 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.reasoning { margin: 8px 0; padding: 9px 12px; border: 1px solid var(--line, #e3e6ea); border-radius: 8px; background: var(--panel, #f6f7f9); }
+.reasoning summary { cursor: pointer; font-size: 12px; opacity: .75; }
+.reasoning-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; margin-top: 8px; font-size: 12px; line-height: 1.55; }
+</style></head><body>
 <title>Polis IDE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3200,7 +3203,7 @@ async function sendToAgent(text) {
   text = String(text || '').trim();
   if (!text || S.busy || !SAMPLE) return;
   const history = historyTurns();
-  const user = { id: ++msgId, role: 'user', text }, msg = { id: ++msgId, role: 'assistant', text: '', calls: [], status: 'thinking', tier: null, error: null };
+  const user = { id: ++msgId, role: 'user', text }, msg = { id: ++msgId, role: 'assistant', text: '', thinking: '', calls: [], status: 'thinking', tier: null, error: null };
   set({ chat: S.chat.concat([user, msg]), busy: true, tab: 'agent' });
   const ctl = CTL = new AbortController();
   const turns = [{ role: 'user', content: D.AGENT_RULES + '<api>\n' + D.DOCS + '\n</api>' }].concat(history, [{ role: 'user', content: text + '\n\n' + ideState() }]);
@@ -3219,8 +3222,8 @@ async function sendToAgent(text) {
     },
   };
   try {
-    const res = await SAMPLE(turns, { tools: [tool], modelTier: S.tier, model: selectedModel().v + ':' + selectedThinking(), signal: ctl.signal, onText: ({ text: t }) => { msg.text = t; msg.status = 'writing'; bump(); } });
-    msg.text = res.text; msg.tier = res.modelTierApplied; msg.model = res.modelApplied || null; msg.truncated = res.truncated; msg.status = 'done';
+    const res = await SAMPLE(turns, { tools: [tool], modelTier: S.tier, model: selectedModel().v + ':' + selectedThinking(), signal: ctl.signal, onThinking: ({ text: t }) => { msg.thinking = t; bump(); }, onText: ({ text: t }) => { msg.text = t; msg.status = 'writing'; bump(); } });
+    msg.text = res.text; msg.thinking = res.thinking || msg.thinking; msg.tier = res.modelTierApplied; msg.model = res.modelApplied || null; msg.truncated = res.truncated; msg.status = 'done';
   } catch (e) {
     if (e && e.code === 'refused') msg.text = ''; else if (e && typeof e.text === 'string') msg.text = e.text;
     msg.status = e && e.code === 'cancelled' ? 'stopped' : 'error';
@@ -3401,6 +3404,7 @@ function Reply({ m }) {
   return html`
     <div class="msg agent">
       <span class="who">Agent${tierLabel ? html` <i class="tier">${tierLabel}</i>` : null}</span>
+      ${m.thinking ? html`<${Thinking} text=${m.thinking} active=${m.status === 'thinking'} />` : null}
       ${parts.map((p, k) => p.call ? html`<${Call} key=${'c' + k} c=${p.call} />` : html`<div key=${'t' + k} class="bubble">${renderText(p.t)}</div>`)}
       ${m.status === 'thinking' && !m.calls.length ? html`<div class="bubble thinking">Thinking…</div>` : null}
       ${m.status === 'thinking' && m.calls.length ? html`<div class="bubble thinking">Working…</div>` : null}
@@ -3408,6 +3412,11 @@ function Reply({ m }) {
       ${m.error ? html`<div class="meta err">${m.error}</div>` : null}
       ${m.truncated ? html`<div class="meta">The answer was cut short. Ask for less at a time.</div>` : null}
     </div>`;
+}
+function Thinking({ text, active }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [text]);
+  return html`<details class="reasoning" open><summary>Thinking${active ? '…' : ''}</summary><div class="reasoning-text" ref=${ref}>${text}</div></details>`;
 }
 function renderText(t) {
   // light formatting: `code`, **bold**, paragraphs

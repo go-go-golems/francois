@@ -139,10 +139,12 @@ type Options = {
   cache?: boolean | { gcTime?: number; refresh?: boolean };
   signal?: AbortSignal;
   onText?: (e: { text: string; delta: string }) => void;
+  onThinking?: (e: { text: string; delta: string }) => void;
   tools?: Tool[];
   images?: unknown;
 };
 type Result = {
+  thinking?: string;
   text: string;
   finalText?: string;
   truncated: boolean;
@@ -170,6 +172,11 @@ function capture(input: unknown, options: Options) {
     throw error("invalid_request", "Invalid abort signal");
   if (options.onText !== undefined && typeof options.onText !== "function")
     throw error("invalid_request", "Invalid text callback");
+  if (
+    options.onThinking !== undefined &&
+    typeof options.onThinking !== "function"
+  )
+    throw error("invalid_request", "Invalid thinking callback");
   if (
     options.modelTier !== undefined &&
     !["quick", "default", "complex"].includes(options.modelTier)
@@ -237,6 +244,7 @@ function capture(input: unknown, options: Options) {
     callbacks,
     signal: options.signal,
     onText: options.onText,
+    onThinking: options.onThinking,
     ttl: Math.min(ttl, 86400000),
     cache: !tools.length && policy !== false,
     refresh: typeof policy === "object" && policy.refresh === true,
@@ -250,18 +258,31 @@ function safeText(
   try {
     callback?.(event);
   } catch (e) {
-    console.error("sample onText failed", e);
+    console.error("sample stream callback failed", e);
   }
 }
 function rawCall(
   c: Captured,
   signal: AbortSignal,
   onText: Options["onText"],
+  onThinking: Options["onThinking"],
   images: { mimeType: string; data: string }[],
 ): Promise<Result> {
   return new Promise(async (resolve, reject) => {
     let text = "";
     let delivered = "";
+    let thinking = "",
+      thinkingDelivered = "";
+    let thinkingTimer: ReturnType<typeof setTimeout> | undefined;
+    const flushThinking = () => {
+      clearTimeout(thinkingTimer);
+      thinkingTimer = undefined;
+      if (thinking !== thinkingDelivered) {
+        const delta = thinking.slice(thinkingDelivered.length);
+        thinkingDelivered = thinking;
+        safeText(onThinking, { text: thinking, delta });
+      }
+    };
     let textTimer: ReturnType<typeof setTimeout> | undefined;
     const flushText = () => {
       clearTimeout(textTimer);
@@ -279,6 +300,7 @@ function rawCall(
       if (done) return;
       done = true;
       flushText();
+      flushThinking();
       signal.removeEventListener("abort", abort);
       for (const child of children) child.abort();
       active.delete(callId);
@@ -296,6 +318,10 @@ function rawCall(
     active.set(callId, {
       fail: (e) => settle(() => reject({ ...e, ...(text ? { text } : {}) })),
       event: (e) => {
+        if (e.type === "thinking") {
+          thinking = e.text;
+          if (!thinkingTimer) thinkingTimer = setTimeout(flushThinking, 200);
+        }
         if (e.type === "text") {
           text = e.text;
           if (!textTimer) textTimer = setTimeout(flushText, 200);
@@ -314,6 +340,7 @@ function rawCall(
         if (e.type === "tool")
           void (async () => {
             flushText();
+            flushThinking();
             if (done || signal.aborted) return;
             const ctl = new AbortController();
             children.add(ctl);
@@ -383,11 +410,12 @@ function rawCall(
 }
 const cache = new Map<
   string,
-  { at: number; ttl: number; value: any; text: string }
+  { at: number; ttl: number; value: any; text: string; thinking: string }
 >();
 type Subscriber = {
   signal?: AbortSignal;
   onText?: Options["onText"];
+  onThinking?: Options["onThinking"];
   text: string;
 };
 const flights = new Map<
@@ -397,6 +425,7 @@ const flights = new Map<
     promise: Promise<any>;
     subscribers: Set<Subscriber>;
     text: string;
+    thinking: string;
   }
 >();
 function invoke(
@@ -434,6 +463,10 @@ function invoke(
       Date.now() - prior.at < Math.min(prior.ttl, captured.ttl)
     ) {
       safeText(captured.onText, { text: prior.text, delta: prior.text });
+      safeText(captured.onThinking, {
+        text: prior.thinking,
+        delta: prior.thinking,
+      });
       return structuredClone(prior.value);
     }
     const sharedKey = captured.cache && !captured.refresh ? key : random();
@@ -442,6 +475,7 @@ function invoke(
       const ctl = new AbortController();
       const subscribers = new Set<Subscriber>();
       let latest = "";
+      let latestThinking = "";
       const promise = rawCall(
         captured,
         ctl.signal,
@@ -454,6 +488,12 @@ function invoke(
             safeText(s.onText, e);
           }
         },
+        (e) => {
+          latestThinking = e.text;
+          const shared = flights.get(sharedKey);
+          if (shared) shared.thinking = e.text;
+          for (const s of subscribers) safeText(s.onThinking, e);
+        },
         prepared.images,
       )
         .then((result) => {
@@ -461,6 +501,7 @@ function invoke(
             ? parseJSON(result.finalText ?? result.text, result.truncated)
             : {
                 text: result.text,
+                thinking: result.thinking ?? "",
                 truncated: result.truncated,
                 modelTierApplied: result.modelTierApplied,
                 ...(result.modelApplied
@@ -473,24 +514,37 @@ function invoke(
               ttl: captured.ttl,
               value,
               text: result.text,
+              thinking: result.thinking ?? latestThinking,
             });
             if (cache.size > 100) cache.delete(cache.keys().next().value!);
           }
           return value;
         })
         .finally(() => flights.delete(sharedKey));
-      flight = { ctl, promise, subscribers, text: latest };
+      flight = {
+        ctl,
+        promise,
+        subscribers,
+        text: latest,
+        thinking: latestThinking,
+      };
       flights.set(sharedKey, flight);
     }
     const current = flight;
     const subscriber = {
       signal: captured.signal,
       onText: captured.onText,
+      onThinking: captured.onThinking,
       text: current.text,
     };
     current.subscribers.add(subscriber);
     if (current.text)
       safeText(captured.onText, { text: current.text, delta: current.text });
+    if (current.thinking)
+      safeText(captured.onThinking, {
+        text: current.thinking,
+        delta: current.thinking,
+      });
     return new Promise((resolve, reject) => {
       const abort = () => {
         current.subscribers.delete(subscriber);

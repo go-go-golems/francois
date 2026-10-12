@@ -60,6 +60,10 @@ The model selector offers `lunaroute/glm-5.3-flash` (low/medium/high) and
 `lunaroute/deepseek-4.1-flash` (low/high/xhigh), persisting both choices in the
 artifact's localStorage. It sends the selected thinking level as a Pi model suffix.
 The configured gateway maps GLM medium to high and DeepSeek xhigh to high.
+POLIS streams provider thinking into a collapsible, auto-scrolling panel above
+its answer. The sample runtime exposes `onThinking({text, delta})` and a separate
+`result.thinking` field; thinking stays out of answer text and chat history.
+Providers that emit no thinking text simply show the normal answer.
 
 The worker registers LunaRoute's provider using Pi's cached `models-store.json`
 catalog and existing Pi credentials, including its OAuth-stored gateway key.

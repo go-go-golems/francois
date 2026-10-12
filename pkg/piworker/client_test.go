@@ -41,6 +41,11 @@ func runHelperWorker() {
 				_, _ = fmt.Fprintln(os.Stdout, "this is not JSON")
 				continue
 			}
+			if input == "thinking" {
+				_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "thinking", CallID: callID, Text: "Inspecting the scene.", Delta: "Inspecting the scene."})
+				_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "result", CallID: callID, Result: &Result{Text: "done", Thinking: "Inspecting the scene."}})
+				continue
+			}
 			if input == "wait" {
 				continue
 			}
@@ -119,4 +124,18 @@ func TestClientToolsCancellationAndWorkerExit(t *testing.T) {
 			t.Fatal("dead worker still advertised models")
 		}
 	})
+}
+
+func TestClientForwardsThinkingSeparately(t *testing.T) {
+	c := testClient(t)
+	var events []Event
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err := c.Sample(ctx, Request{CallID: "thinking", Input: json.RawMessage(`"thinking"`)}, func(e Event) { events = append(events, e) }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 || events[0].Type != "thinking" || events[0].Delta != "Inspecting the scene." || events[1].Result.Thinking != events[0].Text || events[1].Result.Text != "done" {
+		t.Fatalf("thinking/text separation lost: %+v", events)
+	}
 }

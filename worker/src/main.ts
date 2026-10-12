@@ -146,6 +146,7 @@ async function sample(r: Request) {
   const ctl = new AbortController();
   controllers.set(r.callId, ctl);
   let visible = "";
+  let thinking = "";
   try {
     let model = selected[r.options.modelTier];
     let applied: string | undefined;
@@ -256,7 +257,16 @@ async function sample(r: Request) {
       });
       let roundText = "";
       let separated = false;
+      let thinkingSeparated = false;
       for await (const event of stream) {
+        if (event.type === "thinking_delta") {
+          let delta = event.delta;
+          if (!thinkingSeparated && round > 0 && thinking)
+            delta = "\n\n" + delta;
+          thinkingSeparated = true;
+          thinking += delta;
+          emit({ type: "thinking", callId: r.callId, text: thinking, delta });
+        }
         if (event.type === "text_delta") {
           let delta = event.delta;
           if (!separated) {
@@ -285,6 +295,7 @@ async function sample(r: Request) {
           callId: r.callId,
           result: {
             text: visible,
+            thinking,
             finalText: roundText,
             truncated: message.stopReason === "length",
             modelTierApplied: r.options.modelTier,
