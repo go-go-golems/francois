@@ -119,7 +119,14 @@ func Start(ctx context.Context, node, worker, agentDir, cwd string, tiers map[st
 }
 func (c *Client) setError(err error) { c.mu.Lock(); defer c.mu.Unlock(); c.err = err }
 func (c *Client) lastError() error   { c.mu.Lock(); defer c.mu.Unlock(); return c.err }
-func (c *Client) Models() []Model    { return append([]Model(nil), c.models...) }
+func (c *Client) Models() []Model {
+	select {
+	case <-c.done:
+		return []Model{}
+	default:
+	}
+	return append([]Model(nil), c.models...)
+}
 func (c *Client) send(v any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()

@@ -302,3 +302,58 @@ Review ui/src/runtime.ts and its capability modules, worker/src/main.ts, pkg/hos
 ### Technical details
 
 All manually created test databases live under /tmp. The real model smoke used explicit model mappings and the existing Pi auth configuration; credential values were not emitted. The local archive contains no credentials or test database. Unsupported methods are documented rather than shimmed under deprecated names.
+
+## Step 6: Final review, worker readiness, and preview handoff
+
+The completed capability milestone is committed as 263c006. Final review found that a dead worker could still advertise its startup model list. The client now returns an empty model list after protocol/process failure, and new sampling calls return sampling_disabled rather than entering a broken pipe. The existing protocol-failure test covers this state.
+
+### Prompt Context
+
+See Step 3.
+**Commit (code):** 263c006 — Complete local capabilities and validate Pi hosting workflows.
+
+### What I did
+
+- Reviewed the final diff and confirmed source snapshots, credentials, and runtime data were not accidentally staged.
+- Added worker readiness reporting and a protocol-failure assertion.
+- Prepared persistent local imports for POLIS and the capability playground under ignored var/francois.
+- Stopped the temporary test servers and prepared a Pi-backed tmux preview using explicit gpt-6-luna mappings.
+
+### Why
+
+The operator must see an unavailable worker as unavailable, while imported HTML and saved data remain accessible. Test data should remain separate from the user's persistent preview database.
+
+### What worked
+
+- Final race-enabled Go suite, TypeScript checks, four contract tests, lint, vet, generation, package-local, and docmgr doctor passed.
+- A full-file download regression test streamed 25 MiB plus 3 bytes, proving the prior chunk truncation is fixed.
+- The archive includes the Go executable, worker entrypoint, dependency lockfile/manifest, examples, and README.
+- Git ignores the persistent database and package archive.
+
+### What didn't work
+
+The first focused patch assumed the Models method was multiline; apply_patch rejected its context without changing files. After reading the actual one-line method, the focused patch applied. Stopping a test server automatically removed its tmux session, so a subsequent kill-session reported that the session was absent; the listener was already stopped.
+
+### What I learned
+
+A successful startup handshake is a snapshot, not continuing worker readiness. Provider metadata must not remain advertised after a private protocol failure.
+
+### What was tricky to build
+
+Model readiness must be read without racing the event reader. The closed done channel is the lifecycle signal, so this needs no extra health polling or credentials checks.
+
+### What warrants a second pair of eyes
+
+The remaining extension tasks are explicitly open. The preview uses one local owner; provider costs are charged to that owner's Pi configuration.
+
+### What should be done in the future
+
+Use README for startup and the open ticket tasks for platform extensions. Production release infrastructure is not dispatched by this handoff.
+
+### Code review instructions
+
+Inspect Client.Models, the host's pre-call readiness check, and the invalid-frame worker test. The detailed design remains historical; README and ticket index describe the implemented state.
+
+### Technical details
+
+Preview runs in tmux session francois-preview on 127.0.0.1:8080 with Node 24 and explicit openai-codex/gpt-6-luna tier mappings. Artifact ports and SQLite identity are persisted in var/francois. No secret values or var data are committed.

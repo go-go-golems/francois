@@ -115,5 +115,8 @@ func TestClientToolsCancellationAndWorkerExit(t *testing.T) {
 		if err == nil {
 			t.Fatal("worker protocol error was ignored")
 		}
+		if len(c.Models()) != 0 {
+			t.Fatal("dead worker still advertised models")
+		}
 	})
 }

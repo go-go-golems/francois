@@ -255,6 +255,10 @@ func (h *Host) sample(w http.ResponseWriter, r *http.Request, artifact string) {
 		fail(w, 403, "not_declared", "Sampling is not declared")
 		return
 	}
+	if len(h.Backend.Models()) == 0 {
+		fail(w, 503, "sampling_disabled", "The model worker is unavailable; restart the host after checking Pi configuration")
+		return
+	}
 	var req piworker.Request
 	if err = readJSON(w, r, &req); err != nil {
 		fail(w, 400, "invalid_request", err.Error())
