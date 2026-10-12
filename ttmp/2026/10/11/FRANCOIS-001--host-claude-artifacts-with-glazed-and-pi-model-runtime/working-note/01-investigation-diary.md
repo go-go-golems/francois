@@ -519,3 +519,71 @@ Review `examples/polis.html` at CDN scripts, Markdown CSS, Reply, Thinking, and 
 - DOMPurify: https://github.com/cure53/DOMPurify — rendered HTML sanitization.
 - Settings: synchronous GFM; HTML profile; style attributes forbidden; named DOM properties sanitized.
 - Memoization key: the accumulated text string; existing stream coalescing controls update frequency.
+
+## Step 10: Make local model errors explicit and add versioned CLI updates
+
+The `update` command publishes a new immutable HTML version for an existing artifact, preserving its identity, origin, capability manifest, and durable application data. It uses the store's existing compare-and-set publication operation, so a competing publication cannot be silently overwritten. The command reads bounded complete HTML and emits structured ID/title/previous-version/version output.
+
+POLIS now describes Francois worker availability, Pi authentication, provider failures, cancellation, and capability declarations accurately. Successful requests carry actual provider/model metadata; if the requested model selector was not applied, the reply displays the requested selector and the model used instead. These application changes live in `examples/polis.html`, so updating from that file retains them; updating from another complete HTML file replaces them just like any other authored content.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, do 1 and 2 (1 would be overwritten if we reimport it, right?)"
+**Assistant interpretation:** Implement the earlier items: accurate local model failure/fallback reporting and a CLI command to update an existing artifact without recreating it. Explain that replacing HTML replaces application changes unless they are in the input file.
+**Inferred user intent:** Keep the application maintainable from checked-in HTML while preserving existing artifact data.
+
+**User follow-up (verbatim):** "commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Continue the already authorized implementation diary and commit this validated feature milestone.
+
+### What I did
+- Applied the Glazed command-authoring and diary skills; inspected the current commands, store publication contract, and browser sampling path before editing.
+- Added `cmd/francois/cmds/update.go`, a GlazeCommand with `--id`, `--file`, and `--data-dir`; registered it through the existing Cobra builder.
+- Shared a bounded HTML reader between import and update. A new import still requires a unique ID; update requires an existing artifact and retains its manifest.
+- Added a CLI integration test verifying structured output, required flags, immutable versions, origin port, title, manifest, owner, document preservation, unknown-ID failure, and invalid-document failure without mutation.
+- Added provider diagnostic classification in `worker/src/provider-error.ts`: authentication, rate limiting, and other provider errors use explicit public codes and fixed messages without forwarding raw diagnostics.
+- Added `modelUsed` metadata through worker results, Go, the browser runtime, and the fake backend. POLIS captures the requested selector when sending and displays a fallback notice when it was not honored.
+- Replaced remaining Claude-platform error instructions in the editable POLIS application with Francois/Pi-specific instructions. Kept cancellation visibly stopped rather than a generic provider error.
+- Used the new CLI against local POLIS: version 4 became version 5, with its persisted port unchanged. Refreshed the browser and restarted the preview to load the protocol changes.
+- Documented the command, preservation behavior, source-file ownership, and actual-model metadata in README.
+
+### Why
+Importing a second artifact would create a new identity and origin rather than updating the existing application. The existing transactional publication mechanism already provides the required version semantics, so the CLI does not need a new database schema or a server-side replacement API. Accurate fallback reporting requires actual model identity in the result; a tier label alone cannot tell the reader what ran.
+
+### What worked
+- Go tests across all packages passed with loopback access; Go build and vet passed.
+- `make glazed-lint` passed using the selected Glazed v1.4.1 analyzer. `make lint` reported zero issues with the installed golangci-lint 2.4.0.
+- TypeScript check, five Node contract cases, and browser/worker build passed. The added provider-error test confirms auth/rate-limit classification and that a sample diagnostic key is not exposed.
+- The update integration test preserved the original HTML version, new version, document, owner, port, title, and manifest. Missing artifacts and invalid HTML returned errors without advancing the current version.
+- `go run ./cmd/francois update --help` exposes the domain flags and the three structured-output flags.
+- `go run ./cmd/francois update --id polis --file examples/polis.html --format json` returned ID polis, previous_version 4, version 5.
+- Browser validation on a temporary fake backend showed `Requested lunaroute/glm-5.3-flash:low was unavailable. Used test/fake instead.` and displayed `test/fake` as the actual model. This exercised the real POLIS send/tool/result/render path without a paid request.
+- Browser checks of the application's actual error mapping distinguished unavailable worker, Pi authentication, undeclared sampling, cancellation, provider failure, and disconnected host.
+- Inline POLIS scripts passed Node syntax checks; `git diff --check` passed.
+
+### What didn't work
+- TypeScript checks exposed an overbroad replacement in the worker's unrelated fatal-frame handler: `worker/src/main.ts(407,33): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?`. The handler has no sample-local message variable. Restored its static upstream_error code and reran the TypeScript check and worker build. This was caught before committing.
+- Required vulnerability scan `GOBIN=/tmp/francois-tools GOCACHE=/tmp/francois-go-cache GOWORK=off make govulncheck PATH=/tmp/francois-tools:$PATH` returned `make: *** [Makefile:37: govulncheck] Error 3`. Its summary reports 13 reachable vulnerability findings with the existing Go toolchain/dependencies, plus eight imported-package and six required-module findings without reachable calls. Examples include GO-2026-6617 in golang.org/x/net v0.56.0 (fixed v0.60.0) and standard-library fixes requiring versions newer than the current go1.26.5 toolchain. Dependency/toolchain upgrades were not included in these two requested features. No claim of a clean vulnerability scan is made.
+- The first curl to the temporary preview failed with `curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Couldn't connect to server`. Inspecting the tmux startup log and retrying after readiness succeeded.
+- pnpm's launcher reports Node 20 versus the declared Node 24 engine; compilation/contracts succeeded and the preview explicitly uses Node 24.
+
+### What I learned
+HTML replacement is separate from artifact deletion: preserving the artifact record and publication history preserves the origin and data while replacing all application markup. The source file must contain the desired application fixes. Provider diagnostics also need a public classification layer; displaying raw diagnostics would both confuse UI users and risk exposing configuration details.
+
+### What was tricky to build
+Actual model identity must survive JSON decoding in Go and the browser result projection. Adding a field only to the Node result would be silently lost by the typed Go result structure. Capturing the requested selector per message avoids reporting a later UI selection as the request's original choice. Cancellation takes precedence over provider failure when the abort signal has fired.
+
+### What warrants a second pair of eyes
+Review `Update.RunIntoGlazeProcessor` and the existing store publication transaction together. Review the modelUsed projection and the conditions for displaying a fallback notice. Dependency/toolchain vulnerability findings need their own scoped maintenance work; the scan is a recorded failing check.
+
+### What should be done in the future
+Address the vulnerability scan's existing toolchain and dependency findings separately. Open pages require a refresh after CLI update; this command does not broadcast a live reload through a running host.
+
+### Code review instructions
+Start with `cmd/francois/cmds/update.go` and `update_test.go`, then command registration. Review `worker/src/provider-error.ts`, result structures/projection, and POLIS COPY/copyFor/sendToAgent/Reply. Run `go test ./cmd/francois/cmds`, `pnpm test`, and `go run ./cmd/francois update --help` for focused checks.
+
+### Technical details
+- Update flow: bounded file read → existing artifact lookup → compare-and-set Publish → structured output.
+- Preserved: artifact ID/title/port/manifest; existing versions; owner; documents/assets/comments; origin-based browser storage.
+- Input bounds: 1 byte–16 MiB and complete HTML document, shared with import.
+- Result metadata: modelApplied identifies an honored selector; modelUsed reports actual provider/model.
+- Public provider errors: authentication_error, rate_limited, upstream_error; raw diagnostic text remains out of page results.
+- Temporary fake preview was stopped with `lsof-who -p 8090 -k` and its tmux session removed. Main preview remains on 8080; POLIS remains on 33921.

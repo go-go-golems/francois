@@ -34,7 +34,7 @@ func (f *Fake) Sample(ctx context.Context, r Request, emit func(Event), execute 
 			text += delta
 			emit(Event{Type: "text", CallID: r.CallID, Text: text, Delta: delta})
 		}
-		emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier}})
+		emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier, ModelUsed: "test/fake"}})
 		return nil
 	}
 	if len(r.Tools) > 0 {
@@ -56,6 +56,6 @@ func (f *Fake) Sample(ctx context.Context, r Request, emit func(Event), execute 
 		return err
 	}
 	emit(Event{Type: "text", CallID: r.CallID, Text: text, Delta: text})
-	emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier}})
+	emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier, ModelUsed: "test/fake"}})
 	return nil
 }

@@ -24,6 +24,19 @@ loopback port, keeping browser storage separate. You can also import HTML from
 the library UI. Stop the process with Ctrl-C. Artifact data is in
 `./var/francois/francois.db`; do not delete it to restart the service.
 
+Update an existing artifact from an HTML file:
+
+```sh
+go run ./cmd/francois update --id polis --file examples/polis.html
+```
+
+This publishes a new immutable HTML version and preserves the ID, title, port,
+capability manifest, documents, assets, comments, and browser storage origin.
+Refresh open pages to load the new HTML. `import` still creates a new artifact
+and requires a unique ID; `update` requires an existing ID.
+The file is the source of the complete replacement HTML: keep application changes
+in that file, such as the model controls and error messages in `examples/polis.html`.
+
 The model worker loads `~/.pi/agent/auth.json`, `models.json`, `models-store.json`,
 and Pi settings. Pi handles OAuth and provider configuration. Its SDK may use
 credential environment fallback and configured key resolvers; Francois does
@@ -49,7 +62,8 @@ An artifact can request a model directly with
 Pi selectors can include thinking levels, such as `provider/model:xhigh`.
 Explicit `effort` takes precedence. `/api/models` includes supported thinking levels.
 Unavailable explicit models fall back to the tier; `modelApplied` identifies a
-successful explicit selection. The owner’s Pi account pays for all model calls.
+successful explicit selection and `modelUsed` reports the actual provider/model.
+POLIS shows a fallback notice when the requested selector is not applied. The owner’s Pi account pays for all model calls.
 
 ## POLIS model selection
 

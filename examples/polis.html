@@ -3180,16 +3180,27 @@ function selectModel(value) {
 S.model = selectedModel().v;
 S.thinking = selectedThinking();
 const COPY = {
-  not_granted: 'Claude is not allowed on this page. Allow it in the artifact’s permissions to use the agent.',
-  sampling_disabled: 'Claude is turned off for this account, so the agent can’t run.',
-  rate_limited: 'Too many requests right now. Wait a minute, then send again.',
-  session_expired: 'Your session expired. Sign in again to keep using the agent.',
-  tools_unavailable: 'This view can’t run page tools, so the agent can’t edit the city here.',
-  refused: 'Claude declined that request. Try rephrasing it.',
-  empty_completion: 'No answer came back. Try a smaller request.',
-  prompt_too_large: 'The conversation got too long. Clear the chat and try again.',
+  not_granted: 'Sampling is not enabled for this artifact. Check its capability manifest.',
+  not_declared: 'This artifact does not declare the sample capability. Import it with a sampling manifest.',
+  capability_disabled: 'Sampling is disabled for this artifact. Check its capability manifest.',
+  capability_removed: 'The sampling capability was removed. Refresh this page.',
+  sampling_disabled: 'The Pi model worker is unavailable. Check Pi configuration and restart Francois.',
+  authentication_error: 'Pi authentication failed for this provider. Log in through Pi, then restart Francois.',
+  rate_limited: 'The model request limit was reached. Wait briefly and retry.',
+  session_expired: 'This page connection expired. Refresh POLIS and retry.',
+  tools_unavailable: 'Browser tools are unavailable, so the agent cannot edit the scene.',
+  refused: 'The selected model declined that request. Try rephrasing it.',
+  empty_completion: 'The model returned no answer. Try a smaller request or another model.',
+  prompt_too_large: 'The conversation exceeds the local size limit. Clear the chat and retry.',
+  images_unavailable: 'The selected model cannot accept these images.',
+  cancelled: 'Request stopped.',
 };
-const copyFor = e => COPY[e && e.code] || 'The connection dropped before the answer finished. Send again to retry.';
+function copyFor(e) {
+  if (e && e.code === 'upstream_error') return e.message === 'Connection interrupted'
+    ? 'The connection to Francois dropped. Wait for reconnection and retry.'
+    : 'The model provider request failed. Retry or choose another model.';
+  return COPY[e && e.code] || (e && e.code === 'invalid_request' ? e.message : 'The request failed. Retry or refresh POLIS.');
+}
 const clip = (s, n) => (s.length > n ? s.slice(0, n) + `\n… (${s.length - n} more characters)` : s);
 function ideState() {
   const r = S.run, ps = C.paramList();
@@ -3224,7 +3235,7 @@ async function sendToAgent(text) {
   text = String(text || '').trim();
   if (!text || S.busy || !SAMPLE) return;
   const history = historyTurns();
-  const user = { id: ++msgId, role: 'user', text }, msg = { id: ++msgId, role: 'assistant', text: '', thinking: '', calls: [], status: 'thinking', tier: null, error: null };
+  const user = { id: ++msgId, role: 'user', text }, msg = { id: ++msgId, role: 'assistant', text: '', thinking: '', calls: [], status: 'thinking', tier: null, modelUsed: null, fallback: null, error: null };
   set({ chat: S.chat.concat([user, msg]), busy: true, tab: 'agent' });
   const ctl = CTL = new AbortController();
   const turns = [{ role: 'user', content: D.AGENT_RULES + '<api>\n' + D.DOCS + '\n</api>' }].concat(history, [{ role: 'user', content: text + '\n\n' + ideState() }]);
@@ -3242,14 +3253,16 @@ async function sendToAgent(text) {
       return clip(JSON.stringify(r), 30000);
     },
   };
+  const requestedModel = selectedModel().v + ':' + selectedThinking();
   try {
-    const res = await SAMPLE(turns, { tools: [tool], modelTier: S.tier, model: selectedModel().v + ':' + selectedThinking(), signal: ctl.signal, onThinking: ({ text: t }) => { msg.thinking = t; bump(); }, onText: ({ text: t }) => { msg.text = t; msg.status = 'writing'; bump(); } });
-    msg.text = res.text; msg.thinking = res.thinking || msg.thinking; msg.tier = res.modelTierApplied; msg.model = res.modelApplied || null; msg.truncated = res.truncated; msg.status = 'done';
+    const res = await SAMPLE(turns, { tools: [tool], modelTier: S.tier, model: requestedModel, signal: ctl.signal, onThinking: ({ text: t }) => { msg.thinking = t; bump(); }, onText: ({ text: t }) => { msg.text = t; msg.status = 'writing'; bump(); } });
+    msg.text = res.text; msg.thinking = res.thinking || msg.thinking; msg.tier = res.modelTierApplied; msg.model = res.modelApplied || null; msg.modelUsed = res.modelUsed || null; msg.fallback = res.modelApplied === requestedModel ? null : 'Requested ' + requestedModel + ' was unavailable. Used ' + (res.modelUsed || res.modelTierApplied + ' tier') + ' instead.'; msg.truncated = res.truncated; msg.status = 'done';
   } catch (e) {
     if (e && e.code === 'refused') msg.text = ''; else if (e && typeof e.text === 'string') msg.text = e.text;
     msg.status = e && e.code === 'cancelled' ? 'stopped' : 'error';
     if (msg.status === 'error') msg.error = copyFor(e);
-    if (e && ['not_granted', 'sampling_disabled', 'capability_disabled', 'capability_removed', 'not_declared'].includes(e.code)) set({ sampler: 'denied' });
+    if (e && e.code === 'sampling_disabled') set({ sampler: 'unavailable' });
+    if (e && ['not_granted', 'capability_disabled', 'capability_removed', 'not_declared'].includes(e.code)) set({ sampler: 'denied' });
     if (e && e.code === 'tools_unavailable') set({ sampler: 'notools' });
   } finally {
     if (CTL === ctl) CTL = null;
@@ -3386,7 +3399,7 @@ function Agent() {
   useEffect(() => { const el = list.current; if (el) el.scrollTop = el.scrollHeight; }, [s.chat]);
   const send = e => { e && e.preventDefault(); if (!text.trim() || s.busy) return; sendToAgent(text); setText(''); };
   const avail = s.sampler === 'ready';
-  const note = { checking: 'Connecting to the model runtime…', unavailable: 'The model runtime is unavailable. The editor and the view still work here.', denied: 'Claude isn’t allowed on this page, so the agent is off. Allow it from the artifact’s permissions and reload.', notools: 'This view can’t run page tools, so the agent can’t edit the city here.' }[s.sampler];
+  const note = { checking: 'Connecting to the model runtime…', unavailable: 'The model runtime is unavailable. The editor and the view still work here.', denied: 'Sampling is not enabled for this artifact. Check its manifest and refresh POLIS.', notools: 'This view can’t run page tools, so the agent can’t edit the city here.' }[s.sampler];
   return html`
     <div class="agent">
       <div class="chat" ref=${list} aria-live="polite">
@@ -3421,10 +3434,11 @@ function Reply({ m }) {
   const parts = []; let pos = 0;
   m.calls.forEach((c, i) => { const at = Math.min(c.at, m.text.length); if (at > pos) parts.push({ t: m.text.slice(pos, at) }); pos = Math.max(pos, at); parts.push({ call: c, i }); });
   if (pos < m.text.length) parts.push({ t: m.text.slice(pos) });
-  const tierLabel = m.model || (m.tier ? m.tier + ' fallback' : null);
+  const tierLabel = m.model || m.modelUsed || m.tier;
   return html`
     <div class="msg agent">
       <span class="who">Agent${tierLabel ? html` <i class="tier">${tierLabel}</i>` : null}</span>
+      ${m.fallback ? html`<div class="meta" role="status">${m.fallback}</div>` : null}
       ${m.thinking ? html`<${Thinking} text=${m.thinking} active=${m.status === 'thinking'} />` : null}
       ${parts.map((p, k) => p.call ? html`<${Call} key=${'c' + k} c=${p.call} />` : html`<div key=${'t' + k} class="bubble"><${Markdown} text=${p.t} /></div>`)}
       ${m.status === 'thinking' && !m.calls.length ? html`<div class="bubble thinking">Thinking…</div>` : null}

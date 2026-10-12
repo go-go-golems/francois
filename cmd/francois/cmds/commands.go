@@ -18,7 +18,6 @@ import (
 	"github.com/go-go-golems/glazed/pkg/cmds/values"
 	"github.com/go-go-golems/glazed/pkg/middlewares"
 	"github.com/go-go-golems/glazed/pkg/types"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -128,12 +127,9 @@ func (i *Import) RunIntoGlazeProcessor(ctx context.Context, p *values.Values, ou
 	if err := p.DecodeSectionInto(schema.DefaultSlug, &s); err != nil {
 		return err
 	}
-	data, err := os.ReadFile(s.File)
+	data, err := readHTML(s.File)
 	if err != nil {
-		return errors.Wrap(err, "read HTML")
-	}
-	if !strings.Contains(strings.ToLower(string(data)), "<html") {
-		return errors.New("Import requires a complete HTML document")
+		return err
 	}
 	manifest := map[string]json.RawMessage{"sample": json.RawMessage(`{}`)}
 	if s.Manifest != "" {
@@ -184,7 +180,8 @@ func (m *Models) RunIntoGlazeProcessor(ctx context.Context, p *values.Values, ou
 func Register(root *cobra.Command) error {
 	serve := &Serve{glazed.NewCommandDescription("serve", glazed.WithShort("Serve the library and isolated artifact origins"), glazed.WithFlags(flags()...))}
 	imp := &Import{glazed.NewCommandDescription("import", glazed.WithShort("Import an HTML artifact into persistent storage"), glazed.WithFlags(fields.New("file", fields.TypeString, fields.WithRequired(true)), fields.New("id", fields.TypeString, fields.WithRequired(true)), fields.New("title", fields.TypeString), fields.New("manifest", fields.TypeString, fields.WithHelp("JSON capabilities manifest file")), fields.New("data-dir", fields.TypeString, fields.WithDefault("./var/francois"))))}
-	for _, command := range []glazed.Command{serve, imp} {
+	update := &Update{glazed.NewCommandDescription("update", glazed.WithShort("Publish a new HTML version of an existing artifact"), glazed.WithLong("Replace HTML while preserving the artifact ID, port, manifest and stored data. Refresh open pages to load the new version. Concurrent publication fails rather than overwriting a newer version."), glazed.WithFlags(fields.New("file", fields.TypeString, fields.WithRequired(true)), fields.New("id", fields.TypeString, fields.WithRequired(true)), fields.New("data-dir", fields.TypeString, fields.WithDefault("./var/francois"))))}
+	for _, command := range []glazed.Command{serve, imp, update} {
 		c, err := cli.BuildCobraCommandFromCommand(command)
 		if err != nil {
 			return err

@@ -1,3 +1,4 @@
+import { ProviderError } from "./provider-error";
 import { registerLunaroute } from "./lunaroute";
 import { createInterface } from "node:readline";
 import { join } from "node:path";
@@ -281,7 +282,9 @@ async function sample(r: Request) {
       const message = await stream.result();
       if (message.stopReason === "aborted") throw new Error("Cancelled");
       if (message.stopReason === "error")
-        throw new Error("Provider request failed");
+        throw new ProviderError(
+          message.errorMessage ?? "Provider request failed",
+        );
       if (message.stopReason === "deferred")
         throw new Error("Deferred provider responses are not supported");
       context.messages.push(message);
@@ -300,6 +303,7 @@ async function sample(r: Request) {
             truncated: message.stopReason === "length",
             modelTierApplied: r.options.modelTier,
             modelApplied: applied,
+            modelUsed: model.provider + "/" + model.id,
           },
         });
         return;
@@ -333,20 +337,36 @@ async function sample(r: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Model request failed";
+    const provider =
+      error instanceof ProviderError ? error : new ProviderError(message);
+    const localMessages = [
+      "Images are not supported by the selected model",
+      "Tool conversation exceeds local context budget",
+      "Empty completion",
+      "Tool round limit reached",
+      "Deferred provider responses are not supported",
+      "Unknown page tool",
+      "Model unavailable",
+    ];
+    const code = ctl.signal.aborted
+      ? "cancelled"
+      : message.includes("Images are not supported")
+        ? "images_unavailable"
+        : message.includes("context budget")
+          ? "prompt_too_large"
+          : message === "Empty completion"
+            ? "empty_completion"
+            : provider.code;
     emit({
       type: "error",
       callId: r.callId,
       error: {
-        code: ctl.signal.aborted
-          ? "cancelled"
-          : message.includes("Images are not supported")
-            ? "images_unavailable"
-            : message.includes("context budget")
-              ? "prompt_too_large"
-              : message === "Empty completion"
-                ? "empty_completion"
-                : "upstream_error",
-        message,
+        code,
+        message: ctl.signal.aborted
+          ? "Stopped"
+          : localMessages.includes(message)
+            ? message
+            : provider.message,
         text: visible || undefined,
       },
     });

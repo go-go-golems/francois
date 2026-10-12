@@ -96,3 +96,14 @@ test("local writes emit pending snapshots and roll back rejected changes", async
   assert.equal(snapshots.at(-1).metadata.hasPendingWrites, false);
   stop();
 });
+
+test("provider failures distinguish authentication and limits without leaking diagnostics", async () => {
+  const { ProviderError } = await import("../worker/src/provider-error");
+  const auth = new ProviderError(
+    "401 unauthorized; secret=example-provider-key",
+  );
+  assert.equal(auth.code, "authentication_error");
+  assert.equal(auth.message.includes("example-provider-key"), false);
+  assert.equal(new ProviderError("429 too many requests").code, "rate_limited");
+  assert.equal(new ProviderError("socket disconnected").code, "upstream_error");
+});

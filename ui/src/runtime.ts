@@ -150,6 +150,7 @@ type Result = {
   truncated: boolean;
   modelTierApplied: string;
   modelApplied?: string;
+  modelUsed?: string;
 };
 const plain = (v: unknown): v is Record<string, unknown> =>
   v !== null &&
@@ -504,6 +505,7 @@ function invoke(
                 thinking: result.thinking ?? "",
                 truncated: result.truncated,
                 modelTierApplied: result.modelTierApplied,
+                modelUsed: result.modelUsed,
                 ...(result.modelApplied
                   ? { modelApplied: result.modelApplied }
                   : {}),

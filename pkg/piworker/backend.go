@@ -43,6 +43,7 @@ type Result struct {
 	Truncated        bool    `json:"truncated"`
 	ModelTierApplied string  `json:"modelTierApplied"`
 	ModelApplied     string  `json:"modelApplied,omitempty"`
+	ModelUsed        string  `json:"modelUsed,omitempty"`
 }
 type Failure struct {
 	Code    string `json:"code"`

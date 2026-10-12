@@ -19,3 +19,7 @@ Implemented local host commands, isolated artifact origins, embedded minimalist 
 ## 2026-10-11
 
 Verified real Pi streaming and POLIS scene edits; completed the tested localhost capability surface, image preprocessing, shared cancellation, persistent state, rooms/comments, CI, and local worker packaging. Platform-specific and underspecified extensions remain explicit open follow-ups.
+
+## 2026-10-12
+
+Added a versioned Glazed update command that preserves existing artifact identity, origin, manifest and data; replaced Claude-specific POLIS failure messages and surfaced actual-model fallback metadata. CLI/state and browser checks passed; the required vulnerability scan reported existing toolchain/dependency findings, recorded in diary Step 10.
