@@ -64,6 +64,9 @@ POLIS streams provider thinking into a collapsible, auto-scrolling panel above
 its answer. The sample runtime exposes `onThinking({text, delta})` and a separate
 `result.thinking` field; thinking stays out of answer text and chat history.
 Providers that emit no thinking text simply show the normal answer.
+Answers and thinking render GitHub-flavored Markdown, including tables and fenced
+code blocks. The POLIS HTML loads pinned Marked and DOMPurify browser scripts
+from jsDelivr, alongside its existing CDN dependencies; rendered HTML is sanitized.
 
 The worker registers LunaRoute's provider using Pi's cached `models-store.json`
 catalog and existing Pi credentials, including its OAuth-stored gateway key.

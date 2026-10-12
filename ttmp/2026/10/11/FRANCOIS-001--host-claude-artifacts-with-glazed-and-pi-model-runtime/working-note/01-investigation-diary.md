@@ -470,3 +470,52 @@ Start with `worker/src/main.ts` at thinking_delta, `pkg/piworker/backend.go` Res
 - Browser callback: `onThinking({text, delta})`; result field: `thinking`.
 - UI: open collapsible details, 260 px maximum content height, plain text with preserved whitespace.
 - No new SDK dependency, provider option, credential exposure, or thinking-history persistence was added.
+
+## Step 9: Render assistant answers and thinking as Markdown
+
+POLIS now uses one memoized Markdown component for both assistant answers and thinking. GitHub-flavored tables, fenced code, headings, lists, blockquotes, emphasis, and links receive styles matching the existing POLIS palette. Thinking retains its live update, bounded scroll area, and collapse control.
+
+### Prompt Context
+**User prompt (verbatim):** "render chat output (and thinking) as markdown"
+**Assistant interpretation:** Replace the answer's limited inline formatting and thinking's plain text with complete Markdown rendering.
+**Inferred user intent:** Read structured model output naturally while it streams.
+
+### What I did
+- Added pinned browser scripts for Marked 18.1.0 and DOMPurify 3.4.16 alongside POLIS's existing CDN scripts; verified current versions against npm metadata.
+- Replaced `renderText` with the shared `Markdown` component; use Marked's synchronous GFM parsing and DOMPurify HTML-profile sanitization before React HTML insertion.
+- Added compact Markdown styles for code, tables, lists, headings, links, quotes, and separators. Removed thinking's pre-wrapped whitespace because Markdown supplies paragraph structure.
+- Published local POLIS version 4, preserving previous HTML versions and the unchanged original source snapshot.
+
+### Why
+A full Markdown parser handles nested structures and streaming incomplete code fences that the previous regex formatter did not support. Sharing a renderer keeps answer and thinking presentation consistent. Sanitization is required when inserting the resulting HTML; Marked's own documentation recommends a separate sanitizer.
+
+### What worked
+- Every nonempty inline HTML script passed Node syntax validation; `git diff --check` passed.
+- Browser checks exercised the actual Markdown component extracted from the served application: heading, bold, italic, two list items, blockquote, table, link, and fenced code rendered as their respective elements.
+- A partial fenced block rendered code while incomplete and updated correctly when its closing fence arrived.
+- Script tags, event-handler attributes, and javascript links were removed from the test output.
+- The actual Thinking component rendered a Markdown heading, list, and code block, retained the live label, and collapsed when its summary was clicked.
+
+### What didn't work
+The sanitizer fixture included an image with a nonexistent source. Its permitted image element produced a browser resource error; its onerror attribute was removed. No application failure or dependency-loading failure occurred.
+
+### What I learned
+Thinking whitespace must use normal flow for parsed Markdown; preformatted code alone keeps preserved whitespace. Streaming can reuse the same parser on each accumulated text update without a separate completion-only renderer.
+
+### What was tricky to build
+Assistant text is split around tool records using original string positions. Markdown rendering stays within those existing text segments so tool records keep their original ordering. The separate thinking component still owns automatic scrolling.
+
+### What warrants a second pair of eyes
+Review Markdown parsing and sanitization together before changing allowed HTML behavior. Both libraries are pinned CDN dependencies, consistent with this imported application's existing dependency model.
+
+### What should be done in the future
+No additional work is required for this request. CDN asset vendoring would be a separate offline-packaging task for POLIS and its existing React/htm/font resources.
+
+### Code review instructions
+Review `examples/polis.html` at CDN scripts, Markdown CSS, Reply, Thinking, and Markdown. Open http://127.0.0.1:33921 and refresh the page to load version 4. This change affects the application HTML only; backend and worker logic are unchanged.
+
+### Technical details
+- Marked: https://marked.js.org/using_advanced — parsing does not perform sanitization.
+- DOMPurify: https://github.com/cure53/DOMPurify — rendered HTML sanitization.
+- Settings: synchronous GFM; HTML profile; style attributes forbidden; named DOM properties sanitized.
+- Memoization key: the accumulated text string; existing stream coalescing controls update frequency.

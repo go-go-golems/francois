@@ -1,6 +1,25 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.reasoning { margin: 8px 0; padding: 9px 12px; border: 1px solid var(--line, #e3e6ea); border-radius: 8px; background: var(--panel, #f6f7f9); }
 .reasoning summary { cursor: pointer; font-size: 12px; opacity: .75; }
-.reasoning-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; margin-top: 8px; font-size: 12px; line-height: 1.55; }
+.reasoning-text { white-space: normal; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; margin-top: 8px; font-size: 12px; line-height: 1.55; }
+
+.markdown { line-height: 1.55; overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p { margin: 0 0 8px; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 { margin: 14px 0 7px; line-height: 1.3; font-weight: 500; }
+.markdown h1 { font-size: 1.35em; } .markdown h2 { font-size: 1.2em; } .markdown h3 { font-size: 1.1em; }
+.markdown ul, .markdown ol { margin: 7px 0; padding-left: 22px; }
+.markdown li { margin: 3px 0; } .markdown li p { margin: 3px 0; }
+.markdown pre { margin: 9px 0; padding: 10px; overflow-x: auto; background: var(--code-bg, #f6f7f9); border: 1px solid var(--line, #e3e6ea); border-radius: 6px; white-space: pre; }
+.markdown code { font-family: var(--font-mono, monospace); font-size: .9em; }
+.markdown :not(pre) > code { background: var(--code-bg, #f6f7f9); padding: 1px 4px; border-radius: 3px; }
+.markdown pre code { padding: 0; background: none; }
+.markdown blockquote { margin: 9px 0; padding-left: 12px; border-left: 3px solid var(--line, #e3e6ea); color: var(--muted, #4f5660); }
+.markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 9px 0; }
+.markdown th, .markdown td { border: 1px solid var(--line, #e3e6ea); padding: 5px 8px; text-align: left; }
+.markdown a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.markdown hr { border: 0; border-top: 1px solid var(--line, #e3e6ea); margin: 12px 0; }
+.markdown img { max-width: 100%; }
 </style></head><body>
 <title>Polis IDE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -268,6 +287,8 @@ tr.fresh .dotf{background:var(--fg)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@18.1.0/lib/marked.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js"></script>
 <script>
 /* polis core: the DSL, the build pipeline (lattice → mass → world) and the live layer.
    DOM-free: the renderer and the IDE sit on top of window.PolisCore. */
@@ -3405,7 +3426,7 @@ function Reply({ m }) {
     <div class="msg agent">
       <span class="who">Agent${tierLabel ? html` <i class="tier">${tierLabel}</i>` : null}</span>
       ${m.thinking ? html`<${Thinking} text=${m.thinking} active=${m.status === 'thinking'} />` : null}
-      ${parts.map((p, k) => p.call ? html`<${Call} key=${'c' + k} c=${p.call} />` : html`<div key=${'t' + k} class="bubble">${renderText(p.t)}</div>`)}
+      ${parts.map((p, k) => p.call ? html`<${Call} key=${'c' + k} c=${p.call} />` : html`<div key=${'t' + k} class="bubble"><${Markdown} text=${p.t} /></div>`)}
       ${m.status === 'thinking' && !m.calls.length ? html`<div class="bubble thinking">Thinking…</div>` : null}
       ${m.status === 'thinking' && m.calls.length ? html`<div class="bubble thinking">Working…</div>` : null}
       ${m.status === 'stopped' ? html`<div class="meta">Stopped.</div>` : null}
@@ -3416,11 +3437,14 @@ function Reply({ m }) {
 function Thinking({ text, active }) {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [text]);
-  return html`<details class="reasoning" open><summary>Thinking${active ? '…' : ''}</summary><div class="reasoning-text" ref=${ref}>${text}</div></details>`;
+  return html`<details class="reasoning" open><summary>Thinking${active ? '…' : ''}</summary><div class="reasoning-text" ref=${ref}><${Markdown} text=${text} /></div></details>`;
 }
-function renderText(t) {
-  // light formatting: `code`, **bold**, paragraphs
-  return t.trim().split(/\n{2,}/).map((para, i) => html`<p key=${i}>${para.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((s, j) => s.startsWith('`') && s.endsWith('`') && s.length > 1 ? html`<code key=${j}>${s.slice(1, -1)}</code>` : s.startsWith('**') && s.endsWith('**') && s.length > 3 ? html`<strong key=${j}>${s.slice(2, -2)}</strong>` : s)}</p>`);
+function Markdown({ text }) {
+  const rendered = useMemo(() => DOMPurify.sanitize(
+    marked.parse(String(text || ''), { async: false, gfm: true }),
+    { USE_PROFILES: { html: true }, FORBID_ATTR: ['style'], SANITIZE_NAMED_PROPS: true }
+  ), [text]);
+  return html`<div class="markdown" dangerouslySetInnerHTML=${{ __html: rendered }} />`;
 }
 function Call({ c }) {
   const r = c.result, first = c.code.trim().split('\n')[0];
