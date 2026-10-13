@@ -103,3 +103,93 @@ The second subtlety is getting values that are not secret, but are produced by T
 ## Step 2: Commit and deliver to reMarkable
 
 I committed the ticket and its drafts as `acdaa39` in the francois repo. I uploaded the guide and this diary as one bundle with a table of contents (`remarquee upload bundle … --toc-depth 2`). The result was `OK: uploaded FRANCOIS-003 Yolo K3s Deployment Guide.pdf -> /ai/2026/10/13/FRANCOIS-003`. This proves the document reached the cloud, not that it has synced to the device. `docmgr doctor --ticket FRANCOIS-003 --stale-after 30` passed before the commit.
+
+## Step 3: Code changes for the deployment, public repository and Terraform
+
+The user approved the implementation and answered the open questions. I implemented the code side: sign-out that ends the ZITADEL session, the organization scope flag, invite-only gating and the root Dockerfile. I created the public GitHub repository, added the publish workflow, fixed the vulnerabilities the new CI exposed, and prepared and partly applied the Terraform changes. The cluster and Vault steps are blocked: Tailscale is logged out and the Vault token has expired, and both need an interactive login.
+
+Sign-out was verified in a browser against the Compose stack. After **Sign out**, the next `/auth/login` stops at ZITADEL's account selection, where the account shows as "Signed out", instead of silently signing back in.
+
+### Prompt Context
+**User prompt (verbatim):** "Ok, implement. commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)
+
+Repo is public.
+
+Save keys in vault.
+
+Sign up invite only
+
+Sign out ends zitadel."
+**Assistant interpretation:** Carry out the FRANCOIS-003 runbook. Answers: Q1, public repository and image; Q5, invite-only (ZITADEL `allow_register = false`, users created in the console); Q6, implement RP-initiated logout. All credentials go to Vault.
+**Inferred user intent:** Have Francois actually running on yolo with production-grade identity behavior.
+
+### What I did
+- Checked credentials. `gh` is logged in as `wesen` (repo scope). The AWS `manuel` profile works. Vault returns `403` on `token lookup-self` (expired token). `tailscale status` prints `Logged out.`, so `kubectl` cannot resolve `k3s-demo-1.tail879302.ts.net`. The public-IP kubeconfig times out.
+- **C1/C4/invite-only (commit `2c50123`).**
+  - `identity.Config.ExtraScopes`, `ValidateScopes` and `Provider.LogoutURL`, which builds `end_session_endpoint?client_id&post_logout_redirect_uri&id_token_hint`. `Exchange` now also returns the raw ID token.
+  - Migration `003_session_id_token.sql` adds `sessions.id_token`, cleared on revoke.
+  - `logout` returns `{"ok":true,"redirect":…}` and the UI follows it.
+  - New flags `--oidc-extra-scopes` and `--signup-allowed` (default off; Compose passes it). `/api/session` exposes `signupAvailable`.
+  - Unit tests in `pkg/catalog/identity/oidc_test.go` use a stub discovery document.
+- Moved `deploy/compose/Dockerfile` to `./Dockerfile` with OCI labels. Compose now builds from the root file.
+- **CI (commit `44447f2`).** Added `deploy/gitops-targets.json` and `.github/workflows/publish-image.yaml` (infra-tooling, GitHub App mode), with `open_gitops_pr: false` until the Vault role and App credential exist.
+- Scanned the full history for secret patterns before publishing. The only matches were the validator's own fixtures (`sk_live_abcdefghijklmnop`, `BEGIN RSA PRIVATE KEY` in test tables). Ran `gh repo create go-go-golems/francois --public --source . --push`.
+- **Fail fast (commit `9dc27cc`).** `--oidc-extra-scopes` is now validated before the database connection.
+- **Security (commit `72999cc`).**
+  - Toolchain `go1.26.9` (go.mod and Dockerfile `golang:1.26.9`), `golang.org/x/net v0.60.0` and `x/text v0.42.0`. `govulncheck`: "No vulnerabilities found."
+  - Four gosec findings got `#nosec` justifications: G124 on the dev-only non-Secure cookie, and three G705 on fixed-type embedded assets, an octet-stream attachment, and allowlisted asset types served with `nosniff`. gosec now exits 0.
+- **k3s worktree** (`feat/francois-yolo` from `origin/main` in a scratch worktree; the main checkout is on someone's `fix/hk3s-0044-tune-memory-down` branch and was not touched).
+  - Copied the draft package, Vault policies and roles, and the bootstrap script.
+  - Replaced the init container with a shell wrapper in the main container.
+  - Added the `francois` destination to `prod-apps` and a package README.
+  - `validate_gitops.sh`: `OK francois`, `Violations: 0`.
+- **terraform worktree** (`feat/francois-yolo`, commit `174ca7e`).
+  - `zitadel/francois/envs/prod` with `allow_register = false` by default, plus a README.
+  - DNS `wildcard_apps_francois_yolo_a`.
+  - Stripe module variables `app_slug`, `lookup_key_prefix` and `price_nickname`. Defaults are unchanged: the existing sandbox plan shows "No changes."
+  - New root `stripe/apps/francois/envs/sandbox`.
+- **Stripe applied.** Imported `prod_VQpH0Crg2Ztp5I` and `price_1UPxdFLeHmcfmvuCg0zsScj5`. The plan was "0 to add, 2 to change, 0 to destroy" (metadata, name, description, URL, tax code, lookup key, nickname, `tax_behavior` from unspecified to exclusive). Applied it, and a re-plan with `-detailed-exitcode` returned 0.
+
+### Why
+- Front-channel logout (a browser redirect) is used instead of the library's `rp.EndSession`, which calls the end-session endpoint server-side (`zitadel/oidc/v3/pkg/client/client.go:106–143`). ZITADEL's session cookie lives in the browser, so the browser has to visit the endpoint for ZITADEL to clear it.
+- The ID token is stored server-side with the session because `id_token_hint` lets ZITADEL end exactly that session without asking the user which one.
+- Q4 was resolved by reading `infra-tooling` `origin/main` `open_gitops_pr.py`. `replace_manifest_image_text` only enters a container list when a line is exactly `containers:`, so an `initContainers:` image would never be bumped. A shell wrapper (`sh -ec '<copy>; exec francois "$@"' francois <args>`) keeps a single image line.
+- Q2: the Compose sandbox key belongs to `acct_1TxEMcLeHmcfmvuC` ("Scapegoat Consulting sandbox"), and the Terraform-managed `prod_Ux95umhPXiXgXw` ("The Scapegoat Pro") is visible with that key. It is the same account, so I imported the hand-made Francois objects rather than duplicating them.
+
+### What worked
+- Browser test on Compose, after rebuilding the image:
+  1. The first `/auth/login` signed in silently (an old ZITADEL session), reproducing the problem.
+  2. **Sign out**, then `/auth/login`, landed on ZITADEL "Select Account" with `Ada Admin … Signed out`.
+  3. Signed in with a password, then called logout by fetch: `endpoint: http://localhost:18081/oidc/v1/end_session`, params `client_id, id_token_hint, post_logout_redirect_uri`, `hintLen: 1138`, `post: http://localhost:8090/`.
+  4. Signed in again silently (ZITADEL session still alive, as expected since the fetch did not follow the redirect), clicked **Sign out**, ran `/auth/login`: "Select Account" again.
+- Wrapper test in the built image as uid 10001: it copied `models.json` with mode `-rw-------` and passed the arguments through to `francois catalog serve`.
+- `TEST_DATABASE_URL=… go test ./... -count=1` and `golangci-lint run ./...` (0 issues) after each code change.
+
+### What didn't work
+- In the first browser run, Playwright's network list showed only `POST /auth/logout => 200` and no request to `:18081`. I suspected the redirect was not being followed. The next `/auth/login` showed ZITADEL's "Signed out" state, which proved it was: the network list does not include top-level navigations.
+- `go get golang.org/x/text@v0.41.0 golang.org/x/net@v0.60.0` failed with `golang.org/x/net@v0.60.0 requires golang.org/x/text@v0.42.0`. I used `x/text@v0.42.0`.
+- The first CI `Dependency Scanning` runs on `44447f2` and `9dc27cc` failed: gosec "Issues : 4", and govulncheck reported GO-2026-6629, -6617, -6613, -6612, -6611, -6610, -6608, -6607 and -6605 (x/text, x/net and the go1.26.5 stdlib). `72999cc` addresses them.
+- The first `publish-image` run (`44447f2`) was cancelled by the concurrency group when `9dc27cc` was pushed.
+
+### What I learned
+- ZITADEL's v1 login UI (Compose) and Login V2 (production) both honor `id_token_hint` plus `post_logout_redirect_uri` when the URI is registered on the client, as `catalog-setup` and the Terraform client do.
+- The reusable workflow sets OCI labels through metadata-action, so the Dockerfile `ARG VERSION/REVISION` defaults matter only for local builds.
+
+### What was tricky to build
+Logout for sessions created before migration 003 has no ID token. The redirect still carries `client_id`, which ZITADEL accepts, but without a hint it may ask which session to end. `TestLogoutURL` covers the hint-less form. The portal session is revoked before the redirect is computed, so a failed or missing redirect still leaves the user signed out of Francois.
+
+### What warrants a second pair of eyes
+- `tax_behavior` changed from unspecified to `exclusive` on the Francois sandbox Price. Checkout does not enable automatic tax, so the charged amount is unchanged, but a live Price needs the owner's tax decision (`terraform/stripe/README.md`).
+- Storing ID tokens in `sessions.id_token`. They are signed and contain the email address. They are cleared on revoke but are kept until then.
+
+### What should be done in the future
+- Vault, ZITADEL Terraform, DNS apply, the webhook endpoint, the k3s PR and the first sync: blocked on `vault login` and `tailscale up`.
+
+### Code review instructions
+- `pkg/catalog/identity/oidc.go` (`LogoutURL`, `Exchange`), `pkg/catalog/auth.go` (`logout`, `login`), `pkg/catalog/store/sessions.go`, `ui/catalog/ui.tsx` (Header).
+- Validate with `go test ./pkg/catalog/identity/` and `TEST_DATABASE_URL=… go test ./pkg/catalog/`, then the Compose browser round trip above.
+
+### Technical details
+- francois commits: `2c50123`, `44447f2`, `9dc27cc`, `72999cc`. GitHub: https://github.com/go-go-golems/francois.
+- terraform branch `feat/francois-yolo` @ `174ca7e` (worktree `scratchpad/tf-francois`). The Stripe state is at `stripe/francois/sandbox/terraform.tfstate`.
+- k3s branch `feat/francois-yolo` (worktree `scratchpad/k3s-francois`), not yet committed.
