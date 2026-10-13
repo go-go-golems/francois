@@ -36,6 +36,8 @@ func (s *Server) flowCookie() string {
 }
 
 func (s *Server) setCookie(w http.ResponseWriter, name, value string, maxAge int) {
+	// #nosec G124 -- Secure follows the portal scheme: always set for HTTPS
+	// deployments (with the __Host- prefix); off only for http://localhost.
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, Secure: s.Config.Secure(), SameSite: http.SameSiteLaxMode})
 }
 

@@ -13,7 +13,7 @@ COPY pkg/web/static ./pkg/web/static
 COPY pkg/catalog/web/static ./pkg/catalog/web/static
 RUN pnpm build && pnpm install --prod --frozen-lockfile
 
-FROM golang:1.26.5 AS server
+FROM golang:1.26.9 AS server
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

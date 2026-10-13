@@ -32,6 +32,7 @@ func (rt *Runtime) Handler(inst store.Instance) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", mime)
+		// #nosec G705 -- embedded build asset with a fixed type, not request data.
 		_, _ = w.Write(data)
 	})
 	m.HandleFunc("GET /launch", func(w http.ResponseWriter, r *http.Request) {
@@ -271,5 +272,7 @@ func (rt *Runtime) blob(w http.ResponseWriter, r *http.Request, inst store.Insta
 	if !strings.HasPrefix(kind, "image/") && !strings.HasPrefix(kind, "font/") && !strings.HasPrefix(kind, "video/") {
 		w.Header().Set("Content-Disposition", "attachment")
 	}
+	// #nosec G705 -- upload types are allowlisted (no HTML/SVG), the handler
+	// sets nosniff, and non-media types download as attachments.
 	_, _ = w.Write(data)
 }

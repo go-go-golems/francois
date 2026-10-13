@@ -184,5 +184,6 @@ func (h *Host) readFile(w http.ResponseWriter, r *http.Request, artifact string)
 	w.Header().Set("X-File-Size", strconv.FormatInt(before.Size(), 10))
 	w.Header().Set("X-File-Revision", hex.EncodeToString(hash.Sum(nil)))
 	w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(path.Base(name), `"`, "")+`"`)
+	// #nosec G705 -- served as application/octet-stream attachment, never rendered.
 	_, _ = w.Write(data)
 }
