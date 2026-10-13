@@ -1,0 +1,55 @@
+# Phase 6: add to kustomization.yaml only after the unrestricted baseline
+# works, so a blocked connection is not mistaken for a configuration error.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: francois
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: francois
+      app.kubernetes.io/component: app
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: traefik}
+        # kubelet probes arrive from the node address.
+        - ipBlock: {cidr: 91.98.46.169/32}
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: postgres}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+              app.kubernetes.io/component: primary
+      ports:
+        - {protocol: TCP, port: 5432}
+    # The public ZITADEL issuer hairpins to Traefik's in-cluster endpoint.
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: traefik}
+      ports:
+        - {protocol: TCP, port: 8443}
+    # Stripe API and the Pi model provider use public HTTPS.
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 443}

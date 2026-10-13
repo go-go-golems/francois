@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: francois
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: "francois"
+    app.kubernetes.io/part-of: "prod-apps"
+    app.kubernetes.io/managed-by: "argocd"
+    scapegoat.dev/tier: "app"
+    scapegoat.dev/source-type: "kustomize"
+    scapegoat.dev/has-database: "true"
+    scapegoat.dev/has-persistent-storage: "true"
+    scapegoat.dev/has-ingress: "true"
+    scapegoat.dev/database-type: "postgres"
+  annotations:
+    scapegoat.dev/description: "Francois hosted subscriber catalog: portal plus isolated instance origins"
+spec:
+  project: prod-apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: francois
+  source:
+    repoURL: https://github.com/wesen/2026-03-27--hetzner-k3s.git
+    targetRevision: main
+    path: gitops/kustomize/francois
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

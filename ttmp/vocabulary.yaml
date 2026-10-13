@@ -7,6 +7,10 @@ topics:
       description: WebSocket lifecycle & events
     - slug: llm
       description: Language model runtime and provider integration
+    - slug: deployment
+      description: Packaging, GitOps and runtime deployment
+    - slug: kubernetes
+      description: Kubernetes, K3s and Argo CD
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

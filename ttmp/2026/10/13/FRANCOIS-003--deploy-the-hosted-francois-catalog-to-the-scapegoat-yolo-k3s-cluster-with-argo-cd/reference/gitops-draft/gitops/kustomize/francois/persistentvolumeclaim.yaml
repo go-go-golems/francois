@@ -1,0 +1,15 @@
+# Release blobs, Pi provider copy and worker scratch. Same wave as the
+# Deployment: local-path binds only when the consuming Pod is scheduled.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: francois-data
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi

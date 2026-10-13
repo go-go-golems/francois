@@ -1,0 +1,7 @@
+{
+  "bound_service_account_names": ["francois"],
+  "bound_service_account_namespaces": ["francois"],
+  "policies": ["francois-prod"],
+  "ttl": "1h",
+  "max_ttl": "4h"
+}

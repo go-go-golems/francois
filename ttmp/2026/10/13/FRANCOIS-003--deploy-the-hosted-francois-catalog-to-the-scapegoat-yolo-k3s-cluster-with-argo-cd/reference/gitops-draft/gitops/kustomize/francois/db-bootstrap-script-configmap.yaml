@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: francois-db-bootstrap-script
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  bootstrap.sh: |
+    #!/bin/sh
+    set -eu
+
+    export PGHOST="${POSTGRES_SERVICE_HOST}"
+    export PGPORT="${POSTGRES_SERVICE_PORT}"
+    export PGUSER="${POSTGRES_ADMIN_USER}"
+    export PGPASSWORD="${POSTGRES_ADMIN_PASSWORD}"
+
+    psql -d postgres -v ON_ERROR_STOP=1 <<SQL
+    DO \$\$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${FRANCOIS_DB_USER}') THEN
+        EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '${FRANCOIS_DB_USER}', '${FRANCOIS_DB_PASSWORD}');
+      ELSE
+        EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', '${FRANCOIS_DB_USER}', '${FRANCOIS_DB_PASSWORD}');
+      END IF;
+    END
+    \$\$;
+    SQL
+
+    database_exists="$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '${FRANCOIS_DB_NAME}'")"
+
+    if [ "${database_exists}" != "1" ]; then
+      psql -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${FRANCOIS_DB_NAME}\" OWNER \"${FRANCOIS_DB_USER}\""
+    fi
+
+    psql -d postgres -v ON_ERROR_STOP=1 -c "ALTER DATABASE \"${FRANCOIS_DB_NAME}\" OWNER TO \"${FRANCOIS_DB_USER}\""
+    psql -d postgres -v ON_ERROR_STOP=1 -c "GRANT ALL PRIVILEGES ON DATABASE \"${FRANCOIS_DB_NAME}\" TO \"${FRANCOIS_DB_USER}\""
+
+    echo "francois database bootstrap complete"

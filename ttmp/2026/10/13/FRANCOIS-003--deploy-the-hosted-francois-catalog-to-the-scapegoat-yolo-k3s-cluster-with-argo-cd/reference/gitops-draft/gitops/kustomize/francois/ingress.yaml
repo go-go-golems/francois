@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: francois
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    app.kubernetes.io/name: francois
+    app.kubernetes.io/component: app
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - francois.yolo.scapegoat.dev
+        - "*.apps.francois.yolo.scapegoat.dev"
+      secretName: francois-tls
+  rules:
+    - host: francois.yolo.scapegoat.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: francois
+                port:
+                  number: 80
+    - host: "*.apps.francois.yolo.scapegoat.dev"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: francois
+                port:
+                  number: 80

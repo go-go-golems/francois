@@ -1,0 +1,7 @@
+{
+  "bound_service_account_names": ["francois-db-bootstrap"],
+  "bound_service_account_namespaces": ["francois"],
+  "policies": ["francois-db-bootstrap"],
+  "ttl": "1h",
+  "max_ttl": "4h"
+}
