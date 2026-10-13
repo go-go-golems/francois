@@ -1,0 +1,36 @@
+{
+  "files": [
+    {
+      "original": "/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/07/26/PROJECT REPORT - Stripe Billing - End to End Subscription Infrastructure and Acceptance.md",
+      "snapshot": "sources/01-prior-stripe-billing-report.md",
+      "bytes": 35583,
+      "sha256": "24e2170998972b25f896022e48af7cdcbd22f230bc6e6922d11fcc9bbae1992b"
+    },
+    {
+      "original": "/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/07/27/ARTICLE - Playbook - Subscription Search Product Architecture.md",
+      "snapshot": "sources/02-subscription-product-playbook.md",
+      "bytes": 30637,
+      "sha256": "ff819c496c4e535daed340f6bc31614be178027dcab3ca33a09338bb7c1aeba3"
+    },
+    {
+      "original": "/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/08/02/PROJECT REPORT - hyperblog - A Subscription Blog Whose Cursor Is a Glossary Term.md",
+      "snapshot": "sources/03-hyperblog-report.md",
+      "bytes": 34990,
+      "sha256": "badec58c8fcfdd1c42545114abb698cdaa3daf6aa01ca57c4604869ab2d868f4"
+    },
+    {
+      "original": "/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/09/15/PROJ - Fortress - Developer Portal and Go Authentication Toolkit.md",
+      "snapshot": "sources/04-fortress-report.md",
+      "bytes": 27083,
+      "sha256": "4a44602e76938049ec42d65456e4aa2a6600a8bcf71321923076293f365a1a13"
+    },
+    {
+      "original": "/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/07/21/PROJ - serve-artifacts - Write API, Production Deployment, and the JSON Contract.md",
+      "snapshot": "sources/05-serve-artifacts-report.md",
+      "bytes": 26657,
+      "sha256": "71178b33b39e7bf29ab3f7ce374b5f2552261451ba4597884d85d351b552119b"
+    }
+  ],
+  "francois_commit": "bd373eba8d00b4329f33e801a63161fb0ec4b626",
+  "prior_billing_repo_commit": "f119d6d1c5ea3ed79b1a560a899159e61e18ee15"
+}
