@@ -15,3 +15,7 @@ Uploaded guide + diary bundle to reMarkable: /ai/2026/10/13/FRANCOIS-003/FRANCOI
 ## 2026-10-13
 
 Implemented sign-out through ZITADEL end_session, --oidc-extra-scopes, invite-only --signup-allowed, root Dockerfile, publish workflow; public repo go-go-golems/francois; image ghcr.io/go-go-golems/francois:sha-72999cc (public); Stripe francois catalog imported+applied; PRs wesen/2026-03-27--hetzner-k3s#339 and wesen/terraform#34 open
+
+## 2026-10-13
+
+Deployed: Argo francois Synced/Healthy, wildcard cert issued, smoke tests pass, Stripe webhook enabled (k3s 0e06f98, image sha-7f1441a)

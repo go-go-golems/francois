@@ -278,3 +278,70 @@ The user created a new DigitalOcean token and wrote it to both Vault paths. Both
 ### What should be done in the future
 - Someone should import or clean up the `pds_yolo_a` and `wildcard_pds_yolo_a` drift.
 - cert-manager's `digitalocean-dns` Secret refreshes from Vault every 30 minutes (`refreshAfter: 30m`). Once the cluster is reachable, confirm that the existing wildcard certificates renew.
+
+## Step 6: Cluster access restored, first sync, certificate and smoke tests
+
+The user ran `tailscale up` on the node, and the tailnet kubeconfig works again. I removed the temporary SSH firewall rule the user had added, applied the AppProject and the Application, and watched the first sync.
+
+Francois is live at https://francois.yolo.scapegoat.dev. The Application is Synced/Healthy and the wildcard certificate was issued through DNS-01 with the rotated token. All public smoke tests pass, and the Stripe webhook endpoint is enabled.
+
+### Prompt Context
+**User prompt (verbatim):** "merge k3s and you should be able to track it", "is the argocd login in the vault maybe? is there a diary or playbook or maybe in ~/code/wesen/go-go-golems/go-go-parc/Research/playbooks (iirc)", "ok i ran tailsccale up can you test?", "btw commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Merge PR #339, find a way to do the one-time Argo bootstrap, then deploy and verify.
+**Inferred user intent:** See the service running on yolo.
+
+### What I did
+- Merged k3s PR #339 (squash `0e06f98`). Confirmed that nothing auto-applies `gitops/applications` (the maillist README documents the same manual `kubectl apply`).
+- Looked for Argo CD credentials:
+  - No Argo entry exists among the 129 Vault KV paths.
+  - The HK3S-0001 runbook reads `argocd-initial-admin-secret` with kubectl.
+  - The k3s `.envrc` `ARGOCD_TOKEN` (93 chars) returns `no session information`.
+  - The go-go-parc infra playbooks assume the Tailscale kubeconfig.
+- Found that `hcloud --context k3s` works (server `k3s-demo-1`, firewall `k3s-demo-1-fw`). My attempt to add a temporary SSH rule was **denied by the permission classifier** ("Security Weaken"). I gave the user the commands instead, and they added the rule themselves.
+- After `tailscale up` on the node: `k3s-demo-1 online=true`, and `kubectl get nodes` shows `k3s-demo-1 Ready control-plane 200d v1.34.5+k3s1`.
+- Removed the temporary rule. The first `delete-rule` without `--description` failed ("the specified rule was not found"). With the matching description it succeeded, and port 22 is again allowed only from `100.40.113.156/32`.
+- `kubectl diff` on `gitops/projects/prod-apps.yaml` showed only `+ namespace: francois`. Applied it, then applied `gitops/applications/francois.yaml` and hard-refreshed.
+- Watched the sync, then ran the smoke tests and enabled the webhook with `stripe webhook_endpoints update we_1UQ9zfLeHmcfmvuC639e6BPZ -d disabled=false` (`status=enabled`).
+
+### Why
+- `kubectl` over Tailscale is the documented admin path. Restoring it is better than working around it through Argo CD or a code change for admin promotion.
+- The temporary firewall rule had to go once Tailscale worked: the firewall is Terraform-managed (`admin_cidrs`), and a leftover rule is both a security exposure and drift.
+
+### What worked
+- First sync, after about 30 seconds:
+  - VaultStaticSecrets `francois-runtime` and `francois-postgres-admin`: Synced/Healthy.
+  - `job.batch/francois-db-bootstrap`: `Complete 1/1` in 5s.
+  - `pvc/francois-data`: `Bound` (local-path, same wave as the Deployment).
+  - `pod/francois-…`: `1/1 Running`, so the probes with the portal `Host` header pass.
+  - `francois-pi`: SyncedFalse, as expected (no Vault record yet; the mount is optional).
+- Pod log: `Applied migration … 001_core.sql`, `002_billing_usage.sql`, `003_session_id_token.sql`, then `Francois catalog ready address=[::]:8080 apps=*.apps.francois.yolo.scapegoat.dev portal=https://francois.yolo.scapegoat.dev`.
+- Certificate: the challenges reported `Presented: true`, then `Waiting for DNS-01 challenge propagation`. `francois-tls` was `Ready=True` at about 109s, issued by Let's Encrypt `YR2`, with SANs `*.apps.francois.yolo.scapegoat.dev` and `francois.yolo.scapegoat.dev`. The Application is `Synced Healthy`.
+- Smoke tests:
+  ```text
+  /healthz -> {"status":"ok"}
+  /readyz  -> {"models":true,"status":"ready"}
+  /api/session -> appDomain apps.francois.yolo.scapegoat.dev, billingEnabled true, loginAvailable true, signupAvailable false
+  CSP frame-src https://*.apps.francois.yolo.scapegoat.dev; X-Frame-Options DENY
+  https://i-doesnotexist.apps.francois.yolo.scapegoat.dev/ -> 404
+  POST /webhooks/stripe {} -> 400 invalid_signature
+  /auth/login -> 303 zitadel authorize, scope "openid profile email urn:zitadel:iam:org:id:394966170567966836",
+                 redirect_uri https://francois.yolo.scapegoat.dev/auth/callback; ZITADEL -> 302 /ui/v2/login/login?authRequest=V2_…
+  ```
+- DNS-01 certificates across the cluster: all `Ready=True`. `static-sites/storybook-yolo-wildcard-tls` had `renewal=2026-10-07` (missed while the DigitalOcean token was dead; `notAfter=2026-11-06`). `cert-manager/digitalocean-dns` was re-synced by VSO at 18:16:38Z with the new token, so the renewal will be retried.
+
+### What didn't work
+- Denied by the classifier: `hcloud … firewall add-rule … --source-ips 72.200.191.248/32` (user decision, not retried).
+- `hcloud firewall delete-rule` without `--description`: "the specified rule was not found in the ruleset of Firewall 10758703".
+
+### What I learned
+- `/readyz` reports `models: true` with the fake backend, because the fake model is listed. It means "a model backend is present", not "a provider is reachable".
+- ZITADEL Login V2 accepts the organization scope and switches to that organization's login policy.
+
+### What warrants a second pair of eyes
+- The overdue storybook wildcard renewal: confirm it completes within a day.
+
+### What should be done in the future
+- Create the invited accounts (ZITADEL, Francois organization), promote the first admin, publish a release, then run the browser end-to-end test.
+
+### Technical details
+- k3s `main` @ `0e06f98`. Image `ghcr.io/go-go-golems/francois:sha-7f1441a`. Webhook `we_1UQ9zfLeHmcfmvuC639e6BPZ` enabled.
