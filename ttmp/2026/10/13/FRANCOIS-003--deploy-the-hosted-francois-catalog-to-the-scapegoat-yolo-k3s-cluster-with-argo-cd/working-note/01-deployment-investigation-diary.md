@@ -532,3 +532,104 @@ Mid-turn: "actually i stored the key in /tmp/lunaroute.key (for francois)"
 - Vault `kv/apps/francois/prod/pi` v2 keys: `auth.json`, `models-store.json`, `settings.json`.
 - k3s `main` `d826168` (#343). Terraform `feat/francois-yolo` `1607bf2`.
 - Evidence: `various/e2e/06-sample-instance.png`.
+
+## Step 10: slop.boutique as a second site, with delegated ACME validation
+
+This step makes one Francois process serve the same catalog under a second domain, `slop.boutique`, whose zone lives on a friend's Cloudflare account. The portal is the bare name and instances are its single-label children (`i-<id>.slop.boutique`). Our cluster obtains the certificate without a Cloudflare token: the owner delegates the ACME challenge name to our DigitalOcean zone with one CNAME.
+
+Outcome: francois `a8200b9` adds `--site <origin>=<app domain>`. The pod (image `sha-a8200b9`, k3s #344 and #345 → `26fb78d`) logs a ready line for both sites. Through a port-forward with `Host: slop.boutique`, the site answers with its own app domain, CSP, `www` redirect and sign-in callback. The certificate is pending until the owner adds the challenge CNAME. The ZITADEL URI change (terraform `5b07f73`) is planned but not applied, because the permission classifier refused `terraform apply`.
+
+### Prompt Context
+**User prompts (verbatim):**
+- "Give me the DNS instructions again for my friend, they use cloudflare, now that we set up the thing"
+- "hey it's for them to redirect slop.boutique and co to our setup"
+- "add support for second domain. delegate to ours so we can do SSL." (interrupted)
+- "we want slop.boutique, the sub wildcard, and we can modify francois. How would we do that?"
+- "write text that i can give them on how to do it"
+- "ok, sent it to them, continue our side."
+
+**Assistant interpretation:** Serve Francois on `slop.boutique` with instances under `*.slop.boutique`, get TLS by DNS-01 through a delegated challenge CNAME, and change the Francois code so every absolute URL follows the domain a request arrives on.
+
+**Inferred user intent:** Friends' domains front the same hosted catalog without moving their DNS hosting or sharing provider credentials.
+
+### What I did
+- **No earlier DNS instructions existed.** I searched this session's transcript, every other Claude Code project transcript and the Pi sessions: none mentions a friend or `slop.boutique`. `dig` showed the zone on Cloudflare nameservers, with `@` proxied to a live site and no `www` record.
+- **Francois code (`a8200b9`).**
+  - New `catalog.Site{PublicURL, AppDomain, AppScheme, AppPort, OIDC}` replaces the single URL fields. `Config.Sites[0]` is the primary site, and `Config.Validate` rejects:
+    - a missing site, or a URL that isn't a bare origin;
+    - a scheme that differs from the primary's;
+    - a malformed app domain;
+    - a repeated portal host or app domain;
+    - a site without an OIDC provider.
+  - `Server.Handler` matches portal hosts first, then `www.<portal>` (308 to the portal), then `Site.instanceName` for `i-<id>.<app domain>`. A request is 421 when no site matches or the port is wrong.
+  - The portal handlers read the site from the request context (`s.site(r)`):
+    - the Origin check, CSP `frame-src` and `/api/session` `appDomain`;
+    - instance `origin` in JSON (`instanceJSON(r, i)`) and in launch codes;
+    - login/callback/logout through `site.OIDC` (one relying party per callback URL);
+    - Stripe Checkout and Portal return URLs (`Checkout(ctx, u, portal)`, `Portal(ctx, u, portal)`).
+  - The payments `Deployment` idempotency tag stays `francois-<primary host>`.
+  - `hosted.Runtime.Handler(inst, portal, origin)` now receives the portal origin used for frame-ancestors, `data-portal` and the boot `portalOrigin`. `hosted.Config` no longer carries origins.
+  - `--app-domain` may now equal the portal hostname. The portal is the bare name, and instance labels are single-label children.
+  - Tests:
+    - `TestSecondSite` (Postgres) covers the per-site session/CSP, the `www` 308, a rejected cross-site Origin, the same instance under both domains, a launch through the second site with frame-ancestors and `portalOrigin`, and a launch code refused on the other site's origin.
+    - `TestConfigValidate` and `TestInstanceName` are pure unit tests.
+    - `go test ./...` passed with `TEST_DATABASE_URL`; `golangci-lint run ./...` reported 0 issues.
+- **Terraform (`5b07f73` on PR #34).**
+  - New `alias_urls` variable (default `["https://slop.boutique"]`).
+  - `redirect_uris` and `post_logout_redirect_uris` are now built over `concat([public_url], alias_urls)`.
+  - Plan: 1 to change, exactly the two added URIs.
+- **k3s.**
+  - **#344** (automated pin `sha-a8200b9`) merged first, because the old image would reject the unknown flag.
+  - **#345** (`26fb78d`) adds:
+    - ClusterIssuer `letsencrypt-prod-dns01-digitalocean-follow`: the DigitalOcean solver with `cnameStrategy: Follow`, so existing certificates keep the plain issuer;
+    - Certificate `francois-slop-boutique-tls` for `slop.boutique` and `*.slop.boutique`;
+    - two Ingress hosts plus a second TLS entry;
+    - the Deployment arg `--site=https://slop.boutique=slop.boutique`.
+  - A server-side dry run of the issuer, the certificate and the rendered kustomization passed before the merge.
+- **Friend's instructions**, in two stages:
+  1. Now: `_acme-challenge` CNAME `slop-boutique.acme.scapegoat.dev`, DNS only, plus a CAA record for `letsencrypt.org` if they already have CAA records.
+  2. After the certificate is issued: `@` and `*` CNAME to `francois.yolo.scapegoat.dev`, DNS only.
+
+### Why
+- **Why `*.slop.boutique` and not `*.apps.slop.boutique`:** the challenge for `slop.boutique` and the challenge for `*.slop.boutique` both live at `_acme-challenge.slop.boutique`, so the owner adds one delegation CNAME. A two-level wildcard would need a second one.
+- **Why portal and instances may share a registrable domain:** the session and flow cookies use the `__Host-` prefix, which forbids a `Domain` attribute, so an instance cannot set or overwrite them. Portal mutations need the exact portal `Origin` plus the CSRF header. The production primary already has both under `scapegoat.dev`.
+- **Why the follow strategy uses a separate issuer:** `cnameStrategy: Follow` changes where every certificate on that issuer writes its TXT record. A new issuer limits the change to certificates that ask for it.
+- **Why launch codes carry the site's instance origin:** the exchange compares the stored origin with the request's origin. A code issued on one site's portal therefore cannot be redeemed through the other site's instance origin, which `TestSecondSite` asserts.
+
+### What worked
+- Probing the pod with `kubectl port-forward svc/francois` and `Host:` headers:
+  - `/api/session` on `slop.boutique` → `{"appDomain":"slop.boutique",…}`;
+  - CSP `frame-src https://*.slop.boutique`;
+  - `www.slop.boutique/account?x=1` → `308 https://slop.boutique/account?x=1`;
+  - `/auth/login` → ZITADEL with `redirect_uri=https%3A%2F%2Fslop.boutique%2Fauth%2Fcallback`;
+  - `i-nope.slop.boutique` → 404 `Unknown instance`;
+  - the primary host → 200.
+- Pod log: two `Francois catalog ready` lines, `portal=https://francois.yolo.scapegoat.dev` and `portal=https://slop.boutique`.
+
+### What didn't work
+- `terraform apply` for the ZITADEL change was refused by the permission classifier: `Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Protected-Scope IaC Apply]`. The change is committed and planned; the user applies it.
+- The `slop.boutique` challenge is pending with `reason=<redacted DigitalOcean SDK error: godo.ErrorResponse …>`. The challenge CNAME does not exist yet, so cert-manager looks for a `slop.boutique` zone in our DigitalOcean account. Nothing has been presented to Let's Encrypt, so no ACME failure or long backoff accrues. The presentation is retried on the controller's rate limit.
+- Argo shows `francois` OutOfSync/Progressing because the Ingress (wave 3) waits for the certificate (wave 2) to become Ready. This is expected until issuance.
+- golangci-lint flagged the named returns on `instanceName` (`nonamedreturns`); I rewrote it with unnamed results.
+
+### What I learned
+- One wildcard covers the portal and its instances when the app domain equals the portal hostname, and the ACME challenge names for the bare name and the wildcard coincide.
+- Argo sync waves make an Ingress wait for its certificate's health. A new host cannot be routed by Traefik before issuance, which avoids serving the default certificate.
+
+### What was tricky to build
+- Ordering the deploy against the image. The `--site` arg had to land after the pin PR, or the old binary would exit on an unknown flag. I merged #344, rebased the branch onto it, added the arg and then opened #345.
+- Choosing a request-scoped site without threading a parameter through every handler. The site goes into the request context in `Handler`, and `s.site(r)` falls back to the primary.
+
+### What warrants a second pair of eyes
+- An open Checkout attempt is reused for retries. A user who starts Checkout on one site and retries on the other within the session's lifetime returns to the first site. Access is unaffected; only the landing page differs.
+- Sessions are per domain (host-only cookies). A user signs in separately on each site, which is intended but visible.
+
+### What should be done in the future
+- User: apply terraform `zitadel/francois/envs/prod` (5b07f73). Until then, sign-in on `slop.boutique` fails at ZITADEL with an invalid redirect URI.
+- When the owner adds the challenge CNAME, confirm `Certificate francois-slop-boutique-tls` turns Ready and Argo applies the Ingress. Then the owner switches `@` and `*`, and a browser run on `slop.boutique` (sign-in, launch, sign-out) closes the task.
+
+### Technical details
+- Code `a8200b9`; image `ghcr.io/go-go-golems/francois:sha-a8200b9`.
+- k3s #344 (pin) and #345 → `26fb78d`.
+- Terraform PR #34 `5b07f73`.
+- Delegation target: `slop-boutique.acme.scapegoat.dev` (TXT written by cert-manager in the `scapegoat.dev` DigitalOcean zone).

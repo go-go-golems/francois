@@ -27,3 +27,7 @@ NetworkPolicy (#340), release-blob backup verified (#341), automated GitOps PR l
 ## 2026-10-13
 
 Pi backend live with LunaRoute only (k3s #343); models approved; real subscriber call verified. GitHub/Google invited-user sign-in added to Terraform PR #34 (disabled until OAuth clients exist).
+
+## 2026-10-13
+
+Second site slop.boutique: catalog serve --site (a8200b9), follow-CNAME DNS-01 issuer + certificate + ingress (k3s #345), ZITADEL alias URIs planned (terraform 5b07f73, apply pending)

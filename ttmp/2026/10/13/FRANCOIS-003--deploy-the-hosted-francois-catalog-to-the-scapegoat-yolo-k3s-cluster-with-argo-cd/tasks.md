@@ -13,3 +13,4 @@
 - [x] Phase 7: Pi backend (Vault pi record, --backend=pi, approve models) <!-- t:59st -->
 - [x] Phase 8: enable CI GitOps PRs (check Q4 init image line); release-blob backup CronJob and restore check <!-- t:r3f0 -->
 - [ ] GitHub/Google sign-in: create OAuth clients, write Vault idp-github/idp-google, set client IDs, apply <!-- t:53y8 -->
+- [ ] slop.boutique second site: apply ZITADEL alias_urls (5b07f73), confirm cert after owner's challenge CNAME, browser run on slop.boutique <!-- t:yjp8 -->
