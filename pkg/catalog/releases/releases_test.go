@@ -20,8 +20,8 @@ func TestValidateExamplesAndBlockers(t *testing.T) {
 	}
 	base := `<!doctype html><html><head></head><body>`
 	for name, body := range map[string]string{
-		"bootstrap":  `<script type="application/json" id="francois-view">{}</script>`,
-		"credential": `const key = "sk_live_abcdefghijklmnop"`,
+		"bootstrap":   `<script type="application/json" id="francois-view">{}</script>`,
+		"credential":  `const key = "sk_live_abcdefghijklmnop"`,
 		"private key": "-----BEGIN RSA PRIVATE KEY-----",
 	} {
 		_, checks := Validate(Upload{ArtifactID: "x", Title: "X", Version: "1", HTML: []byte(base + body + "</body></html>")})

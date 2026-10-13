@@ -153,3 +153,59 @@ Initialized from `go-go-golems/go-template` commit
 `5bf14bfd4a7b13124dbe9f2c3078c29a33627a11`.
 Detailed design, evidence, tasks, and implementation diary are in docmgr ticket
 **FRANCOIS-001**, under `ttmp/2026/10/11/`.
+
+## Hosted subscriber catalog
+
+`francois catalog` is a separate, multi-user service: subscribers sign in through
+ZITADEL (OIDC code + PKCE), subscribe through Stripe-hosted Checkout, and run
+release-pinned application instances. Each instance executes on its own origin
+(`i-<id>.<app-domain>`), never on the trusted portal/admin origin, and receives
+the same `window.claude` runtime with server-enforced, instance-scoped `db`,
+`room`, `user`, `assets`, `comments` and quota-controlled `sample` calls served by
+the operator's Pi configuration. The local `serve` command is unchanged.
+
+Run the whole stack locally (Linux; uses host networking so the browser and the
+server share `http://localhost:18081` as the issuer):
+
+```sh
+docker compose -f deploy/compose/compose.yaml up --build
+docker compose -f deploy/compose/compose.yaml logs zitadel-setup   # test users
+```
+
+Open `http://localhost:8090` and sign in as `admin@francois.test`,
+`alice@francois.test` or `bob@francois.test` (password `Password1!`). Optional
+settings go in the ignored `deploy/compose/.env`:
+
+```sh
+STRIPE_API_KEY=sk_test_...        # sandbox key; enables the stripe profile
+STRIPE_PRICE_ID=price_...         # server-controlled recurring Price
+FRANCOIS_BACKEND=pi               # default: fake deterministic model
+PI_AGENT_DIR=/home/you/.pi/agent  # provider files are copied, read-only source
+```
+
+With Stripe: `docker compose -f deploy/compose/compose.yaml --profile stripe up -d`.
+The forwarder's signing secret is handed to the server through the bootstrap
+volume; only verified webhooks change access.
+
+Operator commands (all take `--database-url` or `--database-url-file`):
+
+```sh
+francois catalog migrate
+francois catalog serve --public-url https://francois.example --app-domain apps.example ...
+francois catalog publish --artifact-id polis --version 1.0.0 --html examples/polis.html --actor-user-id usr_...
+francois catalog users promote --issuer https://issuer --subject <sub>   # bootstrap admin
+francois catalog users grant-access --user-id usr_... --days 30 --reason pilot
+francois catalog settings --file settings.json                         # validated revision
+```
+
+The admin UI (`/admin`) covers HTML upload → check → draft → isolated preview →
+publish/withdraw, users (roles, disable, session revocation, complimentary
+access, credit adjustments), instances (inspect, suspend), billing events and
+reconciliation, model usage, versioned settings (approved models, thinking
+levels, credit weights, allowance and limits) and the audit log.
+
+Integration tests need a PostgreSQL server; each test creates its own database:
+
+```sh
+TEST_DATABASE_URL='postgres://user:pass@127.0.0.1:5432/postgres?sslmode=disable' go test ./pkg/catalog/...
+```

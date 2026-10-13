@@ -37,6 +37,8 @@ type Config struct {
 	// BillingRequired is false when no Stripe configuration exists; access
 	// then comes only from complimentary grants.
 	PriceID string
+	// GrantTTL bounds instance runtime grants; zero means 30 minutes.
+	GrantTTL time.Duration
 }
 
 type Server struct {
@@ -70,7 +72,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 		cfg.AppPort = cfg.PublicURL.Port()
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, OIDC: oidc, Payments: pay, Backend: b}
-	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{PortalOrigin: cfg.PortalOrigin(), AppOrigin: cfg.AppOrigin})
+	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{PortalOrigin: cfg.PortalOrigin(), AppOrigin: cfg.AppOrigin, GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {
 			// Lost entitlement closes live views promptly; new requests

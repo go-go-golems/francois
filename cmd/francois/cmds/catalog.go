@@ -79,6 +79,7 @@ type CatalogServeSettings struct {
 	StripePriceID      string   `glazed:"stripe-price-id"`
 	StripeLiveMode     bool     `glazed:"stripe-live-mode"`
 	TrialAllowed       bool     `glazed:"trial-allowed"`
+	GrantTTL           string   `glazed:"grant-ttl"`
 	Backend            string   `glazed:"backend"`
 	Node               string   `glazed:"node"`
 	Worker             string   `glazed:"worker"`
@@ -194,7 +195,11 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		backend = client
 	}
 	defer func() { _ = backend.Close() }()
-	srv := catalog.New(ctx, catalog.Config{PublicURL: public, AppDomain: s.AppDomain, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID},
+	grantTTL, err := time.ParseDuration(s.GrantTTL)
+	if err != nil || grantTTL < time.Minute || grantTTL > 12*time.Hour {
+		return errors.New("grant-ttl must be a duration between 1m and 12h")
+	}
+	srv := catalog.New(ctx, catalog.Config{PublicURL: public, AppDomain: s.AppDomain, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, GrantTTL: grantTTL},
 		db, &releases.Publisher{Store: db, Blobs: blobs}, oidc, pay, backend)
 	return srv.Run(ctx, s.Listen)
 }
@@ -451,6 +456,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("stripe-webhook-secret-files", fields.TypeStringList, fields.WithHelp("Current and previous webhook signing secret files")),
 			fields.New("stripe-price-id", fields.TypeString, fields.WithHelp("Server-controlled recurring Price ID for the subscriber plan")),
 			fields.New("stripe-live-mode", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Expect live-mode keys and events")),
+			fields.New("grant-ttl", fields.TypeString, fields.WithDefault("30m"), fields.WithHelp("Lifetime of instance runtime grants (renewed through the portal)")),
 			fields.New("trial-allowed", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Grant access while a subscription is trialing")),
 			fields.New("backend", fields.TypeChoice, fields.WithChoices("pi", "fake"), fields.WithDefault("fake"), fields.WithHelp("Operator Pi model worker or deterministic fake")),
 			fields.New("node", fields.TypeString, fields.WithDefault("node"), fields.WithHelp("Node executable")),

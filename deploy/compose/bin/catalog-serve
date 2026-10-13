@@ -15,7 +15,7 @@ fi
 args=(catalog serve --listen 127.0.0.1:8090 --public-url "$PUBLIC_URL" --app-domain "$APP_DOMAIN"
   --database-url "$DATABASE_URL" --release-dir /var/lib/francois/releases --worker-dir /var/lib/francois/worker
   --oidc-issuer "$ISSUER" --oidc-client-id-file /bootstrap/oidc-client-id
-  --backend "$BACKEND" --pi-agent-dir "$PI_DIR" --worker /app/worker/dist/main.js)
+  --backend "$BACKEND" --grant-ttl "${GRANT_TTL:-30m}" --pi-agent-dir "$PI_DIR" --worker /app/worker/dist/main.js)
 if [[ -n ${STRIPE_PRICE_ID:-} ]]; then
   # The stripe profile writes its listener secret shortly after starting.
   for _ in $(seq 1 30); do [[ -s /bootstrap/stripe-webhook-secret ]] && break; sleep 1; done

@@ -117,6 +117,7 @@ services:
       PUBLIC_URL: http://localhost:8090
       APP_DOMAIN: apps.localhost
       BACKEND: ${FRANCOIS_BACKEND:-fake}
+      GRANT_TTL: ${GRANT_TTL:-30m}
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
     depends_on:
       zitadel-setup:
