@@ -105,6 +105,9 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 	if s.AppDomain == "" || strings.HasPrefix(s.AppDomain, ".") || strings.EqualFold(s.AppDomain, public.Hostname()) {
 		return errors.New("app-domain must be a separate domain, e.g. apps.example")
 	}
+	if err = identity.ValidateScopes(s.OIDCExtraScopes); err != nil {
+		return err
+	}
 	db, err := openCatalog(ctx, s.dbSettings)
 	if err != nil {
 		return err
@@ -140,9 +143,6 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		if clientSecret, err = secret("", s.OIDCClientSecret); err != nil {
 			return err
 		}
-	}
-	if err = identity.ValidateScopes(s.OIDCExtraScopes); err != nil {
-		return err
 	}
 	oidc := identity.New(identity.Config{Issuer: s.OIDCIssuer, ClientID: s.OIDCClientID, ClientSecret: clientSecret, RedirectURL: strings.TrimSuffix(s.PublicURL, "/") + "/auth/callback", ExtraScopes: s.OIDCExtraScopes})
 	var pay *payments.Service
