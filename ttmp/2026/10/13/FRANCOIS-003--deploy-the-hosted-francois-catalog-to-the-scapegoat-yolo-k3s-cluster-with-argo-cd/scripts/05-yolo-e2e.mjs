@@ -128,6 +128,60 @@ try {
     log("portal API from instance origin:", probe);
     await page.screenshot({ path: `${out}/04-instance.png`, fullPage: true });
     await ctx.storageState({ path: statePath("alice") });
+  } else if (step === "admin-models") {
+    // Approve the LunaRoute models (the only provider configured) and give
+    // subscribers a monthly and daily credit allowance.
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await login(page, creds.admin_username, creds.admin_password);
+    const result = await page.evaluate(async () => {
+      const s = await (await fetch("/api/session")).json();
+      const cur = await (await fetch("/api/admin/settings")).json();
+      const available = cur.providerModels.map((m) => m.selector);
+      const want = [
+        { selector: "lunaroute/glm-5.3-flash", label: "GLM 5.3 Flash", thinking: ["off", "minimal", "low"], credits: 1 },
+        { selector: "lunaroute/glm-5.3", label: "GLM 5.3", thinking: ["off", "minimal", "low", "medium"], credits: 3 },
+        { selector: "lunaroute/deepseek-4.1-flash", label: "DeepSeek 4.1 Flash", thinking: ["low", "medium"], credits: 1 },
+      ].filter((m) => available.includes(m.selector));
+      const doc = { ...(cur.active?.document ?? cur.defaults) };
+      doc.models = { allowed: want, tiers: { quick: "lunaroute/glm-5.3-flash", default: "lunaroute/glm-5.3", complex: "lunaroute/glm-5.3" } };
+      doc.allowance = { ...doc.allowance, monthlyCredits: 2000, dailyCredits: 200 };
+      const r = await fetch("/api/admin/settings", { method: "PATCH", headers: { "Content-Type": "application/json", "X-CSRF-Token": s.csrfToken }, body: JSON.stringify(doc) });
+      return { status: r.status, body: await r.json(), available: available.length, modelProvider: cur.secrets?.modelProvider };
+    });
+    log("provider models", result.available, "modelProvider configured", result.modelProvider);
+    log("save", result.status, JSON.stringify({ revision: result.body.revision ?? result.body.error, approved: result.body.document?.models?.allowed?.map((m) => m.selector) }));
+    if (result.status !== 200) process.exitCode = 1;
+  } else if (step === "alice-sample") {
+    // A real model call from a subscriber's instance through the hosted
+    // sampling runtime (Pi worker -> LunaRoute).
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await login(page, creds.alice_username, creds.alice_password);
+    await page.goto(BASE + "/apps/polis");
+    await page.getByRole("button", { name: /run in a new private instance/i }).click();
+    await page.waitForURL(/\/instances\//, { timeout: 30000 });
+    let appFrame;
+    for (let i = 0; i < 30 && !appFrame; i++) {
+      appFrame = page.frames().find((f) => /^https:\/\/i-[^.]+\.apps\.francois\.yolo\.scapegoat\.dev\//.test(f.url()));
+      if (!appFrame) await page.waitForTimeout(1000);
+    }
+    if (!appFrame) throw new Error("no instance frame on the app origin");
+    await page.waitForTimeout(4000);
+    const res = await appFrame.evaluate(async () => {
+      const t0 = Date.now();
+      try {
+        const sample = await window.claude.use("sample");
+        const limits = await sample.limits().catch((e) => ({ error: String(e) }));
+        const r = await sample([{ role: "user", content: "Reply with exactly the word: pong" }], { modelTier: "quick" });
+        return { ok: true, ms: Date.now() - t0, text: String(r.text).slice(0, 80), tier: r.modelTierApplied, model: r.modelUsed ?? r.modelApplied, limits };
+      } catch (e) {
+        return { ok: false, ms: Date.now() - t0, error: `${e.code ?? e.name}: ${e.message}` };
+      }
+    });
+    log("sample", JSON.stringify(res));
+    await page.screenshot({ path: `${out}/06-sample-instance.png`, fullPage: true });
+    if (!res.ok) process.exitCode = 1;
   } else if (step === "control") {
     // Without signing out, a live ZITADEL session makes /auth/login silent.
     // This is the behaviour the logout step must break.

@@ -455,3 +455,80 @@ Phase 7 (Pi backend) waits on the user's choice of provider credentials.
 
 ### Technical details
 - k3s `main`: #340 (NetworkPolicy), #341 (backup), #342 (automated pin `sha-25aa9cd`). francois `25aa9cd`.
+
+## Step 9: Real models through LunaRoute, and GitHub/Google sign-in prepared
+
+This step replaces the fake backend with Pi, with LunaRoute as the only model provider, and verifies a real subscriber model call in production. It also adds GitHub and Google sign-in to the ZITADEL Terraform for invited users only. Those identity providers stay disabled until someone creates the OAuth clients in the GitHub and Google consoles; no API can create them.
+
+Outcome: `kv/apps/francois/prod/pi` holds a Francois-dedicated LunaRoute key, k3s PR #343 switched the Deployment to `--backend=pi`, three models are approved (settings revision 1), and Alice's instance got `pong` from `lunaroute/glm-5.3-flash` in 2.55 s. Terraform PR #34 gained commit `1607bf2`, which plans with no changes until the client IDs are set.
+
+### Prompt Context
+**User prompt (verbatim):** "Use the lunaroute credentials (put them in vault, provision I guess by storing in files at startup using a startup script or something), and also set up github and google SSO ?"
+Mid-turn: "actually i stored the key in /tmp/lunaroute.key (for francois)"
+**Assistant interpretation:** Provision only LunaRoute for the Pi worker from Vault using the dedicated key, enable the Pi backend, approve models, and add GitHub/Google login without breaking invite-only sign-up.
+**Inferred user intent:** Subscribers get real model calls billed to a Francois-specific key, and invited users can sign in with GitHub or Google.
+
+### What I did
+- **Pi directory, LunaRoute only.**
+  - The worker (`worker/src/lunaroute.ts`) registers LunaRoute from `models-store.json` and reads the gateway key from the `lunaroute` OAuth entry in `auth.json` (`getApiKey` returns `access`; `refreshToken` returns the credential unchanged).
+  - I built a scratch directory with three files:
+    - `auth.json = {lunaroute:{type:"oauth",access:<key>,refresh:<key>,expires:4102444800000}}`, built from `/tmp/lunaroute.key` with `jq --rawfile`. The key is never printed.
+    - `models-store.json` = the `lunaroute` entry of my local store.
+    - `settings.json` = default `lunaroute/glm-5.3`, thinking `minimal`, three enabled models.
+  - The directory has no `models.json`, so no other provider can appear.
+- `francois models list --pi-agent-dir <dir>` listed only LunaRoute: 17 rows, all three tiers on `glm-5.3`.
+- Verified the dedicated key directly:
+  - `GET https://gw.lunaroute.com/v1/models -> 200`, 14 models.
+  - `POST /v1/chat/completions` (glm-5.3-flash) `-> 200`.
+- **Vault.**
+  - Version 1 of `kv/apps/francois/prod/pi` briefly held the key from my personal Pi login, because the user's message about the dedicated key arrived while I was writing it.
+  - I wrote version 2 with the dedicated key and ran `vault kv destroy -versions=1`.
+  - The VaultStaticSecret `francois-pi` picked up version 2 at 20:52:26Z (5-minute refresh). I polled for that before merging.
+- **k3s PR #343** (`d826168`): `--backend=fake` → `--backend=pi`, plus README notes on re-seeding the catalog. The existing shell wrapper already installs the three files into `/var/lib/francois/pi` with mode 0600. Argo synced; the new pod logged `Francois catalog ready` with the files present.
+- **Model approval.** New E2E step `admin-models` PATCHes `/api/admin/settings`:
+  - approved: glm-5.3-flash (1 credit), glm-5.3 (3 credits), deepseek-4.1-flash (1 credit)
+  - tiers: quick → flash, default/complex → glm-5.3
+  - allowance: 2000 monthly / 200 daily credits
+  - result: `save 200 {"revision":1,...}`
+- **Real call.** New step `alice-sample` logs Alice in, launches Polis and, inside the instance frame, calls `await (await window.claude.use("sample"))([{role:"user",content:"Reply with exactly the word: pong"}], {modelTier:"quick"})`. Result: `{"ok":true,"ms":2550,"text":"pong","tier":"quick","model":"lunaroute/glm-5.3-flash"}`.
+- **GitHub/Google sign-in (terraform `1607bf2`, PR #34).**
+  - Neither IdP exists yet at the instance or org level: `admin/v1/idps/templates/_search` and the org-scoped management search both returned empty.
+  - Added `zitadel_org_idp_github` and `zitadel_org_idp_google` with `count = var.<x>_client_id == "" ? 0 : 1`.
+  - Both use `is_creation_allowed=false`, `is_auto_creation=false`, `is_linking_allowed=true` and `auto_linking=AUTO_LINKING_OPTION_EMAIL`.
+  - `client_secret` comes from an ephemeral `vault_kv_secret_v2` (`kv/apps/francois/prod/idp-{github,google}`).
+  - The login policy sets `allow_external_idp`/`idps` from the created IdPs.
+  - `terraform validate` passed; `terraform plan` → "No changes".
+
+### Why
+- Personal subscription logins must not pay for hosted subscriber traffic. A key used only by Francois can be rotated or revoked on its own.
+- Leaving out `models.json` and every other `auth.json` entry means the worker cannot find another provider even if an admin approves its selector.
+- External IdPs that can create users would turn GitHub/Google into open self-registration. With linking only, the invite (a user created in the ZITADEL console) remains the gate.
+- `client_secret` is write-only in zitadel provider 3.3.0 (schema: `write_only: true`). Only a write-only attribute can take an ephemeral value, so the secret never reaches the S3 state. `client_id` is a normal attribute, so it is a variable (non-secret).
+
+### What worked
+- `GET /idps/callback` on ZITADEL returned 400 (the route exists and rejects a request without state), so it is the callback to register for both providers on v4.16.1.
+- The Pi worker started with the read-only Secret copied into the private directory; no code change was needed.
+
+### What didn't work
+- `terraform providers schema -json` first failed with `Error: No valid credential sources found` (S3 backend). Earlier applies in this session used `AWS_PROFILE=manuel`; with it the dump worked.
+- My first Vault write used the personal key (see above). I destroyed version 1, and the cluster Secret has since moved to version 2.
+- `gh pr merge --delete-branch` printed `fatal: 'main' is already used by worktree…` (local branch cleanup). The merge itself succeeded (`MERGED d826168`).
+
+### What I learned
+- The worker's catalog is static: `ModelRuntime.create({allowModelNetwork:false})` and `refreshModels` returns the stored list. When LunaRoute adds models, re-seed `models-store.json` and restart the pod.
+- ZITADEL's `auto_linking` only prompts the user to link the matched account; creation stays off.
+
+### What was tricky to build
+- Ordering the secret rotation against the merge. Merging before the VaultStaticSecret refresh would have started Pi with the old key, so I polled the cluster Secret's key prefix until it showed the dedicated key.
+
+### What warrants a second pair of eyes
+- Email auto-linking trusts the email the IdP reports. Google emails are verified; GitHub's primary email is verified by GitHub. Do not add an IdP whose email claim is unverified with this setting.
+
+### What should be done in the future
+- The user creates the GitHub OAuth App and the Google OAuth client (callback `https://zitadel.yolo.scapegoat.dev/idps/callback`) and writes `client_id`/`client_secret` to Vault. Then set `github_client_id`/`google_client_id` and apply.
+- Delete `/tmp/lunaroute.key` (mode 0664) now that Vault holds the key.
+
+### Technical details
+- Vault `kv/apps/francois/prod/pi` v2 keys: `auth.json`, `models-store.json`, `settings.json`.
+- k3s `main` `d826168` (#343). Terraform `feat/francois-yolo` `1607bf2`.
+- Evidence: `various/e2e/06-sample-instance.png`.

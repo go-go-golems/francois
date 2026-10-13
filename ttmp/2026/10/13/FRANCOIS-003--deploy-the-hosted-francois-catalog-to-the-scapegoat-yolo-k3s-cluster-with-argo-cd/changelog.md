@@ -23,3 +23,7 @@ Deployed: Argo francois Synced/Healthy, wildcard cert issued, smoke tests pass, 
 ## 2026-10-13
 
 NetworkPolicy (#340), release-blob backup verified (#341), automated GitOps PR loop verified (#342, sha-25aa9cd live); guide gained implementation-status section
+
+## 2026-10-13
+
+Pi backend live with LunaRoute only (k3s #343); models approved; real subscriber call verified. GitHub/Google invited-user sign-in added to Terraform PR #34 (disabled until OAuth clients exist).

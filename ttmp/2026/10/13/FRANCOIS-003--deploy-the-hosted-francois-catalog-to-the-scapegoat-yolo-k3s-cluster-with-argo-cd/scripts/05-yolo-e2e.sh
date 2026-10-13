@@ -2,7 +2,7 @@
 # Browser end-to-end test of https://francois.yolo.scapegoat.dev with the
 # E2E accounts in the Francois ZITADEL organization. Credentials are read from
 # Vault (kv/apps/francois/prod/e2e-users) into this process only.
-# Usage: 05-yolo-e2e.sh <step>   (steps: admin, alice-subscribe, alice-run, control, logout)
+# Usage: 05-yolo-e2e.sh <step>   (steps: admin, admin-models, alice-subscribe, alice-run, alice-sample, control, logout)
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 export VAULT_ADDR=${VAULT_ADDR:-https://vault.yolo.scapegoat.dev}
