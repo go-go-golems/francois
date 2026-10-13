@@ -38,10 +38,7 @@ jobs:
       platforms: linux/amd64
       gitops_target_config: deploy/gitops-targets.json
       push_image: ${{ github.event_name != 'pull_request' }}
-      # Enabled once Vault role francois-gitops-pr and the GitHub App
-      # credential exist (FRANCOIS-003 Phase 8):
-      # ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-      open_gitops_pr: false
+      open_gitops_pr: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
       gitops_pr_token_source: github_app
       vault_role: francois-gitops-pr
       gitops_app_secret_path: kv/data/ci/github/francois/gitops-pr-app
