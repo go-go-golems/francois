@@ -107,31 +107,104 @@ func (s *Store) Write(ctx context.Context, artifact, path, operation string, bod
 	}
 	return tx.Commit()
 }
-func (s *Store) Query(ctx context.Context, artifact string, q Query) ([]Document, error) {
+
+// ValidateQuery checks a collection query's bounds before any rows are read.
+func ValidateQuery(q Query) error {
 	if err := ValidatePath(q.Path, false); err != nil {
-		return nil, err
+		return err
 	}
 	if len(q.Filters) > 10 || q.Limit < 0 || q.Limit > 1000 {
-		return nil, errors.New("Invalid query limits")
+		return errors.New("Invalid query limits")
 	}
 	if q.Direction != "" && q.Direction != "asc" && q.Direction != "desc" {
-		return nil, errors.New("Invalid ordering")
+		return errors.New("Invalid ordering")
 	}
 	for _, f := range q.Filters {
 		switch f.Op {
 		case "==", "!=", "<", "<=", ">", ">=", "in", "not-in", "array-contains":
 		default:
-			return nil, errors.New("Invalid filter operator")
+			return errors.New("Invalid filter operator")
 		}
 		if f.Field == "" || strings.Contains(f.Field, ".") {
-			return nil, errors.New("Filters use top-level fields")
+			return errors.New("Filters use top-level fields")
 		}
 		if f.Op == "in" || f.Op == "not-in" {
 			a, ok := f.Value.([]any)
 			if !ok || len(a) == 0 || len(a) > 30 {
-				return nil, errors.New("in filters need 1–30 values")
+				return errors.New("in filters need 1–30 values")
 			}
 		}
+	}
+	return nil
+}
+
+// Apply filters, orders and limits documents already scoped to a collection.
+func Apply(docs []Document, q Query) []Document {
+	out := []Document{}
+	for _, d := range docs {
+		match := true
+		for _, f := range q.Filters {
+			v, ok := d.Body[f.Field]
+			if !ok || !matches(v, f) {
+				match = false
+				break
+			}
+		}
+		if match {
+			out = append(out, d)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if q.Order != "" {
+			av, ao := a.Body[q.Order]
+			bv, bo := b.Body[q.Order]
+			if ao != bo {
+				return ao
+			}
+			if ao {
+				c := compare(av, bv)
+				if c != 0 {
+					if q.Direction == "desc" {
+						return c > 0
+					}
+					return c < 0
+				}
+			}
+		}
+		return a.ID < b.ID
+	})
+	if q.Limit > 0 && len(out) > q.Limit {
+		out = out[:q.Limit]
+	}
+	return out
+}
+
+// ValidateDepth bounds nesting of a JSON document body.
+func ValidateDepth(v any, depth int) error {
+	if depth > 32 {
+		return errors.New("Document exceeds 32 levels")
+	}
+	switch x := v.(type) {
+	case map[string]any:
+		for _, v := range x {
+			if err := ValidateDepth(v, depth+1); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, v := range x {
+			if err := ValidateDepth(v, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) Query(ctx context.Context, artifact string, q Query) ([]Document, error) {
+	if err := ValidateQuery(q); err != nil {
+		return nil, err
 	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT path,body,version FROM docs WHERE artifact=? ORDER BY path`, artifact)
 	if err != nil {
@@ -168,45 +241,12 @@ func (s *Store) Query(ctx context.Context, artifact string, q Query) ([]Document
 		}
 		d.ID = rest
 		d.Exists = true
-		match := true
-		for _, f := range q.Filters {
-			v, ok := d.Body[f.Field]
-			if !ok || !matches(v, f) {
-				match = false
-				break
-			}
-		}
-		if match {
-			docs = append(docs, d)
-		}
+		docs = append(docs, d)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.SliceStable(docs, func(i, j int) bool {
-		a, b := docs[i], docs[j]
-		if q.Order != "" {
-			av, ao := a.Body[q.Order]
-			bv, bo := b.Body[q.Order]
-			if ao != bo {
-				return ao
-			}
-			if ao {
-				c := compare(av, bv)
-				if c != 0 {
-					if q.Direction == "desc" {
-						return c > 0
-					}
-					return c < 0
-				}
-			}
-		}
-		return a.ID < b.ID
-	})
-	if q.Limit > 0 && len(docs) > q.Limit {
-		docs = docs[:q.Limit]
-	}
-	return docs, nil
+	return Apply(docs, q), nil
 }
 func equal(a, b any) bool {
 	x, _ := json.Marshal(a)

@@ -29,6 +29,7 @@ type Request = {
     effort?: "low" | "medium" | "high";
   };
   tools?: { name: string; description: string; inputSchema?: object }[];
+  maxRounds?: number;
 };
 type ToolResult = { value: unknown; isError: boolean };
 const controllers = new Map<string, AbortController>();
@@ -229,8 +230,9 @@ async function sample(r: Request) {
         ];
       }
     }
-    for (let round = 0; round < 5; round++) {
-      if (round === 4) context.tools = [];
+    const rounds = Math.min(Math.max(r.maxRounds || 5, 1), 10);
+    for (let round = 0; round < rounds; round++) {
+      if (round === rounds - 1) context.tools = [];
       if (
         Buffer.byteLength(
           JSON.stringify(
@@ -280,6 +282,19 @@ async function sample(r: Request) {
         }
       }
       const message = await stream.result();
+      // Private accounting frame; the host aggregates it and never forwards it.
+      emit({
+        type: "usage",
+        callId: r.callId,
+        usage: {
+          input: message.usage?.input ?? 0,
+          output: message.usage?.output ?? 0,
+          cacheRead: message.usage?.cacheRead ?? 0,
+          cacheWrite: message.usage?.cacheWrite ?? 0,
+          cost: message.usage?.cost?.total ?? 0,
+          model: model.provider + "/" + model.id,
+        },
+      });
       if (message.stopReason === "aborted") throw new Error("Cancelled");
       if (message.stopReason === "error")
         throw new ProviderError(

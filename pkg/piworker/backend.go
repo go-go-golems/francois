@@ -35,6 +35,8 @@ type Request struct {
 	Input   json.RawMessage `json:"input"`
 	Options Options         `json:"options"`
 	Tools   []Tool          `json:"tools,omitempty"`
+	// MaxRounds bounds tool rounds; only the server sets it (0 = default 5).
+	MaxRounds int `json:"maxRounds,omitempty"`
 }
 type Result struct {
 	Thinking         string  `json:"thinking,omitempty"`
@@ -64,6 +66,18 @@ type Event struct {
 	Result     *Result         `json:"result,omitempty"`
 	Error      *Failure        `json:"error,omitempty"`
 	Models     []Model         `json:"models,omitempty"`
+	Usage      *Usage          `json:"usage,omitempty"`
+}
+
+// Usage is a private per-round accounting event; it is never forwarded to
+// pages. Cost may be zero or estimated for subscription/OAuth providers.
+type Usage struct {
+	Input      int64   `json:"input"`
+	Output     int64   `json:"output"`
+	CacheRead  int64   `json:"cacheRead"`
+	CacheWrite int64   `json:"cacheWrite"`
+	Cost       float64 `json:"cost"`
+	Model      string  `json:"model,omitempty"`
 }
 type ToolResult struct {
 	Value   json.RawMessage `json:"value"`

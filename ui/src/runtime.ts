@@ -3,6 +3,7 @@ import { normalizeInput, parseJSON } from "./sample-contract";
 import { installDB } from "./runtime-db";
 import { installRooms } from "./runtime-rooms";
 import { installFiles } from "./runtime-files";
+import { obtainGrant } from "../catalog/launch-protocol";
 
 type Failure = { code: string; message: string; text?: string };
 type Wire = Record<string, any>;
@@ -23,11 +24,37 @@ const active = new Map<
   { event: (e: Wire) => void; fail: (e: Failure) => void }
 >();
 const random = () => crypto.randomUUID();
+// Hosted instances authenticate with an instance-scoped bearer grant that is
+// renewed through the parent portal; local hosting needs no credential.
+const hosted = boot.hosted === true;
+let grant: string = boot.grant ?? "";
+let renewing: Promise<void> | undefined;
+function renew() {
+  renewing ??= obtainGrant(boot.portalOrigin, "renew")
+    .then((g) => {
+      grant = g.grant;
+      scheduleRenewal(g.expiresAt);
+    })
+    .finally(() => (renewing = undefined));
+  return renewing;
+}
+function scheduleRenewal(expiresAt: string) {
+  const wait = new Date(expiresAt).getTime() - Date.now() - 120000;
+  setTimeout(() => void renew().catch(() => {}), Math.max(wait, 5000));
+}
+if (hosted) scheduleRenewal(boot.grantExpiresAt);
 export async function request(
   path: string,
   options: RequestInit = {},
+  retried = false,
 ): Promise<any> {
-  const response = await fetch(path, options);
+  const headers = new Headers(options.headers);
+  if (hosted) headers.set("Authorization", "Bearer " + grant);
+  const response = await fetch(path, { ...options, headers });
+  if (hosted && response.status === 401 && !retried) {
+    await renew().catch(() => {});
+    return request(path, options, true);
+  }
   if (!response.ok) {
     let failure;
     try {
@@ -90,7 +117,8 @@ async function connect() {
             up = true;
             readyResolve!();
             for (const f of listeners) f({ type: "connection", up: true });
-          } else if (event.type === "reload") {
+          } else if (event.type === "reload" || event.type === "revoked") {
+            closed = true;
             location.reload();
             return;
           } else if (event.callId) {
@@ -584,7 +612,7 @@ const sample = Object.assign(
 );
 Object.freeze(sample);
 const manifest = boot.manifest as Record<string, any>;
-const profile = (uid: string) =>
+const localProfile = (uid: string) =>
   Object.freeze({
     id: uid,
     name:
@@ -598,13 +626,13 @@ const profile = (uid: string) =>
     isMe: uid === boot.owner,
     guest: false,
   });
-const user = Object.freeze({
+const localUser = Object.freeze({
   id: async () => boot.owner,
-  name: async () => profile(boot.owner).name,
+  name: async () => localProfile(boot.owner).name,
   email: async () => null,
-  avatarUrl: async () => profile(boot.owner).avatarUrl,
+  avatarUrl: async () => localProfile(boot.owner).avatarUrl,
   me: async () =>
-    Object.freeze({ ...profile(boot.owner), isOwner: true, canEdit: true }),
+    Object.freeze({ ...localProfile(boot.owner), isOwner: true, canEdit: true }),
   isOwner: async () => true,
   canEdit: async () => true,
   can: async (name: string) =>
@@ -612,13 +640,31 @@ const user = Object.freeze({
       name,
     ) && name !== "people.add",
   profiles: async (ids: string[]) =>
-    Object.fromEntries(ids.map((uid) => [uid, profile(uid)])),
+    Object.fromEntries(ids.map((uid) => [uid, localProfile(uid)])),
   search: async (q: string) =>
     manifest.user?.scopes?.includes("profile") &&
     "local owner".includes(String(q).toLowerCase())
-      ? [profile(boot.owner)]
+      ? [localProfile(boot.owner)]
       : [],
 });
+// Hosted identity is the verified signed-in user and their instance role;
+// co-member profiles come from the server and never include email.
+const me = boot.me ?? {};
+const hostedUser = Object.freeze({
+  id: async () => me.id,
+  name: async () => me.name,
+  email: async () => null,
+  avatarUrl: async () => me.avatarUrl,
+  me: async () => Object.freeze({ ...me }),
+  isOwner: async () => me.isOwner === true,
+  canEdit: async () => me.canEdit === true,
+  can: async (name: string) =>
+    (name === "data.write" || name === "assets.write") && me.canEdit === true,
+  profiles: async (ids: string[]) =>
+    transport.rpc("user.profiles", { ids: [...ids].slice(0, 100) }),
+  search: async (q: string) => transport.rpc("user.search", { q: String(q) }),
+});
+const user = hosted ? hostedUser : localUser;
 const comments = Object.freeze({
   anchorFor: (element: Element) => ({
     id: element.id || null,
@@ -626,7 +672,7 @@ const comments = Object.freeze({
     tag: element.tagName.toLowerCase(),
   }),
   async openComposer({ element, range }: { element?: Element; range?: Range }) {
-    if (parent === window) return { opened: false };
+    if (parent === window || hosted) return { opened: false };
     await transport.ready();
     const anchor = element
       ? comments.anchorFor(element)
@@ -682,7 +728,9 @@ const capabilities: Record<string, unknown> = {
     },
     list: () => transport.rpc("assets.list"),
     delete: (key: string) =>
-      transport.rpc("assets.delete", { id: key.split("/").at(-1) }),
+      transport.rpc("assets.delete", {
+        id: key.split("?")[0].split("/").at(-1),
+      }),
   }),
 };
 Object.defineProperty(window, "claude", {

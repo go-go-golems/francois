@@ -104,7 +104,7 @@ func (h *Host) operation(r *http.Request, v *View, req rpcRequest) (any, error) 
 		if req.Method != "db.delete" && args.Body == nil {
 			return nil, errors.New("Document body must be an object")
 		}
-		if err := validateDepth(args.Body, 0); err != nil {
+		if err := store.ValidateDepth(args.Body, 0); err != nil {
 			return nil, err
 		}
 		if err := h.Store.Write(ctx, v.Artifact, args.Path, strings.TrimPrefix(req.Method, "db."), args.Body); err != nil {
@@ -229,24 +229,4 @@ func (h *Host) readable(path string) bool {
 	}
 	parts := strings.Split(path, "/")
 	return len(parts) >= 3 && parts[2] == h.Owner
-}
-func validateDepth(v any, depth int) error {
-	if depth > 32 {
-		return errors.New("Document exceeds 32 levels")
-	}
-	switch x := v.(type) {
-	case map[string]any:
-		for _, v := range x {
-			if err := validateDepth(v, depth+1); err != nil {
-				return err
-			}
-		}
-	case []any:
-		for _, v := range x {
-			if err := validateDepth(v, depth+1); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

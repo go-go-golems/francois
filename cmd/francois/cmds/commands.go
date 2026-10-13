@@ -195,5 +195,5 @@ func Register(root *cobra.Command) error {
 	}
 	group.AddCommand(command)
 	root.AddCommand(group)
-	return nil
+	return registerCatalog(root)
 }
