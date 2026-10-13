@@ -10,10 +10,12 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: repo://.github/workflows/publish-image.yaml
+      Note: CI publish + automated GitOps image-pin PRs
+    - Path: repo://Dockerfile
+      Note: Production image (moved from deploy/compose) built by the GHCR publish workflow
     - Path: repo://cmd/francois/cmds/catalog.go
       Note: catalog serve flags and startup validation mapped to Deployment args
-    - Path: repo://deploy/compose/Dockerfile
-      Note: Image to promote to the root Dockerfile for CI
     - Path: repo://pkg/catalog/identity/oidc.go
       Note: OIDC scopes; code change C1 adds ZITADEL org scope
     - Path: repo://pkg/catalog/server.go
