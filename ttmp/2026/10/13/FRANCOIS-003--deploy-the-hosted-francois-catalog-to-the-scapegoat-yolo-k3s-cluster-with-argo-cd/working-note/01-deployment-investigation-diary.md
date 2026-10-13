@@ -193,3 +193,63 @@ Logout for sessions created before migration 003 has no ID token. The redirect s
 - francois commits: `2c50123`, `44447f2`, `9dc27cc`, `72999cc`. GitHub: https://github.com/go-go-golems/francois.
 - terraform branch `feat/francois-yolo` @ `174ca7e` (worktree `scratchpad/tf-francois`). The Stripe state is at `stripe/francois/sandbox/terraform.tfstate`.
 - k3s branch `feat/francois-yolo` (worktree `scratchpad/k3s-francois`), not yet committed.
+
+## Step 4: Identity and Vault provisioned; cluster access and DigitalOcean token blocked
+
+After the user logged in to Vault and Tailscale, I provisioned everything that does not need the cluster. That covers the ZITADEL organization and client, the Vault roles, the GitHub App credential, the disabled Stripe webhook endpoint and the runtime secret record. Two new blockers appeared, both outside this deployment's code:
+
+- The cluster node's Tailscale key had expired, and the node is still offline.
+- Both DigitalOcean tokens in Vault are rejected. One is the Terraform DNS token; the other is cert-manager's DNS-01 token, which every wildcard certificate depends on.
+
+While checking how webhooks would behave, I found and fixed a real problem. The Stripe sandbox account is shared with other applications, and Francois would have retried their events.
+
+### Prompt Context
+**User prompt (verbatim):** "done." (after running `tailscale up` and `vault login`). Later, while I was working: "is that maybe because the hosts need to reauthenticate or so?", "you should have tailscale permission now though", "ok expiry disabled, which node is that?", "do you by chance know anything about the user to login to hetzner?"
+**Assistant interpretation:** Continue the runbook with the new credentials and diagnose the cluster access problem.
+**Inferred user intent:** Unblock the deployment.
+
+### What I did
+- Vault: `token lookup` shows `display_name: oidc-wesen`, identity policy `admin`.
+- Cluster access:
+  - `kubectl` over the tailnet failed: `dial tcp 100.73.36.123:6443: i/o timeout`.
+  - `tailscale status --json` showed `k3s-demo-1 online=false … keyExpiry=2026-09-25T19:59:42Z expired=true` (last seen 2026-09-25T21:00). `k3s-proxmox` and `k3s-server` had also expired.
+  - The user disabled key expiry. The status is now `keyExpiry=none expired=false`, but the node is still `online=false`.
+  - The public path is closed. The Hetzner firewall allows 22 and 6443 only from `admin_cidrs = ["100.40.113.156/32"]`, and our IPv4 is `72.200.191.248`, so `ssh root@91.98.46.169` timed out.
+  - The VM login is `root` with SSH key only (`~/.ssh/id_ed25519.pub` matches `terraform.tfvars`). Cloud-init sets no password.
+- ZITADEL: `terraform plan` showed 4 resources to add. Applied ("4 added"); re-plan `-detailed-exitcode` returned 0. Outputs: `organization_id = 394966170567966836`, `oidc_client_id = 394966177899610228`, `project_id = 394966174242177140`.
+- DNS: the plan failed with `GET https://api.digitalocean.com/v2/domains/scapegoat.dev: 401 … Unable to authenticate you`. Both Vault tokens, `kv/infra/dns/scapegoat-dev` (`api_token`, updated 2026-07-29) and `kv/platform/cert-manager/prod/digitalocean` (`access-token`, updated 2026-07-18), are 71-character `dop_v1_` tokens that get **401** from `/v2/account` and from `/v2/domains/scapegoat.dev/records`.
+- Vault roles: wrote only the Francois policies and roles (`francois-prod`, `francois-db-bootstrap`, `gha-francois-gitops-pr`, plus the roles `francois-prod`, `francois-db-bootstrap` and `github-actions/francois-gitops-pr`). I did not rerun the script that rewrites every application's policies. Read-back confirmed the bound ServiceAccount, namespace and claims.
+- GitHub App: all `kv/ci/github/*/gitops-pr-app` entries use app `3926776`. I copied datalab's credential to `kv/ci/github/francois/gitops-pr-app`; the `private_key` SHA-256 prefix `1e14f472a43d` matches the source.
+- Stripe webhook: created `we_1UQ9zfLeHmcfmvuC639e6BPZ` for `https://francois.yolo.scapegoat.dev/webhooks/stripe` with 7 events. In the same shell, piped its secret into `scripts/bootstrap-francois-secrets.sh` and set the endpoint `disabled=true`. `kv/apps/francois/prod/runtime` holds 10 keys.
+- **Code fix (commit `7f1441a`): ignore foreign Stripe customers.** Customers are now tagged `francois_deployment`. The new `Gateway.CustomerDeployment` reads the tag. In `processOne`, an event whose customer has no local mapping is marked `ignored` when the tag differs from `Config.Deployment`, and retried only for our own customers. Tests: untagged and foreign customers end with no pending events; our own unmapped customer still gets `unknown_customer`.
+- Image `sha-7f1441a`: all seven workflows green, including Dependency Scanning, which failed before `72999cc`. Pinned in k3s PR #339 (commit `c19b6f2`).
+
+### Why
+- The Stripe sandbox account `acct_1TxEMcLeHmcfmvuC` serves the.scapegoat.dev TODO app, the local Compose stack and now yolo. The webhook endpoint receives every subscription and invoice event in the account. Before the fix, each foreign event would have been retried 12 times with exponential backoff, making Stripe API calls each time, and then shown as a failed event in Admin → Billing.
+- I created the webhook endpoint disabled so that Stripe does not accumulate failed deliveries, or warn about and auto-disable the endpoint, while the host is not serving.
+- I wrote targeted Vault policies and roles to avoid the side effects of rewriting every application's policy from a feature branch.
+
+### What worked
+- The ZITADEL apply, the Vault writes and reads, the GitHub App copy, the webhook-to-Vault pipeline (no secret printed), and CI.
+
+### What didn't work
+- `kubectl get nodes`: `dial tcp 100.73.36.123:6443: i/o timeout`. The node is still offline after expiry was disabled. It probably needs `tailscale up` on the node.
+- `ssh root@91.98.46.169`: `Connection timed out` (firewall `admin_cidrs`).
+- DNS Terraform and both DigitalOcean tokens: HTTP 401.
+- My first token check used zsh-incompatible `set -- $pair` and an unquoted `?`: "no matches found". I reran it under `bash -c`.
+
+### What I learned
+- The DigitalOcean 401 is platform-wide. New DNS-01 certificates cannot be issued, and the existing wildcard certificates (`*.hosting.yolo`, `*.storybook.yolo`, `*.pds.yolo`) will fail to renew. Francois's `*.apps.francois.yolo` certificate cannot be issued until a new token is in `kv/platform/cert-manager/prod/digitalocean`.
+
+### What was tricky to build
+- Telling apart our own customer whose local mapping write is still in flight (retry) from a foreign customer (ignore). Only our deployment tags customers with its own `Config.Deployment` value, so the tag decides. Untagged customers created by Francois before this change exist only in the local Compose deployment, where they are mapped and never reach this branch.
+
+### What warrants a second pair of eyes
+- The Stripe sandbox account is shared by three deployments. A live account should be Francois-only, or keep this tag-based filter.
+
+### What should be done in the future
+- User actions: restore the node's tailnet (`tailscale up` on the node, or temporarily allow SSH from `72.200.191.248/32`). Create a new DigitalOcean API token with domain read/write scope and write it to both Vault paths.
+- Then: DNS apply, merge PR #339, apply the AppProject and Application, enable the webhook endpoint, smoke tests, first admin, browser run.
+
+### Technical details
+- francois commits: `7f1441a` (code), image `ghcr.io/go-go-golems/francois:sha-7f1441a`. k3s PR #339 @ `c19b6f2`; terraform PR #34 @ `174ca7e`.
