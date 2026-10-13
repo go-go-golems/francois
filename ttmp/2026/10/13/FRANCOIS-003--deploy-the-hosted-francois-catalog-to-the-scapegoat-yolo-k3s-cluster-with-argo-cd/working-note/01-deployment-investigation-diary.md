@@ -99,3 +99,7 @@ The second subtlety is getting values that are not secret, but are produced by T
 - Ticket path: `ttmp/2026/10/13/FRANCOIS-003--deploy-the-hosted-francois-catalog-to-the-scapegoat-yolo-k3s-cluster-with-argo-cd/`.
 - Francois revision inspected: `b1a8150` (clean `main`, no remote).
 - Draft outputs: `reference/gitops-draft/{gitops,vault,scripts}`, `reference/terraform-draft/zitadel/francois/envs/prod`.
+
+## Step 2: Commit and deliver to reMarkable
+
+I committed the ticket and its drafts as `acdaa39` in the francois repo. I uploaded the guide and this diary as one bundle with a table of contents (`remarquee upload bundle … --toc-depth 2`). The result was `OK: uploaded FRANCOIS-003 Yolo K3s Deployment Guide.pdf -> /ai/2026/10/13/FRANCOIS-003`. This proves the document reached the cloud, not that it has synced to the device. `docmgr doctor --ticket FRANCOIS-003 --stale-after 30` passed before the commit.
