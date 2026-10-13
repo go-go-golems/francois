@@ -253,3 +253,28 @@ While checking how webhooks would behave, I found and fixed a real problem. The 
 
 ### Technical details
 - francois commits: `7f1441a` (code), image `ghcr.io/go-go-golems/francois:sha-7f1441a`. k3s PR #339 @ `c19b6f2`; terraform PR #34 @ `174ca7e`.
+
+## Step 5: DigitalOcean token rotated, Francois DNS record applied
+
+The user created a new DigitalOcean token and wrote it to both Vault paths. Both now pass the domain records API, so I applied the Francois DNS record. This was a targeted apply, because the zone has unrelated pending drift. The cluster node is still offline on the tailnet.
+
+### Prompt Context
+**User prompt (verbatim):** "where can i create a DO token or test if I have one already?" then "ok I wrote it to the vault, try again"
+**Assistant interpretation:** Verify the rotated token and continue the DNS phase.
+**Inferred user intent:** Unblock DNS and certificate issuance.
+
+### What I did
+- I first checked the local `doctl` contexts. `default`, `librechat` and `mento` all get `401 … Unable to authenticate you` on `/v2/account` and `/v2/domains/scapegoat.dev`. I pointed the user to https://cloud.digitalocean.com/account/api/tokens (Custom Scopes: domain read/update/create/delete).
+- After the rotation, both Vault paths (updated 2026-10-13T18:09Z) return `records_api=200`.
+- `terraform plan` on the DNS zone: "3 to add": `pds_yolo_a`, `wildcard_apps_francois_yolo_a` and `wildcard_pds_yolo_a`. I applied only `-target='digitalocean_record.records["wildcard_apps_francois_yolo_a"]'`: "1 added". The DigitalOcean API shows `1835311720 *.apps.francois.yolo 91.98.46.169 ttl=3600`.
+- Commented the apply status and the PDS drift on terraform PR #34.
+
+### Why
+- `main.tf` says the PDS records "already exist in DigitalOcean (created out-of-band); import them before applying". A full apply could duplicate them. Fixing that drift belongs to HK3S-0031, not to this ticket.
+
+### What didn't work
+- Nothing new. The node is still `online=false`.
+
+### What should be done in the future
+- Someone should import or clean up the `pds_yolo_a` and `wildcard_pds_yolo_a` drift.
+- cert-manager's `digitalocean-dns` Secret refreshes from Vault every 30 minutes (`refreshAfter: 30m`). Once the cluster is reachable, confirm that the existing wildcard certificates renew.
