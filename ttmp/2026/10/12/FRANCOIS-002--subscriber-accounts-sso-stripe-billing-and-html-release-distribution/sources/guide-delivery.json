@@ -6,5 +6,8 @@
   "document": "FRANCOIS-002 Subscription Service Intern Guide.pdf",
   "result": "OK: uploaded FRANCOIS-002 Subscription Service Intern Guide.pdf -> /ai/2026/10/12/FRANCOIS-002",
   "evidence_level": "uploader cloud delivery result; physical device synchronization not verified",
-  "recorded_at": "2026-10-12T21:21:39.984120-04:00"
+  "recorded_at": "2026-10-12T21:21:39.984120-04:00",
+  "revision": 1,
+  "source_commit": "b294a00",
+  "status": "historical distribution-first guide; superseded by hosted/admin revision 2"
 }

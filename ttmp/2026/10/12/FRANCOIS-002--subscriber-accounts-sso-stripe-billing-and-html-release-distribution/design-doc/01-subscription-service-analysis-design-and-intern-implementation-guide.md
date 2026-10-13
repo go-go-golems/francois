@@ -24,8 +24,8 @@ ExternalSources:
     - https://docs.stripe.com/webhooks
     - https://docs.stripe.com/billing/subscriptions/webhooks
     - https://zitadel.com/docs/examples/login/go
-Summary: Proposed subscriber distribution portal using ZITADEL OIDC, Stripe subscriptions, immutable HTML releases, authenticated downloads, and release notifications.
-LastUpdated: 2026-10-12T21:16:55.331276-04:00
+Summary: Proposed subscriber hosted artifact platform using ZITADEL OIDC, Stripe, isolated application instances, database and room APIs, real user identity, metered Pi-backed LLM calls, optional downloads, and release notifications.
+LastUpdated: 2026-10-12T23:25:38.824129-04:00
 WhatFor: Teach a new intern the existing system, prior identity and billing patterns, the proposed product, and a phased implementation with explicit contracts.
 WhenToUse: Before implementing subscription accounts or publicly distributing paid Francois artifacts.
 ---
@@ -34,27 +34,27 @@ WhenToUse: Before implementing subscription accounts or publicly distributing pa
 
 ## 1. What we are building
 
-We are adding a website where a person can create an account, sign in through an existing identity provider, buy a recurring subscription, and download curated HTML applications such as POLIS IDE. An operator publishes immutable application releases. Subscribers browse the release catalog and receive links when new releases appear. The website authenticates the person and checks their subscription before sending the paid file bytes.
+We are adding a website where a person can create an account, sign in through an existing identity provider, buy a recurring subscription, and run curated HTML applications such as POLIS IDE with hosted database, room, user, and LLM capabilities. An operator publishes immutable application releases. Subscribers launch private application instances, can share an instance with other subscribers, and may also download releases. The server owns persistent instance state and supplies the browser APIs expected by the application.
 
-Francois already runs downloaded HTML applications locally. Its Go process supplies the applications' Claude-style browser APIs, SQLite state, and access to the owner's Pi model configuration. The new website has a different responsibility: distributing applications to subscribers. A customer can download an application, import it into their own Francois instance, and use their own Pi authentication. The website does not need access to that customer's local credentials.
+Francois already runs downloaded HTML applications locally. Its Go process supplies the applications' Claude-style browser APIs, SQLite state, and access to the owner's Pi model configuration. The hosted website extends that product with real signed-in users, instance-scoped cloud state, collaboration, and server-funded model calls. The hosted worker uses operator-controlled Pi provider configuration; it never reads a subscriber's home directory. A customer may still download a release and run it locally with their own Pi credentials.
 
 This document is a **proposed design and implementation guide**, not a claim that user management or billing has been implemented. The existing repository baseline is `bd373eb`. No production identity configuration, Stripe resources, mailing campaigns, or remote deployment was changed during this investigation.
 
-The recommended first release covers downloadable files and opted-in release notifications. A scope question was presented about also hosting applications and model calls; absent a different product choice, this guide proceeds with distribution. Hosted model usage would require a separate cost, isolation, and authorization design. It must not appear accidentally because a subscription portal shares a repository with a local model runner.
+Revision 2 supersedes the distribution-only assumption after the user explicitly requested hosted `db`, `room`, `user`, and LLM functionality. Hosting is now part of the first-release contract. Downloads and release notifications remain optional product features within that service. The owner runtime is still not exposed unchanged: hosted users, instance ownership, origin separation, and model admission are explicit parts of this revision.
 
 ### Essential terms
 
 An **identity provider** authenticates people. We propose the existing ZITADEL infrastructure, using OpenID Connect, or OIDC, to establish a verified identity. **Single sign-on**, or SSO, means people can authenticate through that provider and reuse its login across participating applications. This does not make a browser session cookie transferable between websites; each application establishes its own session.
 
-A **local user** is the distribution service's record for a verified `(issuer, subject)` identity. The issuer identifies the trusted OIDC provider, and subject identifies a person within it. An email address is editable contact information, not that record's identity key. A **session** is the distribution site's time-limited browser login, represented by an opaque cookie and a database record.
+A **local user** is the hosted service's record for a verified `(issuer, subject)` identity. The issuer identifies the trusted OIDC provider, and subject identifies a person within it. An email address is editable contact information, not that record's identity key. A **session** is the distribution site's time-limited browser login, represented by an opaque cookie and a database record.
 
 A **subscription** is Stripe's recurring commercial relationship with a mapped customer. An **entitlement** is the application's decision that a local user may download subscriber releases now. Signing in establishes identity; it does not establish entitlement. Stripe's current subscription state is projected into the application's database, where download handlers can evaluate it cheaply.
 
-A **catalog artifact** is a product entry such as POLIS. A **release** is an immutable published version of that artifact. A **release file** is the exact downloadable HTML or companion file associated with the release. The local runner's editable artifact versions and the subscriber site's curated releases are different records with different owners.
+A **catalog artifact** is a product entry such as POLIS. A **release** is an immutable published version of that artifact. A **release file** is the exact authored HTML or companion file associated with the release. An **application instance** is a running workspace pinned to a release, with an owner, members, durable documents, and its own origin. A **view** is one live browser tab/frame within that instance. Releases are shared product code; instance data belongs to the instance members. The local runner's editable artifact versions and the subscriber site's curated releases are different records with different owners.
 
 ### One representative journey
 
-Maya signs in with ZITADEL. The website receives verified claims and creates user `usr_...`, keyed by issuer and subject. Maya buys the configured subscription through Stripe-hosted Checkout. Stripe notifies the website through a signed HTTP request called a webhook. The site's worker retrieves current Stripe state and updates Maya's subscription projection. Maya's next download request succeeds if the account is enabled, the release is published, and the subscription qualifies.
+Maya signs in with ZITADEL. The website receives verified claims and creates user `usr_...`, keyed by issuer and subject. Maya buys the configured subscription through Stripe-hosted Checkout. Stripe notifies the website through a signed HTTP request called a webhook. The site's worker retrieves current Stripe state and updates Maya's subscription projection. Maya clicks Run for POLIS. The server creates a private instance pinned to the selected release and launches it on a separate application origin. Its injected `window.claude` runtime reports Maya as the user, stores documents under that instance, and executes model calls through the operator's Pi-backed worker after checking Maya's allowance. Maya can optionally download the same release as well.
 
 The browser's return from Checkout can occur before the webhook has been processed. The account screen therefore initially says “Payment received; activating your subscription” only when verified billing information supports that message, or more generally “Checking subscription status.” It refreshes the local projection. It never grants access simply because a return URL contains `success=true`.
 
@@ -74,9 +74,9 @@ The repository is `/home/manuel/code/wesen/go-go-golems/francois`. Its `serve`, 
 
 `pkg/host/server.go:69` creates one durable local owner for the whole host. At line 92, `Run` rejects a non-loopback listening address. `pkg/store/store.go:39` creates the SQLite artifact, version, document, asset, and comment tables. The local host's “user” capability does not represent authenticated subscriber accounts. Its stable owner identifier cannot be reused as a remote customer identity.
 
-The existing artifact runtime has powerful operations. POLIS declares an `eval` tool that executes JavaScript in its browser page. Files can be read beneath an explicitly configured local root. The Pi worker reads private model/auth files through the SDK. These features are useful in the owner-run local process; they do not belong on the subscriber portal's origin or in its request handlers.
+The existing artifact runtime has powerful operations. POLIS declares an `eval` tool that executes JavaScript in its browser page. Files can be read beneath an explicitly configured local root. The Pi worker reads private model/auth files through the SDK. These capabilities are useful in hosting too, but their ownership must become request- and instance-specific. Browser tools stay inside the hosted application origin. Server project-file reads remain disabled unless an explicitly isolated instance workspace is introduced. Pi credentials remain private to the model worker.
 
-The new server will therefore be a separate command, proposed as `francois catalog serve`. It uses the same top-level Go module and binary but constructs a separate HTTP handler tree and service graph. Starting it will not construct `pkg/host.Host`, start artifact-origin listeners, load `worker/dist/main.js`, or read `~/.pi/agent`. The local commands remain local. This is a clear product boundary, not an adapter for the existing local identity API.
+The new server remains a separate command, proposed as `francois catalog serve`, with one service graph for accounts/catalog plus hosted instance handlers and a Pi-backed worker. It does not construct the existing single-owner `pkg/host.Host` unchanged or start a new loopback port for each hosted instance. It routes isolated virtual hosts to hosted handlers, reusing domain functionality and the browser capability contract after replacing global-owner assumptions. Local commands retain their existing behavior.
 
 | Existing file | What the intern should learn from it | Relationship to new work |
 |---|---|---|
@@ -84,7 +84,7 @@ The new server will therefore be a separate command, proposed as `francois catal
 | `cmd/francois/cmds/update.go` | Bounded complete-HTML reading and immutable local updates. | Share document validation where appropriate; do not turn update into remote billing logic. |
 | `pkg/store/store.go:122` | Transactional compare-and-set publication. | A source of local authored versions for explicit catalog publication. |
 | `pkg/host/server.go:69,92` | One owner and loopback-only service lifecycle. | Preserve this ownership boundary. |
-| `pkg/piworker/backend.go` | Model runtime protocol and capabilities. | No dependency from the distribution server. |
+| `pkg/piworker/backend.go` | Model runtime protocol and capabilities. | Reuse for hosted sampling; add principal, quota, and usage ownership outside the provider implementation. |
 | `examples/polis.html` | Maintained application, model controls, thinking, and Markdown. | Candidate release source; never execute under the portal origin. |
 | `ui/src/app.tsx`, `pkg/web/embed.go` | React/RTK Query UI and embedded host assets. | Existing frontend conventions; add a distinct subscriber frontend entry point. |
 
@@ -136,54 +136,54 @@ The inspected predecessor code is under Go `internal/` directories and cannot be
 
 ## 4. Product contract for the first release
 
-The proposed paid plan is one recurring membership that unlocks the published subscriber catalog. Public catalog pages show descriptions, screenshots, version notes, and runtime requirements. Subscribers can download all currently published releases while their access is valid. An operator may mark specific releases as free samples; free bytes have their own explicit download policy.
+The proposed paid plan is one recurring membership that unlocks hosted application instances, a configured included LLM allowance, and optional downloads from the published catalog. Public catalog pages show descriptions, screenshots, version notes, and runtime requirements. Subscribers can run or download currently published releases while their access is valid. An operator may mark specific releases as free samples; free bytes have their own explicit download policy.
 
 Pricing amount, currency, monthly/yearly intervals, trial availability, legal terms, and commercial license are product-owner decisions. The first implementation needs one server-configured recurring Price. Supporting yearly pricing later can be an additional accepted Price mapped to the same entitlement; it does not require a second product tier. Do not invent a price or copy the predecessor's USD 5 price.
 
 The product decisions proposed here are:
 
-- Downloads grant access to bytes, not remote execution or model credits.
-- New paid downloads and release notifications require current entitlement.
+- Hosting includes instance-scoped database, room, user, and model capabilities. Downloads also grant access to authored bytes for local use.
+- Launch, hosted capability requests, new paid downloads, and release notifications require current entitlement. LLM calls additionally require available allowance.
 - Already downloaded files remain on the customer's machine after cancellation; the service cannot revoke them.
-- The first release does not impose download counts, seat counts, teams, organizations, or per-file purchases.
+- The first release has no download-count limit, organizational tenancy, or per-file purchase. Hosted storage/instance limits and included model-call limits are explicit; sharing is an instance membership, not a team billing product.
 - Period-end cancellation preserves access through the already established access end while the subscription qualifies.
 - Failed initial payments grant no access. The proposed first-release policy denies new paid downloads in `past_due`; a commercial grace policy can change this explicitly later.
 - Published release files are immutable. Corrections produce a new release.
-- Email notifications link to the authenticated release page. They contain no privileged file URL, session token, or inline paid application.
+- Email notifications link to the authenticated release page with Run/Download actions. They contain no runtime grant, session token, or inline paid application.
 
 A subscription is an access policy, not DRM. A customer who already has the HTML can run, copy, or share it. License terms may define permitted use, but the server must not claim cancellation can delete a downloaded copy.
 
-### Decision: distribute applications before hosting them
+### Decision: host capabilities with explicit instance ownership
 
-- **Context:** Francois contains a local owner runtime with powerful tools and private Pi configuration.
-- **Options considered:** Add subscribers directly to the current runtime; build a distribution portal and let subscribers run locally.
-- **Decision:** Propose a separate distribution command and HTTP origin first.
-- **Rationale:** It meets the stated subscribe/receive/download use case without public execution or an operator-funded model budget.
-- **Consequences:** Downloaded applications need documented local runtime requirements. Hosted execution is future work with a separate billing and isolation contract.
-- **Status:** proposed, based on the documented first-release assumption.
+- **Context:** The user clarified that hosted `db`, `room`, `user`, and LLM behavior is required.
+- **Options considered:** Distribution only; expose the current local host; implement hosted instance ownership while reusing capability semantics.
+- **Decision:** Include hosting in the first release, behind a real principal, subscription policy, instance membership, separate application origin, and model admission.
+- **Rationale:** This supplies the application behavior the user actually wants without treating the current single-owner process as multi-user.
+- **Consequences:** Hosting needs durable instance tables, principal-scoped views, scoped browser grants, and model usage limits. Downloads remain available.
+- **Status:** accepted scope; proposed implementation. Supersedes the initial distribution-first assumption.
 
 ## 5. Overall architecture
 
-The simplest production shape is one distribution process, one PostgreSQL database, one private release-file directory, the existing ZITADEL provider, Stripe-hosted billing, and an email sender. The email sender can use the existing SES-backed infrastructure or an explicit SMTP configuration. No queue broker or separate billing microservice is needed; durable work is stored in PostgreSQL and drained by goroutines owned by the distribution process.
+The simplest production shape is one Go application process with account/catalog and hosted-instance handlers, one Node Pi worker, one PostgreSQL database, one private release-file directory, the existing ZITADEL provider, Stripe-hosted billing, and an email sender. The email sender can use the existing SES-backed infrastructure or an explicit SMTP configuration. No queue broker or separate billing microservice is needed; durable work is stored in PostgreSQL and drained by goroutines owned by the distribution process.
 
 ```text
 Subscriber browser
-   | HTTPS, site session cookie
-   v
-Francois catalog server ---- OIDC code exchange ---- ZITADEL
-   |         |
-   |         +---- Checkout / Portal requests ------ Stripe
-   |                                                   |
-   |                 signed webhooks <-----------------+
-   |
-   +---- PostgreSQL: users, sessions, subscriptions,
-   |                 release metadata, durable jobs
-   |
-   +---- Private release files: immutable HTML/manifest bytes
-   |
-   +---- Email sender: verified recipient + release-page link
+   | HTTPS site login                    | isolated application frame
+   v                                     v
+Account / catalog origin              per-instance application origin
+   |                                     |
+   +-------------- one Go process -------+
+   | OIDC -> ZITADEL                     | scoped capability RPC / SSE
+   | Checkout / Portal -> Stripe         | db / room / user / assets
+   | signed billing events               | authorized sample calls
+   |                                     v
+   +--> PostgreSQL                    Node Pi worker -> model provider
+   |    accounts, billing, instances,    private operator auth/settings
+   |    documents, call allowance/usage
+   +--> immutable release files
+   +--> release notification sender
 
-Subscriber downloads HTML -> local Francois -> subscriber's Pi config
+Optional download -> customer's local Francois -> customer's Pi config
 ```
 
 ZITADEL is authoritative for authenticated identity. Stripe is authoritative for subscription/payment state. PostgreSQL owns local account status, sessions, Customer correlation, projected billing state, catalog metadata, and notification preferences. The release-file directory owns the stored bytes identified by a content hash. Browser components display the result of server policy; they do not grant access.
@@ -194,7 +194,121 @@ The existing SQLite database is local application state and already works well f
 
 The first deployment runs one replica with a persistent release directory. PostgreSQL may be the existing infrastructure service with a dedicated database/user. Back up both the database and release bytes. An S3-backed private file store can replace the directory when deployment requirements justify it; no second storage implementation is required for the first slice.
 
-The executable may contain both local and catalog commands, but its runtime graph is selected by command. The catalog can run without Node and without any Pi credentials. A future standalone distribution archive can omit the worker; making that archive is an implementation phase, not an assumption that the existing package already does so.
+The executable contains local and hosted catalog commands, selected at startup. Hosted production requires Node and operator-controlled Pi provider configuration because model calls are part of the product. The account/catalog layer can still be tested with a fake model backend; it must not require a subscriber's local config or start the existing local owner host. Node and the worker must be included in the hosted deployment package.
+
+### Hosted application instances
+
+A release is authored application code; an instance is a workspace using that code. The same POLIS release can run in Maya's private instance and another subscriber's private instance without sharing documents, presence, or browser storage. Private instances are the default. Sharing is explicit: the owner adds another registered subscriber as an instance member with owner/editor/viewer rights. The membership is keyed by local user ID, not by an email claim sent by the application.
+
+Instance ownership is distinct from platform administration. An instance owner can manage that workspace; a platform administrator can publish releases or suspend accounts. Being an editor of POLIS does not authorize replacing the global POLIS release for all subscribers. The initial sharing rule requires each participating user to have a subscription; team/guest seats are a later commercial choice. Instances whose owning account loses hosting entitlement are frozen for hosted use, without deleting their data.
+
+Each instance pins an immutable release ID. Publishing a new catalog release does not automatically replace every customer's code or reset their data. The owner can explicitly upgrade an instance after reviewing the changelog. Initially support only upgrades that declare compatible stored data; applications with data migrations need an explicit tested migration contract. A code upgrade keeps the instance identity, origin, and data.
+
+| Browser capability | Hosted ownership and behavior |
+|---|---|
+| `db` | PostgreSQL documents keyed by instance ID and logical path; shared documents use member permissions; `data/users/<uid>` is private to that verified user. |
+| `room` | Live membership/presence/events keyed by instance ID and room name, with per-view peers and verified user IDs. |
+| `user` | Current signed-in local user and effective instance role; profile lookup restricted to authorized co-members. |
+| `sample` | Server-admitted Pi-backed call, charged to the caller's allowance, with approved model/thinking choices, text/thinking streams, and browser tools. |
+| `assets`, comments | Durable objects associated with the instance and authorized users, rather than the local host's global owner. |
+| `artifact.publish` | If enabled, instance-owner publication of an instance-specific revision; never global catalog publication. |
+| `files` | Disabled initially for arbitrary server filesystem reads; future explicit instance workspace only. |
+
+The manifest remains a declaration of which capabilities an application uses. Server policy grants the intersection of declared capabilities, instance membership permissions, subscription status, and platform limits. A page cannot gain permission merely by declaring a new namespace. The role visible to the browser is presentation metadata; the server enforces it again for each operation.
+
+### The current runtime changes needed for multiple users
+
+`View` currently carries artifact/version but no authenticated principal. `Host.Owner` is used to stamp document queries, private paths, profiles, comments, and presence. Room events currently report every peer as `isMe: true` because there is only one owner. Hosted views need trusted `UserID`, `InstanceID`, effective role, and authorization lifetime.
+
+Replace those global assumptions with explicit context, using domain operations shared with the local runtime where their contracts are suitable. For hosted operations, scope SQL by `(instance_id, path)` before applying filters/order/limit. Do not load all documents for an artifact and filter by user afterward. Every write, lease acquisition, asset fetch, subscription refresh, and room operation uses the verified view/principal scope.
+
+```go
+// Proposed hosted call context; IDs originate from server authentication.
+type InstanceContext struct {
+    UserID     string
+    InstanceID string
+    ReleaseID  string
+    Role       string
+}
+```
+
+Shared documents can be read by members; owner/editor can write; viewer cannot. The existing private-user document namespace is checked against `UserID`, not instance owner. Neither a different editor nor a workspace owner gets automatic access to another member's private namespace. The existing path, size, depth, query-window, optimistic-write, snapshot, and lease semantics remain useful after ownership changes.
+
+A database change invalidates subscriptions for views in that instance, never every instance of the same release. Room presence is in-memory and keyed by `(instance_id, room_name)`; database state remains durable. Start with one server process so rooms need no external pub/sub. A restart disconnects peers and clients rejoin; it does not erase documents. Multi-replica presence routing is a future measured scaling change.
+
+`room` events distinguish the sending view from the sending person: `sameTab` compares view IDs, while `isMe` compares user IDs. `by` is the actual sender's identity when the user capability is permitted. A second tab of the same person is another peer with `isMe=true, sameTab=false`; another subscriber is a peer with both false. Public co-member profiles expose permitted names/avatar fields, not arbitrary customer email or billing records.
+
+### Separate account and application origins
+
+The trusted portal origin hosts login, billing, settings, and administrator screens. Arbitrary artifact code executes on a separate origin per instance, for example `i-<opaque-id>.apps.<configured-domain>`. Prefer a separately controlled application domain distinct from the account site's registrable domain. DNS/TLS wildcard routing maps those names to the same Go process; there is no per-instance TCP port in production.
+
+Per-instance origins separate native localStorage as the current local ports do. The application origin never receives the account-origin session cookie. Host routing validates the exact registered instance hostname, and runtime grants are bound to that hostname and instance. Publication is limited to curated/admin-approved code; origin isolation limits the code's authority but does not make application authors unable to see data the application is permitted to render.
+
+Do not make the entire portal an origin-sharing host for artifact HTML. Even an iframe under `/apps/polis` on the portal origin is still same-origin JavaScript. The hosted application's grant permits only that instance's capabilities; it does not permit `/api/admin`, Stripe Portal creation, user-management changes, or another instance's data.
+
+### Browser launch without relying on third-party cookies
+
+An iframe on a separate application site cannot reliably rely on third-party login cookies. The embedded first release therefore uses a small trusted launch bootstrap and a per-instance bearer grant kept by the runtime. The grant is an application-scoped credential, not the user's portal session or a provider key.
+
+1. The signed-in portal resolves an authorized instance and loads its public trusted bootstrap frame, which contains no paid application HTML.
+2. The bootstrap generates a random verifier and S256 challenge, then signals readiness to the parent. The parent validates both the message origin and the expected iframe window.
+3. The parent POSTs to its own `instances/{id}/launch` endpoint with CSRF protection and the challenge. The server checks subscriber access and membership and creates a one-use code bound to the portal session, user, instance, target origin, challenge, and short expiry.
+4. The parent sends the code only to that frame with an exact `targetOrigin`. The bootstrap redeems it on the application origin using its verifier. Redemption is atomic, checks the target, and rechecks access.
+5. The application origin returns a bounded runtime grant and authorized page bootstrap. The browser fetches the instance's authored HTML with that grant and installs the injected capability runtime under the same isolated application origin.
+6. Runtime RPC, SSE, model, and asset requests use the scoped grant. Renewal goes through the same parent/session authorization path; the page cannot extend a grant solely by asserting that it is still entitled.
+
+The bootstrap code and handshake are controlled by the server before authored scripts execute. No grant goes in a URL or referrer. The parent does not implement a generic proxy for arbitrary requests from the child; it handles only a narrowly defined launch/renew exchange for that instance. The application frame is sandboxed with only the browser permissions it needs, without unrestricted top-level navigation or account-origin access.
+
+This flow is a proposed internal launch protocol. It should use well-tested randomness, hashing, browser-binding, and code-exchange primitives, with explicit tests for source/origin mismatch, wrong instance, wrong verifier, expiration, replay, and parent logout. Do not treat `postMessage` alone as authentication. A scoped bearer grant can be used outside the UI by a holder, so its short lifetime, server-side binding, current authorization checks, and revocation are real controls.
+
+Iframe launch is the first supported hosted entry point. Standalone application windows can be added with an equally browser-bound flow; they should not be implemented by disabling authentication or sharing the portal cookie across wildcard hosts. When the signed-in user changes, discard active grants and browser runtime caches before loading application data for the new principal.
+
+### Hosted LLM execution and subscription allowance
+
+Use the existing Pi SDK/Node worker to call approved providers. Production has operator-controlled Pi configuration or an equivalent explicit provider-config directory, mounted privately. That uses the original project's provider/auth management approach while avoiding subscriber filesystem access. Do not mount unrelated coding-agent sessions/extensions or enable server shell tools.
+
+The operator's provider account pays for hosted requests. The Stripe subscription therefore includes a configured model allowance and resource limits. Start with a simple included call-credit policy, no automatic overage, an allowed model catalog, bounded prompt/output size, bounded tool rounds, per-user concurrency, and a global admission limit. Exact allowance numbers and model credit weights are owner settings, not figures invented by this guide.
+
+A request reserves its call credits transactionally before a provider request starts. The reservation ledger is keyed by server call ID, user ID, instance ID, and allowance period. Two tabs cannot both spend the last available credit. Reject unknown/disallowed explicit models rather than falling back to a cheaper or more expensive provider invisibly. Tier fallbacks, if offered, must stay inside the approved plan model set and return actual model identity.
+
+```text
+sample request:
+    validate scoped grant, member role, owner/caller subscriptions
+    validate declared tools/images and allowed model/thinking choice
+    transactionally reserve credits within caller allowance
+    admit within caller and global concurrency bounds
+    record provider-started before invoking the worker
+    stream thinking/text and correlate browser tool calls
+    record each round's token usage and effective provider/model
+    settle reservation and terminal status exactly once
+```
+
+An operation that fails before provider admission releases its reservation. Once a provider attempt starts, cancellation/error does not automatically refund consumed allowance; the defined first-release policy charges the started call. This avoids repeated canceled calls providing unlimited paid inference. Administrative refunds are explicit ledger adjustments, not silent edits to counters.
+
+The SDK's assistant messages already contain per-round usage, but `worker/src/main.ts` currently drops it from the public/private completion protocol. Add private usage/start events and aggregate usage across all tool rounds. Store token counts and provider-reported cost when available. Provider cost fields may be missing, configured estimates, or zero for OAuth/subscription routes; they are not a guaranteed cash invoice. Included call credits are the deterministic customer allowance, while token/cost records support operations and tuning.
+
+Every call belongs to its authenticated caller and instance, and tool results must match that call/view. Browser tools still execute in the caller's browser. A POLIS `eval` request edits that view's scene/editor or uses permitted instance APIs; it does not execute arbitrary JavaScript or shell commands in the Go/Node server. Different calls use separate contexts, never a shared conversation history. Room events and durable document writes share only the instance data the application explicitly addresses.
+
+Account suspension, instance membership revocation, and subscription loss deny new operations and revoke active grants/views. The server cancels their in-flight call contexts and removes room presence. A finite grant/view lifetime bounds stale connections, but event-driven revocation should close them promptly. A model failure leaves database state intact and returns the local error codes already established for POLIS.
+
+### The administrator application
+
+The user explicitly requires a real administrator UI in addition to operator commands. Place it under `/admin` on the trusted portal origin, with embedded assets under `/static/` and admin-role plus session/CSRF enforcement on every mutation. Hiding a menu item is not authorization. An authenticated subscriber or application grant must fail the same server checks if it requests these endpoints directly.
+
+The initial screens are deliberately conventional:
+
+- **Applications and releases:** upload HTML/manifest, enter catalog metadata, inspect requirements/hash/size, save a draft, publish a version, withdraw a release, and view versions. Uploading a draft does not notify users; publication does.
+- **Users:** find an account, inspect role/status/instances, disable hosting/downloads, re-enable it, revoke sessions/grants, and assign the admin role through an audited action. Password/MFA/email verification remain ZITADEL-owned.
+- **Instances:** inspect membership, pinned release, storage usage, active views, and recent operation failures; suspend an instance or help an owner upgrade. Administrators do not execute a customer's page under the portal origin.
+- **Billing and usage:** inspect mapped Customer/subscriptions, pending Checkout attempts, webhook/reconciliation errors, model usage, and credit adjustments. Use Stripe Portal/Dashboard for the appropriate commercial operation instead of editing a paid boolean.
+- **Settings:** edit approved model/thinking choices, tier mappings, included allowance weights/limits, instance/document/asset bounds, publishing/notification defaults, and nonsecret provider identifiers. Show secret configuration as configured/not configured; do not return credential contents to the browser.
+
+An administrator's HTML upload calls the same release publication service as the CLI. There is one validation/atomic-storage/version transaction, not separate UI and CLI implementations. Publication records author/admin identity and an audit event. Withdraw changes catalog availability; the product owner must choose whether already pinned instances may continue or must be disabled for a faulty release, and the action should show that impact explicitly.
+
+Settings are versioned and validated before activation. Keep ordinary product limits and nonsecret model policy in database settings, while issuer endpoints, database credentials, Stripe keys, Pi provider secrets, and secret file paths stay in deployment configuration. A setting change must not let a browser supply an arbitrary provider URL or request raw keys. Apply a settings revision atomically so one call cannot be admitted under one quota policy and charged under another without recording which policy applied.
+
+Bootstrap the first admin by exact issuer/subject through an operator command. Subsequent role changes go through the admin API and record actor/subject/action/time. Audit settings changes, publication, suspension, session revocation, and credit adjustments. This is a small searchable audit table, not a general event-sourcing system. Keep prompt text and provider secrets out of it.
+
 
 ## 6. User management and SSO
 
@@ -266,9 +380,9 @@ Logout is a CSRF-protected POST that revokes the local session. Provider-global 
 
 The account page shows display name, verified contact email, membership status, scheduled end date, billing management, notification preference, and logout. Users change identity-owned details through the provider's profile/security UI. Password reset, email verification, MFA, and social-account linkage remain provider features rather than new local credential implementations. Notification settings and subscription display are application-owned.
 
-Operators need a small set of commands: list users, inspect billing/download state, disable downloads for an account, re-enable it, revoke sessions, and assign the admin role. These are proposed Glazed operator commands; database access and the operating-system identity authorize their use. Bootstrap administration by exact issuer/subject, never by “first signup wins” or an email-domain rule.
+Administrators need the web screens described in Section 5 plus corresponding operator commands for inspection and recovery: list users, inspect billing/runtime/download state, disable access, re-enable it, revoke sessions/grants, and assign the admin role. CLI database access is an operator authority; web actions require an authenticated admin principal and CSRF protection. Bootstrap administration by exact issuer/subject, never by “first signup wins” or an email-domain rule.
 
-Disabling a local account denies downloads and release notifications and revokes existing sessions. A subsequently verified identity may establish a restricted account session to access its own billing-management and support pages, so disabling downloads does not prevent the person from canceling a paid subscription. No route using that restricted principal may return paid file bytes. Logging in must not overwrite the disabled flag.
+Disabling a local account denies hosted operations, downloads, and release notifications, revokes sessions/runtime grants, and cancels active calls. A subsequently verified identity may establish a restricted account session to access its own billing-management and support pages, so disabling downloads does not prevent the person from canceling a paid subscription. No route using that restricted principal may launch an instance, use its capabilities, or return paid file bytes. Logging in must not overwrite the disabled flag.
 
 Deletion is an explicit lifecycle operation, not an ordinary profile edit. Revoke sessions, stop notifications, handle the open subscription, and then remove or anonymize application profile data under the chosen retention policy. Financial record retention and privacy policy need a product/operations decision; the first release may expose a support request rather than attempting automatic destructive deletion.
 
@@ -395,7 +509,7 @@ Two requests arriving out of order still retrieve current Stripe state. Two even
 
 ## 9. Entitlement policy
 
-Implement one pure policy function and call it from downloads, account views, and notification recipient selection. Do not duplicate status strings in several handlers. Inputs are the principal's local account state, accepted Price IDs, release visibility, and current subscription projections; output includes allowed/denied and a stable reason code.
+Implement a pure membership policy used by downloads, hosted instance admission, account views, and notification recipient selection. Layer instance membership and role checks on top for runtime operations, and allowance reservation on top for model calls. Do not duplicate status strings in several handlers. Inputs are the principal's local account state, accepted Price IDs, release visibility, and current subscription projections; output includes allowed/denied and a stable reason code.
 
 | Stripe status | Proposed paid-download access | Explanation |
 |---|---|---|
@@ -425,7 +539,7 @@ The concrete Go policy uses a principal containing `Authenticated` and optional 
 
 The proposed strict `past_due` policy differs from the TODO predecessor's grace policy. That is a product decision, not a claim that Stripe mandates denial. If the owner chooses grace, add a named bounded policy and tests. Do not infer grace from copied code.
 
-Account suspension overrides commercial entitlement. Admin role allows publishing/operations, but should not silently fabricate a paid subscription record. If staff need catalog access, define a separate explicit staff-preview path on a distinct origin or an audited grant; no staff-preview execution is necessary for the first release.
+Account suspension overrides commercial entitlement. Hosted access also requires an enabled instance, qualifying owner subscription, caller subscription, and authorized instance membership. Owner/editor/viewer permissions determine individual capability operations. Admin role allows publishing/operations but does not silently fabricate a paid subscription record. An admin Preview action creates an explicit admin-owned review instance on an application origin, with audited use of the same runtime and model limits; it never executes uploaded HTML in the portal DOM.
 
 Refund and dispute handling require a stated product policy. A refund alone does not guarantee a subscription changes status. The initial operational runbook should cancel/suspend access when required and reconcile, rather than pretending the status table automatically handles every financial event. This guide does not decide refund law or tax liability.
 
@@ -496,7 +610,7 @@ GET /api/releases/{release}/files/{file}/download:
 
 Do not serve paid bytes under `/static/`, a public blob URL, a thumbnail route, a “source” endpoint, or an unauthenticated preview. Catalog metadata has its own view type that omits file bodies. The frontend must not preload an entire paid HTML application before checking a lock flag. This follows hyperblog's server-side byte-withholding principle.
 
-The portal does not execute downloaded applications under its own authenticated origin. Merely placing paid HTML in an iframe on the portal origin would give application JavaScript access to same-origin requests and possibly account actions. For the first release, use operator-reviewed screenshots and descriptions for preview. If interactive preview becomes necessary, use a separate origin without subscriber cookies and design that execution boundary explicitly.
+The portal does not execute uploaded applications under its own authenticated origin. Hosted execution uses the per-instance application origins and scoped launch protocol in Section 5. Public previews remain screenshots/descriptions; authenticated Run and admin Preview use real isolated instances. An iframe path on the portal origin is not sufficient isolation.
 
 A download link containing only release/file IDs still requires a session and current entitlement. It is not a bearer grant. Email links go to the catalog page and use the same download handler. Do not introduce presigned public links for the local-filesystem implementation.
 
@@ -553,6 +667,26 @@ The catalog database is distinct from local `francois.db`. The following table i
 | `notification_preferences` | user_id, enabled, verified contact revision, updated_at | Independent of identity/billing state. |
 | `release_deliveries` | release_id, user_id, channel, state, attempts, next_attempt_at, provider_message_id, error_code | Unique release/user/channel; retryable delivery. |
 
+Hosting and administration add these domain records to the same PostgreSQL database:
+
+| Table | Key/important fields | Required invariant |
+|---|---|---|
+| `instances` | id, owner_user_id, release_id, state, hostname, created_at | Unique instance origin; pinned release; owner authority separate from release publisher. |
+| `instance_members` | instance_id, user_id, role | Unique instance/user; only server-authorized owner/admin membership mutations. |
+| `instance_documents` | instance_id, path, body, version | Instance scope plus private-user authorization before query windows or writes. |
+| `instance_leases` | instance_id, path, holder, expiry | Cooperative lease scope cannot escape its instance. |
+| `instance_assets`, comments/threads | instance_id, owner_user_id, metadata/content key | Every lookup/write checks instance and role; no global owner stamping. |
+| `launch_codes` | code_hash, portal_session_hash, user_id, instance_id, origin, challenge, expiry, consumed_at | One-use, browser-bound, audience-specific exchange. |
+| `runtime_grants` | token_hash, session reference, user_id, instance_id, permissions, expiry, revoked_at | No portal authority; revoked with session/access changes. |
+| `model_allowance_periods` | user_id, period_start, included, reserved, used | Atomic admission cannot spend the same last credits twice. |
+| `model_calls` | id, user_id, instance_id, period, settings_revision, reserved_credits, state, model, aggregate usage | Exactly one local reservation/settlement per call ID; no provider secrets or raw prompts. |
+| `platform_settings` | revision, validated nonsecret document, actor, activated_at | One atomic active revision; secret values remain outside browser-readable settings. |
+| `admin_audit` | actor, action, subject, time, nonsecret change summary | Trace publication, role/access changes, settings and credit adjustments. |
+
+Use a calendar-UTC month as the initial model-allowance period, with per-call credit weights and a daily admission safeguard configured by the owner. Billing period and allowance period are separate concepts; the account UI must show reset timing explicitly. If anniversary-based allowance is chosen instead, change that policy and its tests deliberately.
+
+Views and room presence remain in memory; grants and durable instance data remain in PostgreSQL. Model reservations are reconciled after process failure. If a provider attempt may have started but its final usage is unknown, retain the defined started-call charge and expose an operator-review status rather than refunding uncertain work automatically.
+
 The first migration should encode the important uniqueness in the database:
 
 ```sql
@@ -577,20 +711,28 @@ Keep one top-level `go.mod`. A small domain layout is sufficient:
 ```text
 cmd/francois/cmds/catalog/
   root.go, serve.go, migrate.go, publish.go
-  users.go, reconcile.go, deliveries.go
+  users.go, reconcile.go, deliveries.go, settings.go
 pkg/catalog/
-  server.go, routes.go, account.go, downloads.go
+  server.go, routes.go, account.go, downloads.go, admin.go
+  instances/service.go, instances/members.go
+  runtime/server.go, runtime/grants.go, runtime/views.go
+  runtime/db.go, runtime/rooms.go, runtime/user.go, runtime/sampling.go
   identity/oidc.go, identity/sessions.go
   billing/service.go, billing/stripe.go, billing/policy.go
+  usage/admission.go, usage/ledger.go
+  settings/service.go, audit/store.go
   releases/service.go, releases/files.go
   notifications/service.go, notifications/mail.go
   store/postgres.go, store/migrations/*.sql
   web/embed.go
 ui/catalog/
   main.tsx, app.tsx, api.ts, account.tsx, library.tsx, style.css
+  admin/releases.tsx, admin/users.tsx, admin/settings.tsx
+  admin/billing.tsx, admin/instances.tsx
+  runtime-launch.ts
 ```
 
-Every path above is proposed. Existing `pkg/host` and `pkg/store` remain the local runtime implementation. Use standard `net/http` ServeMux and explicit middleware composition. Follow context propagation, `github.com/pkg/errors` wrapping, zerolog, errgroup ownership, and `_ "embed"` conventions already required by this repository.
+Every path above is proposed. Existing `pkg/host` and `pkg/store` remain the local runtime implementation; extract reusable document/query helpers and reuse browser capability implementation where it has correct semantics, with hosted context passed explicitly. Use standard `net/http` ServeMux and explicit middleware composition. Follow context propagation, `github.com/pkg/errors` wrapping, zerolog, errgroup ownership, and `_ "embed"` conventions already required by this repository.
 
 Define interfaces at genuine external boundaries rather than wrapping every helper:
 
@@ -627,14 +769,15 @@ catalog serve:
     connect PostgreSQL and verify migration compatibility
     open private release root
     discover configured OIDC provider with bounded startup context
-    create Stripe client and mail sender
-    construct catalog ServeMux with explicit policies
-    start HTTP listener, billing worker, notification worker under errgroup
+    create Stripe client, mail sender and approved Pi model backend
+    load active platform settings and construct instance/usage services
+    construct portal/admin and instance-origin handlers with explicit policies
+    start HTTP listener, billing/notification workers and model backend under errgroup
     on signal: stop accepting requests, cancel workers, drain bounded work,
                close listener/store/root
 ```
 
-Workers take context arguments, claim work with recoverable leases, and stop on cancellation. No goroutine silently outlives the command. The initial process graph must be testable without Node, Pi config, or a local artifact library database.
+Workers take context arguments, claim work with recoverable leases, and stop on cancellation. No goroutine silently outlives the command. The account/catalog and hosted handler graph must be testable with a fake model backend and no local artifact-library database. Production hosted sampling requires the Node worker and private operator provider configuration. Credentials are not read during pure policy/account tests.
 
 ## 15. HTTP and frontend API reference
 
@@ -664,7 +807,30 @@ All JSON errors use `{ "error": { "code": "...", "message": "..." } }`. Unknown 
 | `POST /notifications/unsubscribe` | Valid signed token | Disable release notifications. |
 | `GET /healthz`, `GET /readyz` | Public operational endpoints | Liveness and local storage/database readiness. |
 
-Do not put administrator mutations in the public API in the first slice unless needed by an implemented operator screen. Operator CLI access is sufficient. If an admin API is introduced, each route needs admin-role plus CSRF checks and cannot be used by an ordinary subscriber.
+Administrator screens and APIs are required in the first implementation. They use the trusted account origin, session admin role, CSRF, and audit service. Reuse domain services between UI and operator commands.
+
+| Method/path | Authorization | Contract |
+|---|---|---|
+| `GET /admin` | Admin session | Management UI shell. |
+| `POST /api/admin/releases/upload` | Admin + CSRF | Bounded HTML/manifest upload into a draft with metadata/hash validation. |
+| `POST /api/admin/releases/{id}/publish` | Admin + CSRF | Immutable release publication, audit, announcement marker. |
+| `POST /api/admin/releases/{id}/withdraw` | Admin + CSRF | Explicit withdrawal and selected existing-instance impact. |
+| `GET /api/admin/users`, `GET /api/admin/users/{id}` | Admin | Account/billing/instance/usage inspection without credential contents. |
+| `PATCH /api/admin/users/{id}` | Admin + CSRF | Supported role/disabled changes; preserve provider-owned identity. |
+| `POST /api/admin/users/{id}/revoke-sessions` | Admin + CSRF | Revoke portal sessions, runtime grants, active calls/views. |
+| `GET /api/admin/instances` | Admin | Instance membership/release/storage inspection. |
+| `POST /api/admin/instances/{id}/suspend` | Admin + CSRF | Runtime suspension without data deletion. |
+| `GET/PATCH /api/admin/settings` | Admin; CSRF on PATCH | Validate and activate nonsecret settings revision. |
+| `GET /api/admin/billing/events`, `POST /api/admin/billing/reconcile` | Admin; CSRF on POST | Inspect/retry billing convergence using the existing queue. |
+| `POST /api/admin/usage/adjustments` | Admin + CSRF | Explicit audited allowance adjustment. |
+| `GET/POST /api/instances` | Subscriber; CSRF on POST | List own/member instances or create a private release-pinned instance. |
+| `POST /api/instances/{id}/launch` | Subscriber/member + CSRF | Browser-bound, instance-scoped launch code. |
+| `POST/DELETE /api/instances/{id}/members` | Instance owner or admin + CSRF | Add/remove registered subscriber membership, with audited scope. |
+| `POST /api/instances/{id}/upgrade` | Instance owner or admin + CSRF | Explicit pinned-release upgrade preserving instance data. |
+| Instance-origin `/launch`, `/api/launch/exchange` | Trusted bootstrap; valid one-use exchange on POST | No paid bytes before authorized scoped grant. |
+| Instance-origin `/page`, capability RPC/SSE/call/asset endpoints | Instance grant + current entitlement/role | Authenticated HTML and hosted capability operations. |
+
+An instance grant is structurally rejected by account/admin routes. A portal session alone is not forwarded to arbitrary application origins. Host dispatch and each service's principal requirement are tested independently.
 
 ### Representative JSON shapes
 
@@ -700,9 +866,9 @@ Metadata does not include source text. `downloadAccess` guides UI presentation; 
 
 ## 16. Deployment and configuration
 
-The first production deployment needs a public HTTPS URL, a dedicated OIDC web client/callback, a PostgreSQL database, a persistent private release directory, Stripe sandbox/live configuration, and a verified sender. Reuse existing infrastructure patterns from the reviewed vault reports: immutable images, GitOps deployment definitions, Vault-delivered runtime secrets, and backups outside the node.
+The first production deployment needs a trusted account HTTPS URL, per-instance application hostname/TLS routing on a separate application domain, a dedicated OIDC web client/callback, PostgreSQL, a private release directory, a Node Pi worker with private operator auth files, Stripe configuration, and a verified sender. Reuse existing infrastructure patterns from the reviewed vault reports: immutable images, GitOps deployment definitions, Vault-delivered runtime secrets, and backups outside the node.
 
-The proposed Glazed settings are `listen`, `public-url`, `database-url-file`, `release-dir`, `oidc-issuer`, `oidc-client-id`, `oidc-client-secret-file` when the client type requires it, `session-key-file` if the selected SDK needs encrypted flow state, `stripe-secret-key-file`, `stripe-webhook-secret-files`, `stripe-price-id`, `stripe-live-mode`, and email-sender settings. Client IDs, issuer URLs, Price IDs, and directories are nonsecret; secret files must not be emitted in structured command output.
+The proposed Glazed settings are `listen`, `public-url`, `database-url-file`, `release-dir`, `oidc-issuer`, `oidc-client-id`, `oidc-client-secret-file` when the client type requires it, `session-key-file` if the selected SDK needs encrypted flow state, `stripe-secret-key-file`, `stripe-webhook-secret-files`, `stripe-price-id`, `stripe-live-mode`, email-sender settings, `application-domain`, `node`, `worker`, and `pi-agent-dir`. Allowed model IDs, tier mappings and allowance/storage limits belong to validated platform settings, with deployment defaults only where appropriate. Client IDs, issuer URLs, Price IDs, and directories are nonsecret; secret files must not be emitted in structured command output.
 
 Choose a pinned, compatible Go/toolchain and dependency set before production. The FRANCOIS-001 Step 10 vulnerability scan failed against the existing toolchain/dependencies; this ticket does not reinterpret a passing local functionality test as a clean production security result. Resolve those findings in an explicit implementation/deployment phase and retain evidence.
 
@@ -718,7 +884,7 @@ An operational dashboard can be a small authenticated view or CLI output: oldest
 
 ## 17. Implementation phases for a new intern
 
-The implementation should proceed as a sequence of working slices. Each phase has a concrete exit condition. Commit the code and full investigation diary at coherent milestones; do not mark later phases complete because this document exists.
+The implementation should proceed as nine working slices. Each phase has a concrete exit condition. Commit the code and full investigation diary at coherent milestones; do not mark later phases complete because this document exists.
 
 ### Phase 1: establish the catalog boundary and persistence
 
@@ -732,11 +898,11 @@ Provision a dedicated development OIDC web client. Implement code+PKCE login, on
 
 **Exit:** two different verified subjects produce different users even when profile email text matches; one subject with an updated email remains the same user; callback replay fails; session expiry/logout work; an ordinary user cannot obtain administrator controls.
 
-### Phase 3: curated release storage and download authorization
+### Phase 3: releases, administration, and instance capabilities
 
-Implement explicit publisher, private atomic blob storage, release metadata, screenshots, and attachment-only download handler. Begin with a clearly marked free fixture and a subscriber fixture whose bytes are denied until entitlement exists. Implement the pure policy before billing integration.
+Implement the shared publisher, private release storage, admin HTML-upload/draft/publish/user/settings screens, metadata and downloads. Add private instances, membership, isolated virtual hosts, trusted launch bootstrap/grants, real user profiles, instance-scoped documents, and room presence. Use fixture entitlements and a fake sampling backend at this stage.
 
-**Exit:** unentitled requests never receive paid source bytes through any route; a valid fixture principal can download byte-identical HTML/manifest; metadata and screenshots do not disclose the source; a missing blob returns a controlled error.
+**Exit:** an admin uploads and publishes an application through the web UI; a subscriber cannot call admin APIs. Two users have isolated private instances; authorized members of one shared instance see shared documents/presence and correct identity, while private-user documents remain private. Launch/grant denial and replay tests pass; optional downloads remain byte-identical.
 
 ### Phase 4: Stripe Customer, Checkout, and Portal
 
@@ -750,23 +916,29 @@ Implement signature verification, mode/version checks, durable inbox, worker lif
 
 **Exit:** duplicate and out-of-order events converge; old canceled subscriptions do not hide replacements; crash/retry resumes work; initial failure denies; renewal extends access; scheduled cancellation preserves access until end; terminal cancellation removes new-download access. Record the exact chosen past_due/trial policy.
 
-### Phase 6: subscriber notification delivery
+### Phase 6: hosted model execution and allowance
+
+Connect the operator's Pi-backed model worker to principal-scoped hosted views. Implement allowed model/thinking policy, atomic credit reservation/settlement, private start/usage events, per-user and global admission limits, text/thinking streams, and browser tool correlation. Add administrator usage, limit settings, and explicit adjustment UI.
+
+**Exit:** POLIS can stream an answer/thinking and perform its eval tool in the hosted browser; two users cannot see each other's call events/history. Two tabs racing the last credits admit only one valid reservation. Cancellation, provider error, process failure, model rejection, and membership/subscription revocation produce the defined ledger/access behavior. No raw key or unrelated server tool reaches an application.
+
+### Phase 7: subscriber notification delivery
 
 Implement preferences, verified-contact checks, recipient generation marker/cursor, unique delivery jobs, rechecks, sender interface, retries, and unsubscribe. Begin with a capture sink; configure SES/SMTP only after the sink acceptance passes.
 
 **Exit:** publish generates one logical delivery per eligible user, crash/retry resumes generation, unsubscribe before send suppresses delivery, inactive/disabled users are skipped, and all links pass through the authenticated download path. Do not claim exactly-once provider delivery.
 
-### Phase 7: integrated customer journey and production readiness
+### Phase 8: integrated customer journey and production readiness
 
-Run full browser acceptance: sign up, subscribe, wait for projection, download, import locally, run the artifact, receive a captured release notice, manage/cancel billing, and verify access changes. Complete known vulnerability maintenance, consistent backups/restore, secret delivery, verified sender configuration, and production OIDC/Stripe settings.
+Run full browser acceptance: admin upload/publish; subscriber sign-in/purchase; create/launch a hosted instance; stream thinking/answer and execute browser tools; persist documents; join another permitted member in a room; change settings and inspect usage; optionally download/import locally; receive a captured notice; cancel and verify hosted/download access changes. Complete known vulnerability maintenance, consistent backups/restore, secret delivery, verified sender configuration, and production OIDC/Stripe settings.
 
 **Exit:** the journey and denial cases are demonstrated with retained sanitized evidence; release files match their recorded hashes; no operator/customer model credential is present in portal responses or release bytes. Distinguish sandbox acceptance from live launch.
 
-### Phase 8: launch and operational handoff
+### Phase 9: launch and operational handoff
 
 Deploy one catalog instance with its private storage. Configure the public webhook endpoint and sender only for the chosen environment. Perform an approved production acceptance journey, document reconciliation and support runbooks, and record image digest, application commit, API versions, and restore proof.
 
-**Exit:** an operator can inspect a user's access, reconcile a missing webhook, withdraw a release, retry a delivery, rotate an endpoint secret, and restore metadata/files. Pricing, trial/grace, license, tax configuration, and email-policy decisions are explicit rather than embedded in accidental code defaults.
+**Exit:** administrators can inspect accounts/instances/usage, publish and withdraw releases, manage validated settings, revoke views/calls, reconcile billing, retry deliveries, and restore metadata/files; operator commands support recovery. Pricing, trial/grace, license, tax configuration, and email-policy decisions are explicit rather than embedded in accidental code defaults.
 
 ## 18. Test matrix and experiments
 
@@ -776,6 +948,10 @@ Use tests to prove externally observable invariants. A handler returning 403 is 
 |---|---|---|
 | Identity | State/binding mismatch, nonce failure, callback replay, expiry, changed email, same email/different subject. | OIDC fixtures plus browser login against the configured development issuer. |
 | Sessions | Expired/revoked token, disabled account, profile update preserves roles, logout, CSRF failure. | Database-backed tests and route matrix. |
+| Hosted launch | Wrong frame/source/origin, wrong verifier/instance, expired/replayed code, no third-party cookies, logout revocation. | Browser bootstrap tests and grant exchange fixtures. |
+| Hosted state/rooms | Private instance separation, shared instance ACL, private-user docs, per-view/per-user identity, cross-instance subscription/event denial. | Two/three-user browser sessions and scoped PostgreSQL queries. |
+| Hosted LLM | Model allowlist, last-credit race, start/usage/settlement, cancellation/error, blocked overage, revoked member, tool result correlation. | Fake worker/ledger tests plus real permitted provider calls. |
+| Admin UI | Upload/draft/publish, role denial, CSRF, settings validation/revision, sessions/grants revocation, audit records. | Browser acceptance and direct forbidden API requests. |
 | Billing attempts | Double click, provider timeout after creation, DB failure after Customer creation, foreign Session/Customer input. | Fake gateway state plus sandbox object counts/IDs. |
 | Webhooks | Invalid/raw-body signature, wrong mode/version, duplicate, irrelevant event, DB failure, worker crash, delayed old subscription event. | Signed fixtures, PostgreSQL transactions, Stripe CLI. |
 | Entitlement | Exact Price, unknown Price/status, malformed items, active period, trial disabled, past_due denial, period-end and terminal cancellation. | Pure table-driven policy tests. |
@@ -799,7 +975,7 @@ Runtime checks should use tmux for long-lived services, and `lsof-who -p <port> 
 
 - **Context:** Identity, billing, publication, and email have different external systems but one product.
 - **Options considered:** Separate microservices; one catalog process with explicit package and transaction boundaries.
-- **Decision:** One process and database, with private files and two durable workers.
+- **Decision:** One Go application process and PostgreSQL database, private files, durable billing/notification workers, and one Pi model worker. Separate portal and per-instance origins are routing boundaries, not additional microservices.
 - **Rationale:** It is straightforward to deploy and inspect, and avoids infrastructure that contributes no first-release behavior.
 - **Consequences:** One-replica capacity and local release storage are explicit initial constraints. Scale requires a measured change.
 - **Status:** proposed.
@@ -819,12 +995,12 @@ The guide can be implemented with test fixtures before these commercial choices 
 
 1. Subscription amount/currency and whether yearly pricing is included.
 2. The trusted ZITADEL issuer/project and allowed self-signup/social-provider policies.
-3. Confirmation that the first release sells downloads/notifications, without hosted model calls.
-4. Whether active members can download the entire catalog, or only releases during their membership; this guide proposes the entire currently published catalog.
+3. Hosted model allowance, credit weights, permitted models/thinking levels, concurrency, and daily safeguards; hosting scope is now confirmed.
+4. Hosted instance/storage limits, sharing permissions and owner-cancellation behavior, plus catalog download policy; this guide proposes private defaults, explicit subscriber membership, owner-entitlement gating, and the published catalog.
 5. Trial and payment-failure grace; this guide proposes no automatic trial and no past_due access.
 6. Release notification opt-in and verified sending domain; this guide proposes opt-in messages linking to the website.
 7. Commercial license, refund/dispute response, tax settings, retention, and support process.
-8. Deployment domain, PostgreSQL/volume ownership, and backup destination.
+8. Account/application domains and TLS routing, operator model credentials, PostgreSQL/volume ownership, and backup destination.
 
 These are visible assumptions, not reasons to delay the first technical slices. They should not be converted into a configurable policy framework with dozens of unused modes. Implement the chosen first-release contract and retain the tests that define it.
 
@@ -866,4 +1042,4 @@ Absolute predecessor root: `/home/manuel/code/wesen/2026-07-25--zitadel-go-test`
 | [Customer Portal integration](https://docs.stripe.com/customer-management/integrate-customer-portal) | Owner-authenticated portal creation and subsequent webhook handling. |
 | [SES deliverability](https://docs.aws.amazon.com/ses/latest/dg/send-email-concepts-deliverability.html) | Verified sender, delivery feedback, and notification operations. |
 
-A reviewer should first check the product boundary: the portal distributes authored bytes and never starts the owner's model runtime. Then review identity/session ownership, Customer correlation, the pure access policy, private download paths, subscription replacement convergence, and recoverable publication/notification work. The architecture is sufficient when those concrete operations compose correctly; adding extra middleware abstractions or infrastructure is not a substitute for those checks.
+A reviewer should first check the product boundary: hosted instances receive scoped capabilities and model allowance, while their HTML never executes under the trusted account/admin origin. The server uses operator-controlled provider credentials, never a subscriber's local home directory. Then review identity/session ownership, Customer correlation, the pure access policy, private download paths, subscription replacement convergence, and recoverable publication/notification work. The architecture is sufficient when those concrete operations compose correctly; adding extra middleware abstractions or infrastructure is not a substitute for those checks.

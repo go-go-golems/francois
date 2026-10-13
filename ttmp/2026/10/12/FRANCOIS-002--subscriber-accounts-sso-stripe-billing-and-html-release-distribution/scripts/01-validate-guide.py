@@ -16,6 +16,11 @@ assert text.count('```') % 2 == 0
 assert re.findall(r'^## (\d+)\.', text, re.M) == [str(i) for i in range(1, 21)]
 assert '<!--' not in text
 assert 'proposed design and implementation guide' in text
+assert re.findall(r'^### Phase (\d+):', text, re.M) == [str(i) for i in range(1, 10)]
+for requirement in ['Hosted application instances', 'The administrator application', 'model_allowance_periods', 'runtime_grants', 'third-party cookies']:
+    assert requirement in text, requirement
+for obsolete in ['The catalog can run without Node', 'Operator CLI access is sufficient', 'Hosting is future work']:
+    assert obsolete not in text, obsolete
 manifest = json.loads((root / 'sources/manifest.json').read_text())
 for item in manifest['files']:
     data = (root / item['snapshot']).read_bytes()

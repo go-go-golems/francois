@@ -127,3 +127,65 @@ Open the design doc from the ticket index and run its validation script. Review 
 
 ### Technical details
 Remote destination: /ai/2026/10/12/FRANCOIS-002. PDF name: FRANCOIS-002 Subscription Service Intern Guide.pdf. Delivery preserves the normal no-overwrite policy; no physical-device synchronization claim is made.
+
+## Step 3: Revise the product for hosted capabilities and an administrator UI
+
+The user clarified that file distribution alone is insufficient: the service must provide hosted db, room, user, and LLM behavior, followed by an explicit administrator interface for uploading HTML and managing users/settings. Revision 2 updates the existing guide and scope rather than pretending the original distribution assumption was accepted. The initial cloud PDF remains historical and will not be overwritten.
+
+The new design uses release-pinned instances with private defaults, explicit subscriber membership, isolated browser origins, scoped launch/runtime grants, server-owned provider configuration, and per-caller model allowance. A trusted admin UI manages publishing, accounts, instances, billing/usage, and validated nonsecret settings. No hosting or administration code was implemented in this documentation revision.
+
+### Prompt Context
+**User prompt (verbatim):** "we should actually provide hosting, i.e. db / room / user / LLM functionality. How would that work?"
+**User follow-up (verbatim):** "we also want an admin side of things, to upload new html, manage users, settings, etc..."
+**Assistant interpretation:** Correct the product scope to include hosted runtime capabilities and a real management interface, and explain/design the ownership and lifecycle needed to implement them.
+**Inferred user intent:** Subscribers should use the HTML applications directly on the service while administrators operate the product, rather than requiring every subscriber to install a local runner.
+
+### What I did
+- Re-read current host RPC, view bootstrapping, user/presence code, and model protocol to identify global-owner assumptions.
+- Replaced distribution-only conclusions with hosted instances, while preserving local commands and optional downloads.
+- Added instance/private-document/room/member ownership, per-instance virtual origins, browser-bound launch grants, quota-controlled Pi execution, usage/start events, and revocation behavior.
+- Added required admin screens and APIs for upload/draft/publish/withdraw, user/session management, instance inspection, billing reconciliation/usage, and settings revisions/audit.
+- Updated proposed schema, package layout, process graph, API table, deployment requirements, acceptance tests, and implementation plan to nine phases.
+- Preserved the original reMarkable receipt as revision 1 tied to b294a00. The new upload uses a revision-2 document name and separate receipt.
+- Updated the ticket index/tasks and strengthened its document validator with hosted/admin requirements and phase order.
+
+### Why
+A single local Host.Owner cannot identify several subscribers. Scoping by release/artifact alone also merges different users' data and rooms. Instance identity is needed independently of user identity, while a trusted principal establishes who may act within it. Arbitrary HTML must not execute under the admin/account origin.
+
+Pi's provider runtime remains a useful implementation, but the service operator supplies its credentials and pays for hosted inference. Subscription admission therefore needs a model allowlist, transactionally reserved call allowance, bounded concurrency, and observable usage. The current worker discards per-round SDK usage; this is an explicit implementation gap.
+
+### What worked
+- Existing source confirms where view context, query ownership, private-user paths, user profiles, and peer identity must change.
+- The guide retains the existing browser capability contract and browser-side tool execution rather than introducing a separate arbitrary-code server executor.
+- The revised process remains one Go service plus one Node worker/database, with origin boundaries and scoped data rather than a container or microservice per application.
+- The validator checks 20 sections, nine implementation phases, required hosted/admin concepts, reference paths, source hashes, and absence of selected obsolete distribution-only conclusions.
+
+### What didn't work
+No new runtime failure was encountered because this step changes documentation only. The initial distribution assumption was incorrect for the intended product and is now explicitly superseded.
+
+### What I learned
+Per-instance origin isolation and runtime authentication are separate requirements. A cross-site iframe must not depend on third-party cookies; the guide proposes a controlled parent/bootstrap exchange with a one-use browser-bound code and instance-scoped grant. postMessage alone is not identity proof.
+
+### What was tricky to build
+The application can act through its permitted instance capabilities, but must not inherit the portal's billing/admin authority. The guide separates the portal session, launch exchange, instance grant, view identity, and server provider credentials. Model allowance also requires a clear distinction between reservation, provider-start ambiguity, and terminal settlement.
+
+### What warrants a second pair of eyes
+Review launch protocol source/origin/verifier binding, paid instance-owner/member access, role and private-user-data policy, subscription revocation, model accounting under crash/cancellation, and settings changes. These are proposed contracts with acceptance tests, not verified deployed behaviors.
+
+### What should be done in the future
+Implement the revised nine phases. Set allowance amounts, allowed models, storage/instance limits, sharing/cancellation policy, domains/TLS, sender and commercial settings before launch. Use the admin UI and CLI through the same domain services.
+
+### Code review instructions
+Read revised Sections 1–5 for the hosted product, Sections 13–15 for schema/packages/APIs, and Phases 3 and 6 for runtime/admin/model work. Compare the guide against b294a00 to see which initial assumptions were removed.
+
+### Technical details
+- Instance documents: instance_id + path; private data additionally requires verified UserID.
+- Presence: instance_id + room; sameTab compares views, isMe compares users.
+- Runtime grant: scoped user/instance/origin, bounded lifetime, server subscription/ACL rechecks, no portal/admin authority.
+- Hosted LLM: operator Pi auth, allowed model policy, caller allowance reservation, per-round usage, browser tools.
+- Admin mutations: session role + CSRF + audit; uploaded HTML executes only on an application origin.
+
+
+### Revision 2 delivery checkpoint
+
+The 14,176-word hosted/admin guide passed its validator and docmgr doctor. The cloud upload result is `OK: uploaded FRANCOIS-002 Hosted Platform and Admin Intern Guide v2.pdf -> /ai/2026/10/12/FRANCOIS-002`. The original PDF was not overwritten. Its new hash and revision are in sources/guide-delivery-v2.json. Physical tablet synchronization was not verified. All nine implementation phases remain open.
