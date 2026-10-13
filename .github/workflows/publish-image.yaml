@@ -1,0 +1,51 @@
+# Builds and tests on pull requests; on main, publishes
+# ghcr.io/go-go-golems/francois:sha-<short> and opens an image-pin PR against
+# the yolo K3s GitOps repository (FRANCOIS-003). The GitOps PR credential is
+# a GitHub App read from Vault through GitHub Actions OIDC.
+name: publish-image
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    # Documentation and ticket changes do not change the container.
+    paths-ignore:
+      - "ttmp/**"
+      - "*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: publish-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    uses: go-go-golems/infra-tooling/.github/workflows/publish-ghcr-image.yml@main
+    secrets: inherit
+    with:
+      dockerfile: ./Dockerfile
+      build_context: .
+      test_command: go test ./... -count=1
+      go_version_file: go.mod
+      image_name: ghcr.io/go-go-golems/francois
+      platforms: linux/amd64
+      gitops_target_config: deploy/gitops-targets.json
+      push_image: ${{ github.event_name != 'pull_request' }}
+      # Enabled once Vault role francois-gitops-pr and the GitHub App
+      # credential exist (FRANCOIS-003 Phase 8):
+      # ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+      open_gitops_pr: false
+      gitops_pr_token_source: github_app
+      vault_role: francois-gitops-pr
+      gitops_app_secret_path: kv/data/ci/github/francois/gitops-pr-app
+      gitops_app_owner: wesen
+      gitops_app_repositories: 2026-03-27--hetzner-k3s
+      tooling_repository: go-go-golems/infra-tooling
+      tooling_ref: main
