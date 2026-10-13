@@ -3,11 +3,27 @@ Title: Subscription service investigation diary
 Ticket: FRANCOIS-002
 Status: active
 Topics:
-  - backend
+    - backend
 DocType: working-note
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://deploy/compose/compose.yaml
+      Note: End-to-end acceptance stack (ZITADEL, Stripe CLI, Pi)
+    - Path: repo://pkg/catalog/catalog_test.go
+      Note: PostgreSQL integration test of the hosted platform
+    - Path: repo://pkg/catalog/hosted/routes.go
+      Note: Launch exchange, grant-gated page injection, assets
+    - Path: repo://pkg/catalog/hosted/sample.go
+      Note: Model allowlist, admission, reservation and settlement
+    - Path: repo://pkg/catalog/payments/service.go
+      Note: Checkout attempts, webhook ingest and reconciliation worker
+    - Path: repo://pkg/catalog/server.go
+      Note: Host dispatch and the single hosted-access rule (authorizeInstance)
+    - Path: repo://pkg/catalog/store/usage.go
+      Note: Allowance ledger (reserve/start/settle/recover)
+    - Path: repo://ui/catalog/instances.tsx
+      Note: Launcher frame and parent side of the launch handshake
 ExternalSources: []
 Summary: Evidence and decisions for the proposed subscriber HTML distribution service; implementation remains open.
 LastUpdated: 2026-10-12T21:18:58.719369-04:00
@@ -334,3 +350,23 @@ Browser validation found four real bugs that unit/integration tests had missed (
 ### Technical details
 - Sandbox objects: `prod_VQpH0Crg2Ztp5I` / `price_1UPxdFLeHmcfmvuCg0zsScj5` (test mode), Checkout attempt `chk_020806b270c68339703edb36` completed.
 - Origins observed: preview `i-82f3669b96eb2f785857`, Alice's shared board `i-99127b164e4989bf88c3`, POLIS preview `i-8e19bb1e6c08af74bc87`, Alice's POLIS `i-e743c79ab92958abdfc8`.
+
+## Step 6: Repository gates and logger conventions
+
+Brought the new packages in line with the repository's CI gates: generated logcopter package loggers replace direct `zerolog/log` imports, golangci-lint findings (named returns, `max` shadowing, one gofmt) are fixed, and hosted grants now renew at 75 % of their remaining lifetime (minimum 15 s) instead of a fixed T−2 min.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 4.
+**Assistant interpretation:** Keep the implementation consistent with the repository's conventions and CI checks.
+**Inferred user intent:** Mergeable, CI-clean work.
+
+### Evidence and commits
+- 0bee348 — "Use generated package loggers in catalog, lint fixes, proportional grant renewal".
+- `make logcopter-check` (initially `generated file is not current: .../pkg/catalog/logcopter.go`) now passes; `golangci-lint run ./...` → `0 issues.`; `make glazed-lint` → no findings; `TEST_DATABASE_URL=... go test ./...` all `ok`; `pnpm test` 5 pass.
+- Rebuilt stack: `/readyz` → `{"models":true,"status":"ready"}`; Bob's instance data persisted across restarts.
+
+### Noteworthy decisions or failures
+- The 9 golangci-lint findings were style-only; no behavior changed.
+
+### Remaining requirements and next action
+- Open: Phase 7 release notifications (`be57`), Phase 8b production readiness (`pezy`), Phase 9 launch (`dxkw`), and the umbrella Phase 8 (`i63k`).
