@@ -109,7 +109,7 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 
 func (s *Server) sameOrigin(r *http.Request) bool {
 	if o := r.Header.Get("Origin"); o != "" {
-		return o == s.Config.PortalOrigin()
+		return o == s.site(r).PortalOrigin()
 	}
 	// Browsers always send Origin on cross-origin POSTs; fall back to Fetch
 	// metadata for older same-origin requests.
@@ -130,7 +130,8 @@ func safeReturn(p string) string {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	if !s.OIDC.Configured() {
+	oidc := s.site(r).OIDC
+	if !oidc.Configured() {
 		httpx.Fail(w, 503, "login_unavailable", "Sign-in is not configured")
 		return
 	}
@@ -144,7 +145,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("signup") == "1" && s.Config.SignupAllowed {
 		prompt = "create"
 	}
-	target, err := s.OIDC.AuthURL(r.Context(), state, nonce, verifier, prompt)
+	target, err := oidc.AuthURL(r.Context(), state, nonce, verifier, prompt)
 	if err != nil {
 		log.Warn().Err(err).Msg("OIDC discovery failed")
 		http.Redirect(w, r, "/?login_error=provider_unavailable", http.StatusSeeOther)
@@ -174,7 +175,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		fail("flow_invalid")
 		return
 	}
-	id, idToken, err := s.OIDC.Exchange(r.Context(), q.Get("code"), flow.Verifier, flow.Nonce)
+	id, idToken, err := s.site(r).OIDC.Exchange(r.Context(), q.Get("code"), flow.Verifier, flow.Nonce)
 	if err != nil {
 		log.Warn().Err(err).Msg("OIDC exchange failed")
 		fail("exchange_failed")
@@ -208,8 +209,8 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	// credentials instead of silently reusing it. The portal session is
 	// already gone if this fails; the browser then simply stays signed out
 	// of Francois only.
-	if s.OIDC.Configured() {
-		target, err := s.OIDC.LogoutURL(r.Context(), p.Session.IDToken, s.Config.PortalOrigin()+"/", "")
+	if site := s.site(r); site.OIDC.Configured() {
+		target, err := site.OIDC.LogoutURL(r.Context(), p.Session.IDToken, site.PortalOrigin()+"/", "")
 		if err != nil {
 			log.Warn().Err(err).Msg("Identity provider logout unavailable")
 		} else if target != "" {

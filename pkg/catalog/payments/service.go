@@ -20,7 +20,6 @@ var (
 type Config struct {
 	PriceID    string
 	Livemode   bool
-	PublicURL  string
 	Deployment string // stable idempotency namespace
 }
 
@@ -65,9 +64,11 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 	return s.Store.SaveCustomer(ctx, u.ID, id)
 }
 
-// Checkout returns a hosted Checkout URL for the single configured plan.
-// Double clicks and retries resolve to the same admitted attempt/Session.
-func (s *Service) Checkout(ctx context.Context, u store.User) (string, error) {
+// Checkout returns a hosted Checkout URL for the single configured plan that
+// returns to portal (the origin the user started from). Double clicks and
+// retries resolve to the same admitted attempt/Session, including its return
+// URL.
+func (s *Service) Checkout(ctx context.Context, u store.User, portal string) (string, error) {
 	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
 		if err != nil {
@@ -96,8 +97,8 @@ func (s *Service) Checkout(ctx context.Context, u store.User) (string, error) {
 	// the same Session from Stripe.
 	cs, err := s.Gateway.CreateCheckout(ctx, CheckoutRequest{
 		CustomerID: customer, PriceID: s.Config.PriceID, UserID: u.ID, AttemptID: attempt.ID,
-		SuccessURL:     s.Config.PublicURL + "/account?checkout={CHECKOUT_SESSION_ID}",
-		CancelURL:      s.Config.PublicURL + "/account",
+		SuccessURL:     portal + "/account?checkout={CHECKOUT_SESSION_ID}",
+		CancelURL:      portal + "/account",
 		IdempotencyKey: s.Config.Deployment + "-checkout-" + attempt.ID,
 	})
 	if err != nil {
@@ -109,8 +110,9 @@ func (s *Service) Checkout(ctx context.Context, u store.User) (string, error) {
 	return cs.URL, nil
 }
 
-// Portal creates a Customer Portal session for the caller's own Customer.
-func (s *Service) Portal(ctx context.Context, u store.User) (string, error) {
+// Portal creates a Customer Portal session for the caller's own Customer that
+// returns to portal.
+func (s *Service) Portal(ctx context.Context, u store.User, portal string) (string, error) {
 	customer, err := s.Store.CustomerFor(ctx, u.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return "", ErrNoCustomer
@@ -118,7 +120,7 @@ func (s *Service) Portal(ctx context.Context, u store.User) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return s.Gateway.CreatePortal(ctx, customer, s.Config.PublicURL+"/account")
+	return s.Gateway.CreatePortal(ctx, customer, portal+"/account")
 }
 
 // Refresh enqueues an owner-scoped reconciliation. An optional Checkout

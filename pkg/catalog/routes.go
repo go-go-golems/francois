@@ -74,7 +74,8 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-src "+s.Config.AppScheme+"://*."+s.Config.AppDomain+portSuffix(s.Config.AppPort)+"; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		site := s.site(r)
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-src "+site.AppScheme+"://*."+site.AppDomain+portSuffix(site.AppPort)+"; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		m.ServeHTTP(w, r)
 	})
 }
@@ -92,7 +93,8 @@ func (s *Server) access(ctx context.Context, u store.User) (billing.Decision, er
 
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
-	out := map[string]any{"authenticated": p != nil, "loginAvailable": s.OIDC.Configured(), "signupAvailable": s.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": s.Config.AppDomain}
+	site := s.site(r)
+	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured(), "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain}
 	if p != nil {
 		d, err := s.access(r.Context(), p.User)
 		if err != nil {
@@ -308,7 +310,7 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 403, "email_unverified", "Verify your email address with the identity provider first")
 		return
 	}
-	u, err := s.Payments.Checkout(r.Context(), p.User)
+	u, err := s.Payments.Checkout(r.Context(), p.User, s.site(r).PortalOrigin())
 	if err != nil {
 		s.billingFailure(w, err)
 		return
@@ -321,7 +323,7 @@ func (s *Server) portalSession(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "billing_unavailable", "Billing is not configured")
 		return
 	}
-	u, err := s.Payments.Portal(r.Context(), principal(r.Context()).User)
+	u, err := s.Payments.Portal(r.Context(), principal(r.Context()).User, s.site(r).PortalOrigin())
 	if err != nil {
 		s.billingFailure(w, err)
 		return

@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *Server) instanceJSON(i store.Instance) map[string]any {
+func (s *Server) instanceJSON(r *http.Request, i store.Instance) map[string]any {
 	return map[string]any{"id": i.ID, "title": i.Title, "kind": i.Kind, "state": i.State, "role": i.Role, "artifactId": i.ArtifactID, "version": i.Version,
-		"releaseId": i.ReleaseID, "ownerName": i.OwnerName, "ownerUserId": i.OwnerUserID, "members": i.Members, "origin": s.Config.AppOrigin(i.Hostname),
+		"releaseId": i.ReleaseID, "ownerName": i.OwnerName, "ownerUserId": i.OwnerUserID, "members": i.Members, "origin": s.site(r).AppOrigin(i.Hostname),
 		"createdAt": i.CreatedAt, "updatedAt": i.UpdatedAt}
 }
 
@@ -25,7 +25,7 @@ func (s *Server) instances(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []map[string]any{}
 	for _, i := range list {
-		out = append(out, s.instanceJSON(i))
+		out = append(out, s.instanceJSON(r, i))
 	}
 	httpx.OK(w, out)
 }
@@ -84,7 +84,7 @@ func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Could not create instance")
 		return
 	}
-	httpx.JSON(w, 201, s.instanceJSON(inst))
+	httpx.JSON(w, 201, s.instanceJSON(r, inst))
 }
 
 // member loads an instance only when the caller belongs to it.
@@ -139,7 +139,7 @@ func (s *Server) instance(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	out := s.instanceJSON(inst)
+	out := s.instanceJSON(r, inst)
 	out["membersList"] = members
 	out["release"] = publicRelease(rel)
 	out["upgrades"] = upgrades
@@ -210,7 +210,7 @@ func (s *Server) launch(w http.ResponseWriter, r *http.Request) {
 		writeDenied(w, err)
 		return
 	}
-	origin := s.Config.AppOrigin(inst.Hostname)
+	origin := s.site(r).AppOrigin(inst.Hostname)
 	code, err := s.Store.CreateLaunchCode(r.Context(), store.LaunchCode{SessionHash: p.Session.Hash, UserID: p.User.ID, InstanceID: inst.ID, Origin: origin, Challenge: in.Challenge}, 60*time.Second)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Could not launch")

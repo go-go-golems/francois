@@ -244,7 +244,7 @@ func (s *Server) adminPreview(w http.ResponseWriter, r *http.Request) {
 		unavailable(w, err)
 		return
 	}
-	httpx.OK(w, s.instanceJSON(inst))
+	httpx.OK(w, s.instanceJSON(r, inst))
 }
 
 func (s *Server) adminDeleteDraft(w http.ResponseWriter, r *http.Request) {
@@ -333,7 +333,7 @@ func (s *Server) adminUser(w http.ResponseWriter, r *http.Request) {
 	audit, _ := s.Store.AuditLog(ctx, u.ID, 20)
 	list := []map[string]any{}
 	for _, i := range insts {
-		list = append(list, s.instanceJSON(i))
+		list = append(list, s.instanceJSON(r, i))
 	}
 	httpx.OK(w, map[string]any{"user": u, "access": d, "subscriptions": subs, "complimentary": grants, "instances": list, "sessions": sessions,
 		"stripeCustomerId": customer, "allowance": allowance, "calls": calls, "audit": audit})
@@ -431,7 +431,7 @@ func (s *Server) adminInstances(w http.ResponseWriter, r *http.Request) {
 	views := s.Runtime.ActiveViews()
 	out := []map[string]any{}
 	for _, i := range list {
-		item := s.instanceJSON(i)
+		item := s.instanceJSON(r, i)
 		item["activeViews"] = views[i.ID]
 		out = append(out, item)
 	}
@@ -458,7 +458,7 @@ func (s *Server) adminInstance(w http.ResponseWriter, r *http.Request) {
 		}
 		rows.Close()
 	}
-	out := s.instanceJSON(inst)
+	out := s.instanceJSON(r, inst)
 	out["membersList"] = members
 	out["usage"] = usage
 	out["activeViews"] = s.Runtime.ActiveViews()[inst.ID]
@@ -494,7 +494,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		models = append(models, map[string]any{"selector": m.Provider + "/" + m.ID, "name": m.Name, "thinkingLevels": m.ThinkingLevels, "images": m.Images})
 	}
 	// Secret configuration is reported as configured/not configured only.
-	secrets := map[string]bool{"oidc": s.OIDC.Configured(), "stripe": s.Payments != nil, "modelProvider": len(s.Backend.Models()) > 0}
+	secrets := map[string]bool{"oidc": s.site(r).OIDC.Configured(), "stripe": s.Payments != nil, "modelProvider": len(s.Backend.Models()) > 0}
 	httpx.OK(w, map[string]any{"active": rev, "history": history, "providerModels": models, "secrets": secrets, "defaults": settings.Defaults()})
 }
 

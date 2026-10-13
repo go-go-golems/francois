@@ -21,9 +21,10 @@ import (
 	xhtml "golang.org/x/net/html"
 )
 
-// Handler serves one instance's isolated origin.
-func (rt *Runtime) Handler(inst store.Instance) http.Handler {
-	origin := rt.Config.AppOrigin(inst.Hostname)
+// Handler serves one instance's isolated origin. portal is the only parent
+// allowed to frame it and hand out launch codes; it is the portal of the site
+// the instance is opened through.
+func (rt *Runtime) Handler(inst store.Instance, portal, origin string) http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /static/{name}", func(w http.ResponseWriter, r *http.Request) {
 		data, mime, ok := catalogweb.AppAsset(r.PathValue("name"))
@@ -38,12 +39,12 @@ func (rt *Runtime) Handler(inst store.Instance) http.Handler {
 	m.HandleFunc("GET /launch", func(w http.ResponseWriter, r *http.Request) {
 		// Trusted bootstrap: no paid bytes, frameable only by the portal.
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "frame-ancestors "+rt.Config.PortalOrigin)
+		w.Header().Set("Content-Security-Policy", "frame-ancestors "+portal)
 		_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en" data-portal="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title><link rel="stylesheet" href="/static/launch.css"></head><body><p id="francois-launch">Connecting…</p><script src="/static/launch.js"></script></body></html>`,
-			html.EscapeString(rt.Config.PortalOrigin), html.EscapeString(inst.Title))
+			html.EscapeString(portal), html.EscapeString(inst.Title))
 	})
 	m.HandleFunc("POST /api/launch/exchange", func(w http.ResponseWriter, r *http.Request) { rt.exchange(w, r, inst, origin) })
-	m.HandleFunc("GET /page", func(w http.ResponseWriter, r *http.Request) { rt.page(w, r, inst, origin) })
+	m.HandleFunc("GET /page", func(w http.ResponseWriter, r *http.Request) { rt.page(w, r, inst, portal, origin) })
 	m.HandleFunc("POST /api/views", func(w http.ResponseWriter, r *http.Request) { rt.createView(w, r, inst) })
 	m.HandleFunc("GET /api/views/{view}/events", func(w http.ResponseWriter, r *http.Request) { rt.events(w, r, inst) })
 	m.HandleFunc("POST /api/views/{view}/rpc", func(w http.ResponseWriter, r *http.Request) { rt.rpc(w, r, inst) })
@@ -158,7 +159,7 @@ func avatar(name string, hue int) string {
 
 // page returns the authored HTML with the hosted runtime injected. It is the
 // only route that returns release bytes, and only to a valid grant.
-func (rt *Runtime) page(w http.ResponseWriter, r *http.Request, inst store.Instance, origin string) {
+func (rt *Runtime) page(w http.ResponseWriter, r *http.Request, inst store.Instance, portal, origin string) {
 	token := bearer(r)
 	p, err := rt.authenticate(r.Context(), token, inst)
 	if err != nil {
@@ -182,7 +183,7 @@ func (rt *Runtime) page(w http.ResponseWriter, r *http.Request, inst store.Insta
 	boot, _ := json.Marshal(map[string]any{
 		"hosted": true, "artifactId": p.Release.ArtifactID, "version": 1, "release": p.Release.Version,
 		"manifest": available(p.Release.Manifest), "owner": p.User.ID, "me": me, "models": rt.models(p),
-		"grant": token, "grantExpiresAt": g.ExpiresAt, "portalOrigin": rt.Config.PortalOrigin, "origin": origin,
+		"grant": token, "grantExpiresAt": g.ExpiresAt, "portalOrigin": portal, "origin": origin,
 		"instance": map[string]any{"id": inst.ID, "title": p.Instance.Title, "role": p.Role},
 	})
 	// Escape "<" so JSON cannot terminate the script element.

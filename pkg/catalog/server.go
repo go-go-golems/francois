@@ -23,14 +23,57 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Config struct {
+// Site is one portal origin and the application domain whose instance
+// origins it frames. Every site serves the same catalog, users and instances;
+// only absolute URLs (sign-in redirect, Stripe return, instance origins)
+// differ.
+type Site struct {
 	// PublicURL is the trusted portal origin, e.g. https://francois.example.
 	PublicURL *url.URL
-	// AppDomain hosts instance origins as i-<id>.<AppDomain>.
+	// AppDomain hosts instance origins as i-<id>.<AppDomain>. It may equal
+	// the portal hostname: the portal is the bare name, instances are its
+	// single-label children.
 	AppDomain string
 	// AppScheme/AppPort default to the portal's scheme and port.
 	AppScheme string
 	AppPort   string
+	// OIDC signs users in with this site's callback URL.
+	OIDC *identity.Provider
+}
+
+func (c Site) PortalOrigin() string { return c.PublicURL.Scheme + "://" + c.PublicURL.Host }
+
+func (c Site) AppOrigin(hostname string) string {
+	host := hostname + "." + c.AppDomain
+	if c.AppPort != "" {
+		host += ":" + c.AppPort
+	}
+	return c.AppScheme + "://" + host
+}
+
+// instanceName returns the instance label of an application host on this
+// site, e.g. "i-abc" for i-abc.apps.example, and whether the host belongs to
+// it. The second result reports a host on this domain with the wrong port.
+func (c Site) instanceName(host string) (string, bool, bool) {
+	h, port, err := net.SplitHostPort(host)
+	if err != nil {
+		h, port = host, ""
+	}
+	label, found := strings.CutSuffix(h, "."+strings.ToLower(c.AppDomain))
+	if !found || label == "" || strings.Contains(label, ".") {
+		return "", false, false
+	}
+	if port != c.AppPort {
+		return "", true, false
+	}
+	return label, false, true
+}
+
+type Config struct {
+	// Sites are the portal origins served by this process. The first is the
+	// primary site; all sites must share its scheme because session cookies
+	// use the __Host- prefix on HTTPS.
+	Sites []Site
 	// TrialAllowed enables access while a subscription is trialing.
 	TrialAllowed bool
 	// BillingRequired is false when no Stripe configuration exists; access
@@ -43,38 +86,66 @@ type Config struct {
 	SignupAllowed bool
 }
 
+// Validate rejects site lists the host dispatcher cannot route
+// unambiguously.
+func (c Config) Validate() error {
+	if len(c.Sites) == 0 {
+		return errors.New("at least one site is required")
+	}
+	portals := map[string]bool{}
+	domains := map[string]bool{}
+	for _, site := range c.Sites {
+		u := site.PublicURL
+		if u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" && u.Path != "/" || u.RawQuery != "" {
+			return errors.New("a site URL must be an origin such as https://francois.example")
+		}
+		if u.Scheme != c.Sites[0].PublicURL.Scheme {
+			return errors.Errorf("site %s must use the primary site's scheme %s", u, c.Sites[0].PublicURL.Scheme)
+		}
+		d := strings.ToLower(site.AppDomain)
+		if d == "" || strings.HasPrefix(d, ".") || strings.HasSuffix(d, ".") || strings.ContainsAny(d, "/:* ") {
+			return errors.Errorf("site %s needs an application domain such as apps.example", u)
+		}
+		if site.OIDC == nil {
+			return errors.Errorf("site %s has no OIDC provider", u)
+		}
+		host := strings.ToLower(u.Host)
+		if portals[host] || domains[d] {
+			return errors.Errorf("site %s repeats a portal host or application domain", u)
+		}
+		portals[host], domains[d] = true, true
+	}
+	return nil
+}
+
+func (c Config) primary() *Site { return &c.Sites[0] }
+
 type Server struct {
 	Config    Config
 	Store     *store.Store
 	Publisher *releases.Publisher
-	OIDC      *identity.Provider
 	Payments  *payments.Service // nil when billing is not configured
 	Backend   piworker.Backend
 	Runtime   *hosted.Runtime
 	portal    http.Handler
 }
 
-func (c Config) Secure() bool { return c.PublicURL.Scheme == "https" }
+func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
 
-func (c Config) PortalOrigin() string { return c.PublicURL.Scheme + "://" + c.PublicURL.Host }
-
-func (c Config) AppOrigin(hostname string) string {
-	host := hostname + "." + c.AppDomain
-	if c.AppPort != "" {
-		host += ":" + c.AppPort
+// New expects a configuration that passed Validate.
+func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher, pay *payments.Service, b piworker.Backend) *Server {
+	cfg.Sites = append([]Site(nil), cfg.Sites...)
+	for i := range cfg.Sites {
+		site := &cfg.Sites[i]
+		if site.AppScheme == "" {
+			site.AppScheme = site.PublicURL.Scheme
+		}
+		if site.AppPort == "" {
+			site.AppPort = site.PublicURL.Port()
+		}
 	}
-	return c.AppScheme + "://" + host
-}
-
-func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher, oidc *identity.Provider, pay *payments.Service, b piworker.Backend) *Server {
-	if cfg.AppScheme == "" {
-		cfg.AppScheme = cfg.PublicURL.Scheme
-	}
-	if cfg.AppPort == "" {
-		cfg.AppPort = cfg.PublicURL.Port()
-	}
-	srv := &Server{Config: cfg, Store: s, Publisher: p, OIDC: oidc, Payments: pay, Backend: b}
-	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{PortalOrigin: cfg.PortalOrigin(), AppOrigin: cfg.AppOrigin, GrantTTL: cfg.GrantTTL})
+	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b}
+	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {
 			// Lost entitlement closes live views promptly; new requests
@@ -96,38 +167,54 @@ func (s *Server) policy() billing.Policy {
 	return billing.Policy{AcceptedPrices: map[string]bool{s.Config.PriceID: s.Config.PriceID != ""}, TrialAllowed: s.Config.TrialAllowed}
 }
 
-// Handler dispatches by exact Host: the portal origin, or a registered
-// instance hostname under the application domain.
+type siteKey struct{}
+
+// site is the portal site a request arrived on.
+func (s *Server) site(r *http.Request) *Site {
+	if site, ok := r.Context().Value(siteKey{}).(*Site); ok {
+		return site
+	}
+	return s.Config.primary()
+}
+
+// Handler dispatches by exact Host: a site's portal origin, www.<portal> as a
+// redirect to it, or a registered instance hostname under a site's
+// application domain. An instance opened through a site is framed by that
+// site's portal only.
 func (s *Server) Handler() http.Handler {
-	portalHost := s.Config.PublicURL.Host
-	suffix := "." + s.Config.AppDomain
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := strings.ToLower(r.Host)
-		if host == strings.ToLower(portalHost) {
-			s.portal.ServeHTTP(w, r)
-			return
+		for i := range s.Config.Sites {
+			site := &s.Config.Sites[i]
+			portal := strings.ToLower(site.PublicURL.Host)
+			if host == portal {
+				s.portal.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), siteKey{}, site)))
+				return
+			}
+			if host == "www."+portal {
+				http.Redirect(w, r, site.PortalOrigin()+r.URL.RequestURI(), http.StatusPermanentRedirect)
+				return
+			}
 		}
-		name := host
-		if h, port, err := net.SplitHostPort(host); err == nil {
-			if port != s.Config.AppPort {
+		for i := range s.Config.Sites {
+			site := &s.Config.Sites[i]
+			name, misdirected, ok := site.instanceName(host)
+			if misdirected {
 				httpx.Fail(w, 421, "misdirected", "Unknown host")
 				return
 			}
-			name = h
-		} else if s.Config.AppPort != "" {
-			httpx.Fail(w, 421, "misdirected", "Unknown host")
+			if !ok {
+				continue
+			}
+			inst, err := s.Store.InstanceByHost(r.Context(), name)
+			if err != nil {
+				httpx.Fail(w, 404, "not_found", "Unknown instance")
+				return
+			}
+			s.Runtime.Handler(inst, site.PortalOrigin(), site.AppOrigin(inst.Hostname)).ServeHTTP(w, r)
 			return
 		}
-		if !strings.HasSuffix(name, suffix) || strings.Count(strings.TrimSuffix(name, suffix), ".") != 0 {
-			httpx.Fail(w, 421, "misdirected", "Unknown host")
-			return
-		}
-		inst, err := s.Store.InstanceByHost(r.Context(), strings.TrimSuffix(name, suffix))
-		if err != nil {
-			httpx.Fail(w, 404, "not_found", "Unknown instance")
-			return
-		}
-		s.Runtime.Handler(inst).ServeHTTP(w, r)
+		httpx.Fail(w, 421, "misdirected", "Unknown host")
 	})
 }
 
@@ -210,6 +297,8 @@ func (s *Server) Run(ctx context.Context, listen string) error {
 		_ = srv.Shutdown(shutdown)
 		return s.Runtime.Wait()
 	})
-	log.Info().Str("address", l.Addr().String()).Str("portal", s.Config.PortalOrigin()).Str("apps", "*."+s.Config.AppDomain).Msg("Francois catalog ready")
+	for _, site := range s.Config.Sites {
+		log.Info().Str("address", l.Addr().String()).Str("portal", site.PortalOrigin()).Str("apps", "*."+site.AppDomain).Msg("Francois catalog ready")
+	}
 	return g.Wait()
 }

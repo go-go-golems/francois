@@ -85,7 +85,17 @@ func setup(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	public, _ := url.Parse("http://portal.test")
-	srv := New(ctx, Config{PublicURL: public, AppDomain: "apps.test"}, s, &releases.Publisher{Store: s, Blobs: blobs}, identity.New(identity.Config{}), nil, &piworker.Fake{})
+	// The second site uses its portal hostname as application domain, like
+	// a single-wildcard custom domain does in production.
+	boutique, _ := url.Parse("http://boutique.test")
+	cfg := Config{Sites: []Site{
+		{PublicURL: public, AppDomain: "apps.test", OIDC: identity.New(identity.Config{})},
+		{PublicURL: boutique, AppDomain: "boutique.test", OIDC: identity.New(identity.Config{})},
+	}}
+	if err = cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	srv := New(ctx, cfg, s, &releases.Publisher{Store: s, Blobs: blobs}, nil, &piworker.Fake{})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { cancel(); ts.Close(); _ = srv.Runtime.Wait() })
 	return &env{t: t, srv: srv, ts: ts, store: s, client: ts.Client()}
@@ -124,10 +134,10 @@ func (e *env) do(a *tactor, host, method, path string, body io.Reader, headers m
 		e.t.Fatal(err)
 	}
 	req.Host = host
-	if a != nil && host == "portal.test" {
+	if a != nil && (host == "portal.test" || host == "boutique.test") {
 		req.AddCookie(&http.Cookie{Name: "francois_session_dev", Value: a.token})
 		if method != "GET" {
-			req.Header.Set("Origin", "http://portal.test")
+			req.Header.Set("Origin", "http://"+host)
 			req.Header.Set("X-CSRF-Token", a.csrf)
 		}
 	}
@@ -147,12 +157,16 @@ func (e *env) do(a *tactor, host, method, path string, body io.Reader, headers m
 }
 
 func (e *env) portal(a *tactor, method, path string, v any) (int, map[string]any) {
+	return e.portalAt("portal.test", a, method, path, v)
+}
+
+func (e *env) portalAt(host string, a *tactor, method, path string, v any) (int, map[string]any) {
 	var body io.Reader
 	if v != nil {
 		raw, _ := json.Marshal(v)
 		body = bytes.NewReader(raw)
 	}
-	code, b, _ := e.do(a, "portal.test", method, path, body, nil)
+	code, b, _ := e.do(a, host, method, path, body, nil)
 	out := map[string]any{}
 	_ = json.Unmarshal(b, &out)
 	return code, out
@@ -194,8 +208,12 @@ type grant struct {
 
 // launch performs the portal launch and app-origin exchange.
 func (e *env) launch(a tactor, instance map[string]any) (grant, int, string) {
+	return e.launchAt("portal.test", a, instance)
+}
+
+func (e *env) launchAt(portal string, a tactor, instance map[string]any) (grant, int, string) {
 	verifier, challenge := pkce()
-	code, out := e.portal(&a, "POST", "/api/instances/"+instance["id"].(string)+"/launch", map[string]string{"challenge": challenge})
+	code, out := e.portalAt(portal, &a, "POST", "/api/instances/"+instance["id"].(string)+"/launch", map[string]string{"challenge": challenge})
 	if code != 200 {
 		return grant{}, code, errCode(out)
 	}
@@ -539,5 +557,74 @@ func TestHostedPlatform(t *testing.T) {
 	}
 	if code, _ := e.rpc(va2, "db.get", map[string]any{"path": "tasks/one"}); code != 401 {
 		t.Fatalf("grant survived logout: %d", code)
+	}
+}
+
+// TestSecondSite serves one catalog under two portal origins: absolute URLs,
+// Origin checks, launch codes and framing follow the site a request arrives
+// on.
+func TestSecondSite(t *testing.T) {
+	e := setup(t)
+	admin := e.user("ada", "admin", false)
+	alice := e.user("alice", "subscriber", true)
+	_, rel := e.upload(admin, `<!doctype html><html><head><title>Board</title></head><body>`+marker+`</body></html>`)
+	releaseID := rel["id"].(string)
+	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+releaseID+"/publish", nil); code != 200 {
+		t.Fatalf("publish: %d %v", code, out)
+	}
+
+	code, b, hdr := e.do(nil, "boutique.test", "GET", "/api/session", nil, nil)
+	if code != 200 || !bytes.Contains(b, []byte(`"appDomain":"boutique.test"`)) || !strings.Contains(hdr.Get("Content-Security-Policy"), "frame-src http://*.boutique.test;") {
+		t.Fatalf("second site session: %d %s %s", code, b, hdr.Get("Content-Security-Policy"))
+	}
+
+	// www.<portal> redirects to the portal, keeping the path.
+	req, _ := http.NewRequest("GET", e.ts.URL+"/account?x=1", nil)
+	req.Host = "www.boutique.test"
+	noFollow := *e.client
+	noFollow.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	res, err := noFollow.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != 308 || res.Header.Get("Location") != "http://boutique.test/account?x=1" {
+		t.Fatalf("www redirect: %d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+
+	// The other site's origin is cross-origin for this portal.
+	if code, _, _ := e.do(&alice, "boutique.test", "POST", "/api/instances", strings.NewReader(`{}`), map[string]string{"Origin": "http://portal.test"}); code != 403 {
+		t.Fatalf("other site's Origin accepted: %d", code)
+	}
+
+	// An instance created on one site is reachable under both.
+	_, inst := e.portal(&alice, "POST", "/api/instances", map[string]string{"releaseId": releaseID})
+	primary, _ := inst["origin"].(string)
+	label := strings.TrimSuffix(strings.TrimPrefix(primary, "http://"), ".apps.test")
+	_, again := e.portalAt("boutique.test", &alice, "GET", "/api/instances/"+inst["id"].(string), nil)
+	if again["origin"] != "http://"+label+".boutique.test" {
+		t.Fatalf("second site origin: %v (primary %s)", again["origin"], primary)
+	}
+
+	g, code, why := e.launchAt("boutique.test", alice, inst)
+	if code != 200 || g.origin != "http://"+label+".boutique.test" {
+		t.Fatalf("launch through second site: %d %s %v", code, why, g)
+	}
+	code, b, hdr = e.do(nil, g.host, "GET", "/launch", nil, nil)
+	if code != 200 || hdr.Get("Content-Security-Policy") != "frame-ancestors http://boutique.test" || !bytes.Contains(b, []byte(`data-portal="http://boutique.test"`)) {
+		t.Fatalf("launch page framing: %d %s", code, hdr.Get("Content-Security-Policy"))
+	}
+	code, b, _ = e.do(nil, g.host, "GET", "/page", nil, map[string]string{"Authorization": "Bearer " + g.token})
+	if code != 200 || !bytes.Contains(b, []byte(`"portalOrigin":"http://boutique.test"`)) {
+		t.Fatalf("page boot: %d", code)
+	}
+
+	// A launch code issued through one site is bound to that site's
+	// instance origin.
+	verifier, challenge := pkce()
+	_, out := e.portalAt("boutique.test", &alice, "POST", "/api/instances/"+inst["id"].(string)+"/launch", map[string]string{"challenge": challenge})
+	raw, _ := json.Marshal(map[string]string{"code": out["code"].(string), "verifier": verifier})
+	if code, _, _ := e.do(nil, label+".apps.test", "POST", "/api/launch/exchange", bytes.NewReader(raw), map[string]string{"Origin": primary}); code != 401 {
+		t.Fatalf("code redeemed on the other site's origin: %d", code)
 	}
 }

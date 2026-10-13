@@ -29,11 +29,7 @@ import (
 type Authorizer func(ctx context.Context, user store.User, inst store.Instance) error
 
 type Config struct {
-	// PortalOrigin is the only parent allowed to hand out launch codes.
-	PortalOrigin string
-	// AppOrigin maps an instance hostname to its exact origin.
-	AppOrigin func(hostname string) string
-	GrantTTL  time.Duration
+	GrantTTL time.Duration
 }
 
 type Runtime struct {

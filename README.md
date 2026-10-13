@@ -198,6 +198,15 @@ francois catalog users grant-access --user-id usr_... --days 30 --reason pilot
 francois catalog settings --file settings.json                         # validated revision
 ```
 
+One process can serve the same catalog under further domains. Each
+`--site <portal origin>=<app domain>` adds a portal and its instance domain;
+the app domain may equal the portal hostname (`https://slop.example=slop.example`
+puts instances at `i-<id>.slop.example`, so one `*.slop.example` certificate
+covers both). Sign-in, the Origin check, launch codes, framing and Stripe
+return URLs follow the domain a request arrives on, and `www.<portal>`
+redirects to the portal. Register `<portal>/auth/callback` and `<portal>/` on
+the OIDC client for every site. Sessions are per domain.
+
 The admin UI (`/admin`) covers HTML upload → check → draft → isolated preview →
 publish/withdraw, users (roles, disable, session revocation, complimentary
 access, credit adjustments), instances (inspect, suspend), billing events and

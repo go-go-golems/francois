@@ -68,6 +68,7 @@ type CatalogServeSettings struct {
 	Listen             string   `glazed:"listen"`
 	PublicURL          string   `glazed:"public-url"`
 	AppDomain          string   `glazed:"app-domain"`
+	Sites              []string `glazed:"site"`
 	ReleaseDir         string   `glazed:"release-dir"`
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
@@ -99,11 +100,8 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		return err
 	}
 	public, err := url.Parse(s.PublicURL)
-	if err != nil || (public.Scheme != "http" && public.Scheme != "https") || public.Host == "" || public.Path != "" && public.Path != "/" {
+	if err != nil {
 		return errors.New("public-url must be an origin such as https://francois.example")
-	}
-	if s.AppDomain == "" || strings.HasPrefix(s.AppDomain, ".") || strings.EqualFold(s.AppDomain, public.Hostname()) {
-		return errors.New("app-domain must be a separate domain, e.g. apps.example")
 	}
 	if err = identity.ValidateScopes(s.OIDCExtraScopes); err != nil {
 		return err
@@ -144,7 +142,25 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 			return err
 		}
 	}
-	oidc := identity.New(identity.Config{Issuer: s.OIDCIssuer, ClientID: s.OIDCClientID, ClientSecret: clientSecret, RedirectURL: strings.TrimSuffix(s.PublicURL, "/") + "/auth/callback", ExtraScopes: s.OIDCExtraScopes})
+	// Every site signs in with the same client; each registers its own
+	// callback URL on it.
+	site := func(u *url.URL, appDomain string) catalog.Site {
+		return catalog.Site{PublicURL: u, AppDomain: appDomain, OIDC: identity.New(identity.Config{Issuer: s.OIDCIssuer, ClientID: s.OIDCClientID,
+			ClientSecret: clientSecret, RedirectURL: u.Scheme + "://" + u.Host + "/auth/callback", ExtraScopes: s.OIDCExtraScopes})}
+	}
+	sites := []catalog.Site{site(public, s.AppDomain)}
+	for _, spec := range s.Sites {
+		raw, appDomain, ok := strings.Cut(spec, "=")
+		u, err := url.Parse(raw)
+		if !ok || err != nil {
+			return errors.Errorf("--site %q must look like https://portal.example=apps.example", spec)
+		}
+		sites = append(sites, site(u, appDomain))
+	}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, SignupAllowed: s.SignupAllowed}
+	if err = cfg.Validate(); err != nil {
+		return err
+	}
 	var pay *payments.Service
 	if s.StripeKeyFile != "" {
 		key, err := secret("", s.StripeKeyFile)
@@ -174,7 +190,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		if err != nil {
 			return err
 		}
-		pay = payments.NewService(g, db, payments.Config{PriceID: s.StripePriceID, Livemode: s.StripeLiveMode, PublicURL: strings.TrimSuffix(s.PublicURL, "/"), Deployment: "francois-" + public.Hostname()})
+		pay = payments.NewService(g, db, payments.Config{PriceID: s.StripePriceID, Livemode: s.StripeLiveMode, Deployment: "francois-" + public.Hostname()})
 	}
 	var backend piworker.Backend = &piworker.Fake{}
 	if s.Backend == "pi" {
@@ -204,8 +220,8 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 	if err != nil || grantTTL < time.Minute || grantTTL > 12*time.Hour {
 		return errors.New("grant-ttl must be a duration between 1m and 12h")
 	}
-	srv := catalog.New(ctx, catalog.Config{PublicURL: public, AppDomain: s.AppDomain, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, GrantTTL: grantTTL, SignupAllowed: s.SignupAllowed},
-		db, &releases.Publisher{Store: db, Blobs: blobs}, oidc, pay, backend)
+	cfg.GrantTTL = grantTTL
+	srv := catalog.New(ctx, cfg, db, &releases.Publisher{Store: db, Blobs: blobs}, pay, backend)
 	return srv.Run(ctx, s.Listen)
 }
 
@@ -446,11 +462,12 @@ func registerCatalog(root *cobra.Command) error {
 	}
 	cwd, _ := os.Getwd()
 	serve := &CatalogServe{glazed.NewCommandDescription("serve", glazed.WithShort("Serve the subscriber portal, admin UI and isolated instance origins"),
-		glazed.WithLong("Serves the trusted portal at --public-url and instance origins at i-<id>.<app-domain> from one listener. Secrets are read from files; no subscriber home directory is used. --backend fake runs without Node or Pi credentials."),
+		glazed.WithLong("Serves the trusted portal at --public-url and instance origins at i-<id>.<app-domain> from one listener. Each --site adds another portal origin and application domain for the same catalog; register its /auth/callback and / on the OIDC client. Secrets are read from files; no subscriber home directory is used. --backend fake runs without Node or Pi credentials."),
 		withDB(
 			fields.New("listen", fields.TypeString, fields.WithDefault("127.0.0.1:8090"), fields.WithHelp("Listen address")),
 			fields.New("public-url", fields.TypeString, fields.WithDefault("http://localhost:8090"), fields.WithHelp("Trusted portal origin")),
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
+			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),
 			fields.New("oidc-issuer", fields.TypeString, fields.WithHelp("OIDC issuer URL (ZITADEL)")),
