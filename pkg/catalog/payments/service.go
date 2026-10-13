@@ -58,7 +58,7 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 	if !errors.Is(err, store.ErrNotFound) {
 		return "", err
 	}
-	id, err = s.Gateway.CreateCustomer(ctx, u.ID, u.Email, u.DisplayName, s.Config.Deployment+"-customer-"+u.ID)
+	id, err = s.Gateway.CreateCustomer(ctx, u.ID, s.Config.Deployment, u.Email, u.DisplayName, s.Config.Deployment+"-customer-"+u.ID)
 	if err != nil {
 		return "", errors.Wrap(err, "create Stripe customer")
 	}
@@ -216,6 +216,15 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 	}
 	user, err := s.Store.UserForCustomer(ctx, customer)
 	if errors.Is(err, store.ErrNotFound) {
+		// A Stripe account can be shared with other applications and other
+		// Francois deployments; their Customers are not ours to retry.
+		dep, derr := s.Gateway.CustomerDeployment(call, customer)
+		if derr != nil {
+			return true, s.Store.FailEvent(ctx, e, "stripe_unavailable", backoff, terminal)
+		}
+		if dep != s.Config.Deployment {
+			return true, s.Store.CompleteEvent(ctx, e, "", nil, "ignored")
+		}
 		// Never create users from event data; retry in case the mapping
 		// write is still in flight, then surface for operators.
 		return true, s.Store.FailEvent(ctx, e, "unknown_customer", backoff, terminal)

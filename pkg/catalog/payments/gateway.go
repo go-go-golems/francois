@@ -38,7 +38,10 @@ type Event struct {
 
 // Gateway is the external Stripe boundary; tests supply a fake.
 type Gateway interface {
-	CreateCustomer(ctx context.Context, userID, email, name, idempotencyKey string) (string, error)
+	CreateCustomer(ctx context.Context, userID, deployment, email, name, idempotencyKey string) (string, error)
+	// CustomerDeployment returns the francois_deployment tag of a Customer,
+	// empty for Customers this service did not create.
+	CustomerDeployment(ctx context.Context, customerID string) (string, error)
 	CreateCheckout(ctx context.Context, r CheckoutRequest) (CheckoutSession, error)
 	RetrieveCheckout(ctx context.Context, id string) (CheckoutSession, error)
 	CreatePortal(ctx context.Context, customerID, returnURL string) (string, error)
@@ -68,8 +71,8 @@ func NewStripe(secretKey string, webhookSecrets []string) (Gateway, error) {
 	return &stripeGateway{client: stripe.NewClient(secretKey), secrets: webhookSecrets}, nil
 }
 
-func (g *stripeGateway) CreateCustomer(ctx context.Context, userID, email, name, key string) (string, error) {
-	p := &stripe.CustomerCreateParams{Name: stripe.String(name), Metadata: map[string]string{"francois_user_id": userID}}
+func (g *stripeGateway) CreateCustomer(ctx context.Context, userID, deployment, email, name, key string) (string, error) {
+	p := &stripe.CustomerCreateParams{Name: stripe.String(name), Metadata: map[string]string{"francois_user_id": userID, "francois_deployment": deployment}}
 	if email != "" {
 		p.Email = stripe.String(email)
 	}
@@ -122,6 +125,14 @@ func (g *stripeGateway) CreatePortal(ctx context.Context, customer, returnURL st
 		return "", err
 	}
 	return s.URL, nil
+}
+
+func (g *stripeGateway) CustomerDeployment(ctx context.Context, id string) (string, error) {
+	c, err := g.client.V1Customers.Retrieve(ctx, id, &stripe.CustomerRetrieveParams{})
+	if err != nil {
+		return "", err
+	}
+	return c.Metadata["francois_deployment"], nil
 }
 
 func (g *stripeGateway) SubscriptionCustomer(ctx context.Context, id string) (string, error) {

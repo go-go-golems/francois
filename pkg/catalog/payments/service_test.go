@@ -21,13 +21,14 @@ type fakeGateway struct {
 	subs      map[string][]billing.Subscription // customer -> subscriptions
 	creates   int
 	failOnce  bool
+	deploy    map[string]string // customer -> francois_deployment tag
 }
 
 func newFake() *fakeGateway {
-	return &fakeGateway{customers: map[string]string{}, sessions: map[string]CheckoutSession{}, subs: map[string][]billing.Subscription{}}
+	return &fakeGateway{customers: map[string]string{}, sessions: map[string]CheckoutSession{}, subs: map[string][]billing.Subscription{}, deploy: map[string]string{}}
 }
 
-func (f *fakeGateway) CreateCustomer(_ context.Context, user, _, _, key string) (string, error) {
+func (f *fakeGateway) CreateCustomer(_ context.Context, user, deployment, _, _, key string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if c, ok := f.customers[key]; ok {
@@ -35,7 +36,14 @@ func (f *fakeGateway) CreateCustomer(_ context.Context, user, _, _, key string) 
 	}
 	c := "cus_" + user
 	f.customers[key] = c
+	f.deploy[c] = deployment
 	return c, nil
+}
+
+func (f *fakeGateway) CustomerDeployment(_ context.Context, c string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.deploy[c], nil
 }
 
 // CreateCheckout honours idempotency keys like Stripe: the same key returns
@@ -236,7 +244,25 @@ func TestWorkerConvergesOnCurrentState(t *testing.T) {
 		t.Fatalf("expected one row per subscription, got %d", len(subs))
 	}
 
-	// Unknown Customers never create users; the event is retried.
+	// Customers of other applications or other Francois deployments sharing
+	// the Stripe account are ignored at once, without retries.
+	g.deploy["cus_foreign"] = "francois-elsewhere"
+	for _, id := range []string{"evt_untagged", "evt_foreign"} {
+		c := map[string]string{"evt_untagged": "cus_other_app", "evt_foreign": "cus_foreign"}[id]
+		if _, err := s.InsertEvent(ctx, store.StripeEvent{EventID: id, Type: "invoice.paid", CustomerID: c}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.processOne(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if events, _ := s.Events(ctx, "pending", 10); len(events) != 0 {
+		t.Fatalf("foreign customer events are pending: %+v", events)
+	}
+
+	// Our own Customer without a local mapping never creates a user; the
+	// event is retried in case the mapping write is still in flight.
+	g.deploy["cus_unknown"] = "test"
 	if _, err := s.InsertEvent(ctx, store.StripeEvent{EventID: "evt_x", Type: "invoice.paid", CustomerID: "cus_unknown"}); err != nil {
 		t.Fatal(err)
 	}
