@@ -405,3 +405,53 @@ I created two invited test accounts in the Francois ZITADEL organization, promot
 
 ### Technical details
 - Commit `0c41b08` (script and screenshots). Rerun with `scripts/05-yolo-e2e.sh admin|alice-subscribe|alice-run|control|logout`.
+
+## Step 8: NetworkPolicy, release-blob backup and the automated release loop
+
+This step finished Phase 6 (NetworkPolicy) and Phase 8 (CI GitOps PRs, release-blob backup), each verified in production:
+- The NetworkPolicy was enabled and the E2E steps rerun under it.
+- The new backup CronJob was run once by hand and uploaded both release blobs off-node.
+- Turning on `open_gitops_pr` produced the first automated one-line image PR, which I merged. Argo rolled it out, and a subscriber session survived the restart.
+
+Phase 7 (Pi backend) waits on the user's choice of provider credentials.
+
+### Prompt Context
+**User prompt (verbatim):** (continuation; "btw commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)")
+**Assistant interpretation:** Finish the runbook's remaining phases with evidence.
+**Inferred user intent:** A complete, maintainable deployment.
+
+### What I did
+- **NetworkPolicy (PR #340, squash-merged).**
+  - Checked the live labels first: `postgres-0` has `app.kubernetes.io/component=primary,app.kubernetes.io/name=postgres`; the Traefik pod matches `app.kubernetes.io/name=traefik`; the `traefik` service targets `web websecure`; one `k8s-app=kube-dns` pod exists; `todo-demo` (same policy shape) is Synced/Healthy.
+  - Added `network-policy.yaml` to the kustomization. The validator passed.
+- Reran the E2E steps `admin`, `control` and `alice-run` under the policy, and tested egress with `kubectl exec … curl`.
+- **Release-blob backup (PR #341, squash-merged).**
+  - Added a `francois-backup` SA, VaultAuth, VaultStaticSecret (`kv/infra/backups/object-storage`) and a CronJob at `40 4 * * *` running `aws s3 sync --size-only` (no deletes) plus a count check.
+  - Wrote Vault policy and role `francois-backup`, and ran `vault kv patch kv/infra/backups/object-storage francois-prefix=francois/`. The key list before and after differs only by `francois-prefix`.
+  - Ran it once with `kubectl create job francois-backup-manual-1 --from=cronjob/francois-backup`.
+- **Release loop.** Commit `25aa9cd` set `open_gitops_pr` to the main-push expression. The publish run `38449250835` succeeded with jobs `release / publish: success` and `release / Open GitOps PR: success`. It opened k3s PR #342 `automation/francois-francois-yolo-sha-25aa9cd`, with diff `- …:sha-7f1441a` / `+ …:sha-25aa9cd` in `gitops/kustomize/francois/deployment.yaml` only. I merged it after its validate check passed.
+
+### Why
+- The backup uses its own identity, as Datadrop and tiny-message-desk do. The serving pod (`francois-prod`) cannot read the shared bucket credentials.
+- An incremental sync without deletes is a complete backup, because blobs are never modified or deleted in place (content-addressed keys).
+
+### What worked
+- Under the NetworkPolicy:
+  - The pod stayed `ready=true restarts=0`, with no `Unhealthy` events. The kubelet probes from the node IP are allowed.
+  - `admin` login worked, which proves the OIDC code exchange from the pod to ZITADEL through the Traefik hairpin. `control` worked, and `alice-run` launched the instance.
+  - Egress from the pod: `api.stripe.com -> 404` (reachable, unauthenticated), `gw.lunaroute.com/v1/models -> 401` (reachable), ZITADEL discovery `-> 200`, `10.43.0.1:443` (kube API) `-> 000 blocked`.
+- Backup job: `upload: …/58/583af21e… to s3://scapegoat-k3s-backups/francois/releases/blobs/58/583af21e…`, the same for `67/67b19d5e…`, and `release blobs: local=2 remote=2`. Both keys equal the manifest and html SHA-256s from the Polis publish.
+- Rollout of `sha-25aa9cd`: Recreate, `Francois catalog ready` at 18:49:20Z, Application `Synced Healthy`. A rerun of `alice-run` with the stored browser state launched Polis again, so portal sessions in PostgreSQL survived the pod replacement.
+
+### What didn't work
+- My first wait command (`sleep 45; …`) was blocked by the harness's rule against fixed sleeps. I ran the E2E steps directly, since they take long enough, and checked the probes afterwards.
+- `kubectl rollout status` right after merging returned immediately for the old ReplicaSet, because Argo had not synced yet (`OutOfSync Healthy`). I used an `until` loop on the Deployment image instead.
+
+### What I learned
+- The infra-tooling action names the branch `automation/<image>-<target>-sha-<short>` and edits only the `containers:` entry named in the target, as its source shows. Removing the init container was necessary for one-line PRs.
+
+### What should be done in the future
+- Phase 7: the Pi backend needs a decision about whose provider credentials pay for subscriber model calls (see the open question in the final report).
+
+### Technical details
+- k3s `main`: #340 (NetworkPolicy), #341 (backup), #342 (automated pin `sha-25aa9cd`). francois `25aa9cd`.

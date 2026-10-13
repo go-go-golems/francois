@@ -41,6 +41,17 @@ Nothing in this guide has been applied to the cluster yet. It is a design and an
 | k3s repo | `/home/manuel/code/wesen/2026-03-27--hetzner-k3s` | GitOps manifests, Argo CD Applications, Vault policies and roles, bootstrap scripts |
 | terraform repo | `/home/manuel/code/wesen/terraform` | DNS records, ZITADEL organizations and OIDC clients, Stripe catalog |
 
+## 0. Implementation status (2026-10-13)
+
+The deployment described here is **live** at https://francois.yolo.scapegoat.dev (Argo CD Application `francois`, project `prod-apps`). The diary (`working-note/01-…`, Steps 3–8) records every action. The implementation differs from this design in the following ways:
+
+- **No init container.** The Pi provider copy runs in a shell wrapper in the main container (`sh -ec '<copy>; exec francois "$@"' francois <args>`). Q4 was resolved by reading infra-tooling's `open_gitops_pr.py`: it only patches entries under a line that is exactly `containers:`, so an `initContainers:` image would never be bumped.
+- **Answers to the open questions.** Q1: public repository and image (`github.com/go-go-golems/francois`, `ghcr.io/go-go-golems/francois`). Q2: same Stripe sandbox account, so the existing Product and Price were imported into `stripe/apps/francois/envs/sandbox`. Q5: invite-only (`allow_register = false`, `--signup-allowed` off). Q6: sign-out ends the ZITADEL session through RP-initiated logout with `id_token_hint` (migration `003_session_id_token.sql`).
+- **Extra code changes.** `--oidc-extra-scopes` (C1); Go 1.26.9 plus patched `x/net` and `x/text` (govulncheck clean); foreign Stripe customers are ignored (customers are tagged `francois_deployment`), because the sandbox account is shared with other applications.
+- **Shipped beyond the first slice.** The NetworkPolicy (k3s #340), the release-blob backup to `s3://scapegoat-k3s-backups/francois/releases/blobs/` (k3s #341), and automated GitOps PRs (first one: k3s #342).
+- **Platform repairs made along the way.** The node's Tailscale key had expired. Both DigitalOcean tokens in Vault had stopped working and were rotated. Only the Francois DNS record was applied (`-target`), because the zone has unrelated PDS import drift.
+- **Not done yet.** Phase 7, the Pi backend: the operator still has to choose which provider credentials pay for subscriber model calls. The service currently runs `--backend=fake`.
+
 ## 1. Executive summary
 
 Francois Catalog is a single Go process. It serves a trusted portal at one origin and runs subscriber application instances on separate origins, one per instance, of the form `i-<id>.<app-domain>`. It stores everything durable in PostgreSQL plus a directory of content-addressed release files. It needs four external services: an OIDC provider (ZITADEL), Stripe, an optional Pi model worker for metered LLM calls, and wildcard DNS and TLS for the instance origins.

@@ -19,3 +19,7 @@ Implemented sign-out through ZITADEL end_session, --oidc-extra-scopes, invite-on
 ## 2026-10-13
 
 Deployed: Argo francois Synced/Healthy, wildcard cert issued, smoke tests pass, Stripe webhook enabled (k3s 0e06f98, image sha-7f1441a)
+
+## 2026-10-13
+
+NetworkPolicy (#340), release-blob backup verified (#341), automated GitOps PR loop verified (#342, sha-25aa9cd live); guide gained implementation-status section
