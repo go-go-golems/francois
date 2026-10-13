@@ -82,6 +82,9 @@ function InstanceList({ list, empty }: { list: Instance[]; empty: string }) {
 // answers only the narrow launch/renew handshake from that exact frame.
 export function Launcher({ id }: { id: string }) {
   const { data: inst, isLoading, error } = api.useInstanceQuery(id);
+  // The launch handshake is a CSRF-protected mutation; wait for the token.
+  const { data: session } = api.useSessionQuery();
+  const ready = !!session?.csrfToken;
   const [launch] = api.useLaunchMutation();
   const frame = useRef<HTMLIFrameElement>(null);
   const [info, setInfo] = useState(false);
@@ -158,7 +161,7 @@ export function Launcher({ id }: { id: string }) {
               Account
             </Link>
           </div>
-        ) : (
+        ) : !ready ? null : (
           <div className="v-device">
             <iframe
               key={nonce}
@@ -226,7 +229,6 @@ function InstanceInfo({ inst, onClose }: { inst: Instance; onClose: () => void }
               {m.role}
               {owner && m.role !== "owner" && (
                 <button className="tlink quiet" onClick={() => act(remove({ id: inst.id, userId: m.userId }).unwrap(), "Member removed")}>
-                  {" "}
                   remove
                 </button>
               )}

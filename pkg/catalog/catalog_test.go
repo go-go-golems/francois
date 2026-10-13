@@ -314,6 +314,9 @@ func TestHostedPlatform(t *testing.T) {
 	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+releaseID+"/publish", nil); code != 200 {
 		t.Fatalf("publish: %d %v", code, out)
 	}
+	if _, b, _ := e.do(&admin, "portal.test", "GET", "/api/admin/releases", nil, nil); !bytes.Contains(b, []byte(releaseID)) {
+		t.Fatalf("admin release list misses the release: %s", b)
+	}
 	// CSRF and Origin are enforced on cookie-authenticated mutations.
 	if code, _, _ := e.do(&admin, "portal.test", "POST", "/api/admin/releases/"+releaseID+"/publish", nil, map[string]string{"X-CSRF-Token": "nope"}); code != 403 {
 		t.Fatalf("bad CSRF accepted: %d", code)

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, errorCode, errorMessage } from "./api";
 import { navigate, show } from "./store";
-import { date, datetime, Empty, Line, Link, loginHref, reasonLabel, Row } from "./ui";
+import { date, dateUTC, datetime, Empty, Line, Link, loginHref, reasonLabel, Row } from "./ui";
 
 export function Account() {
   const { data: session } = api.useSessionQuery();
@@ -130,7 +130,7 @@ export function Account() {
         </div>
         {!a.user.emailVerified && a.billingEnabled && <p className="warn small">Verify your email with the identity provider before subscribing.</p>}
       </Row>
-      <Row label="Model allowance" sub={`period ${a.allowance.period} · resets ${date(a.allowance.resetsAt)}`}>
+      <Row label="Model allowance" sub={`period ${a.allowance.period} · resets ${dateUTC(a.allowance.resetsAt)}`}>
         <div className="meter" aria-label="Allowance used">
           <div style={{ width: pct + "%" }} />
         </div>

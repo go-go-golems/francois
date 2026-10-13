@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Starts the catalog with provisioned IDs and optional Stripe/Pi settings.
+set -euo pipefail
+args=(catalog serve --listen 127.0.0.1:8090 --public-url "$PUBLIC_URL" --app-domain "$APP_DOMAIN"
+  --database-url "$DATABASE_URL" --release-dir /var/lib/francois/releases --worker-dir /var/lib/francois/worker
+  --oidc-issuer "$ISSUER" --oidc-client-id-file /bootstrap/oidc-client-id
+  --backend "$BACKEND" --pi-agent-dir /etc/francois/pi --worker /app/worker/dist/main.js)
+if [[ -n ${STRIPE_PRICE_ID:-} ]]; then
+  # The stripe profile writes its listener secret shortly after starting.
+  for _ in $(seq 1 30); do [[ -s /bootstrap/stripe-webhook-secret ]] && break; sleep 1; done
+fi
+if [[ -s /bootstrap/stripe-secret-key && -s /bootstrap/stripe-webhook-secret && -n ${STRIPE_PRICE_ID:-} ]]; then
+  args+=(--stripe-secret-key-file /bootstrap/stripe-secret-key --stripe-webhook-secret-files /bootstrap/stripe-webhook-secret --stripe-price-id "$STRIPE_PRICE_ID")
+  echo "Stripe sandbox billing enabled (price $STRIPE_PRICE_ID)"
+else
+  echo "Stripe billing disabled (start the 'stripe' profile and set STRIPE_PRICE_ID to enable)"
+fi
+exec francois "${args[@]}"

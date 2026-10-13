@@ -109,9 +109,12 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 
 // publicRelease is release metadata without storage keys or bytes.
 func publicRelease(r store.Release) map[string]any {
+	// Only capabilities the hosted runtime provides are advertised.
 	caps := []string{}
-	for k := range r.Manifest {
-		caps = append(caps, k)
+	for _, k := range []string{"sample", "db", "room", "user", "assets", "comments", "downloads"} {
+		if _, ok := r.Manifest[k]; ok {
+			caps = append(caps, k)
+		}
 	}
 	access := "subscriber_required"
 	if r.FreeSample {

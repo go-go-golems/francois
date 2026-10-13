@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Idempotent local provisioning: migrate the catalog, create the ZITADEL
+# project + PKCE web app + test users, and bootstrap the first admin by exact
+# issuer/subject. Writes only nonsecret IDs to /bootstrap.
+set -euo pipefail
+PAT_FILE=/bootstrap/zitadel-admin.pat
+echo "Waiting for $ISSUER ..."
+for _ in $(seq 1 90); do curl -fsS "$ISSUER/debug/ready" >/dev/null 2>&1 && break; sleep 2; done
+curl -fsS "$ISSUER/.well-known/openid-configuration" >/dev/null
+for _ in $(seq 1 60); do [[ -s $PAT_FILE ]] && break; sleep 2; done
+PAT=$(cat "$PAT_FILE")
+api() { # method path [json]
+  curl -fsS -X "$1" "$ISSUER$2" -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' ${3:+-d "$3"}
+}
+
+francois catalog migrate --database-url "$DATABASE_URL" >/dev/null
+
+project=$(api POST /management/v1/projects/_search '{"queries":[{"nameQuery":{"name":"francois","method":"TEXT_QUERY_METHOD_EQUALS"}}]}' | jq -r '.result[0].id // empty')
+if [[ -z $project ]]; then
+  project=$(api POST /management/v1/projects '{"name":"francois"}' | jq -r .id)
+fi
+client=$(api POST "/management/v1/projects/$project/apps/_search" '{}' | jq -r '[.result[]? | select(.name=="francois-portal")][0].oidcConfig.clientId // empty')
+if [[ -z $client ]]; then
+  client=$(api POST "/management/v1/projects/$project/apps/oidc" "$(jq -n --arg r "$PUBLIC_URL/auth/callback" --arg p "$PUBLIC_URL/" '{
+    name:"francois-portal", redirectUris:[$r], postLogoutRedirectUris:[$p],
+    responseTypes:["OIDC_RESPONSE_TYPE_CODE"], grantTypes:["OIDC_GRANT_TYPE_AUTHORIZATION_CODE"],
+    appType:"OIDC_APP_TYPE_WEB", authMethodType:"OIDC_AUTH_METHOD_TYPE_NONE", devMode:true,
+    accessTokenType:"OIDC_TOKEN_TYPE_BEARER", idTokenUserinfoAssertion:true}')" | jq -r .clientId)
+fi
+printf '%s' "$client" > /bootstrap/oidc-client-id
+
+user() { # username first last password -> user id
+  local id
+  id=$(api POST /management/v1/users/_search "$(jq -n --arg u "$1" '{queries:[{userNameQuery:{userName:$u,method:"TEXT_QUERY_METHOD_EQUALS"}}]}')" | jq -r '.result[0].id // empty')
+  if [[ -z $id ]]; then
+    id=$(api POST /management/v1/users/human/_import "$(jq -n --arg u "$1" --arg f "$2" --arg l "$3" --arg p "$4" '{
+      userName:$u, profile:{firstName:$f,lastName:$l,displayName:($f+" "+$l)},
+      email:{email:$u,isEmailVerified:true}, password:$p, passwordChangeRequired:false}')" | jq -r .userId)
+  fi
+  printf '%s' "$id"
+}
+admin=$(user admin@francois.test Ada Admin 'Password1!')
+alice=$(user alice@francois.test Alice Subscriber 'Password1!')
+bob=$(user bob@francois.test Bob Subscriber 'Password1!')
+
+francois catalog users promote --database-url "$DATABASE_URL" --issuer "$ISSUER" --subject "$admin" >/dev/null
+chmod 0644 /bootstrap/oidc-client-id
+cat <<MSG
+Francois catalog provisioning complete.
+  Portal:  $PUBLIC_URL
+  Issuer:  $ISSUER   (client $client)
+  Users (password Password1!):
+    admin@francois.test  administrator ($admin)
+    alice@francois.test  subscriber    ($alice)
+    bob@francois.test    subscriber    ($bob)
+MSG

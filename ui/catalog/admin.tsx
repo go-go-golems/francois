@@ -253,7 +253,7 @@ function Releases() {
           <div className="row2">
             <div className="field">
               <label htmlFor="r-id">Application ID</label>
-              <input id="r-id" className="slug" required pattern="[a-z0-9][a-z0-9_-]*" value={form.artifactId} onChange={(e) => set("artifactId", e.target.value)} />
+              <input id="r-id" className="slug" required pattern="[a-z0-9][a-z0-9_\-]*" value={form.artifactId} onChange={(e) => set("artifactId", e.target.value)} />
             </div>
             <div className="field">
               <label htmlFor="r-tags">Tags</label>

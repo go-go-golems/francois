@@ -72,6 +72,7 @@ type CatalogServeSettings struct {
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
 	OIDCClientID       string   `glazed:"oidc-client-id"`
+	OIDCClientIDFile   string   `glazed:"oidc-client-id-file"`
 	OIDCClientSecret   string   `glazed:"oidc-client-secret-file"`
 	StripeKeyFile      string   `glazed:"stripe-secret-key-file"`
 	StripeWebhookFiles []string `glazed:"stripe-webhook-secret-files"`
@@ -125,6 +126,11 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 	blobs, err := releases.OpenBlobs(s.ReleaseDir)
 	if err != nil {
 		return err
+	}
+	if s.OIDCClientIDFile != "" {
+		if s.OIDCClientID, err = secret("", s.OIDCClientIDFile); err != nil {
+			return err
+		}
 	}
 	var clientSecret string
 	if s.OIDCClientSecret != "" {
@@ -439,6 +445,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),
 			fields.New("oidc-issuer", fields.TypeString, fields.WithHelp("OIDC issuer URL (ZITADEL)")),
 			fields.New("oidc-client-id", fields.TypeString, fields.WithHelp("OIDC web client ID (PKCE)")),
+			fields.New("oidc-client-id-file", fields.TypeString, fields.WithHelp("File containing the OIDC client ID (written by provisioning)")),
 			fields.New("oidc-client-secret-file", fields.TypeString, fields.WithHelp("Optional OIDC client secret file")),
 			fields.New("stripe-secret-key-file", fields.TypeString, fields.WithHelp("Stripe secret key file; billing is disabled when empty")),
 			fields.New("stripe-webhook-secret-files", fields.TypeStringList, fields.WithHelp("Current and previous webhook signing secret files")),

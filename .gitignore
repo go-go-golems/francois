@@ -24,3 +24,4 @@ var/
 worker/dist/
 coverage/
 .playwright-mcp/
+deploy/compose/.env

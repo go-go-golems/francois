@@ -173,6 +173,7 @@ export function Line({ k, children, mono }: { k: React.ReactNode; children: Reac
 }
 
 export const date = (s?: string) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—");
+export const dateUTC = (s?: string) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) + " UTC" : "—");
 export const datetime = (s?: string) => (s ? new Date(s).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 export const bytes = (n: number) => (n < 1024 ? n + " B" : n < 1 << 20 ? (n / 1024).toFixed(1) + " KB" : (n / (1 << 20)).toFixed(1) + " MB");
 export const short = (s: string, n = 10) => (s.length > n ? s.slice(0, n) + "…" : s);

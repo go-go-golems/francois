@@ -172,7 +172,7 @@ func (s *Store) Release(ctx context.Context, id string) (Release, error) {
 
 // Releases lists an artifact's releases; states filters by state when given.
 func (s *Store) Releases(ctx context.Context, artifact string, states ...string) ([]Release, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT `+releaseColumns+` FROM releases WHERE ($1='' OR artifact_id=$1) AND (cardinality($2::text[])=0 OR state=ANY($2)) ORDER BY created_at DESC`, artifact, states)
+	rows, err := s.Pool.Query(ctx, `SELECT `+releaseColumns+` FROM releases WHERE ($1='' OR artifact_id=$1) AND (COALESCE(cardinality($2::text[]),0)=0 OR state=ANY($2)) ORDER BY created_at DESC`, artifact, states)
 	if err != nil {
 		return nil, err
 	}

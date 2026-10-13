@@ -1,0 +1,128 @@
+# Local end-to-end stack for the hosted Francois catalog.
+#
+#   docker compose -f deploy/compose/compose.yaml up --build
+#
+# Portal:   http://localhost:8090      (apps on http://i-<id>.apps.localhost:8090)
+# ZITADEL:  http://localhost:18081     (issuer; test users are listed by `logs zitadel-setup`)
+#
+# francois and the setup job use host networking so that the browser and the
+# server see the same issuer URL (http://localhost:18081) and the portal can
+# serve *.apps.localhost, which browsers resolve to loopback. Linux only.
+name: francois-catalog
+
+x-francois: &francois
+  build:
+    context: ../..
+    dockerfile: deploy/compose/Dockerfile
+  image: francois-catalog:dev
+  network_mode: host
+  volumes:
+    - bootstrap:/bootstrap
+    - releases:/var/lib/francois
+    - ${PI_AGENT_DIR:-./no-pi}:/etc/francois/pi:ro
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: francois
+      POSTGRES_PASSWORD: francois
+      POSTGRES_DB: francois
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U francois -d francois"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.17.3
+    user: "0"
+    command: start-from-init --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled
+    environment:
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: 18081
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: francois
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: francois
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      # Built-in login UI; no separate login container or proxy needed.
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      # Local testing: do not prompt for second-factor enrollment.
+      ZITADEL_DEFAULTINSTANCE_LOGINPOLICY_MFAINITSKIPLIFETIME: "0s"
+      # Machine user whose PAT the setup job uses to provision the OIDC app.
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: francois-setup
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Francois setup
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2030-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /bootstrap/zitadel-admin.pat
+    ports:
+      - "127.0.0.1:18081:8080"
+    volumes:
+      - bootstrap:/bootstrap
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image has no HTTP client and `zitadel ready` probes the internal
+    # port, which does not match the external domain; setup polls the issuer.
+
+  # One-shot: migrate, provision ZITADEL project/app/users, bootstrap admin.
+  zitadel-setup:
+    <<: *francois
+    user: "0"
+    entrypoint: ["catalog-setup"]
+    environment:
+      ISSUER: http://localhost:18081
+      DATABASE_URL: postgres://francois:francois@127.0.0.1:5435/francois_catalog?sslmode=disable
+      PUBLIC_URL: http://localhost:8090
+    depends_on:
+      zitadel:
+        condition: service_started
+
+  # Optional: Stripe sandbox webhook forwarder. Requires STRIPE_API_KEY (a
+  # test-mode secret key) and STRIPE_PRICE_ID in deploy/compose/.env.
+  stripe:
+    image: stripe/stripe-cli:v1.30.0
+    profiles: ["stripe"]
+    network_mode: host
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        stripe listen --api-key "$$STRIPE_API_KEY" --print-secret > /bootstrap/stripe-webhook-secret &&
+        printf '%s' "$$STRIPE_API_KEY" > /bootstrap/stripe-secret-key &&
+        exec stripe listen --api-key "$$STRIPE_API_KEY" --forward-to http://localhost:8090/webhooks/stripe \
+          --events customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,checkout.session.completed,checkout.session.expired,invoice.paid,invoice.payment_failed
+    environment:
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+    volumes:
+      - bootstrap:/bootstrap
+
+  francois:
+    <<: *francois
+    user: "0"
+    entrypoint: ["catalog-serve"]
+    environment:
+      ISSUER: http://localhost:18081
+      DATABASE_URL: postgres://francois:francois@127.0.0.1:5435/francois_catalog?sslmode=disable
+      PUBLIC_URL: http://localhost:8090
+      APP_DOMAIN: apps.localhost
+      BACKEND: ${FRANCOIS_BACKEND:-fake}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+    depends_on:
+      zitadel-setup:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  bootstrap:
+  releases:

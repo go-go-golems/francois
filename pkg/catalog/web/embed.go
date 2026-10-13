@@ -1,7 +1,11 @@
 // Package web embeds the subscriber portal, admin UI and hosted-origin assets.
 package web
 
-import _ "embed"
+import (
+	_ "embed"
+
+	local "github.com/go-go-golems/francois/pkg/web"
+)
 
 //go:embed static/index.html
 var Index []byte
@@ -46,6 +50,11 @@ func AppAsset(name string) ([]byte, string, bool) {
 		return LaunchCSS, "text/css", true
 	case "runtime.js":
 		return RuntimeJS, "text/javascript", true
+	// Parity with local artifact origins, which applications may reference.
+	case "style.css":
+		return local.Style, "text/css", true
+	case "icon.svg":
+		return local.Icon, "image/svg+xml", true
 	}
 	return nil, "", false
 }
