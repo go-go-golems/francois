@@ -789,7 +789,7 @@ function Usage() {
   );
 }
 
-const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 function Settings() {
   const { data } = api.useSettingsQuery();

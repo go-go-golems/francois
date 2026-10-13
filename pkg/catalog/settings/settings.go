@@ -64,7 +64,7 @@ func Defaults() Document {
 }
 
 var selector = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$`)
-var thinkingLevels = map[string]bool{"off": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true}
+var thinkingLevels = map[string]bool{"off": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true}
 
 // Parse decodes strictly (unknown fields fail) and validates.
 func Parse(raw []byte) (Document, error) {
