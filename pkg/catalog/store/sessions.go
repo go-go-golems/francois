@@ -44,10 +44,10 @@ const (
 )
 
 // CreateSession stores only the digest of a fresh random token.
-func (s *Store) CreateSession(ctx context.Context, user string) (token string, sess Session, err error) {
-	token = RandomHex(32)
-	sess = Session{Hash: Hash(token), UserID: user, CSRF: RandomHex(24), ExpiresAt: time.Now().Add(SessionIdle)}
-	_, err = s.Pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at) VALUES($1,$2,$3,$4,$5)`,
+func (s *Store) CreateSession(ctx context.Context, user string) (string, Session, error) {
+	token := RandomHex(32)
+	sess := Session{Hash: Hash(token), UserID: user, CSRF: RandomHex(24), ExpiresAt: time.Now().Add(SessionIdle)}
+	_, err := s.Pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at) VALUES($1,$2,$3,$4,$5)`,
 		sess.Hash, user, sess.CSRF, sess.ExpiresAt, time.Now().Add(SessionAbsolute))
 	return token, sess, err
 }

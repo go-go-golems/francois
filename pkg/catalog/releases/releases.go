@@ -43,10 +43,10 @@ func (b *Blobs) path(key string) (string, error) {
 
 // Put writes data to a temporary file, syncs it and renames it into its
 // content-addressed key. Existing identical blobs are reused.
-func (b *Blobs) Put(data []byte) (key, sum string, err error) {
+func (b *Blobs) Put(data []byte) (string, string, error) {
 	h := sha256.Sum256(data)
-	sum = hex.EncodeToString(h[:])
-	key = "blobs/" + sum[:2] + "/" + sum
+	sum := hex.EncodeToString(h[:])
+	key := "blobs/" + sum[:2] + "/" + sum
 	final, err := b.path(key)
 	if err != nil {
 		return "", "", err
@@ -153,11 +153,11 @@ func Validate(u Upload) (map[string]json.RawMessage, []Check) {
 	if len(u.Description) > 2000 || len(u.Changelog) > 8000 {
 		add("error", "text_length", "Description or changelog is too long")
 	}
-	max := u.MaxHTML
-	if max <= 0 {
-		max = 16 << 20
+	limit := u.MaxHTML
+	if limit <= 0 {
+		limit = 16 << 20
 	}
-	if len(u.HTML) == 0 || int64(len(u.HTML)) > max {
+	if len(u.HTML) == 0 || int64(len(u.HTML)) > limit {
 		add("error", "html_size", "HTML must be between 1 byte and the configured size limit")
 	}
 	lower := strings.ToLower(string(u.HTML))
@@ -279,12 +279,12 @@ func (p *Publisher) HTML(r store.Release) ([]byte, error) {
 }
 
 // ReadLimited reads at most max+1 bytes so callers can reject oversize input.
-func ReadLimited(r io.Reader, max int64) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(r, max+1))
+func ReadLimited(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > max {
+	if int64(len(data)) > limit {
 		return nil, errors.New("file exceeds the size limit")
 	}
 	return data, nil

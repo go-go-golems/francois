@@ -15,7 +15,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/go-go-golems/francois/pkg/catalog/web"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 func (s *Server) routes() http.Handler {

@@ -229,12 +229,12 @@ func (rt *Runtime) upload(w http.ResponseWriter, r *http.Request, inst store.Ins
 		return
 	}
 	kind := r.Header.Get("Content-Type")
-	max, ok := accepted[kind]
+	limit, ok := accepted[kind]
 	if !ok {
 		httpx.Fail(w, 400, "unsupported_type", "Unsupported asset type")
 		return
 	}
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, max))
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if err != nil || len(data) == 0 {
 		httpx.Fail(w, 413, "too_large", "Invalid asset size")
 		return

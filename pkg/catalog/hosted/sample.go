@@ -12,7 +12,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 // resolveModel maps the page's request onto an approved model. Explicit

@@ -7,7 +7,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/billing"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 var (

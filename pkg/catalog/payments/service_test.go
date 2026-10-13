@@ -86,7 +86,9 @@ func (f *fakeGateway) CustomerSubscriptions(_ context.Context, c string) ([]bill
 	defer f.mu.Unlock()
 	return append([]billing.Subscription(nil), f.subs[c]...), nil
 }
-func (f *fakeGateway) ConstructEvent([]byte, string) (Event, error) { return Event{}, errors.New("unused") }
+func (f *fakeGateway) ConstructEvent([]byte, string) (Event, error) {
+	return Event{}, errors.New("unused")
+}
 
 func testStore(t *testing.T) *store.Store {
 	base := os.Getenv("TEST_DATABASE_URL")

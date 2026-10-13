@@ -12,7 +12,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/settings"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 func (s *Server) adminRoutes(m *http.ServeMux) {
@@ -122,13 +121,13 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) (releases.Upload
 	if err != nil {
 		return releases.Upload{}, err
 	}
-	max := rev.Document.Limits.MaxHTMLBytes
-	r.Body = http.MaxBytesReader(w, r.Body, max+(1<<20))
-	if err = r.ParseMultipartForm(max + (1 << 20)); err != nil {
+	limit := rev.Document.Limits.MaxHTMLBytes
+	r.Body = http.MaxBytesReader(w, r.Body, limit+(1<<20))
+	if err = r.ParseMultipartForm(limit + (1 << 20)); err != nil {
 		return releases.Upload{}, errors.Wrap(err, "upload exceeds the size limit or is malformed")
 	}
 	u := releases.Upload{ArtifactID: strings.TrimSpace(r.FormValue("artifactId")), Title: strings.TrimSpace(r.FormValue("title")), Description: r.FormValue("description"),
-		Version: strings.TrimSpace(r.FormValue("version")), Changelog: r.FormValue("changelog"), FreeSample: r.FormValue("freeSample") == "true", MaxHTML: max}
+		Version: strings.TrimSpace(r.FormValue("version")), Changelog: r.FormValue("changelog"), FreeSample: r.FormValue("freeSample") == "true", MaxHTML: limit}
 	for _, t := range strings.Split(r.FormValue("tags"), ",") {
 		if t = strings.TrimSpace(t); t != "" && len(u.Tags) < 12 {
 			u.Tags = append(u.Tags, strings.ToLower(t))
@@ -139,7 +138,7 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) (releases.Upload
 		return u, errors.New("choose an HTML file")
 	}
 	defer func() { _ = f.Close() }()
-	if u.HTML, err = releases.ReadLimited(f, max); err != nil {
+	if u.HTML, err = releases.ReadLimited(f, limit); err != nil {
 		return u, err
 	}
 	if mf, _, err := r.FormFile("manifest"); err == nil {

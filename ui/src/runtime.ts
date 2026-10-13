@@ -38,9 +38,10 @@ function renew() {
     .finally(() => (renewing = undefined));
   return renewing;
 }
+// Renew at three quarters of the remaining lifetime (at least 15 s apart).
 function scheduleRenewal(expiresAt: string) {
-  const wait = new Date(expiresAt).getTime() - Date.now() - 120000;
-  setTimeout(() => void renew().catch(() => {}), Math.max(wait, 5000));
+  const wait = (new Date(expiresAt).getTime() - Date.now()) * 0.75;
+  setTimeout(() => void renew().catch(() => {}), Math.max(wait, 15000));
 }
 if (hosted) scheduleRenewal(boot.grantExpiresAt);
 export async function request(

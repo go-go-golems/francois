@@ -135,7 +135,7 @@ func (s *Store) SettleCall(ctx context.Context, res Reservation, ok bool, code s
 
 // RecoverCalls settles calls left open by a crashed process: unstarted ones
 // are released, started ones are charged and flagged for operator review.
-func (s *Store) RecoverCalls(ctx context.Context) (released, review int64, err error) {
+func (s *Store) RecoverCalls(ctx context.Context) (int64, int64, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return 0, 0, err
@@ -146,7 +146,7 @@ UPDATE model_allowance_periods p SET reserved=p.reserved-x.c FROM (SELECT user_i
 	if err != nil {
 		return 0, 0, err
 	}
-	released = tag.RowsAffected()
+	released := tag.RowsAffected()
 	tag, err = tx.Exec(ctx, `WITH r AS (UPDATE model_calls SET state='review',error_code='process_restart',settled_at=now() WHERE state='started' RETURNING user_id,period,credits)
 UPDATE model_allowance_periods p SET reserved=p.reserved-x.c,used=p.used+x.c FROM (SELECT user_id,period,sum(credits) c FROM r GROUP BY 1,2) x WHERE p.user_id=x.user_id AND p.period=x.period`)
 	if err != nil {

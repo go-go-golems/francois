@@ -31,8 +31,8 @@ func Fail(w http.ResponseWriter, status int, code, message string) {
 }
 
 // Read decodes exactly one bounded JSON value.
-func Read(w http.ResponseWriter, r *http.Request, dst any, max int64) error {
-	r.Body = http.MaxBytesReader(w, r.Body, max)
+func Read(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(dst); err != nil {
 		return errors.Wrap(err, "invalid JSON body")

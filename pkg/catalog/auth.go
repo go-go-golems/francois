@@ -11,7 +11,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 // Principal is the authenticated portal caller.
