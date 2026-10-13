@@ -5,6 +5,8 @@ package identity
 
 import (
 	"context"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +22,21 @@ type Config struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
+	// ExtraScopes are appended to openid/profile/email, for example
+	// urn:zitadel:iam:org:id:<id> to select the ZITADEL organization whose
+	// login policy applies and to which users belong.
+	ExtraScopes []string
+}
+
+// ValidateScopes rejects empty scopes and scopes containing whitespace, which
+// would split into several scopes in the space-separated scope parameter.
+func ValidateScopes(scopes []string) error {
+	for _, sc := range scopes {
+		if sc == "" || strings.ContainsAny(sc, " \t\r\n") {
+			return errors.Errorf("invalid OIDC scope %q", sc)
+		}
+	}
+	return nil
 }
 
 type Provider struct {
@@ -48,7 +65,7 @@ func (p *Provider) party(ctx context.Context) (rp.RelyingParty, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	party, err := rp.NewRelyingPartyOIDC(ctx, p.cfg.Issuer, p.cfg.ClientID, p.cfg.ClientSecret, p.cfg.RedirectURL,
-		[]string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail},
+		append([]string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail}, p.cfg.ExtraScopes...),
 		rp.WithVerifierOpts(rp.WithNonce(func(ctx context.Context) string {
 			n, _ := ctx.Value(nonceKey{}).(string)
 			return n
@@ -77,16 +94,17 @@ func (p *Provider) AuthURL(ctx context.Context, state, nonce, verifier string, p
 }
 
 // Exchange redeems the code with the PKCE verifier and validates the ID token
-// (issuer, audience, signature, expiry and nonce) through the library.
-func (p *Provider) Exchange(ctx context.Context, code, verifier, nonce string) (store.Identity, error) {
+// (issuer, audience, signature, expiry and nonce) through the library. It
+// also returns the raw ID token, kept only as the logout id_token_hint.
+func (p *Provider) Exchange(ctx context.Context, code, verifier, nonce string) (store.Identity, string, error) {
 	party, err := p.party(ctx)
 	if err != nil {
-		return store.Identity{}, err
+		return store.Identity{}, "", err
 	}
 	ctx = context.WithValue(ctx, nonceKey{}, nonce)
 	tokens, err := rp.CodeExchange[*oidc.IDTokenClaims](ctx, code, party, rp.WithCodeVerifier(verifier))
 	if err != nil {
-		return store.Identity{}, errors.Wrap(err, "exchange authorization code")
+		return store.Identity{}, "", errors.Wrap(err, "exchange authorization code")
 	}
 	c := tokens.IDTokenClaims
 	id := store.Identity{Issuer: c.Issuer, Subject: c.Subject, Email: c.Email, EmailVerified: bool(c.EmailVerified), Name: c.Name}
@@ -103,9 +121,39 @@ func (p *Provider) Exchange(ctx context.Context, code, verifier, nonce string) (
 		}
 	}
 	if id.Subject == "" || id.Issuer != p.cfg.Issuer {
-		return store.Identity{}, errors.New("identity token has an unexpected issuer or subject")
+		return store.Identity{}, "", errors.New("identity token has an unexpected issuer or subject")
 	}
-	return id, nil
+	return id, tokens.IDToken, nil
+}
+
+// LogoutURL builds the OpenID Connect RP-Initiated Logout redirect that ends
+// the identity provider's browser session and returns to postLogout, which
+// must be registered on the client. It is empty when the issuer advertises
+// no end_session_endpoint.
+func (p *Provider) LogoutURL(ctx context.Context, idToken, postLogout, state string) (string, error) {
+	party, err := p.party(ctx)
+	if err != nil {
+		return "", err
+	}
+	endpoint := party.GetEndSessionEndpoint()
+	if endpoint == "" {
+		return "", nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", errors.Wrap(err, "parse end_session_endpoint")
+	}
+	q := u.Query()
+	q.Set("client_id", p.cfg.ClientID)
+	q.Set("post_logout_redirect_uri", postLogout)
+	if idToken != "" {
+		q.Set("id_token_hint", idToken)
+	}
+	if state != "" {
+		q.Set("state", state)
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func withParam(key, value string) rp.AuthURLOpt {

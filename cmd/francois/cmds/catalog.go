@@ -74,6 +74,8 @@ type CatalogServeSettings struct {
 	OIDCClientID       string   `glazed:"oidc-client-id"`
 	OIDCClientIDFile   string   `glazed:"oidc-client-id-file"`
 	OIDCClientSecret   string   `glazed:"oidc-client-secret-file"`
+	OIDCExtraScopes    []string `glazed:"oidc-extra-scopes"`
+	SignupAllowed      bool     `glazed:"signup-allowed"`
 	StripeKeyFile      string   `glazed:"stripe-secret-key-file"`
 	StripeWebhookFiles []string `glazed:"stripe-webhook-secret-files"`
 	StripePriceID      string   `glazed:"stripe-price-id"`
@@ -139,7 +141,10 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 			return err
 		}
 	}
-	oidc := identity.New(identity.Config{Issuer: s.OIDCIssuer, ClientID: s.OIDCClientID, ClientSecret: clientSecret, RedirectURL: strings.TrimSuffix(s.PublicURL, "/") + "/auth/callback"})
+	if err = identity.ValidateScopes(s.OIDCExtraScopes); err != nil {
+		return err
+	}
+	oidc := identity.New(identity.Config{Issuer: s.OIDCIssuer, ClientID: s.OIDCClientID, ClientSecret: clientSecret, RedirectURL: strings.TrimSuffix(s.PublicURL, "/") + "/auth/callback", ExtraScopes: s.OIDCExtraScopes})
 	var pay *payments.Service
 	if s.StripeKeyFile != "" {
 		key, err := secret("", s.StripeKeyFile)
@@ -199,7 +204,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 	if err != nil || grantTTL < time.Minute || grantTTL > 12*time.Hour {
 		return errors.New("grant-ttl must be a duration between 1m and 12h")
 	}
-	srv := catalog.New(ctx, catalog.Config{PublicURL: public, AppDomain: s.AppDomain, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, GrantTTL: grantTTL},
+	srv := catalog.New(ctx, catalog.Config{PublicURL: public, AppDomain: s.AppDomain, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, GrantTTL: grantTTL, SignupAllowed: s.SignupAllowed},
 		db, &releases.Publisher{Store: db, Blobs: blobs}, oidc, pay, backend)
 	return srv.Run(ctx, s.Listen)
 }
@@ -452,6 +457,8 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("oidc-client-id", fields.TypeString, fields.WithHelp("OIDC web client ID (PKCE)")),
 			fields.New("oidc-client-id-file", fields.TypeString, fields.WithHelp("File containing the OIDC client ID (written by provisioning)")),
 			fields.New("oidc-client-secret-file", fields.TypeString, fields.WithHelp("Optional OIDC client secret file")),
+			fields.New("oidc-extra-scopes", fields.TypeStringList, fields.WithHelp("Additional OIDC scopes, e.g. urn:zitadel:iam:org:id:<id> to select the ZITADEL organization")),
+			fields.New("signup-allowed", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Offer the identity provider's registration form; leave off for invite-only deployments")),
 			fields.New("stripe-secret-key-file", fields.TypeString, fields.WithHelp("Stripe secret key file; billing is disabled when empty")),
 			fields.New("stripe-webhook-secret-files", fields.TypeStringList, fields.WithHelp("Current and previous webhook signing secret files")),
 			fields.New("stripe-price-id", fields.TypeString, fields.WithHelp("Server-controlled recurring Price ID for the subscriber plan")),

@@ -13,7 +13,7 @@ name: francois-catalog
 x-francois: &francois
   build:
     context: ../..
-    dockerfile: deploy/compose/Dockerfile
+    dockerfile: Dockerfile
   image: francois-catalog:dev
   network_mode: host
   volumes:

@@ -139,7 +139,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prompt := ""
-	if r.URL.Query().Get("signup") == "1" {
+	if r.URL.Query().Get("signup") == "1" && s.Config.SignupAllowed {
 		prompt = "create"
 	}
 	target, err := s.OIDC.AuthURL(r.Context(), state, nonce, verifier, prompt)
@@ -172,7 +172,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		fail("flow_invalid")
 		return
 	}
-	id, err := s.OIDC.Exchange(r.Context(), q.Get("code"), flow.Verifier, flow.Nonce)
+	id, idToken, err := s.OIDC.Exchange(r.Context(), q.Get("code"), flow.Verifier, flow.Nonce)
 	if err != nil {
 		log.Warn().Err(err).Msg("OIDC exchange failed")
 		fail("exchange_failed")
@@ -183,7 +183,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		fail("account_unavailable")
 		return
 	}
-	token, _, err := s.Store.CreateSession(r.Context(), u.ID)
+	token, _, err := s.Store.CreateSession(r.Context(), u.ID, idToken)
 	if err != nil {
 		fail("session_unavailable")
 		return
@@ -201,5 +201,18 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Runtime.RevokeSession(p.Session.Hash)
 	s.setCookie(w, s.sessionCookie(), "", -1)
-	httpx.OK(w, map[string]bool{"ok": true})
+	out := map[string]any{"ok": true}
+	// End the identity provider session too, so the next sign-in asks for
+	// credentials instead of silently reusing it. The portal session is
+	// already gone if this fails; the browser then simply stays signed out
+	// of Francois only.
+	if s.OIDC.Configured() {
+		target, err := s.OIDC.LogoutURL(r.Context(), p.Session.IDToken, s.Config.PortalOrigin()+"/", "")
+		if err != nil {
+			log.Warn().Err(err).Msg("Identity provider logout unavailable")
+		} else if target != "" {
+			out["redirect"] = target
+		}
+	}
+	httpx.OK(w, out)
 }

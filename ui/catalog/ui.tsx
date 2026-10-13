@@ -67,8 +67,11 @@ export function Header() {
             <button
               className="tlink quiet"
               onClick={async () => {
-                await logout();
-                navigate("/");
+                const out = await logout();
+                // Leave through the identity provider so its session ends too;
+                // it returns the browser to the portal afterwards.
+                if ("data" in out && out.data?.redirect) window.location.assign(out.data.redirect);
+                else navigate("/");
               }}
             >
               Sign out

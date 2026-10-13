@@ -38,6 +38,9 @@ type Config struct {
 	PriceID string
 	// GrantTTL bounds instance runtime grants; zero means 30 minutes.
 	GrantTTL time.Duration
+	// SignupAllowed lets /auth/login?signup=1 open the identity provider's
+	// registration form. Invite-only deployments leave it false.
+	SignupAllowed bool
 }
 
 type Server struct {

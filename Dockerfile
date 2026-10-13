@@ -1,4 +1,5 @@
 # Francois hosted catalog image: Go server + built UI + Node Pi worker.
+# Used by CI (ghcr.io/go-go-golems/francois) and deploy/compose.
 FROM node:24-bookworm-slim AS web
 RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 WORKDIR /src
@@ -22,6 +23,14 @@ COPY --from=web /src/pkg/catalog/web/static ./pkg/catalog/web/static
 RUN CGO_ENABLED=0 go build -trimpath -o /out/francois ./cmd/francois
 
 FROM node:24-bookworm-slim
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="francois" \
+      org.opencontainers.image.description="Francois hosted catalog: subscriber portal, isolated instance origins and Pi model worker" \
+      org.opencontainers.image.source="https://github.com/go-go-golems/francois" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
 RUN apt-get update && apt-get install -y --no-install-recommends curl jq ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=web /src/node_modules ./node_modules

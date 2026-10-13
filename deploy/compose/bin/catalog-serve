@@ -12,7 +12,7 @@ if [[ ${BACKEND:-fake} == pi ]]; then
     [[ -f /etc/francois/pi/$f ]] && install -m 0600 "/etc/francois/pi/$f" "$PI_DIR/$f"
   done
 fi
-args=(catalog serve --listen 127.0.0.1:8090 --public-url "$PUBLIC_URL" --app-domain "$APP_DOMAIN"
+args=(catalog serve --listen 127.0.0.1:8090 --public-url "$PUBLIC_URL" --app-domain "$APP_DOMAIN" --signup-allowed
   --database-url "$DATABASE_URL" --release-dir /var/lib/francois/releases --worker-dir /var/lib/francois/worker
   --oidc-issuer "$ISSUER" --oidc-client-id-file /bootstrap/oidc-client-id
   --backend "$BACKEND" --grant-ttl "${GRANT_TTL:-30m}" --pi-agent-dir "$PI_DIR" --worker /app/worker/dist/main.js)

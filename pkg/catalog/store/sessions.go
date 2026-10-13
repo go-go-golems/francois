@@ -36,6 +36,8 @@ type Session struct {
 	UserID    string
 	CSRF      string
 	ExpiresAt time.Time
+	// IDToken is the sign-in ID token, kept only as the logout id_token_hint.
+	IDToken string
 }
 
 const (
@@ -44,11 +46,11 @@ const (
 )
 
 // CreateSession stores only the digest of a fresh random token.
-func (s *Store) CreateSession(ctx context.Context, user string) (string, Session, error) {
+func (s *Store) CreateSession(ctx context.Context, user, idToken string) (string, Session, error) {
 	token := RandomHex(32)
-	sess := Session{Hash: Hash(token), UserID: user, CSRF: RandomHex(24), ExpiresAt: time.Now().Add(SessionIdle)}
-	_, err := s.Pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at) VALUES($1,$2,$3,$4,$5)`,
-		sess.Hash, user, sess.CSRF, sess.ExpiresAt, time.Now().Add(SessionAbsolute))
+	sess := Session{Hash: Hash(token), UserID: user, CSRF: RandomHex(24), ExpiresAt: time.Now().Add(SessionIdle), IDToken: idToken}
+	_, err := s.Pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at,id_token) VALUES($1,$2,$3,$4,$5,$6)`,
+		sess.Hash, user, sess.CSRF, sess.ExpiresAt, time.Now().Add(SessionAbsolute), idToken)
 	return token, sess, err
 }
 
@@ -57,8 +59,8 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Session, User
 	var sess Session
 	row := s.Pool.QueryRow(ctx, `UPDATE sessions SET last_seen_at=now(), expires_at=LEAST(absolute_expires_at, now()+$2::interval)
 WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at > now() AND absolute_expires_at > now()
-RETURNING token_hash,user_id,csrf_token,expires_at`, Hash(token), SessionIdle.String())
-	if err := row.Scan(&sess.Hash, &sess.UserID, &sess.CSRF, &sess.ExpiresAt); err != nil {
+RETURNING token_hash,user_id,csrf_token,expires_at,id_token`, Hash(token), SessionIdle.String())
+	if err := row.Scan(&sess.Hash, &sess.UserID, &sess.CSRF, &sess.ExpiresAt, &sess.IDToken); err != nil {
 		return sess, User{}, notFound(err)
 	}
 	u, err := s.User(ctx, sess.UserID)
@@ -72,7 +74,7 @@ func (s *Store) RevokeSession(ctx context.Context, hash []byte) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err = tx.Exec(ctx, `UPDATE sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL`, hash); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE sessions SET revoked_at=now(), id_token='' WHERE token_hash=$1 AND revoked_at IS NULL`, hash); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `UPDATE runtime_grants SET revoked_at=now() WHERE session_hash=$1 AND revoked_at IS NULL`, hash); err != nil {
@@ -88,7 +90,7 @@ func (s *Store) RevokeUserSessions(ctx context.Context, user string) (int64, err
 		return 0, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	tag, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, user)
+	tag, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at=now(), id_token='' WHERE user_id=$1 AND revoked_at IS NULL`, user)
 	if err != nil {
 		return 0, err
 	}

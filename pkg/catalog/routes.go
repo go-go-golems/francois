@@ -92,7 +92,7 @@ func (s *Server) access(ctx context.Context, u store.User) (billing.Decision, er
 
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
-	out := map[string]any{"authenticated": p != nil, "loginAvailable": s.OIDC.Configured(), "billingEnabled": s.Payments != nil, "appDomain": s.Config.AppDomain}
+	out := map[string]any{"authenticated": p != nil, "loginAvailable": s.OIDC.Configured(), "signupAvailable": s.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": s.Config.AppDomain}
 	if p != nil {
 		d, err := s.access(r.Context(), p.User)
 		if err != nil {

@@ -18,6 +18,7 @@ export type SessionUser = {
 export type Session = {
   authenticated: boolean;
   loginAvailable: boolean;
+  signupAvailable: boolean;
   billingEnabled: boolean;
   appDomain: string;
   user?: SessionUser;
@@ -252,7 +253,8 @@ export const api = createApi({
         }
       },
     }),
-    logout: b.mutation<{ ok: boolean }, void>({
+    // redirect, when present, is the identity provider's end-session URL.
+    logout: b.mutation<{ ok: boolean; redirect?: string }, void>({
       query: () => ({ url: "auth/logout", method: "POST" }),
       invalidatesTags: ["Session", "Account", "Instances"],
     }),

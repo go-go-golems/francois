@@ -108,7 +108,7 @@ func (e *env) user(name string, role string, access bool) tactor {
 			e.t.Fatal(err)
 		}
 	}
-	token, sess, err := e.store.CreateSession(ctx, u.ID)
+	token, sess, err := e.store.CreateSession(ctx, u.ID, "")
 	if err != nil {
 		e.t.Fatal(err)
 	}
