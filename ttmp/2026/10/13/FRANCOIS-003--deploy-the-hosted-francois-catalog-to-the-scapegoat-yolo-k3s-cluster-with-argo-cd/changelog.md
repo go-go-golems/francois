@@ -31,3 +31,7 @@ Pi backend live with LunaRoute only (k3s #343); models approved; real subscriber
 ## 2026-10-13
 
 Second site slop.boutique: catalog serve --site (a8200b9), follow-CNAME DNS-01 issuer + certificate + ingress (k3s #345), ZITADEL alias URIs planned (terraform 5b07f73, apply pending)
+
+## 2026-10-13
+
+ZITADEL alias URIs for slop.boutique applied by the user (re-plan: no changes); authorize with redirect_uri=https://slop.boutique/auth/callback reaches the login UI
