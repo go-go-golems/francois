@@ -345,3 +345,63 @@ Francois is live at https://francois.yolo.scapegoat.dev. The Application is Sync
 
 ### Technical details
 - k3s `main` @ `0e06f98`. Image `ghcr.io/go-go-golems/francois:sha-7f1441a`. Webhook `we_1UQ9zfLeHmcfmvuC639e6BPZ` enabled.
+
+## Step 7: Invited accounts, first admin, first release and the production browser run
+
+I created two invited test accounts in the Francois ZITADEL organization, promoted one to Francois administrator by exact issuer and subject, published Polis 1.0.0, and drove the production deployment end to end in headless Chromium. The run covered ZITADEL Login V2, Stripe Checkout in the sandbox with card 4242, the webhook pipeline, instance launch on the isolated origin, and sign-out through ZITADEL. A control run showed the silent re-login that sign-out now prevents.
+
+### Prompt Context
+**User prompt (verbatim):** (none new beyond Step 6; one tool call was rejected and then explained by the user: "sorry, i clicked the wrong thing")
+**Assistant interpretation:** Continue Phase 6: accounts, administrator, release, and the browser checklist.
+**Inferred user intent:** Proof that the deployed service works for a real subscriber.
+
+### What I did
+- **Users.** Created `e2e-admin@francois.test` (`394969329885511796`) and `e2e-alice@francois.test` (`394969332167213172`) with ZITADEL `POST /v2/users/human` in organization `394966170567966836`, verified email and random passwords. The token was the Terraform administrator token from `kv/apps/zitadel/prod/terraform`. The passwords went straight to `kv/apps/francois/prod/e2e-users` and were never printed. My first attempt was rejected by the user's click; I reran it after "sorry, i clicked the wrong thing".
+- **First admin.** Ran `kubectl -n francois exec deploy/francois -- francois catalog users promote --database-url-file … --issuer https://zitadel.yolo.scapegoat.dev --subject 394969329885511796`, which returned `usr_305b270c89b81c62ee327f2a promote ok`.
+- **Release.** Ran `francois catalog publish … --artifact-id polis --version 1.0.0 --html /app/examples/polis.html --manifest /app/examples/polis.manifest.json`. Result: `rel_02fefc881efb42bfc6a002cb published`, html sha256 `67b19d5e…`. `/api/catalog` lists `polis 1.0.0`.
+- **E2E script.** Wrote `scripts/05-yolo-e2e.{sh,mjs}`. It uses playwright-core 1.61.1 from the npx cache and the local chromium-1223, and reads credentials from Vault inside its own process. Screenshots go to `various/e2e/`; browser state files are gitignored.
+
+### Why
+- Sign-up is invite-only, so an operator has to create accounts. The ZITADEL API with the existing Terraform token is the operator path that needs no console clicks. Keeping the passwords in Vault follows the user's "save keys in vault".
+- I drove the browser from a script instead of the MCP browser so the test passwords never appear in tool calls or the transcript.
+
+### What worked
+```text
+[admin] session {"authenticated":true,"role":"admin","email":"e2e-admin@francois.test","access":"subscription_required"}
+[admin] admin page title: Operations
+[alice-subscribe] before {"role":"subscriber","allowed":false,"reason":"subscription_required"}
+[alice-subscribe] returned to /account?checkout=cs_test_…
+[alice-subscribe] after {"allowed":true,"reason":"subscriber"}
+[alice-run] instance origin https://i-….apps.francois.yolo.scapegoat.dev
+[alice-run] instance document {"title":"Polis IDE","bytes":254310,"cookieVisible":false}
+[alice-run] portal API from instance origin: blocked: TypeError
+[control] portal session after API-only logout: false
+[control] next /auth/login lands on Francois (silent re-login, as expected while ZITADEL session lives)
+[logout] after sign-out at https://francois.yolo.scapegoat.dev/ authenticated: false
+[logout] next /auth/login lands on zitadel.yolo.scapegoat.dev/ui/v2/login/loginname
+```
+- The production `stripe_events` table holds `checkout.session.completed`, `customer.subscription.created` and `invoice.paid`, all `processed` on attempt 1, plus Francois's own `francois.refresh.account`. The webhook endpoint, signature and worker work in production.
+- Checkout showed "Subscribe to Francois Subscriber $1.00 per month" with the Terraform-managed description, and the email was prefilled from the Francois-created customer.
+- The production login page has no registration link (`allow_register = false`) and carries `organization=394966170567966836`.
+
+### What didn't work
+- Stripe Checkout automation took four iterations:
+  1. `#cardNumber` was not visible, because payment methods are now an accordion with Card collapsed (screenshot `02-checkout.png`).
+  2. `getByRole("radio",{name:/^card$/i}).or(getByText("Card"))` failed: "`<button … data-testid="card-accordion-item-button" …>` … subtree intercepts pointer events".
+  3. Clicking the test-id button failed: "element is not visible", because it is a transparent overlay. A forced click on the "Card" label worked.
+  4. After submit, the page stayed on Checkout. The pre-checked "Save my information with Link" box required a phone number (`02c-checkout-submitted.png`). Unchecking it let the payment complete.
+- A first SQL query through `sh -c` failed on quoting (`syntax error at or near "\"`), and I used the wrong table name `subscriptions` (it is `billing_subscriptions`). I switched to SQL on stdin.
+
+### What I learned
+- The `/readyz` `models:true` flag only reflects the fake model's presence.
+- The cross-origin fetch from an instance to the portal API fails at CORS (`TypeError`) before any cookie question arises. `document.cookie` on the instance contains no Francois cookie.
+
+### What warrants a second pair of eyes
+- The two E2E accounts are real accounts in the production ZITADEL organization, and Alice has an active sandbox subscription. Keep them for regression runs, or delete them; both are recorded in Vault.
+
+### What should be done in the future
+- Phase 7: Pi backend with provider credentials in Vault, then approve models.
+- Phase 8: turn on `open_gitops_pr`, and add the release-blob backup.
+
+### Technical details
+- Commit `0c41b08` (script and screenshots). Rerun with `scripts/05-yolo-e2e.sh admin|alice-subscribe|alice-run|control|logout`.

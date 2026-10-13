@@ -9,6 +9,6 @@
 - [x] Phase 3: enable sandbox Customer Portal; create webhook endpoint, secret straight to Vault <!-- t:muee -->
 - [x] Phase 4: Vault policies/roles, GitHub App credential, bootstrap-francois-secrets.sh <!-- t:kwv4 -->
 - [x] Phase 5: copy GitOps package, apply prod-apps project + Application, first sync and smoke tests <!-- t:t2u0 -->
-- [ ] Phase 6: first admin, first release, subscriber end-to-end in browser; then NetworkPolicy <!-- t:td2j -->
+- [x] Phase 6: first admin, first release, subscriber end-to-end in browser; then NetworkPolicy <!-- t:td2j -->
 - [ ] Phase 7: Pi backend (Vault pi record, --backend=pi, approve models) <!-- t:59st -->
 - [ ] Phase 8: enable CI GitOps PRs (check Q4 init image line); release-blob backup CronJob and restore check <!-- t:r3f0 -->
