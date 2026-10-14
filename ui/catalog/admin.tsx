@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { api, Check, errorMessage, Release, SettingsDoc } from "./api";
+import { api, Check, errorMessage, Plan, Release, SettingsDoc } from "./api";
 import { navigate, show } from "./store";
 import { bytes, date, datetime, Empty, Line, Link, reasonLabel, Row, short, useAct, useRoute } from "./ui";
 
@@ -150,6 +150,7 @@ function UserDetail({ id }: { id: string }) {
   const [adjust] = api.useAdjustMutation();
   const [days, setDays] = useState("30");
   const [reason, setReason] = useState("");
+  const [grantPlan, setGrantPlan] = useState("");
   const [credits, setCredits] = useState("50");
   const [creditReason, setCreditReason] = useState("");
   const act = useAct();
@@ -183,6 +184,11 @@ function UserDetail({ id }: { id: string }) {
         <div className="v-list">
           <Line k="Role">{u.role}</Line>
           <Line k="State">{u.disabled ? "disabled" : "enabled"}</Line>
+          {d.entitlement && (
+            <Line k="Plan">
+              {d.entitlement.plan.name} <span className="muted">· {d.entitlement.source}</span>
+            </Line>
+          )}
           <Line k="Decision">
             {d.access.allowed ? "allowed" : "denied"} · {reasonLabel(d.access.reason)} {d.access.until ? "· until " + date(d.access.until) : ""}
           </Line>
@@ -194,7 +200,7 @@ function UserDetail({ id }: { id: string }) {
           ))}
           {(d.complimentary ?? []).map((g: any) => (
             <Line key={g.id} k="Complimentary">
-              until {date(g.until)} · {g.reason} {g.revokedAt ? "· revoked" : ""}
+              until {date(g.until)} · {g.plan || "highest plan"} · {g.reason} {g.revokedAt ? "· revoked" : ""}
             </Line>
           ))}
         </div>
@@ -224,11 +230,22 @@ function UserDetail({ id }: { id: string }) {
           className="inline-form"
           onSubmit={(e) => {
             e.preventDefault();
-            void act(grant({ id, days: Number(days), reason }).unwrap(), "Complimentary access granted").then(() => setReason(""));
+            void act(grant({ id, days: Number(days), reason, plan: grantPlan || undefined }).unwrap(), "Complimentary access granted").then(() => setReason(""));
           }}
         >
           <input aria-label="Days" className="num" type="number" min={1} max={3660} value={days} onChange={(e) => setDays(e.target.value)} />
-          <span className="muted">days of complimentary access because</span>
+          <span className="muted">days of</span>
+          <select aria-label="Plan" value={grantPlan} onChange={(e) => setGrantPlan(e.target.value)}>
+            <option value="">the highest plan</option>
+            {(d.plans ?? [])
+              .filter((p: any) => p.key !== "free")
+              .map((p: any) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+          <span className="muted">because</span>
           <input aria-label="Reason" required placeholder="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
           <button className="btn btn-ink">Grant</button>
           {(d.complimentary ?? []).some((g: any) => !g.revokedAt) && (
@@ -664,10 +681,41 @@ function Settings() {
               ))}
             </div>
           </Row>
-          <Row label="Allowance" sub="per user, calendar month (UTC)">
+          <Row label="Plans" sub="what each tier includes; ranks order them">
+            <PlansEditor doc={doc} upd={upd} approved={[...approved]} />
+          </Row>
+          <Row label="Demos" sub="visitors without an account">
+            <label className="check">
+              <input type="checkbox" checked={doc.demo.enabled} onChange={(e) => upd((d) => (d.demo.enabled = e.target.checked))} /> Offer demos of artifacts that
+              enable them
+            </label>
             <div className="grid-fields">
-              <NumField label="Included credits / month" value={doc.allowance.monthlyCredits} set={(v) => upd((d) => (d.allowance.monthlyCredits = v))} />
-              <NumField label="Daily safeguard (0 = off)" value={doc.allowance.dailyCredits} set={(v) => upd((d) => (d.allowance.dailyCredits = v))} />
+              <NumField label="Demo lifetime (minutes)" value={doc.demo.ttlMinutes} set={(v) => upd((d) => (d.demo.ttlMinutes = v))} />
+              <NumField label="Live demos (all visitors)" value={doc.demo.maxActive} set={(v) => upd((d) => (d.demo.maxActive = v))} />
+              <NumField label="Demos per address per hour" value={doc.demo.perAddressPerHour} set={(v) => upd((d) => (d.demo.perAddressPerHour = v))} />
+              <NumField label="Credits per demo" value={doc.demo.credits} set={(v) => upd((d) => (d.demo.credits = v))} />
+              <NumField label="Daily credit budget, all demos" value={doc.demo.dailyBudget} set={(v) => upd((d) => (d.demo.dailyBudget = v))} />
+            </div>
+            <ModelPicker label="Demo models (none = all approved)" approved={[...approved]} value={doc.demo.models} set={(m) => upd((d) => (d.demo.models = m))} />
+          </Row>
+          <Row label="Storefront" sub="front page wording">
+            <div className="grid-fields">
+              <label className="field">
+                <span>Title</span>
+                <input value={doc.storefront.title} onChange={(e) => upd((d) => (d.storefront.title = e.target.value))} />
+              </label>
+              <label className="field">
+                <span>Tagline</span>
+                <input value={doc.storefront.tagline} onChange={(e) => upd((d) => (d.storefront.tagline = e.target.value))} />
+              </label>
+            </div>
+            <label className="field">
+              <span>Introduction (Markdown)</span>
+              <textarea rows={5} value={doc.storefront.intro} onChange={(e) => upd((d) => (d.storefront.intro = e.target.value))} />
+            </label>
+          </Row>
+          <Row label="Runtime" sub="concurrency, all users">
+            <div className="grid-fields">
               <NumField label="Concurrent calls per user" value={doc.allowance.perUserConcurrency} set={(v) => upd((d) => (d.allowance.perUserConcurrency = v))} />
               <NumField label="Concurrent calls globally" value={doc.allowance.globalConcurrency} set={(v) => upd((d) => (d.allowance.globalConcurrency = v))} />
               <NumField label="Max tool rounds" value={doc.allowance.maxToolRounds} set={(v) => upd((d) => (d.allowance.maxToolRounds = v))} />
@@ -675,11 +723,10 @@ function Settings() {
           </Row>
           <Row label="Limits" sub="hosted resources">
             <div className="grid-fields">
-              <NumField label="Instances per user" value={doc.limits.instancesPerUser} set={(v) => upd((d) => (d.limits.instancesPerUser = v))} />
-              <NumField label="Members per instance" value={doc.limits.membersPerInstance} set={(v) => upd((d) => (d.limits.membersPerInstance = v))} />
               <NumField label="Documents per instance" value={doc.limits.documentsPerInstance} set={(v) => upd((d) => (d.limits.documentsPerInstance = v))} />
               <NumField label="Asset MiB per instance" value={Math.round(doc.limits.assetBytesPerInstance / (1 << 20))} set={(v) => upd((d) => (d.limits.assetBytesPerInstance = v * (1 << 20)))} />
               <NumField label="Max HTML KiB" value={Math.round(doc.limits.maxHtmlBytes / 1024)} set={(v) => upd((d) => (d.limits.maxHtmlBytes = v * 1024))} />
+              <NumField label="Max media MiB" value={Math.round(doc.limits.maxMediaBytes / (1 << 20))} set={(v) => upd((d) => (d.limits.maxMediaBytes = v * (1 << 20)))} />
             </div>
           </Row>
           <Row label="Publishing">
@@ -701,13 +748,139 @@ function Settings() {
         <div className="v-list">
           {data.history.map((h) => (
             <Line key={h.revision} k={"revision " + h.revision}>
-              {datetime(h.activatedAt)} · {h.document.models.allowed.length} models · {h.document.allowance.monthlyCredits} credits/month
+              {datetime(h.activatedAt)} · {h.document.models.allowed.length} models · {(h.document.plans ?? []).map((p) => p.name).join(", ")}
             </Line>
           ))}
           {data.history.length === 0 && <span className="muted">Defaults only; no revision saved yet.</span>}
         </div>
       </Row>
     </section>
+  );
+}
+
+function ModelPicker({ label, approved, value, set }: { label: string; approved: string[]; value: string[]; set: (v: string[]) => void }) {
+  return (
+    <div className="field">
+      <span>{label}</span>
+      <div className="seg small">
+        {approved.map((m) => (
+          <button key={m} type="button" aria-pressed={value.includes(m)} onClick={() => set(value.includes(m) ? value.filter((x) => x !== m) : [...value, m])}>
+            {m}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// PlansEditor edits the plan list. Prices are Stripe recurring Price IDs;
+// one line each: interval, price ID, then an optional display label.
+function PlansEditor({ doc, upd, approved }: { doc: SettingsDoc; upd: (f: (d: SettingsDoc) => void) => void; approved: string[] }) {
+  const plans = [...doc.plans].sort((a, b) => a.rank - b.rank);
+  const at = (key: string) => (d: SettingsDoc) => d.plans.find((p) => p.key === key)!;
+  const priceText = (p: Plan) => p.prices.map((x) => [x.interval, x.priceId, x.label].filter(Boolean).join(" ")).join("\n");
+  return (
+    <div className="plan-editor">
+      {plans.map((p) => (
+        <div className="plan-edit" key={p.key}>
+          <div className="row2">
+            <label className="field">
+              <span>Name</span>
+              <input value={p.name} onChange={(e) => upd((d) => (at(p.key)(d).name = e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Key · rank</span>
+              <span className="mono">
+                {p.key} · {p.rank}
+              </span>
+            </label>
+          </div>
+          <label className="field">
+            <span>Description</span>
+            <input value={p.description} onChange={(e) => upd((d) => (at(p.key)(d).description = e.target.value))} />
+          </label>
+          <label className="field">
+            <span>Highlights, one per line</span>
+            <textarea rows={3} value={p.highlights.join("\n")} onChange={(e) => upd((d) => (at(p.key)(d).highlights = e.target.value.split("\n").filter((x) => x.trim())))} />
+          </label>
+          {p.key !== "free" && (
+            <PriceField key={p.key + priceText(p)} initial={priceText(p)} set={(prices) => upd((d) => (at(p.key)(d).prices = prices))} />
+          )}
+          <div className="grid-fields">
+            <NumField label="Instances" value={p.instances} set={(v) => upd((d) => (at(p.key)(d).instances = v))} />
+            <NumField label="People per instance" value={p.membersPerInstance} set={(v) => upd((d) => (at(p.key)(d).membersPerInstance = v))} />
+            <NumField label="Credits / month" value={p.monthlyCredits} set={(v) => upd((d) => (at(p.key)(d).monthlyCredits = v))} />
+            <NumField label="Credits / day (0 = off)" value={p.dailyCredits} set={(v) => upd((d) => (at(p.key)(d).dailyCredits = v))} />
+          </div>
+          <ModelPicker label="Models (none = all approved)" approved={approved} value={p.models} set={(m) => upd((d) => (at(p.key)(d).models = m))} />
+          <div className="actions">
+            <label className="check">
+              <input type="checkbox" checked={p.public} onChange={(e) => upd((d) => (at(p.key)(d).public = e.target.checked))} /> Shown on the pricing page
+            </label>
+            {p.key !== "free" && (
+              <button type="button" className="tlink quiet danger" onClick={() => confirm(`Remove the ${p.name} plan?`) && upd((d) => (d.plans = d.plans.filter((x) => x.key !== p.key)))}>
+                Remove plan
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      <NewPlan
+        ranks={doc.plans.map((p) => p.rank)}
+        keys={doc.plans.map((p) => p.key)}
+        add={(key, name, rank) =>
+          upd((d) =>
+            d.plans.push({ key, name, rank, description: "", highlights: [], public: true, prices: [], instances: 3, membersPerInstance: 5, monthlyCredits: 0, dailyCredits: 0, models: [] }),
+          )
+        }
+      />
+    </div>
+  );
+}
+
+function PriceField({ initial, set }: { initial: string; set: (p: Plan["prices"]) => void }) {
+  const [text, setText] = useState(initial);
+  return (
+    <label className="field">
+      <span>Stripe prices, one per line: month|year price_… label</span>
+      <textarea
+        className="slug"
+        rows={2}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() =>
+          set(
+            text
+              .split("\n")
+              .map((l) => l.trim().split(/\s+/))
+              .filter((w) => w.length >= 2)
+              .map(([interval, priceId, ...label]) => ({ interval: interval as "month" | "year", priceId, label: label.join(" ") })),
+          )
+        }
+      />
+    </label>
+  );
+}
+
+function NewPlan({ ranks, keys, add }: { ranks: number[]; keys: string[]; add: (key: string, name: string, rank: number) => void }) {
+  const [name, setName] = useState("");
+  const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const rank = Math.max(0, ...ranks) + 10;
+  return (
+    <div className="inline-form">
+      <input placeholder="new plan name" value={name} onChange={(e) => setName(e.target.value)} />
+      <button
+        type="button"
+        className="btn btn-soft"
+        disabled={!key || keys.includes(key)}
+        onClick={() => {
+          add(key, name, rank);
+          setName("");
+        }}
+      >
+        Add plan (rank {rank})
+      </button>
+    </div>
   );
 }
 

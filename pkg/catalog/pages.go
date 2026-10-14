@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/content"
+	"github.com/go-go-golems/francois/pkg/catalog/httpx"
+	"github.com/go-go-golems/francois/pkg/catalog/settings"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/go-go-golems/francois/pkg/catalog/web"
 	"github.com/pkg/errors"
@@ -93,19 +95,31 @@ type card struct {
 	DemoEnabled            bool
 }
 
-// brand is the storefront name shown in the header and titles.
-func (s *Server) brand(r *http.Request) string {
+// brand is the storefront name shown in the header and titles: the
+// configured storefront title, else the site's hostname.
+func (s *Server) brand(r *http.Request, doc settings.Document) string {
+	if doc.Storefront.Title != "" {
+		return doc.Storefront.Title
+	}
 	return s.site(r).PublicURL.Hostname()
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page string, d pageData) {
 	p := principal(r.Context())
 	site := s.site(r)
-	d.Brand = s.brand(r)
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	d.Brand = s.brand(r, rev.Document)
 	d.Canonical = site.PortalOrigin() + r.URL.Path
 	d.LoginAvailable = site.OIDC.Configured()
 	d.LoginHref = "/auth/login?return=" + url.QueryEscape(r.URL.RequestURI())
 	nav := []navItem{{Href: "/apps", Label: "Catalog"}, {Href: "/journal", Label: "Journal"}}
+	if len(rev.Document.Prices()) > 0 {
+		nav = append(nav, navItem{Href: "/pricing", Label: "Pricing"})
+	}
 	if p != nil {
 		d.User = &p.User
 		nav = append(nav, navItem{Href: "/instances/", Label: "Instances"}, navItem{Href: "/account", Label: "Account"})
@@ -120,6 +134,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		nav[i].Current = strings.HasPrefix(r.URL.Path, strings.TrimSuffix(nav[i].Href, "/"))
 	}
 	d.Nav = nav
+	if d.Description == "" {
+		d.Description = rev.Document.Storefront.Tagline
+	}
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout", d); err != nil {
 		log.Error().Err(err).Str("page", page).Msg("render page")
@@ -245,16 +262,26 @@ func (s *Server) homePage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	front := rev.Document.Storefront
+	headline, tagline := front.Title, front.Tagline
+	if headline == "" {
+		headline, tagline = "Single-file HTML applications, hosted for you:", "a private origin, a real database, shared rooms and model calls — no setup, no keys."
+	}
 	body := map[string]any{
-		"Headline":   "Single-file HTML applications, hosted for you:",
-		"Tagline":    "a private origin, a real database, shared rooms and model calls — no setup, no keys.",
-		"Intro":      template.HTML(""),
+		"Headline":   headline,
+		"Tagline":    tagline,
+		"Intro":      s.md.Render(front.Intro),
 		"Featured":   featured,
 		"Creators":   creators,
 		"Posts":      posts,
 		"LoginError": r.URL.Query().Get("login_error"),
 	}
-	s.render(w, r, http.StatusOK, "home", pageData{Description: "Hosted single-file HTML applications.", Body: body})
+	s.render(w, r, http.StatusOK, "home", pageData{Body: body})
 }
 
 type tagCount struct {
@@ -396,8 +423,22 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 		lines = append(lines, l)
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	doc := rev.Document
+	rank := doc.RequiredRank(a.RequiredPlan)
+	planName := ""
+	for _, pl := range doc.Plans {
+		if pl.Rank == rank {
+			planName = pl.Name
+		}
+	}
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
-		Body: map[string]any{"Card": c, "Body": s.md.Render(page.Body), "Gallery": gallery, "Releases": lines, "Demo": false, "Plan": ""}}
+		Body: map[string]any{"Card": c, "Body": s.md.Render(page.Body), "Gallery": gallery, "Releases": lines,
+			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
 	}
@@ -539,7 +580,11 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	origin := s.site(r).PortalOrigin()
 	doc := rssDoc{Version: "2.0"}
-	doc.Channel.Title = s.brand(r) + " journal"
+	brand := s.site(r).PublicURL.Hostname()
+	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {
+		brand = s.brand(r, rev.Document)
+	}
+	doc.Channel.Title = brand + " journal"
 	doc.Channel.Link = origin + "/journal"
 	doc.Channel.Description = "Notes on how the applications are made."
 	for _, p := range posts {
@@ -579,4 +624,63 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	http.ServeContent(w, r, "", m.CreatedAt, bytes.NewReader(data))
+}
+
+type planView struct {
+	settings.Plan
+	Current bool
+}
+
+// pricingPage lists the public plans by rank, marking the caller's plan.
+func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	current, paid, staff := "", false, false
+	if p := principal(ctx); p != nil {
+		if e, err := s.entitlementIn(ctx, p.User, rev.Document); err == nil {
+			current, paid, staff = e.Plan.Key, e.Source == SourceSubscription || e.Source == SourceTrial, e.Source == SourceStaff
+		}
+	}
+	if staff {
+		current = ""
+	}
+	plans := []planView{}
+	name := ""
+	for _, p := range rev.Document.Plans {
+		if p.Key == current {
+			name = p.Name
+		}
+		if p.Public {
+			plans = append(plans, planView{Plan: p, Current: p.Key == current})
+		}
+	}
+	sort.Slice(plans, func(i, j int) bool { return plans[i].Rank < plans[j].Rank })
+	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Pricing", Crumb: "pricing", Description: "Plans and prices.",
+		Body: map[string]any{"Plans": plans, "Current": name, "Paid": paid, "Staff": staff}})
+}
+
+// publicPlans is GET /api/plans: the public plans, without price IDs.
+func (s *Server) publicPlans(w http.ResponseWriter, r *http.Request) {
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	out := []map[string]any{}
+	for _, p := range rev.Document.Plans {
+		if !p.Public {
+			continue
+		}
+		prices := []map[string]string{}
+		for _, pr := range p.Prices {
+			prices = append(prices, map[string]string{"interval": pr.Interval, "label": pr.Label})
+		}
+		out = append(out, map[string]any{"key": p.Key, "name": p.Name, "rank": p.Rank, "description": p.Description, "highlights": p.Highlights,
+			"prices": prices, "instances": p.Instances, "membersPerInstance": p.MembersPerInstance, "monthlyCredits": p.MonthlyCredits})
+	}
+	httpx.OK(w, out)
 }

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,6 +132,18 @@ func TestPlans(t *testing.T) {
 	expect("granted supporter creates premium", code, out, 403, "plan_required")
 	code, out = e.portal(&admin, "POST", "/api/admin/users/"+free.user.ID+"/access-grants", map[string]any{"days": 7, "reason": "x", "plan": "nope"})
 	expect("grant unknown plan", code, out, 400, "invalid_request")
+
+	// Pricing lists public plans and marks the caller's; the public API
+	// never exposes price IDs.
+	if code, b, _ := e.do(&sup, "portal.test", "GET", "/pricing", nil, nil); code != 200 || !strings.Contains(string(b), "Studio") || !strings.Contains(string(b), "Current plan") {
+		t.Fatalf("pricing %d", code)
+	}
+	if _, b, _ := e.do(nil, "portal.test", "GET", "/api/plans", nil, nil); strings.Contains(string(b), "price_") || !strings.Contains(string(b), `"supporter"`) {
+		t.Fatalf("public plans %s", b)
+	}
+	if _, b, _ := e.do(&sup, "portal.test", "GET", "/apps/premium", nil, nil); !strings.Contains(string(b), `data-rank="20"`) || !strings.Contains(string(b), "Studio plan") {
+		t.Fatalf("artifact plan badge %s", b)
+	}
 
 	// Account shows the plan and its allowance.
 	_, acct := e.portal(&free, "GET", "/api/account", nil)

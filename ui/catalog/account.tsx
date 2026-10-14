@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { api, errorCode, errorMessage } from "./api";
+import { api, errorMessage } from "./api";
 import { navigate, show } from "./store";
 import { date, dateUTC, datetime, Empty, Line, Link, loginHref, reasonLabel, Row } from "./ui";
 
@@ -13,7 +13,6 @@ export function Account() {
     skip: !session?.authenticated,
     pollingInterval: polling ? 2500 : 0,
   });
-  const [checkout, { isLoading: starting }] = api.useCheckoutMutation();
   const [portal, { isLoading: opening }] = api.usePortalMutation();
   const [refresh] = api.useRefreshBillingMutation();
   const dispatch = useDispatch();
@@ -43,15 +42,6 @@ export function Account() {
       </main>
     );
   if (isLoading || !a) return <main><Empty>Loading…</Empty></main>;
-  const start = async () => {
-    try {
-      const { url } = await checkout().unwrap();
-      location.href = url;
-    } catch (e) {
-      if (errorCode(e) === "subscription_open") return manage();
-      dispatch(show({ text: errorMessage(e), bad: true }));
-    }
-  };
   const manage = async () => {
     try {
       const { url } = await portal().unwrap();
@@ -67,7 +57,7 @@ export function Account() {
     <main className="sheet">
       <section className="stats-head">
         <h1>Account</h1>
-        <span className={"status " + (a.access.allowed ? "on" : "off")}>{reasonLabel(a.access.reason)}</span>
+        <span className={"status " + (a.entitlement.source !== "free" ? "on" : "off")}>{a.entitlement.plan.name}</span>
       </section>
       {polling && !a.access.allowed && <p className="notice">Checking your subscription status… Activation can take a few seconds after payment.</p>}
       {a.user.disabled && <p className="notice bad">This account is disabled. You can still manage or cancel billing.</p>}
@@ -85,7 +75,14 @@ export function Account() {
       </Row>
       <Row label="Membership" sub="hosted instances, models, downloads">
         <div className="v-list">
-          <Line k="Access">{a.access.allowed ? "Allowed" : "Not active"} · {reasonLabel(a.access.reason)}</Line>
+          <Line k="Plan">
+            {a.entitlement.plan.name} <span className="muted">· {sourceLabel[a.entitlement.source] ?? a.entitlement.source}</span>
+          </Line>
+          <Line k="Includes">
+            {a.entitlement.plan.instances} {a.entitlement.plan.instances === 1 ? "instance" : "instances"} · {a.entitlement.plan.membersPerInstance} people each ·{" "}
+            {a.entitlement.plan.monthlyCredits} credits a month
+          </Line>
+          <Line k="Billing">{a.access.allowed ? "Active" : "Not active"} · {reasonLabel(a.access.reason)}</Line>
           {a.access.until && (
             <Line k={a.access.cancelScheduled ? "Ends" : "Renews"}>
               {date(a.access.until)}
@@ -104,9 +101,9 @@ export function Account() {
             </button>
           ) : (
             !a.user.disabled && (
-              <button className="btn btn-ink" onClick={start} disabled={starting || !a.user.emailVerified}>
-                {starting ? "Opening Checkout…" : "Subscribe"}
-              </button>
+              <a className="btn btn-ink" href="/pricing">
+                See plans
+              </a>
             )
           )}
           {a.hasCustomer && !sub && (
@@ -185,6 +182,16 @@ export function Account() {
     </main>
   );
 }
+
+const sourceLabel: Record<string, string> = {
+  staff: "staff access",
+  subscription: "subscription",
+  trial: "trial",
+  complimentary: "complimentary",
+  free: "no subscription",
+  guest: "demo visitor",
+  disabled: "account disabled",
+};
 
 export function goAccount() {
   navigate("/account");

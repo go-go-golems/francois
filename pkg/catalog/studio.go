@@ -62,6 +62,7 @@ func (s *Server) studioRoutes(m *http.ServeMux) {
 	m.HandleFunc("PATCH /api/studio/creators/{id}", c(s.studioPatchCreator))
 	m.HandleFunc("DELETE /api/studio/creators/{id}", c(s.studioDeleteCreator))
 	m.HandleFunc("POST /api/studio/markdown", c(s.studioMarkdown))
+	m.HandleFunc("GET /api/studio/plans", c(s.studioPlans))
 }
 
 func me(r *http.Request) store.User { return principal(r.Context()).User }
@@ -285,6 +286,17 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	if in.RequiredPlan != nil && a.RequiredPlan != "" {
+		rev, err := s.Store.ActiveSettings(ctx)
+		if err != nil {
+			unavailable(w, err)
+			return
+		}
+		if _, ok := rev.Document.Plan(a.RequiredPlan); !ok {
+			httpx.Fail(w, 400, "invalid_request", "Unknown plan "+a.RequiredPlan)
+			return
+		}
+	}
 	if in.Creators != nil {
 		if err := s.checkCredits(ctx, r, *in.Creators); err != nil {
 			httpx.Fail(w, 400, "invalid_request", err.Error())
@@ -1088,4 +1100,19 @@ func (s *Server) studioMarkdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, map[string]string{"html": string(s.md.Render(in.Markdown))})
+}
+
+// studioPlans lists every plan (including grant-only ones) for the required
+// plan picker.
+func (s *Server) studioPlans(w http.ResponseWriter, r *http.Request) {
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	out := []map[string]any{}
+	for _, p := range rev.Document.Plans {
+		out = append(out, map[string]any{"key": p.Key, "name": p.Name, "rank": p.Rank, "public": p.Public})
+	}
+	httpx.OK(w, out)
 }

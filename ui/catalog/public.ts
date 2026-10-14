@@ -2,13 +2,23 @@
 // pages: sign out, run an artifact, try a demo. Pages are complete without
 // it; it only replaces placeholders. No framework, to stay small.
 
+type Plan = { key: string; name: string; rank: number; source: string; paid: boolean; instances: number };
 type Session = {
   authenticated: boolean;
   loginAvailable: boolean;
   csrfToken?: string;
-  user?: { role: string; disabled: boolean };
-  access?: { allowed: boolean };
+  user?: { role: string; disabled: boolean; emailVerified: boolean };
+  plan?: Plan;
 };
+
+class RequestError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+  }
+}
 
 type Failure = { error?: { code?: string; message?: string } };
 
@@ -21,7 +31,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (s.csrfToken) headers["X-CSRF-Token"] = s.csrfToken;
   const r = await fetch(path, { method: "POST", credentials: "same-origin", headers, body: JSON.stringify(body) });
   const out = (await r.json().catch(() => ({}))) as T & Failure;
-  if (!r.ok) throw new Error(out.error?.message || "Request failed");
+  if (!r.ok) throw new RequestError(out.error?.message || "Request failed", out.error?.code || "");
   return out;
 }
 
@@ -44,10 +54,14 @@ async function renderActions(box: HTMLElement) {
   const { release, title, demo } = box.dataset;
   const meta = box.querySelector(".muted");
   box.replaceChildren();
+  const required = Number(box.dataset.rank ?? "1");
+  const plan = s.plan;
+  // Mirrors Entitlement.CanRun plus the instance allowance; the server decides.
+  const canRun = !!plan && (plan.source === "staff" || (plan.source !== "guest" && plan.source !== "disabled" && plan.rank >= required && plan.instances > 0));
   if (release) {
     if (!s.authenticated) {
       box.append(el("a", { class: "btn btn-ink", href: loginHref() }, "Sign in to run"));
-    } else if (s.access?.allowed) {
+    } else if (canRun) {
       const run = el("button", { class: "btn btn-ink", type: "button" }, "Run in a new instance");
       run.addEventListener("click", async () => {
         run.setAttribute("disabled", "");
@@ -61,7 +75,8 @@ async function renderActions(box: HTMLElement) {
       });
       box.append(run);
     } else {
-      box.append(el("a", { class: "btn btn-ink", href: "/account?subscribe=1" }, "Subscribe to run"));
+      const name = box.dataset.plan;
+      box.append(el("a", { class: "btn btn-ink", href: "/pricing" }, name ? `Get ${name} to run` : "See plans"));
     }
   }
   if (demo === "true") {
@@ -81,6 +96,36 @@ async function renderActions(box: HTMLElement) {
   if (meta) box.append(meta);
 }
 
+// bindCheckout turns the pricing page's subscribe links into Checkout for
+// signed-in visitors; an existing subscription opens the billing portal,
+// where plans are changed.
+async function bindCheckout(box: HTMLElement) {
+  const s = await getSession();
+  if (!s.authenticated) return;
+  box.querySelectorAll<HTMLAnchorElement>("a[data-interval]").forEach((a) => {
+    a.addEventListener("click", async (e) => {
+      e.preventDefault();
+      a.setAttribute("aria-busy", "true");
+      try {
+        const out = await post<{ url: string }>("/api/billing/checkout", { plan: box.dataset.plan, interval: a.dataset.interval });
+        location.assign(out.url);
+      } catch (err) {
+        if (err instanceof RequestError && err.code === "subscription_open") {
+          try {
+            const out = await post<{ url: string }>("/api/billing/portal", {});
+            location.assign(out.url);
+            return;
+          } catch (perr) {
+            err = perr;
+          }
+        }
+        a.removeAttribute("aria-busy");
+        fail(box, (err as Error).message);
+      }
+    });
+  });
+}
+
 function bindSignOut(btn: HTMLElement) {
   btn.addEventListener("click", async () => {
     try {
@@ -94,6 +139,11 @@ function bindSignOut(btn: HTMLElement) {
 
 function main() {
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
+  document.querySelectorAll<HTMLElement>("[data-checkout]").forEach((box) => {
+    bindCheckout(box).catch(() => {
+      /* links keep pointing to sign-in */
+    });
+  });
   document.querySelectorAll<HTMLElement>("[data-actions]").forEach((box) => {
     renderActions(box).catch(() => {
       /* keep the server-rendered fallback */
