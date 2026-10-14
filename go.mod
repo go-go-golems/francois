@@ -12,6 +12,7 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stripe/stripe-go/v86 v86.1.1
+	github.com/yuin/goldmark v1.8.2
 	github.com/zitadel/oidc/v3 v3.47.8
 	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.36.0
@@ -105,7 +106,6 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/yuin/goldmark v1.8.2 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	github.com/zitadel/logging v0.7.0 // indirect
 	github.com/zitadel/schema v1.3.2 // indirect
