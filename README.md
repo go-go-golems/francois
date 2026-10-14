@@ -213,6 +213,9 @@ access, credit adjustments), instances (inspect, suspend), billing events and
 reconciliation, model usage, versioned settings (approved models, thinking
 levels, credit weights, allowance and limits) and the audit log.
 
+The production deployment (yolo k3s, `francois.yolo.scapegoat.dev` and
+`slop.boutique`) is described in [doc/production.md](doc/production.md).
+
 Integration tests need a PostgreSQL server; each test creates its own database:
 
 ```sh
