@@ -49,7 +49,8 @@ export function Header() {
     ["/apps", "Catalog"],
     ["/journal", "Journal"],
   ];
-  if (session?.authenticated) nav.push(["/instances/", "Instances"], ["/account", "Account"]);
+  const guest = session?.user?.role === "guest";
+  if (session?.authenticated && !guest) nav.push(["/instances/", "Instances"], ["/account", "Account"]);
   if (session?.user?.role === "creator" || session?.user?.role === "admin") nav.push(["/studio", "Studio"]);
   if (session?.user?.role === "admin") nav.push(["/admin", "Admin"]);
   const current = (to: string) => path.startsWith(to.replace(/\/$/, ""));
@@ -72,7 +73,7 @@ export function Header() {
               {label}
             </Link>
           ))}
-          {session?.authenticated ? (
+          {session?.authenticated && !guest ? (
             <button
               className="tlink quiet"
               onClick={async () => {

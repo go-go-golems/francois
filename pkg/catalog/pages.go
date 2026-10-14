@@ -120,7 +120,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	if len(rev.Document.Prices()) > 0 {
 		nav = append(nav, navItem{Href: "/pricing", Label: "Pricing"})
 	}
-	if p != nil {
+	// Demo guests browse like visitors: no account pages, and they may sign in.
+	if p != nil && p.User.Role != "guest" {
 		d.User = &p.User
 		nav = append(nav, navItem{Href: "/instances/", Label: "Instances"}, navItem{Href: "/account", Label: "Account"})
 		if p.User.Role == "creator" || p.User.Role == "admin" {

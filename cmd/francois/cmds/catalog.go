@@ -70,6 +70,7 @@ type CatalogServeSettings struct {
 	AppDomain          string   `glazed:"app-domain"`
 	Sites              []string `glazed:"site"`
 	LegalContact       string   `glazed:"legal-contact"`
+	TrustProxyHeaders  bool     `glazed:"trust-proxy-headers"`
 	ReleaseDir         string   `glazed:"release-dir"`
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
@@ -157,7 +158,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -469,6 +470,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("public-url", fields.TypeString, fields.WithDefault("http://localhost:8090"), fields.WithHelp("Trusted portal origin")),
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
 			fields.New("legal-contact", fields.TypeString, fields.WithHelp("Contact address shown on /privacy and /terms")),
+			fields.New("trust-proxy-headers", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Take visitor addresses from X-Real-Ip/X-Forwarded-For (only behind a trusted ingress); used for demo rate limits")),
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),

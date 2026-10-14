@@ -92,7 +92,7 @@ export type Member = {
 export type Instance = {
   id: string;
   title: string;
-  kind: "workspace" | "preview";
+  kind: "workspace" | "preview" | "demo";
   state: "active" | "suspended";
   role?: "owner" | "editor" | "viewer";
   artifactId: string;
@@ -104,6 +104,7 @@ export type Instance = {
   origin: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string;
   membersList?: Member[];
   release?: Release;
   upgrades?: Release[];

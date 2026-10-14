@@ -49,7 +49,7 @@ func unavailable(w http.ResponseWriter, err error) {
 func (s *Server) adminOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var users, admins, disabled, instances, drafts, published int
-	err := s.Store.Pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM users WHERE role='admin'),(SELECT count(*) FROM users WHERE disabled),
+	err := s.Store.Pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM users WHERE role<>'guest'),(SELECT count(*) FROM users WHERE role='admin'),(SELECT count(*) FROM users WHERE disabled),
  (SELECT count(*) FROM instances WHERE kind='workspace'),(SELECT count(*) FROM releases WHERE state='draft'),(SELECT count(*) FROM releases WHERE state='published')`).Scan(&users, &admins, &disabled, &instances, &drafts, &published)
 	if err != nil {
 		unavailable(w, err)

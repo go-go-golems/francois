@@ -88,6 +88,9 @@ type Config struct {
 	// LegalContact is the address /privacy and /terms tell people to write
 	// to; empty points them to the consent screen's support address.
 	LegalContact string
+	// TrustProxyHeaders takes visitors' addresses from X-Real-Ip or
+	// X-Forwarded-For (set by the ingress) for demo rate limits.
+	TrustProxyHeaders bool
 }
 
 // Validate rejects site lists the host dispatcher cannot route
@@ -125,16 +128,17 @@ func (c Config) Validate() error {
 func (c Config) primary() *Site { return &c.Sites[0] }
 
 type Server struct {
-	Config    Config
-	Store     *store.Store
-	Publisher *releases.Publisher
-	Payments  *payments.Service // nil when billing is not configured
-	Backend   piworker.Backend
-	Runtime   *hosted.Runtime
-	portal    http.Handler
-	legal     *template.Template
-	pages     map[string]*template.Template
-	md        *content.Markdown
+	Config      Config
+	Store       *store.Store
+	Publisher   *releases.Publisher
+	Payments    *payments.Service // nil when billing is not configured
+	Backend     piworker.Backend
+	Runtime     *hosted.Runtime
+	portal      http.Handler
+	legal       *template.Template
+	pages       map[string]*template.Template
+	md          *content.Markdown
+	demoLimiter *limiter
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -152,7 +156,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 		}
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
-		pages: parsePages(), md: content.NewMarkdown()}
+		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter()}
 	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, srv.budget, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {
@@ -318,6 +322,7 @@ func (s *Server) Run(ctx context.Context, listen string) error {
 	if s.Payments != nil {
 		g.Go(func() error { return s.Payments.Run(ctx) })
 	}
+	g.Go(func() error { return s.expireDemos(ctx) })
 	g.Go(func() error {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)

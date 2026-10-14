@@ -69,12 +69,13 @@ func (s *Store) UserByVerifiedEmail(ctx context.Context, email string) (User, er
 	return users[0], nil
 }
 
+// Users lists accounts for administrators; demo guests are left out.
 func (s *Store) Users(ctx context.Context, search string, limit int) ([]User, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 	rows, err := s.Pool.Query(ctx, `SELECT `+userColumns+` FROM users
-WHERE $1='' OR email ILIKE '%'||$1||'%' OR display_name ILIKE '%'||$1||'%' OR id=$1 OR subject=$1
+WHERE role<>'guest' AND ($1='' OR email ILIKE '%'||$1||'%' OR display_name ILIKE '%'||$1||'%' OR id=$1 OR subject=$1)
 ORDER BY created_at DESC LIMIT $2`, search, limit)
 	if err != nil {
 		return nil, err
