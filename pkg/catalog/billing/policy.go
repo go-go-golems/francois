@@ -23,6 +23,8 @@ type Subscription struct {
 type Comp struct {
 	Until   time.Time
 	Revoked bool
+	// Plan is the granted plan's key; empty means the highest plan.
+	Plan string
 }
 
 type Account struct {
@@ -43,6 +45,10 @@ type Decision struct {
 	Status  string     `json:"status,omitempty"`
 	// CancelScheduled is true when access ends at Until without renewal.
 	CancelScheduled bool `json:"cancelScheduled"`
+	// PriceID is the price of the standing subscription that grants access.
+	PriceID string `json:"priceId,omitempty"`
+	// Plan is the plan key of the complimentary grant that grants access.
+	Plan string `json:"plan,omitempty"`
 }
 
 // Stable reason codes.
@@ -60,8 +66,9 @@ const (
 
 var standing = map[string]bool{"active": true, "trialing": true, "past_due": true, "unpaid": true, "paused": true}
 
-// Access decides whether an account may use hosted instances, model calls,
-// and paid downloads now. It is pure and table-tested.
+// Access decides whether an account has paid or granted access now, and
+// through which price or grant. It is pure and table-tested; the catalog's
+// entitlement resolver maps the decision to a plan.
 func (p Policy) Access(a Account, subs []Subscription, comps []Comp, now time.Time) Decision {
 	if a.Disabled {
 		return Decision{Reason: ReasonDisabled}
@@ -84,7 +91,7 @@ func (p Policy) Access(a Account, subs []Subscription, comps []Comp, now time.Ti
 		if !c.Revoked && now.Before(c.Until) {
 			until := c.Until
 			if best == nil || until.After(*best.Until) {
-				best = &Decision{Allowed: true, Reason: ReasonComplimentary, Until: &until}
+				best = &Decision{Allowed: true, Reason: ReasonComplimentary, Until: &until, Plan: c.Plan}
 			}
 		}
 	}
@@ -96,7 +103,7 @@ func (p Policy) Access(a Account, subs []Subscription, comps []Comp, now time.Ti
 	}
 	if len(eligible) == 1 {
 		s := eligible[0]
-		d := Decision{Status: s.Status, CancelScheduled: s.CancelAtPeriodEnd}
+		d := Decision{Status: s.Status, CancelScheduled: s.CancelAtPeriodEnd, PriceID: s.PriceID}
 		switch {
 		case s.Status == "active" && s.AccessUntil != nil && now.Before(*s.AccessUntil):
 			d.Allowed, d.Reason, d.Until = true, ReasonSubscriber, s.AccessUntil

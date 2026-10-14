@@ -35,6 +35,9 @@ type ReserveRequest struct {
 	UserID, InstanceID, CallID, Model string
 	Credits, Included, Daily          int
 	SettingsRevision                  int64
+	// Period overrides the monthly ledger key; demos use "demo:<instance>"
+	// so their budget never touches the visitor's monthly allowance.
+	Period string
 }
 
 // Reserve atomically reserves credits for one call. Concurrent callers for
@@ -42,6 +45,9 @@ type ReserveRequest struct {
 // at most once.
 func (s *Store) Reserve(ctx context.Context, r ReserveRequest) (Reservation, error) {
 	period := Period(time.Now())
+	if r.Period != "" {
+		period = r.Period
+	}
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return Reservation{}, err
@@ -260,4 +266,13 @@ func (s *Store) UsageSummary(ctx context.Context) (UsageSummary, error) {
  count(*) FILTER (WHERE state='failed'),count(*) FILTER (WHERE state='review'),count(DISTINCT user_id) FROM model_calls WHERE period=$1`, u.Period).Scan(
 		&u.Calls, &u.Credits, &u.InputTokens, &u.OutputTokens, &u.Cost, &u.Failed, &u.Review, &u.ActiveUsers)
 	return u, err
+}
+
+// DemoCreditsToday sums the credits charged to demo calls since midnight UTC,
+// across all visitors: the shared daily demo budget.
+func (s *Store) DemoCreditsToday(ctx context.Context) (int, error) {
+	var n int
+	err := s.Pool.QueryRow(ctx, `SELECT COALESCE(sum(credits),0) FROM model_calls WHERE period LIKE 'demo:%' AND state<>'released'
+ AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`).Scan(&n)
+	return n, err
 }

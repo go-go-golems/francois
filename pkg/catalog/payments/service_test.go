@@ -137,10 +137,13 @@ func user(t *testing.T, s *store.Store, name string) store.User {
 	return u
 }
 
+// accepted is the set of plan prices the tests subscribe to.
+var accepted = map[string]bool{"price_ok": true}
+
 func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 	s := testStore(t)
 	g := newFake()
-	svc := NewService(g, s, Config{PriceID: "price_ok", Deployment: "test"})
+	svc := NewService(g, s, Config{Deployment: "test"})
 	ctx := context.Background()
 	maya, eve := user(t, s, "maya"), user(t, s, "eve")
 
@@ -151,7 +154,7 @@ func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			u, err := svc.Checkout(ctx, maya, "http://portal.test")
+			u, err := svc.Checkout(ctx, maya, "price_ok", accepted, "http://portal.test")
 			if err != nil {
 				t.Errorf("checkout %d: %v", i, err)
 			}
@@ -170,10 +173,10 @@ func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 	// A timeout after creation leaves the attempt pending; the retry reuses
 	// the same idempotency key and Session.
 	g.failOnce = true
-	if _, err := svc.Checkout(ctx, eve, "http://portal.test"); err == nil {
+	if _, err := svc.Checkout(ctx, eve, "price_ok", accepted, "http://portal.test"); err == nil {
 		t.Fatal("expected uncertain failure")
 	}
-	u, err := svc.Checkout(ctx, eve, "http://portal.test")
+	u, err := svc.Checkout(ctx, eve, "price_ok", accepted, "http://portal.test")
 	if err != nil || g.creates != 2 {
 		t.Fatalf("retry after timeout: %v creates=%d", err, g.creates)
 	}
@@ -191,11 +194,11 @@ func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 	customer, _ := s.CustomerFor(ctx, maya.ID)
 	until := time.Now().Add(30 * 24 * time.Hour)
 	g.subs[customer] = []billing.Subscription{{ID: "sub_a", CustomerID: customer, PriceID: "price_ok", Status: "active", Quantity: 1, ItemCount: 1, AccessUntil: &until}}
-	if _, err := svc.Checkout(ctx, maya, "http://portal.test"); !errors.Is(err, ErrSubscriptionOpen) {
+	if _, err := svc.Checkout(ctx, maya, "price_ok", accepted, "http://portal.test"); !errors.Is(err, ErrSubscriptionOpen) {
 		t.Fatalf("second purchase offered: %v", err)
 	}
 	// The success return alone never grants access.
-	d, _ := s.Access(ctx, svc.Policy(false), maya, time.Now())
+	d, _ := s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now())
 	if d.Allowed {
 		t.Fatal("access granted before webhook projection")
 	}
@@ -204,7 +207,7 @@ func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 func TestWorkerConvergesOnCurrentState(t *testing.T) {
 	s := testStore(t)
 	g := newFake()
-	svc := NewService(g, s, Config{PriceID: "price_ok", Deployment: "test"})
+	svc := NewService(g, s, Config{Deployment: "test"})
 	ctx := context.Background()
 	maya := user(t, s, "maya")
 	if _, err := s.SaveCustomer(ctx, maya.ID, "cus_maya"); err != nil {
@@ -235,7 +238,7 @@ func TestWorkerConvergesOnCurrentState(t *testing.T) {
 			break
 		}
 	}
-	d, _ := s.Access(ctx, svc.Policy(false), maya, time.Now())
+	d, _ := s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now())
 	if !d.Allowed || d.Reason != billing.ReasonSubscriber {
 		t.Fatalf("replacement hidden by old subscription event: %+v", d)
 	}
@@ -285,7 +288,7 @@ func TestWorkerConvergesOnCurrentState(t *testing.T) {
 			break
 		}
 	}
-	d, _ = s.Access(ctx, svc.Policy(false), maya, time.Now())
+	d, _ = s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now())
 	if d.Allowed {
 		t.Fatalf("canceled subscription still grants access: %+v", d)
 	}

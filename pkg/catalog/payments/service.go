@@ -18,7 +18,6 @@ var (
 )
 
 type Config struct {
-	PriceID    string
 	Livemode   bool
 	Deployment string // stable idempotency namespace
 }
@@ -34,10 +33,6 @@ type Service struct {
 
 func NewService(g Gateway, s *store.Store, cfg Config) *Service {
 	return &Service{Gateway: g, Store: s, Config: cfg, wake: make(chan struct{}, 1)}
-}
-
-func (s *Service) Policy(trial bool) billing.Policy {
-	return billing.Policy{AcceptedPrices: map[string]bool{s.Config.PriceID: true}, TrialAllowed: trial}
 }
 
 func (s *Service) Wake() {
@@ -64,18 +59,19 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 	return s.Store.SaveCustomer(ctx, u.ID, id)
 }
 
-// Checkout returns a hosted Checkout URL for the single configured plan that
-// returns to portal (the origin the user started from). Double clicks and
-// retries resolve to the same admitted attempt/Session, including its return
-// URL.
-func (s *Service) Checkout(ctx context.Context, u store.User, portal string) (string, error) {
+// Checkout returns a hosted Checkout URL for price that returns to portal
+// (the origin the user started from). accepted lists every plan price: an
+// open subscription on any of them sends the user to the billing portal
+// (plan changes happen there) instead of a second subscription. Double
+// clicks and retries resolve to the same admitted attempt/Session.
+func (s *Service) Checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string) (string, error) {
 	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
 		if err != nil {
 			return "", errors.Wrap(err, "refresh subscriptions")
 		}
 		for _, sub := range subs {
-			if sub.PriceID == s.Config.PriceID && billing.OpenStatus(sub.Status) {
+			if accepted[sub.PriceID] && billing.OpenStatus(sub.Status) {
 				_ = s.Store.EnqueueRefresh(ctx, customer, "checkout")
 				s.Wake()
 				return "", ErrSubscriptionOpen
@@ -96,7 +92,7 @@ func (s *Service) Checkout(ctx context.Context, u store.User, portal string) (st
 	// Pending: first try or an uncertain earlier try; the same key returns
 	// the same Session from Stripe.
 	cs, err := s.Gateway.CreateCheckout(ctx, CheckoutRequest{
-		CustomerID: customer, PriceID: s.Config.PriceID, UserID: u.ID, AttemptID: attempt.ID,
+		CustomerID: customer, PriceID: price, UserID: u.ID, AttemptID: attempt.ID,
 		SuccessURL:     portal + "/account?checkout={CHECKOUT_SESSION_ID}",
 		CancelURL:      portal + "/account",
 		IdempotencyKey: s.Config.Deployment + "-checkout-" + attempt.ID,

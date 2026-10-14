@@ -80,7 +80,6 @@ type CatalogServeSettings struct {
 	SignupAllowed      bool     `glazed:"signup-allowed"`
 	StripeKeyFile      string   `glazed:"stripe-secret-key-file"`
 	StripeWebhookFiles []string `glazed:"stripe-webhook-secret-files"`
-	StripePriceID      string   `glazed:"stripe-price-id"`
 	StripeLiveMode     bool     `glazed:"stripe-live-mode"`
 	TrialAllowed       bool     `glazed:"trial-allowed"`
 	GrantTTL           string   `glazed:"grant-ttl"`
@@ -158,7 +157,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -184,14 +183,14 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 				hooks = append(hooks, h)
 			}
 		}
-		if s.StripePriceID == "" || len(hooks) == 0 {
-			return errors.New("Stripe requires --stripe-price-id and at least one --stripe-webhook-secret-files entry")
+		if len(hooks) == 0 {
+			return errors.New("Stripe requires at least one --stripe-webhook-secret-files entry; prices come from the plans in settings")
 		}
 		g, err := payments.NewStripe(key, hooks)
 		if err != nil {
 			return err
 		}
-		pay = payments.NewService(g, db, payments.Config{PriceID: s.StripePriceID, Livemode: s.StripeLiveMode, Deployment: "francois-" + public.Hostname()})
+		pay = payments.NewService(g, db, payments.Config{Livemode: s.StripeLiveMode, Deployment: "francois-" + public.Hostname()})
 	}
 	var backend piworker.Backend = &piworker.Fake{}
 	if s.Backend == "pi" {
@@ -367,6 +366,7 @@ func (c *CatalogUserAction) RunIntoGlazeProcessor(ctx context.Context, p *values
 		Subject string `glazed:"subject"`
 		Days    int    `glazed:"days"`
 		Reason  string `glazed:"reason"`
+		Plan    string `glazed:"plan"`
 	}
 	if err := p.DecodeSectionInto(schema.DefaultSlug, &s); err != nil {
 		return err
@@ -404,7 +404,7 @@ func (c *CatalogUserAction) RunIntoGlazeProcessor(ctx context.Context, p *values
 		if s.Days < 1 || s.Reason == "" {
 			return errors.New("--days and --reason are required")
 		}
-		_, err = db.GrantAccess(ctx, u.ID, u.ID, time.Now().Add(time.Duration(s.Days)*24*time.Hour), s.Reason)
+		_, err = db.GrantAccess(ctx, u.ID, u.ID, time.Now().Add(time.Duration(s.Days)*24*time.Hour), s.Reason, s.Plan)
 	}
 	if err != nil {
 		return err
@@ -480,7 +480,6 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("signup-allowed", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Offer the identity provider's registration form; leave off for invite-only deployments")),
 			fields.New("stripe-secret-key-file", fields.TypeString, fields.WithHelp("Stripe secret key file; billing is disabled when empty")),
 			fields.New("stripe-webhook-secret-files", fields.TypeStringList, fields.WithHelp("Current and previous webhook signing secret files")),
-			fields.New("stripe-price-id", fields.TypeString, fields.WithHelp("Server-controlled recurring Price ID for the subscriber plan")),
 			fields.New("stripe-live-mode", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Expect live-mode keys and events")),
 			fields.New("grant-ttl", fields.TypeString, fields.WithDefault("30m"), fields.WithHelp("Lifetime of instance runtime grants (renewed through the portal)")),
 			fields.New("trial-allowed", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Grant access while a subscription is trialing")),
@@ -515,7 +514,7 @@ func registerCatalog(root *cobra.Command) error {
 		}
 		group.AddCommand(c)
 	}
-	userFlags := withDB(fields.New("user-id", fields.TypeString), fields.New("issuer", fields.TypeString), fields.New("subject", fields.TypeString), fields.New("days", fields.TypeInteger, fields.WithDefault(0)), fields.New("reason", fields.TypeString))
+	userFlags := withDB(fields.New("user-id", fields.TypeString), fields.New("issuer", fields.TypeString), fields.New("subject", fields.TypeString), fields.New("days", fields.TypeInteger, fields.WithDefault(0)), fields.New("reason", fields.TypeString), fields.New("plan", fields.TypeString, fields.WithHelp("grant-access: plan key (default: the highest plan)")))
 	actions := map[string]string{"promote": "Make an exact issuer/subject (or user) an administrator", "disable": "Disable hosted access and revoke runtime grants", "enable": "Re-enable an account", "revoke-sessions": "Revoke portal sessions and runtime grants", "grant-access": "Grant complimentary hosted access for --days"}
 	c, err := cli.BuildCobraCommandFromCommand(list)
 	if err != nil {

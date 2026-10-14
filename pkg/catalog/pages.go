@@ -377,8 +377,8 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	mayDownload := false
-	if p != nil && !p.User.Disabled {
-		if d, err := s.access(ctx, p.User); err == nil && d.Allowed {
+	if p != nil {
+		if e, doc, err := s.entitlement(ctx, p.User); err == nil && e.CanRun(a, doc) {
 			mayDownload = true
 		}
 	}

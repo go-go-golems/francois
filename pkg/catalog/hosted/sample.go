@@ -122,6 +122,19 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 			return
 		}
 	}
+	budget, err := rt.Budget(r.Context(), p.User, p.Instance)
+	if err != nil {
+		failErr(w, err)
+		return
+	}
+	if !budget.Allows(model.Selector) {
+		httpx.Fail(w, 403, "model_not_in_plan", "Model "+model.Selector+" is not included in your plan")
+		return
+	}
+	if budget.Shared && budget.SharedUsed+model.Credits > budget.SharedLimit {
+		httpx.Fail(w, 429, "demo_limit", "Demos have used today's model budget; try again tomorrow")
+		return
+	}
 	req.Options.Model = selector
 	req.MaxRounds = rev.Document.Allowance.MaxToolRounds
 	a := rev.Document.Allowance
@@ -130,7 +143,7 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		return
 	}
 	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, CallID: req.CallID, Model: selector,
-		Credits: model.Credits, Included: a.MonthlyCredits, Daily: a.DailyCredits, SettingsRevision: rev.Revision})
+		Credits: model.Credits, Included: budget.Monthly, Daily: budget.Daily, SettingsRevision: rev.Revision, Period: budget.Period})
 	if err != nil {
 		rt.release(p.User.ID)
 		switch {
