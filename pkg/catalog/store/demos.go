@@ -30,10 +30,10 @@ func (s *Store) CreateGuestSession(ctx context.Context, user string, ttl time.Du
 // ErrDemoCapacity reports that the maximum number of live demos is reached.
 var ErrDemoCapacity = errors.New("demo capacity reached")
 
-// CreateDemo creates a demo instance that expires at expires, unless max
+// CreateDemo creates a demo instance that expires at expires, unless limit
 // live demos already exist (admission is serialized so concurrent visitors
 // cannot exceed it).
-func (s *Store) CreateDemo(ctx context.Context, owner, release, title string, expires time.Time, max int) (Instance, error) {
+func (s *Store) CreateDemo(ctx context.Context, owner, release, title string, expires time.Time, limit int) (Instance, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return Instance{}, err
@@ -46,7 +46,7 @@ func (s *Store) CreateDemo(ctx context.Context, owner, release, title string, ex
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM instances WHERE kind='demo' AND state='active' AND expires_at > now()`).Scan(&live); err != nil {
 		return Instance{}, err
 	}
-	if live >= max {
+	if live >= limit {
 		return Instance{}, ErrDemoCapacity
 	}
 	hex := RandomHex(10)
