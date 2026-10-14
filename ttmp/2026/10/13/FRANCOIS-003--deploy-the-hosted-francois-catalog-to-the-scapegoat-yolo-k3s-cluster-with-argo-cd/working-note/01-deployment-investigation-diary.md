@@ -633,3 +633,92 @@ Outcome: francois `a8200b9` adds `--site <origin>=<app domain>`. The pod (image 
 - k3s #344 (pin) and #345 → `26fb78d`.
 - Terraform PR #34 `5b07f73`.
 - Delegation target: `slop-boutique.acme.scapegoat.dev` (TXT written by cert-manager in the `scapegoat.dev` DigitalOcean zone).
+
+## Step 11: GitHub/Google clients through surf, legal pages, and the sync that never finished
+
+This step makes GitHub and Google sign-in work, which needed real OAuth clients, a published Google consent screen and therefore privacy and terms pages. It also clears an Argo CD deadlock introduced in Step 10: the `slop.boutique` Certificate can only become healthy after the domain owner delegates the ACME challenge, and while it was in sync wave 2 no later revision deployed.
+
+Outcome: GitHub sign-in works in production (the owner signed in as `wesen-github` and landed as admin). Google is configured and published, but no real Google login has been run yet. `/privacy` and `/terms` are live with contact `manuel@scapegoat.dev`. Argo is Synced/Healthy at k3s `3e4a581`; the `slop.boutique` Certificate is out of the kustomization until the CNAME exists.
+
+### Prompt Context
+**User prompts (verbatim):**
+- "The `surf` CLI verb supports github and google commands to configure oauth (create a new google project for slop.boutique). Have them work for both URLs."
+- "try the github again? I unlocked my key" / "ok now github is logged in"
+- "Okk fuck it ~/code/wesen/surf-cli/go you can fix things as you go / add consent screen functionality too. that will be easier"
+- "install the surf binary in case you hadn't"
+- "Write hte two pages and update the google oauth."
+- "i merged, 2. manuel@scapegoat.dev"
+- "i have wesen@ruinwesen.com for github, can you make that an admin?" / "and wesen3000@googlemail.com for google, which you can make invite i guess?"
+- "No need for that top line above the table / form, it overloads the view"
+- "why do we have glm-5.3 so opften here"
+- "you can test locally too"
+- The review comment on k3s #348 (pasted): "Exclude the pending certificate from sync health gating"
+- "do we need the DNS setup for the certificate to become healthy?"
+
+**Assistant interpretation:** Create both OAuth clients with surf (fixing surf where the consoles changed), store secrets in Vault, enable the IdPs in Terraform, invite the two addresses, write the pages Google requires, and unblock deployment.
+
+### What I did
+- **GitHub OAuth app** "slop.boutique", callback `https://zitadel.yolo.scapegoat.dev/idps/callback`, client ID `Ov23liiQNAcZ10sCVkAw`.
+  - The first runs bounced to GitHub's login page (`GITHUB_LOGIN_BOUNCE`): the snap Chromium surf drives was not signed in.
+  - After sign-in the form did not render for surf: GitHub replaced "Authorization callback URL" with a "Redirect URIs" list (`oauth_application_application_callback_urls_attributes_0_url`). Patched, and the app was created (`settings/applications/3930326`).
+  - The confirm step then failed (`expected the GitHub app settings page with a Client ID`): the ID is now in a bare `<code>`. I did not re-run (that would create a second app); I clicked "Generate a new client secret" through `surf js`, read the 40-hex value into a shell variable and piped it to `vault kv put kv/apps/francois/prod/idp-github client_secret=-`.
+  - Check: POST `https://github.com/login/oauth/access_token` with the stored pair and `code=bogus` → `bad_verification_code` (credentials accepted).
+- **Google**, project `slop-boutique`.
+  - `surf google project create --name "slop.boutique"` failed: the console rejects dots in names (`The name has invalid characters`), so the ID control never appeared. Created as `slop-boutique`.
+  - `oauth register` → `GOOGLE_CONSENT_SCREEN_REQUIRED`. I mapped the Auth Platform wizard live and wrote `surf google oauth consent` (wizard, branding, publish).
+  - `oauth register --register` then failed with `TypeError: btn.click is not a function`: `google_oauth_create.js` used `waitForCondition`'s `{value, waitedMs}` as the element, so Create had never been clicked by this verb. Fixed.
+  - The next run created client `380971648284-0n7bvtg3d5fh61dot4nl9e7u17e8otmh.apps.googleusercontent.com` but captured no secret and closed the dialog (gated on the ID only). The client page says "Viewing and downloading client secrets is no longer available", so I clicked "Add secret" and read the new value from the copy button's `aria-label` ("Copy to clipboard: GOCSPX-…") straight into Vault (`…juVa`). The first secret (`…NP-Q`) is unused.
+  - A token-endpoint check is inconclusive: both the real and a wrong secret return `invalid_request` ("doesn't comply with Google's OAuth 2.0 policy").
+- **surf** (wesen/surf-cli #16, merged; binary installed to `~/.local/bin/surf`, previous one at `scratchpad/surf.previous`):
+  - GitHub layout fixes;
+  - Google create `.value` fix and secret capture from copy buttons, with the dialog closed only when ID and secret were both captured;
+  - project-name validation;
+  - new `google oauth consent`.
+  - Verified end to end on throwaway project `surf-consent-test-1013` (wizard → branding → publish → register with secret captured), then shut it down.
+- **Consent screen for `slop-boutique`:**
+  - app name `slop.boutique`, External;
+  - authorized domains `slop.boutique` and `scapegoat.dev`;
+  - home page `https://slop.boutique`;
+  - privacy and terms links `https://slop.boutique/privacy` and `/terms`;
+  - published ("In production").
+- **Terraform** `6efd957`: the two client IDs as variable defaults. The owner ran the apply (2 added, 1 changed); a re-plan shows no changes. ZITADEL's login page now offers GitHub and Google.
+- **Legal pages** (francois `31043b3`): `GET /privacy` and `GET /terms`.
+  - Rendered with `html/template` from `web/legal.tmpl`, named after the request's site.
+  - `--legal-contact` sets the contact address, and the portal footer links both pages.
+  - The privacy text follows what the code stores; for example, `model_calls` has no prompt column.
+- **Users** via ZITADEL `POST /v2/users/human` in org `394966170567966836`, verified email, no password:
+  - `wesen3000@googlemail.com` → `395006651859468306`;
+  - `wesen@ruinwesen.com` already existed as a user in org `383503427226894574`, and usernames are instance-unique (`User already exists (V3-DKcYh)`), so the Francois user is `wesen-github` (`395006686605082642`).
+  - `francois catalog users promote --issuer … --subject 395006686605082642` pre-provisioned it as admin (`usr_86747f0cdcf18ed0caa14249`).
+- **Model list** (`67dbfc7`): the worker emits its local quick/default/complex tier models before the catalog, so `lunaroute/glm-5.3` appeared four times in admin settings. `uniqueModels` keeps one entry per selector. I verified it locally with my build in place of the Compose `francois` container, using the LunaRoute Pi config from Vault in a 0700 scratch directory (deleted afterwards): 14 rows, no duplicates.
+- **CSS** (`750f359`): a list or table opening a ruled row no longer draws its own ink top border.
+- **The stalled sync.**
+  - `status.operationState` showed the #345 operation (revision `26fb78d`) running since 22:20 with `waiting for healthy state of cert-manager.io/Certificate/francois-slop-boutique-tls`, so #346 and #347 were merged but not deployed (`/privacy` returned 404).
+  - First fix (#348 v1): move the Certificate to wave 4. The review pointed out that Argo also waits for the last wave.
+  - #348 v2 (`0d67872`): omit the file from `kustomization.yaml` until the CNAME exists; `scripts/validate_gitops.sh` passed.
+  - After the merge, I ended the operation with `kubectl -n argocd patch app francois --type merge -p '{"status":{"operationState":{"phase":"Terminating"}}}'`. The automated restart picked revision `6150625` (#347, which still contained the Certificate), so I deleted the Certificate and terminated once more. Revision `3e4a581` then synced: `successfully synced (all tasks run)`.
+  - Two leftover challenges were owned by the ClusterIssuer, so garbage collection never removed them. One kept `acme.cert-manager.io/finalizer` after deletion; no TXT record had ever been presented, so I removed the finalizer.
+
+### Why
+- One callback (`/idps/callback`) per provider is enough for all sites: GitHub and Google return to ZITADEL, and ZITADEL returns to whichever portal started the flow.
+- Publishing a Google app with only `openid email profile` needs no verification, but it requires the home page, privacy policy and terms links. "Testing" admits only listed test users.
+- A Certificate whose challenge depends on a third party's DNS has no bounded time to become healthy, so it cannot be part of an Argo wave of a production application.
+
+### What worked
+- Secrets never appeared in output. Every secret went from a shell variable to `vault kv put … client_secret=-`, and only prefixes or suffixes were printed.
+- The wizard script, run on a throwaway project, produced the same configuration as the manual exploration.
+
+### What didn't work
+- `terraform apply` for the agent was refused: `[Protected-Scope IaC Apply]`. The owner ran it with `!`; without `-auto-approve` it failed with `error asking for approval: EOF`, because `!` provides no stdin.
+- `pkill -f "http.server 18777"` and `pgrep -f "localpi/francois catalog serve"` matched their own shell's command line and killed it (exit 144). Kill by PID or task instead.
+- `gh pr edit` failed with `GraphQL: Projects (classic) is being deprecated…`; `gh api -X PATCH repos/…/pulls/348` worked.
+
+### What I learned
+- Argo CD waits for health in every wave of a sync, the last one included, and pruning happens after that. A resource that can stay Progressing indefinitely blocks the operation and, with it, every later automated sync.
+- When an operation is terminated, auto-sync restarts on the revision Argo last fetched, which can be older than the newest merge.
+- cert-manager challenges created with `cnameStrategy: Follow` before the CNAME existed carried an owner reference to the ClusterIssuer, so deleting the Certificate did not remove them.
+
+### What should be done in the future
+- Re-add `certificate-slop-boutique.yaml` to the kustomization once `dig CNAME _acme-challenge.slop.boutique` answers; then the owner switches `@` and `*`, and a browser run on `slop.boutique` follows.
+- Run a real Google sign-in; then disable and delete the unused Google secret `…NP-Q`.
+- Merge k3s #350 (`sha-67dbfc7`) and close #349. Then check the admin model settings: `glm-5.3` may have been reset to 1 credit and removed from the default/complex tiers by the linked rows.

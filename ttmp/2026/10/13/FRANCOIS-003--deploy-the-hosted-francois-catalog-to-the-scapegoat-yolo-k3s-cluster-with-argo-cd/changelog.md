@@ -35,3 +35,7 @@ Second site slop.boutique: catalog serve --site (a8200b9), follow-CNAME DNS-01 i
 ## 2026-10-13
 
 ZITADEL alias URIs for slop.boutique applied by the user (re-plan: no changes); authorize with redirect_uri=https://slop.boutique/auth/callback reaches the login UI
+
+## 2026-10-13
+
+GitHub/Google IdPs live (surf-created clients, consent published, terraform 6efd957 applied by owner); /privacy and /terms (31043b3); admin model dedupe (67dbfc7); Argo deadlock on the slop.boutique Certificate cleared (k3s #348, 3e4a581)
