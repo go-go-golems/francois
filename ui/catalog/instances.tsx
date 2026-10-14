@@ -138,7 +138,7 @@ export function Launcher({ id }: { id: string }) {
         <div className="v-title">
           <strong>{inst.title}</strong>
           <span className="v-desc">
-            {inst.artifactId} v{inst.version} · {inst.kind === "preview" ? "admin preview" : inst.role} · <span className="mono">{inst.origin.replace(/^https?:\/\//, "")}</span>
+            {inst.artifactId} v{inst.version} · {inst.kind === "preview" ? "draft preview" : inst.role} · <span className="mono">{inst.origin.replace(/^https?:\/\//, "")}</span>
           </span>
         </div>
         <div className="v-actions">

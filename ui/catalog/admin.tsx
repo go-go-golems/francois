@@ -2,11 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, Check, errorMessage, Release, SettingsDoc } from "./api";
 import { navigate, show } from "./store";
-import { bytes, date, datetime, Empty, Line, Link, reasonLabel, Row, short, useRoute } from "./ui";
+import { bytes, date, datetime, Empty, Line, Link, reasonLabel, Row, short, useAct, useRoute } from "./ui";
 
 const sections: [string, string][] = [
   ["", "Overview"],
-  ["releases", "Releases"],
   ["users", "Users"],
   ["instances", "Instances"],
   ["billing", "Billing"],
@@ -14,20 +13,6 @@ const sections: [string, string][] = [
   ["settings", "Settings"],
   ["audit", "Audit"],
 ];
-
-function useAct() {
-  const dispatch = useDispatch();
-  return async <T,>(p: Promise<T>, ok?: string): Promise<T | undefined> => {
-    try {
-      const v = await p;
-      if (ok) dispatch(show({ text: ok }));
-      return v;
-    } catch (e) {
-      dispatch(show({ text: errorMessage(e), bad: true }));
-      return undefined;
-    }
-  };
-}
 
 export function Admin() {
   const { data: session } = api.useSessionQuery();
@@ -55,7 +40,6 @@ export function Admin() {
         ))}
       </nav>
       {section === "" && <Overview />}
-      {section === "releases" && <Releases />}
       {section === "users" && (id ? <UserDetail id={id} /> : <Users />)}
       {section === "instances" && (id ? <InstanceDetail id={id} /> : <AdminInstances />)}
       {section === "billing" && <Billing />}
@@ -110,262 +94,10 @@ function Overview() {
         ]}
       />
       <p className="stats-note muted">
-        Publish from <Link className="u" to="/admin/releases">Releases</Link>, approve models and allowances in{" "}
+        Publish from the <Link className="u" to="/studio">Studio</Link>, approve models and allowances in{" "}
         <Link className="u" to="/admin/settings">Settings</Link>.
       </p>
     </section>
-  );
-}
-
-const emptyForm = { artifactId: "", title: "", description: "", tags: "", version: "", changelog: "", manifest: '{\n  "sample": {},\n  "db": {},\n  "user": {"scopes": ["profile"]},\n  "room": {}\n}', freeSample: false };
-
-function Releases() {
-  const { data, isLoading } = api.useAdminReleasesQuery();
-  const [check, { isLoading: checking }] = api.useCheckUploadMutation();
-  const [upload, { isLoading: uploading }] = api.useUploadReleaseMutation();
-  const [publish] = api.usePublishReleaseMutation();
-  const [withdraw] = api.useWithdrawReleaseMutation();
-  const [del] = api.useDeleteDraftMutation();
-  const [preview] = api.usePreviewReleaseMutation();
-  const [update] = api.useUpdateArtifactMutation();
-  const [file, setFile] = useState<File>();
-  const [over, setOver] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [checks, setChecks] = useState<Check[] | null>(null);
-  const [q, setQ] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  const act = useAct();
-  const dispatch = useDispatch();
-  const set = (k: keyof typeof form, v: string | boolean) => {
-    setForm({ ...form, [k]: v });
-    setChecks(null);
-  };
-  const choose = (f?: File) => {
-    if (!f) return;
-    setFile(f);
-    setChecks(null);
-    const base = f.name.replace(/\.html?$/i, "");
-    const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const existing = data?.artifacts.find((a: any) => a.id === slug);
-    setForm((cur) => ({
-      ...cur,
-      artifactId: cur.artifactId || slug,
-      title: cur.title || existing?.title || base,
-      description: cur.description || existing?.description || "",
-      tags: cur.tags || (existing?.tags ?? []).join(", "),
-    }));
-  };
-  const formData = () => {
-    const fd = new FormData();
-    if (file) fd.set("html", file);
-    fd.set("artifactId", form.artifactId);
-    fd.set("title", form.title);
-    fd.set("description", form.description);
-    fd.set("tags", form.tags);
-    fd.set("version", form.version);
-    fd.set("changelog", form.changelog);
-    fd.set("manifestJson", form.manifest);
-    fd.set("freeSample", String(form.freeSample));
-    return fd;
-  };
-  const runCheck = async () => {
-    const r = await act(check(formData()).unwrap());
-    if (r) setChecks(r.checks);
-  };
-  const save = async () => {
-    try {
-      const rel = await upload(formData()).unwrap();
-      setChecks(rel.checks ?? []);
-      dispatch(show({ text: `Draft ${rel.artifactId} v${rel.version} saved. Preview it, then publish.` }));
-      setFile(undefined);
-      setForm(emptyForm);
-    } catch (e: any) {
-      if (e?.data?.checks) setChecks(e.data.checks);
-      dispatch(show({ text: errorMessage(e), bad: true }));
-    }
-  };
-  const openPreview = async (r: Release) => {
-    const inst = await act(preview(r.id).unwrap());
-    if (inst) navigate("/instances/" + inst.id);
-  };
-  const releases = (data?.releases ?? []).filter((r) => !q || r.artifactId.includes(q) || r.version.includes(q));
-  const artifacts = new Map<string, any>((data?.artifacts ?? []).map((a: any) => [a.id, a]));
-  return (
-    <>
-      <section className="publish">
-        <div className="publish-left">
-          <h1 className="h-display">Publish</h1>
-          <div
-            className={"drop" + (over ? " is-over" : "")}
-            role="button"
-            tabIndex={0}
-            onClick={() => input.current?.click()}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setOver(false);
-              choose(e.dataTransfer.files[0]);
-            }}
-          >
-            <span className="drop-icon">↥</span>
-            <span>{file ? file.name : "Drop an HTML file, or click to choose"}</span>
-            <span className="muted small">{file ? bytes(file.size) : "single-file application, authored source"}</span>
-            <input ref={input} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => choose(e.target.files?.[0])} />
-          </div>
-          <p className="muted small">
-            Upload creates a <em>draft</em>. Nobody sees it until you preview it on an isolated origin and publish. Published files are immutable; corrections
-            are new versions.
-          </p>
-          {checks && (
-            <div className="queue">
-              {checks.length === 0 && <div className="qrow"><span className="qname">No findings.</span></div>}
-              {checks.map((c, i) => (
-                <div className="qrow" key={i}>
-                  <span className={"qstatus " + (c.level === "error" ? "warn" : "")}>{c.level}</span>
-                  <span className="qname">{c.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <form
-          className="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="r-title">Title</label>
-              <input id="r-title" required value={form.title} onChange={(e) => set("title", e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="r-version">Version</label>
-              <input id="r-version" className="slug" required placeholder="1.0.0" value={form.version} onChange={(e) => set("version", e.target.value)} />
-            </div>
-          </div>
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="r-id">Application ID</label>
-              <input id="r-id" className="slug" required pattern="[a-z0-9][a-z0-9_\-]*" value={form.artifactId} onChange={(e) => set("artifactId", e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="r-tags">Tags</label>
-              <input id="r-tags" placeholder="ide, 3d, agent" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="r-desc">Description</label>
-            <input id="r-desc" value={form.description} onChange={(e) => set("description", e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="r-notes">Release notes</label>
-            <textarea id="r-notes" rows={3} value={form.changelog} onChange={(e) => set("changelog", e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="r-manifest">Capabilities manifest</label>
-            <textarea id="r-manifest" className="slug" rows={7} spellCheck={false} value={form.manifest} onChange={(e) => set("manifest", e.target.value)} />
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={form.freeSample} onChange={(e) => set("freeSample", e.target.checked)} /> Free sample (downloadable without a
-            subscription)
-          </label>
-          <div className="form-foot">
-            <button type="button" className="btn btn-soft" disabled={!file || checking} onClick={runCheck}>
-              {checking ? "Checking…" : "Check"}
-            </button>
-            <button className="btn btn-ink" disabled={!file || uploading}>
-              {uploading ? "Saving…" : "Save draft"}
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="library">
-        <div className="lib-head">
-          <h2>Releases</h2>
-          <div className="lib-search">
-            <input placeholder="filter …" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter releases" />
-          </div>
-        </div>
-        {isLoading ? (
-          <Empty>Loading…</Empty>
-        ) : releases.length === 0 ? (
-          <Empty>No releases yet.</Empty>
-        ) : (
-          <div className="lib-list">
-            {releases.map((r) => {
-              const html = r.files.find((f) => f.role === "html");
-              const a = artifacts.get(r.artifactId);
-              return (
-                <div className={"lib-row" + (r.state === "withdrawn" || a?.visibility === "hidden" ? " is-unlisted" : "")} key={r.id}>
-                  <div className="lib-thumb mono-mini">{r.artifactId.slice(0, 2).toUpperCase()}</div>
-                  <div className="lib-main">
-                    <strong>
-                      {a?.title ?? r.artifactId} <span className="muted">v{r.version}</span>
-                    </strong>
-                    <span className="muted small">
-                      {r.artifactId} · {r.capabilities.join(" · ")}
-                      {r.freeSample ? " · free sample" : ""}
-                      {a?.visibility === "hidden" ? " · hidden" : ""}
-                    </span>
-                  </div>
-                  <span className="lib-size">{html ? bytes(html.size) : ""}</span>
-                  <span className="lib-added">{date(r.publishedAt ?? r.createdAt)}</span>
-                  <span className={"lib-status" + (r.state === "published" ? " on" : r.state === "withdrawn" ? " bad" : "")}>
-                    {r.state}
-                    {r.pinnedInstances ? ` · ${r.pinnedInstances} pinned` : ""}
-                  </span>
-                  <div className="lib-actions">
-                    <button className="btn btn-soft" onClick={() => openPreview(r)}>
-                      Preview
-                    </button>
-                    {r.state === "draft" && (
-                      <>
-                        <button className="btn btn-ink" onClick={() => act(publish(r.id).unwrap(), `Published ${r.artifactId} v${r.version}`)}>
-                          Publish
-                        </button>
-                        <button className="btn btn-soft" onClick={() => confirm("Delete this draft?") && act(del(r.id).unwrap(), "Draft deleted")}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                    {r.state === "published" && (
-                      <button
-                        className="btn btn-soft"
-                        onClick={() => {
-                          const n = r.pinnedInstances ?? 0;
-                          if (!confirm(`Withdraw ${r.artifactId} v${r.version} from the catalog?`)) return;
-                          const suspend = n > 0 && confirm(`${n} instance(s) are pinned to this release. Suspend them too? (Cancel keeps them running.)`);
-                          void act(withdraw({ id: r.id, suspendPinned: suspend }).unwrap(), "Release withdrawn");
-                        }}
-                      >
-                        Withdraw
-                      </button>
-                    )}
-                    {a && (
-                      <button
-                        className="btn btn-soft"
-                        onClick={() =>
-                          act(update({ id: a.id, visibility: a.visibility === "listed" ? "hidden" : "listed" }).unwrap(), a.visibility === "listed" ? "Hidden from catalog" : "Listed in catalog")
-                        }
-                      >
-                        {a.visibility === "listed" ? "Hide" : "List"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </>
   );
 }
 
@@ -467,9 +199,17 @@ function UserDetail({ id }: { id: string }) {
           ))}
         </div>
         <div className="actions">
-          <button className="btn btn-soft" disabled={self} onClick={() => act(patch({ id, role: u.role === "admin" ? "subscriber" : "admin" }).unwrap(), "Role updated")}>
-            {u.role === "admin" ? "Remove admin role" : "Make admin"}
-          </button>
+          <select
+            className="btn btn-soft"
+            aria-label="Role"
+            disabled={self}
+            value={u.role}
+            onChange={(e) => act(patch({ id, role: e.target.value }).unwrap(), "Role updated")}
+          >
+            <option value="subscriber">Subscriber</option>
+            <option value="creator">Creator (studio)</option>
+            <option value="admin">Administrator</option>
+          </select>
           <button className="btn btn-soft" disabled={self} onClick={() => confirm(u.disabled ? "Re-enable this account?" : "Disable hosted access, downloads and runtime grants?") && act(patch({ id, disabled: !u.disabled }).unwrap(), u.disabled ? "Account enabled" : "Account disabled")}>
             {u.disabled ? "Enable" : "Disable"}
           </button>
