@@ -14,7 +14,7 @@ import (
 func (s *Server) instanceJSON(r *http.Request, i store.Instance) map[string]any {
 	return map[string]any{"id": i.ID, "title": i.Title, "kind": i.Kind, "state": i.State, "role": i.Role, "artifactId": i.ArtifactID, "version": i.Version,
 		"releaseId": i.ReleaseID, "ownerName": i.OwnerName, "ownerUserId": i.OwnerUserID, "members": i.Members, "origin": s.site(r).AppOrigin(i.Hostname),
-		"createdAt": i.CreatedAt, "updatedAt": i.UpdatedAt}
+		"createdAt": i.CreatedAt, "updatedAt": i.UpdatedAt, "expiresAt": i.ExpiresAt}
 }
 
 func (s *Server) instances(w http.ResponseWriter, r *http.Request) {

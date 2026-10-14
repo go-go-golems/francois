@@ -1,0 +1,170 @@
+package catalog
+
+import (
+	"context"
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/go-go-golems/francois/pkg/catalog/httpx"
+	"github.com/go-go-golems/francois/pkg/catalog/store"
+	"github.com/pkg/errors"
+)
+
+// Visitor demos: a short-lived instance of an artifact's latest release for
+// someone who has no account (or no plan). The visitor gets a guest account
+// and a portal session bounded by the demo lifetime, then launches the
+// instance through the normal launch handshake. authorizeInstance admits a
+// demo only for its owner and only until it expires; model calls draw on a
+// per-demo ledger and a shared daily budget (Server.budget).
+
+// demoKeep is how long expired demos are kept (suspended) before deletion,
+// so the daily budget and usage reports can still see their calls.
+const demoKeep = 7 * 24 * time.Hour
+
+// limiter is a per-key sliding-window counter.
+type limiter struct {
+	mu   sync.Mutex
+	hits map[string][]time.Time
+}
+
+func newLimiter() *limiter { return &limiter{hits: map[string][]time.Time{}} }
+
+// allow records a hit for key and reports whether it is within max hits per
+// window.
+func (l *limiter) allow(key string, max int, window time.Duration, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	cut := now.Add(-window)
+	kept := l.hits[key][:0]
+	for _, t := range l.hits[key] {
+		if t.After(cut) {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= max {
+		l.hits[key] = kept
+		return false
+	}
+	l.hits[key] = append(kept, now)
+	// Bound memory: forget idle keys occasionally.
+	if len(l.hits) > 10000 {
+		for k, v := range l.hits {
+			if len(v) == 0 || v[len(v)-1].Before(cut) {
+				delete(l.hits, k)
+			}
+		}
+	}
+	return true
+}
+
+// clientAddress is the visitor's address: the reverse proxy's X-Real-Ip
+// (or first X-Forwarded-For hop) when the deployment trusts proxy headers,
+// otherwise the connection's remote address.
+func (s *Server) clientAddress(r *http.Request) string {
+	if s.Config.TrustProxyHeaders {
+		if ip := strings.TrimSpace(r.Header.Get("X-Real-Ip")); ip != "" {
+			return ip
+		}
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			return strings.TrimSpace(strings.Split(fwd, ",")[0])
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (s *Server) createDemo(w http.ResponseWriter, r *http.Request) {
+	// Public endpoint that creates state and may set a cookie: refuse
+	// cross-site requests explicitly (guard checks Origin only for
+	// session-level routes).
+	if !s.sameOrigin(r) {
+		httpx.Fail(w, 403, "invalid_origin", "Cross-origin request rejected")
+		return
+	}
+	var in struct {
+		ArtifactID string `json:"artifactId"`
+	}
+	if err := httpx.Read(w, r, &in, 1024); err != nil || in.ArtifactID == "" {
+		httpx.Fail(w, 400, "invalid_request", "An artifact is required")
+		return
+	}
+	ctx := r.Context()
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Demos are unavailable")
+		return
+	}
+	cfg := rev.Document.Demo
+	a, err := s.Store.Artifact(ctx, in.ArtifactID)
+	if err != nil || !cfg.Enabled || !a.DemoEnabled || a.Visibility != "listed" {
+		httpx.Fail(w, 403, "demo_disabled", "There is no demo for this application")
+		return
+	}
+	rels, err := s.Store.Releases(ctx, a.ID, "published")
+	if err != nil || len(rels) == 0 {
+		httpx.Fail(w, 403, "demo_disabled", "There is no demo for this application")
+		return
+	}
+	p := principal(ctx)
+	if p != nil && p.User.Disabled {
+		httpx.Fail(w, 403, "account_disabled", "This account is disabled")
+		return
+	}
+	if !s.demoLimiter.allow(s.clientAddress(r), cfg.PerAddressPerHour, time.Hour, time.Now()) {
+		httpx.Fail(w, 429, "rate_limited", "Too many demos from your network; try again later")
+		return
+	}
+	ttl := time.Duration(cfg.TTLMinutes) * time.Minute
+	var owner store.User
+	if p != nil {
+		owner = p.User
+	} else {
+		if owner, err = s.Store.CreateGuest(ctx); err != nil {
+			httpx.Fail(w, 503, "unavailable", "Could not start the demo")
+			return
+		}
+		token, _, err := s.Store.CreateGuestSession(ctx, owner.ID, ttl)
+		if err != nil {
+			httpx.Fail(w, 503, "unavailable", "Could not start the demo")
+			return
+		}
+		s.setCookie(w, s.sessionCookie(), token, int(ttl.Seconds()))
+	}
+	inst, err := s.Store.CreateDemo(ctx, owner.ID, rels[0].ID, "Demo · "+a.Title, time.Now().Add(ttl), cfg.MaxActive)
+	if errors.Is(err, store.ErrDemoCapacity) {
+		httpx.Fail(w, 429, "demo_limit", "All demo slots are in use; try again in a few minutes")
+		return
+	}
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Could not start the demo")
+		return
+	}
+	log.Info().Str("artifact", a.ID).Str("instance", inst.ID).Bool("guest", p == nil).Msg("Demo started")
+	httpx.JSON(w, 201, map[string]any{"id": inst.ID, "expiresAt": inst.ExpiresAt})
+}
+
+// expireDemos runs until ctx ends, suspending expired demos every minute.
+func (s *Server) expireDemos(ctx context.Context) error {
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		ids, err := s.Store.ExpireDemos(ctx, demoKeep)
+		if err != nil && ctx.Err() == nil {
+			log.Warn().Err(err).Msg("Expire demos")
+		}
+		for _, id := range ids {
+			s.Runtime.RevokeInstance(id)
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tick.C:
+		}
+	}
+}
