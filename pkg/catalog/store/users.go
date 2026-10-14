@@ -83,8 +83,9 @@ ORDER BY created_at DESC LIMIT $2`, search, limit)
 }
 
 func (s *Store) SetUserRole(ctx context.Context, id, role string) error {
-	if role != "subscriber" && role != "admin" {
-		return errors.New("role must be subscriber or admin")
+	// guest is assigned only by the server to demo visitors.
+	if role != "subscriber" && role != "creator" && role != "admin" {
+		return errors.New("role must be subscriber, creator or admin")
 	}
 	tag, err := s.Pool.Exec(ctx, `UPDATE users SET role=$2 WHERE id=$1`, id, role)
 	if err == nil && tag.RowsAffected() == 0 {

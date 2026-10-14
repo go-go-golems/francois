@@ -37,6 +37,14 @@ await build({
   legalComments: "eof",
 });
 await build({
+  entryPoints: ["ui/catalog/public.ts"],
+  bundle: true,
+  outfile: "pkg/catalog/web/static/public.js",
+  format: "iife",
+  minify: true,
+  legalComments: "eof",
+});
+await build({
   entryPoints: ["ui/catalog/launch.ts"],
   bundle: true,
   outfile: "pkg/catalog/web/static/launch.js",

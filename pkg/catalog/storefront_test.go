@@ -1,8 +1,13 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/png"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/go-go-golems/francois/pkg/catalog/releases"
@@ -141,4 +146,154 @@ const testHTML = `<!doctype html><html><head><title>Board</title></head><body>bo
 // uploadOf is a minimal valid release upload.
 func uploadOf(artifact, title, version string) releases.Upload {
 	return releases.Upload{ArtifactID: artifact, Title: title, Version: version, HTML: []byte(testHTML), Manifest: []byte(`{"sample":{}}`), MaxHTML: 1 << 20}
+}
+
+// TestStorefrontPages covers the server-rendered public pages and media.
+func TestStorefrontPages(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	st := e.store
+	admin := e.user("ada", "admin", false)
+	cleo := e.user("cleo", "creator", false)
+	sub := e.user("sam", "subscriber", true)
+	get := func(a *tactor, path string) (int, string, http.Header) {
+		code, b, h := e.do(a, "portal.test", "GET", path, nil, nil)
+		return code, string(b), h
+	}
+
+	code, rel := e.upload(admin, testHTML)
+	if code != 201 {
+		t.Fatalf("upload %d %v", code, rel)
+	}
+	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
+		t.Fatalf("publish %d %v", code, out)
+	}
+	png := tinyPNG(t)
+	key, sum, err := e.srv.Publisher.Blobs.Put(png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cover, _ := st.CreateMedia(ctx, store.Media{SHA256: sum, StorageKey: key, MediaType: "image/png", Size: int64(len(png)), Width: 2, Height: 2, Alt: "the board", UploadedBy: admin.user.ID})
+	a, _ := st.Artifact(ctx, "board")
+	a.Description, a.Tags, a.Featured = "A shared board.", []string{"tools"}, true
+	_, _ = st.UpdateArtifact(ctx, a)
+	_ = st.SavePageDraft(ctx, "board", store.Page{Body: "## Published body\n\n<script>alert(1)</script>", Cover: cover.ID})
+	_ = st.PublishPageDraft(ctx, "board")
+	_ = st.SavePageDraft(ctx, "board", store.Page{Body: "## Draft body"})
+	c, _ := st.CreateCreator(ctx, store.Creator{Slug: "cleo", Name: "Cleo Maker", Bio: "Makes *boards*.", UserID: cleo.user.ID})
+	_ = st.SetArtifactCreators(ctx, "board", []string{c.ID})
+
+	// Home, catalog, tag filter.
+	if code, b, h := get(nil, "/"); code != 200 || !strings.Contains(b, "Board") || !strings.Contains(b, "Cleo Maker") || h.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("home %d %s", code, b)
+	}
+	if code, b, _ := get(nil, "/apps?tag=tools"); code != 200 || !strings.Contains(b, `href="/apps/board"`) || !strings.Contains(b, `/media/`+cover.ID) {
+		t.Fatalf("catalog %d %s", code, b)
+	}
+	if _, b, _ := get(nil, "/apps?tag=none"); strings.Contains(b, `href="/apps/board"`) {
+		t.Fatal("tag filter ignored")
+	}
+
+	// Artifact page: write-up rendered without raw HTML, OG tags, credits.
+	code, b, h := get(nil, "/apps/board")
+	if code != 200 || !strings.Contains(b, `<h2 id="published-body">Published body</h2>`) || strings.Contains(b, "<script>alert") ||
+		!strings.Contains(b, `og:image" content="http://portal.test/media/`+cover.ID) || !strings.Contains(b, `href="/creators/cleo"`) || strings.Contains(b, "Draft body") {
+		t.Fatalf("artifact page %d %s", code, b)
+	}
+	if !strings.Contains(h.Get("Content-Security-Policy"), "media-src 'self'") {
+		t.Fatalf("CSP %q", h.Get("Content-Security-Policy"))
+	}
+	// Downloads are offered to entitled users only.
+	if strings.Contains(b, "Download HTML") {
+		t.Fatal("download offered anonymously")
+	}
+	if _, b, _ = get(&sub, "/apps/board"); !strings.Contains(b, "Download HTML") || !strings.Contains(b, "data-signout") {
+		t.Fatal("subscriber page misses download or sign-out")
+	}
+
+	// Draft preview only for editors: admin and the credited creator.
+	for _, who := range []*tactor{nil, &sub} {
+		if _, b, _ = get(who, "/apps/board?draft=1"); strings.Contains(b, "Draft body") || strings.Contains(b, "Draft preview") {
+			t.Fatalf("draft leaked to non-editor: %s", b)
+		}
+	}
+	for _, who := range []*tactor{&admin, &cleo} {
+		if _, b, _ = get(who, "/apps/board?draft=1"); !strings.Contains(b, "Draft body") || !strings.Contains(b, "Draft preview") {
+			t.Fatalf("editor draft preview: %s", b)
+		}
+	}
+
+	// Hidden or unpublished artifacts are not found, except as an editor's draft.
+	a, _ = st.Artifact(ctx, "board")
+	a.Visibility = "hidden"
+	_, _ = st.UpdateArtifact(ctx, a)
+	if code, _, _ = get(nil, "/apps/board"); code != 404 {
+		t.Fatalf("hidden artifact %d", code)
+	}
+	if code, _, _ = get(&cleo, "/apps/board?draft=1"); code != 200 {
+		t.Fatalf("hidden artifact draft for editor %d", code)
+	}
+	_, _ = st.CreateArtifact(ctx, store.Artifact{ID: "unreleased", Title: "Unreleased"})
+	if code, _, _ = get(nil, "/apps/unreleased"); code != 404 {
+		t.Fatalf("unpublished artifact %d", code)
+	}
+	if code, _, _ = get(nil, "/apps/missing"); code != 404 {
+		t.Fatalf("missing artifact %d", code)
+	}
+
+	// Creator page lists only listed artifacts.
+	if code, b, _ = get(nil, "/creators/cleo"); code != 200 || !strings.Contains(b, "<em>boards</em>") || strings.Contains(b, `href="/apps/board"`) {
+		t.Fatalf("creator page %d %s", code, b)
+	}
+	if code, _, _ = get(nil, "/creators/nobody"); code != 404 {
+		t.Fatalf("unknown creator %d", code)
+	}
+
+	// Journal: drafts are visible to their author only; the feed lists published posts.
+	post, _ := st.CreatePost(ctx, store.Post{Slug: "first", Title: "First notes", Summary: "How it started", Body: "Hello **world**", AuthorID: c.ID, CreatedBy: cleo.user.ID})
+	if code, _, _ = get(nil, "/journal/first"); code != 404 {
+		t.Fatalf("draft post public %d", code)
+	}
+	if code, b, _ = get(&cleo, "/journal/first"); code != 200 || !strings.Contains(b, "Draft preview") {
+		t.Fatalf("draft post for author %d", code)
+	}
+	if _, b, _ = get(nil, "/journal/feed.xml"); strings.Contains(b, "First notes") {
+		t.Fatal("draft in feed")
+	}
+	_, _ = st.SetPostState(ctx, post.ID, "published")
+	if code, b, _ = get(nil, "/journal/first"); code != 200 || !strings.Contains(b, "<strong>world</strong>") || !strings.Contains(b, `href="/creators/cleo"`) {
+		t.Fatalf("published post %d %s", code, b)
+	}
+	if code, b, h = get(nil, "/journal/feed.xml"); code != 200 || !strings.Contains(b, "<link>http://portal.test/journal/first</link>") || !strings.HasPrefix(h.Get("Content-Type"), "application/rss+xml") {
+		t.Fatalf("feed %d %s", code, b)
+	}
+	if _, b, _ = get(nil, "/journal"); !strings.Contains(b, "First notes") {
+		t.Fatal("journal index misses post")
+	}
+
+	// Media: exact bytes, sandboxed, cacheable, ranges.
+	code, b, h = get(nil, "/media/"+cover.ID)
+	if code != 200 || b != string(png) || h.Get("Content-Type") != "image/png" || !strings.Contains(h.Get("Content-Security-Policy"), "sandbox") ||
+		!strings.Contains(h.Get("Cache-Control"), "immutable") || h.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("media %d %v", code, h)
+	}
+	if code, _, _ = e.do(nil, "portal.test", "GET", "/media/"+cover.ID, nil, map[string]string{"Range": "bytes=0-3"}); code != 206 {
+		t.Fatalf("media range %d", code)
+	}
+	if code, _, _ = get(nil, "/media/med_missing"); code != 404 {
+		t.Fatalf("missing media %d", code)
+	}
+
+	// SPA routes still return the shell.
+	if code, b, _ = get(nil, "/studio"); code != 200 || !strings.Contains(b, `id="root"`) {
+		t.Fatalf("studio shell %d", code)
+	}
+}
+
+func tinyPNG(t *testing.T) []byte {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }

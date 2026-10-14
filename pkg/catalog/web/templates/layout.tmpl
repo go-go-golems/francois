@@ -1,0 +1,79 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{if .Title}}{{.Title}} · {{end}}{{.Brand}}</title>
+{{if .Description}}<meta name="description" content="{{.Description}}">{{end}}
+<meta property="og:site_name" content="{{.Brand}}">
+<meta property="og:title" content="{{if .Title}}{{.Title}}{{else}}{{.Brand}}{{end}}">
+{{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
+<meta property="og:url" content="{{.Canonical}}">
+{{if .Image}}<meta property="og:image" content="{{.Image}}"><meta name="twitter:card" content="summary_large_image">{{end}}
+<link rel="canonical" href="{{.Canonical}}">
+<link rel="icon" href="/static/icon.svg">
+<link rel="alternate" type="application/rss+xml" title="{{.Brand}} journal" href="/journal/feed.xml">
+<link rel="stylesheet" href="/static/catalog.css">
+<script src="/static/public.js" defer></script>
+</head>
+<body>
+<header class="bar"><div class="page bar-inner">
+<a class="brand" href="/" title="{{.Brand}}"><svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" fill="#111"/><rect x="9" y="7" width="5" height="18" fill="#fff"/><rect x="9" y="7" width="14" height="5" fill="#fff"/><rect x="9" y="15" width="10" height="4" fill="#fff"/></svg></a>
+<div class="addr"><a class="addr-host" href="/">{{.Brand}}/</a><span class="addr-path">{{.Crumb}}</span></div>
+<nav class="nav">
+{{range .Nav}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>
+{{end}}{{if .User}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{else if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}
+</nav>
+</div></header>
+<div class="page">
+{{if .Draft}}<p class="notice draft-banner">Draft preview — visitors see the published page.</p>{{end}}
+{{template "content" .}}
+<footer class="foot">
+<div class="foot-half">
+<h2>For people</h2>
+<div class="foot-cols">
+<div><span>Here</span><a href="/apps">Catalog</a><a href="/journal">Journal</a>{{if .User}}<a href="/instances/">Instances</a><a href="/account">Account</a>{{end}}</div>
+<div><span>Legal</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+<div><span>Notes</span><span class="foot-note">Applications run on their own origins.<br>Your data stays in your instance.</span></div>
+</div>
+</div>
+<div class="foot-half">
+<h2>For machines</h2>
+<div class="foot-cols">
+<div><span>Start</span><a class="path" href="/api/catalog">/api/catalog</a><a class="path" href="/journal/feed.xml">/journal/feed.xml</a></div>
+<div><span>Runtime</span><span class="foot-note">window.claude: db, room,<br>user, sample, assets</span></div>
+</div>
+</div>
+</footer>
+</div>
+</body>
+</html>{{end}}
+
+{{define "cards"}}<section class="rows" aria-label="Applications">
+{{range .}}<article class="ri">
+<a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1">{{if .Cover}}<img src="/media/{{.Cover.ID}}" alt="{{.Cover.Alt}}" loading="lazy">{{else}}<div class="mono-thumb" aria-hidden="true"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
+<div class="ri-text">
+<div class="ri-head">
+<h2 class="ri-title"><a href="/apps/{{.ID}}">{{.Title}}</a></h2>
+<p class="ri-desc">{{if .Description}}{{.Description}}{{else}}An HTML application.{{end}}</p>
+</div>
+<div class="ri-foot">
+{{if .Creators}}<p class="ri-tags">by {{range $i, $c := .Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
+<p class="ri-tags">{{if .Tags}}{{join .Tags " · "}}{{else}}untagged{{end}}</p>
+<p class="ri-actions"><a class="tlink" href="/apps/{{.ID}}">Details</a><span class="ri-path mono">v{{.Version}} · {{date .Published}}</span></p>
+</div>
+</div>
+</article>
+{{end}}</section>{{end}}
+
+{{define "posts"}}<section class="lines post-list">
+{{range .}}<article class="line">
+<div><strong class="post-date">{{date .PublishedAt}}</strong></div>
+<div class="release-body">
+<h2 class="post-title"><a href="/journal/{{.Slug}}">{{.Title}}</a></h2>
+{{if .Summary}}<p class="muted">{{.Summary}}</p>{{end}}
+</div>
+</article>
+{{end}}</section>{{end}}
+
+{{define "media"}}{{if isVideo .MediaType}}<video src="/media/{{.ID}}" controls preload="metadata"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}>{{end}}{{end}}

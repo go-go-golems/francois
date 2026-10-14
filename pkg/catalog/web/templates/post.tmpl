@@ -1,0 +1,10 @@
+{{define "content"}}{{with .Body}}<main>
+<section class="intro">
+<h1>{{.Post.Title}}{{if .Post.Summary}} <span>— {{.Post.Summary}}</span>{{end}}</h1>
+<p class="byline">{{if .Author}}<a class="u" href="/creators/{{.Author.Slug}}">{{.Author.Name}}</a> · {{end}}{{if .Post.PublishedAt}}{{date .Post.PublishedAt}}{{else}}not published{{end}}{{if .Post.Tags}} · {{join .Post.Tags " · "}}{{end}}</p>
+</section>
+{{if .Cover}}<figure class="cover">{{template "media" .Cover}}</figure>{{end}}
+<article class="md">{{.Body}}</article>
+<p class="lead-actions"><a class="u" href="/journal">All posts</a></p>
+</main>{{end}}{{end}}
+

@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { Account } from "./account";
 import { Admin } from "./admin";
-import { AppDetail, Catalog } from "./catalog";
 import { Instances, Launcher } from "./instances";
 import { store } from "./store";
 import { Footer, Header, Link, Notice, useRoute } from "./ui";
@@ -13,9 +12,7 @@ function Routes() {
   const parts = path.split("/").filter(Boolean);
   if (parts[0] === "instances" && parts[1]) return <Launcher id={parts[1]} />;
   let page: React.ReactNode;
-  if (path === "/") page = <Catalog />;
-  else if (parts[0] === "apps" && parts[1]) page = <AppDetail id={parts[1]} />;
-  else if (parts[0] === "instances") page = <Instances />;
+  if (parts[0] === "instances") page = <Instances />;
   else if (parts[0] === "account") page = <Account />;
   else if (parts[0] === "admin") page = <Admin />;
   else

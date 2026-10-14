@@ -12,7 +12,7 @@ export type SessionUser = {
   name: string;
   email: string;
   emailVerified: boolean;
-  role: "subscriber" | "admin";
+  role: "subscriber" | "creator" | "admin" | "guest";
   disabled: boolean;
 };
 export type Session = {
@@ -153,7 +153,7 @@ export type AdminUser = {
   email: string;
   emailVerified: boolean;
   name: string;
-  role: "subscriber" | "admin";
+  role: "subscriber" | "creator" | "admin" | "guest";
   disabled: boolean;
   createdAt: string;
   lastLoginAt?: string;

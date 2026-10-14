@@ -23,9 +23,19 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(web.Index)
 	}
-	for _, p := range []string{"GET /{$}", "GET /apps/", "GET /account", "GET /instances/", "GET /admin", "GET /admin/"} {
+	for _, p := range []string{"GET /account", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
 		m.HandleFunc(p, spa)
 	}
+	// Server-rendered storefront.
+	m.HandleFunc("GET /{$}", s.guard(public, s.homePage))
+	m.HandleFunc("GET /apps", s.guard(public, s.catalogPage))
+	m.HandleFunc("GET /apps/{$}", s.guard(public, s.catalogPage))
+	m.HandleFunc("GET /apps/{id}", s.guard(public, s.artifactPage))
+	m.HandleFunc("GET /creators/{slug}", s.guard(public, s.creatorPage))
+	m.HandleFunc("GET /journal", s.guard(public, s.journalPage))
+	m.HandleFunc("GET /journal/feed.xml", s.journalFeed)
+	m.HandleFunc("GET /journal/{slug}", s.guard(public, s.postPage))
+	m.HandleFunc("GET /media/{id}", s.media)
 	m.HandleFunc("GET /static/{name}", func(w http.ResponseWriter, r *http.Request) {
 		data, mime, ok := web.PortalAsset(r.PathValue("name"))
 		if !ok {
@@ -77,7 +87,7 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		site := s.site(r)
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-src "+site.AppScheme+"://*."+site.AppDomain+portSuffix(site.AppPort)+"; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-src "+site.AppScheme+"://*."+site.AppDomain+portSuffix(site.AppPort)+"; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		m.ServeHTTP(w, r)
 	})
 }
@@ -131,12 +141,7 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 // publicRelease is release metadata without storage keys or bytes.
 func publicRelease(r store.Release) map[string]any {
 	// Only capabilities the hosted runtime provides are advertised.
-	caps := []string{}
-	for _, k := range []string{"sample", "db", "room", "user", "assets", "comments", "downloads"} {
-		if _, ok := r.Manifest[k]; ok {
-			caps = append(caps, k)
-		}
-	}
+	caps := releaseCaps(r)
 	access := "subscriber_required"
 	if r.FreeSample {
 		access = "free_sample"
@@ -164,13 +169,23 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 			latest[rel.ArtifactID] = rel
 		}
 	}
+	credits, err := s.Store.ArtifactCreators(r.Context(), nil)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Catalog unavailable")
+		return
+	}
 	out := []map[string]any{}
 	for _, a := range arts {
 		rel, ok := latest[a.ID]
 		if a.Visibility != "listed" || !ok {
 			continue
 		}
-		out = append(out, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "updatedAt": a.UpdatedAt, "releases": counts[a.ID], "latest": publicRelease(rel)})
+		creators := []map[string]string{}
+		for _, c := range credits[a.ID] {
+			creators = append(creators, map[string]string{"slug": c.Slug, "name": c.Name})
+		}
+		out = append(out, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "updatedAt": a.UpdatedAt, "releases": counts[a.ID], "latest": publicRelease(rel),
+			"cover": a.Page.Cover, "creators": creators, "featured": a.Featured, "requiredPlan": a.RequiredPlan, "demo": a.DemoEnabled, "url": "/apps/" + a.ID})
 	}
 	httpx.OK(w, out)
 }

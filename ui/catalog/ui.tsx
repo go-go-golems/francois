@@ -3,6 +3,11 @@ import { useDispatch, useSelector } from "react-redux";
 import { api } from "./api";
 import { clear, navigate, State } from "./store";
 
+// SPA routes; every other path (the storefront) is rendered by the server
+// and is reached with a normal navigation.
+const spaRoutes = ["/instances", "/account", "/studio", "/admin"];
+const inSPA = (to: string) => spaRoutes.some((p) => to === p || to.startsWith(p + "/") || to.startsWith(p + "?"));
+
 export function Link(props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) {
   const { to, onClick, ...rest } = props;
   return (
@@ -11,7 +16,7 @@ export function Link(props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to
       href={to}
       onClick={(e) => {
         onClick?.(e);
-        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        if (!inSPA(to) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
         navigate(to);
       }}
@@ -40,10 +45,14 @@ export function Header() {
   const { data: session } = api.useSessionQuery();
   const [logout] = api.useLogoutMutation();
   const { path } = useRoute();
-  const nav: [string, string][] = [["/", "Catalog"]];
+  const nav: [string, string][] = [
+    ["/apps", "Catalog"],
+    ["/journal", "Journal"],
+  ];
   if (session?.authenticated) nav.push(["/instances/", "Instances"], ["/account", "Account"]);
+  if (session?.user?.role === "creator" || session?.user?.role === "admin") nav.push(["/studio", "Studio"]);
   if (session?.user?.role === "admin") nav.push(["/admin", "Admin"]);
-  const current = (to: string) => (to === "/" ? path === "/" || path.startsWith("/apps/") : path.startsWith(to.replace(/\/$/, "")));
+  const current = (to: string) => path.startsWith(to.replace(/\/$/, ""));
   const crumb = path.split("/").filter(Boolean)[0] ?? "";
   return (
     <header className="bar">
@@ -71,7 +80,7 @@ export function Header() {
                 // Leave through the identity provider so its session ends too;
                 // it returns the browser to the portal afterwards.
                 if ("data" in out && out.data?.redirect) window.location.assign(out.data.redirect);
-                else navigate("/");
+                else location.assign("/");
               }}
             >
               Sign out
@@ -113,7 +122,8 @@ export function Footer() {
         <div className="foot-cols">
           <div>
             <span>Here</span>
-            <Link to="/">Catalog</Link>
+            <a href="/apps">Catalog</a>
+            <a href="/journal">Journal</a>
             <Link to="/instances/">Instances</Link>
             <Link to="/account">Account</Link>
           </div>
