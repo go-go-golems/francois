@@ -10,14 +10,30 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Page is the public page document of an artifact. The published copy is
+// what visitors see; the draft is the editor's unpublished copy.
+type Page struct {
+	Body    string   `json:"body"`
+	Cover   string   `json:"cover,omitempty"`
+	Gallery []string `json:"gallery"`
+}
+
 type Artifact struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Tags        []string  `json:"tags"`
-	Visibility  string    `json:"visibility"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	Visibility  string   `json:"visibility"`
+	Page        Page     `json:"page"`
+	PageDraft   *Page    `json:"pageDraft,omitempty"`
+	Featured    bool     `json:"featured"`
+	SortOrder   int      `json:"sortOrder"`
+	// RequiredPlan is the key of the lowest plan that may run the artifact;
+	// empty means the lowest paid plan.
+	RequiredPlan string    `json:"requiredPlan"`
+	DemoEnabled  bool      `json:"demoEnabled"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 type ReleaseFile struct {
@@ -54,34 +70,102 @@ func isUnique(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "23505"
 }
 
-// UpsertArtifact creates or updates catalog metadata. It never touches releases.
-func (s *Store) UpsertArtifact(ctx context.Context, a Artifact) (Artifact, error) {
+// CreateArtifact inserts a new artifact; an existing ID fails with
+// ErrConflict.
+func (s *Store) CreateArtifact(ctx context.Context, a Artifact) (Artifact, error) {
 	if a.Tags == nil {
 		a.Tags = []string{}
 	}
 	if a.Visibility == "" {
 		a.Visibility = "listed"
 	}
-	err := s.Pool.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility) VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,description=EXCLUDED.description,tags=EXCLUDED.tags,visibility=EXCLUDED.visibility,updated_at=now()
-RETURNING created_at,updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility).Scan(&a.CreatedAt, &a.UpdatedAt)
+	if a.Page.Gallery == nil {
+		a.Page.Gallery = []string{}
+	}
+	page, _ := json.Marshal(a.Page)
+	err := s.Pool.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,required_plan,demo_enabled)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at,updated_at`,
+		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.RequiredPlan, a.DemoEnabled).Scan(&a.CreatedAt, &a.UpdatedAt)
+	if isUnique(err) {
+		return a, errors.Wrapf(ErrConflict, "artifact %s already exists", a.ID)
+	}
 	return a, err
 }
 
-const artifactColumns = `id,title,description,tags,visibility,created_at,updated_at`
+// UpdateArtifact writes the settings that apply immediately. It never
+// touches the page document or releases.
+func (s *Store) UpdateArtifact(ctx context.Context, a Artifact) (Artifact, error) {
+	if a.Tags == nil {
+		a.Tags = []string{}
+	}
+	err := s.Pool.QueryRow(ctx, `UPDATE catalog_artifacts SET title=$2,description=$3,tags=$4,visibility=$5,featured=$6,sort_order=$7,required_plan=$8,demo_enabled=$9,updated_at=now()
+WHERE id=$1 RETURNING updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility, a.Featured, a.SortOrder, a.RequiredPlan, a.DemoEnabled).Scan(&a.UpdatedAt)
+	return a, notFound(err)
+}
+
+// SavePageDraft replaces the unpublished page document.
+func (s *Store) SavePageDraft(ctx context.Context, id string, p Page) error {
+	if p.Gallery == nil {
+		p.Gallery = []string{}
+	}
+	raw, _ := json.Marshal(p)
+	tag, err := s.Pool.Exec(ctx, `UPDATE catalog_artifacts SET page_draft=$2 WHERE id=$1`, id, raw)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
+}
+
+// PublishPageDraft makes the draft the published page and clears the draft.
+func (s *Store) PublishPageDraft(ctx context.Context, id string) error {
+	tag, err := s.Pool.Exec(ctx, `UPDATE catalog_artifacts SET page=page_draft,page_draft=NULL,updated_at=now() WHERE id=$1 AND page_draft IS NOT NULL`, id)
+	if err == nil && tag.RowsAffected() == 0 {
+		return errors.Wrap(ErrConflict, "there is no page draft")
+	}
+	return err
+}
+
+// DiscardPageDraft removes the unpublished page document.
+func (s *Store) DiscardPageDraft(ctx context.Context, id string) error {
+	_, err := s.Pool.Exec(ctx, `UPDATE catalog_artifacts SET page_draft=NULL WHERE id=$1`, id)
+	return err
+}
+
+const artifactColumns = `id,title,description,tags,visibility,page,page_draft,featured,sort_order,required_plan,demo_enabled,created_at,updated_at`
 
 func scanArtifact(r pgx.Row) (Artifact, error) {
 	var a Artifact
-	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &a.CreatedAt, &a.UpdatedAt)
-	return a, notFound(err)
+	var page, draft []byte
+	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &page, &draft, &a.Featured, &a.SortOrder, &a.RequiredPlan, &a.DemoEnabled, &a.CreatedAt, &a.UpdatedAt)
+	if err != nil {
+		return a, notFound(err)
+	}
+	if err = json.Unmarshal(page, &a.Page); err != nil {
+		return a, err
+	}
+	if a.Page.Gallery == nil {
+		a.Page.Gallery = []string{}
+	}
+	if draft != nil {
+		a.PageDraft = &Page{}
+		if err = json.Unmarshal(draft, a.PageDraft); err != nil {
+			return a, err
+		}
+		if a.PageDraft.Gallery == nil {
+			a.PageDraft.Gallery = []string{}
+		}
+	}
+	return a, nil
 }
 
 func (s *Store) Artifact(ctx context.Context, id string) (Artifact, error) {
 	return scanArtifact(s.Pool.QueryRow(ctx, `SELECT `+artifactColumns+` FROM catalog_artifacts WHERE id=$1`, id))
 }
 
+// Artifacts lists every artifact in storefront order: featured first, then
+// by sort order, then most recently updated.
 func (s *Store) Artifacts(ctx context.Context) ([]Artifact, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT `+artifactColumns+` FROM catalog_artifacts ORDER BY updated_at DESC`)
+	rows, err := s.Pool.Query(ctx, `SELECT `+artifactColumns+` FROM catalog_artifacts ORDER BY featured DESC, sort_order, updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}

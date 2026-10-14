@@ -160,7 +160,11 @@ func (s *Server) adminCheck(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_upload", err.Error())
 		return
 	}
-	manifest, checks := releases.Validate(u)
+	manifest, checks, err := s.Publisher.Check(r.Context(), u)
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
 	httpx.OK(w, map[string]any{"checks": checks, "blocking": releases.Blocking(checks), "manifest": manifest, "size": len(u.HTML)})
 }
 
@@ -289,7 +293,7 @@ func (s *Server) adminArtifact(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", "Invalid title, description or visibility")
 		return
 	}
-	if a, err = s.Store.UpsertArtifact(r.Context(), a); err != nil {
+	if a, err = s.Store.UpdateArtifact(r.Context(), a); err != nil {
 		unavailable(w, err)
 		return
 	}

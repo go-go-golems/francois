@@ -302,12 +302,13 @@ The **page document** stored in `page` and `page_draft`:
 
 ```json
 {
-  "summary": "One paragraph shown on cards and in link previews.",
   "body": "# How it works\n\nMarkdown …",
   "cover": "med_…",
   "gallery": ["med_…", "med_…"]
 }
 ```
+
+The existing `description` column stays the short summary shown on cards and in link previews (up to 2000 characters, plain text). It applies immediately, like the title, so it is not part of the page document.
 
 ### Decision: page draft as a second column, not a revision table
 
@@ -315,7 +316,7 @@ The **page document** stored in `page` and `page_draft`:
 - **Options considered:** (a) edit the live page directly; (b) a `page_revisions` table with full history; (c) two JSON columns, `page` and `page_draft`.
 - **Decision:** (c).
 - **Rationale:** It gives the two states the workflow needs with one row per artifact and no joins on the public path. History can be added later by auditing publishes, which already go to `admin_audit`.
-- **Consequences:** Only one draft at a time; publishing copies the draft and clears it. Title, tags, featured, ordering, required plan, demo flag and creators apply immediately, as visibility already does.
+- **Consequences:** Only one draft at a time; publishing copies the draft and clears it. Title, description, tags, featured, ordering, required plan, demo flag and creators apply immediately, as visibility already does.
 - **Status:** accepted
 
 ### Decision: media in the release blob store
@@ -452,8 +453,8 @@ func (s *Server) canEditArtifact(ctx context.Context, p *Principal, artifactID s
 | `GET /api/studio/artifacts` | creator: own; admin: all | List with release counts and page status |
 | `POST /api/studio/artifacts` | creator, admin | Create `{id, title}`; a creator is linked automatically |
 | `GET /api/studio/artifacts/{id}` | editor of it | Artifact, page, draft, creators, releases |
-| `PATCH /api/studio/artifacts/{id}` | editor of it | `title, tags, visibility, featured, sortOrder, requiredPlan, demoEnabled, creators[]` |
-| `PUT /api/studio/artifacts/{id}/draft` | editor of it | Save the page draft `{summary, body, cover, gallery}` |
+| `PATCH /api/studio/artifacts/{id}` | editor of it | `title, description, tags, visibility, featured, sortOrder, requiredPlan, demoEnabled, creators[]` |
+| `PUT /api/studio/artifacts/{id}/draft` | editor of it | Save the page draft `{body, cover, gallery}` |
 | `POST /api/studio/artifacts/{id}/draft/publish` | editor of it | Copy draft to page, clear draft |
 | `DELETE /api/studio/artifacts/{id}/draft` | editor of it | Discard the draft |
 | `POST /api/studio/releases/check` | creator, admin | Dry-run validation (unchanged semantics) |
@@ -476,6 +477,8 @@ func (s *Server) canEditArtifact(ctx context.Context, p *Principal, artifactID s
 | `DELETE /api/studio/creators/{id}` | admin | Delete |
 | `POST /api/studio/markdown` | creator, admin | Render Markdown with the public renderer, for the editor's preview |
 | `GET/POST /api/studio/tokens`, `DELETE /api/studio/tokens/{id}` | self | Personal API tokens (§5.10) |
+
+Uploading a release no longer rewrites the artifact's title, description and tags: those fields only seed a new artifact, and the title is optional when the artifact exists (`Publisher.prepare` in `releases.go`). Before this change every upload overwrote metadata an editor had set.
 
 The `/api/admin/releases*` endpoints and `PATCH /api/admin/artifacts/{id}` are removed; the studio replaces them. `PATCH /api/admin/users/{id}` accepts the `creator` role.
 
@@ -685,8 +688,8 @@ Studio ─┬─ Artifacts ── list (title, status, latest version, page stat
         └─ Tokens ───── create, list, revoke
 ```
 
-- **Details:** title, tags, visibility, featured, sort order, required plan (from settings), creators.
-- **Write-up:** summary, Markdown body with a side-by-side preview rendered by `POST /api/studio/markdown`, cover and gallery pickers from the media library; **Save draft**, **Preview page** (opens `/apps/<id>?draft=1`), **Publish page**, **Discard draft**.
+- **Details:** title, short description, tags, visibility, featured, sort order, required plan (from settings), creators.
+- **Write-up:** Markdown body with a side-by-side preview rendered by `POST /api/studio/markdown`, cover and gallery pickers from the media library; **Save draft**, **Preview page** (opens `/apps/<id>?draft=1`), **Publish page**, **Discard draft**.
 - **Media:** upload area and grid; inserting an image adds `![alt](/media/<id>)` to the body.
 - **Releases:** today's flow from `admin.tsx`, scoped to the artifact.
 - **Demo:** the artifact's demo flag, with the global demo settings shown for context.
@@ -736,7 +739,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
     page := a.Page
     if draft && a.PageDraft != nil { page = *a.PageDraft }
     view := artifactView{
-        Artifact: a, Summary: page.Summary, Body: s.md.Render(page.Body),
+        Artifact: a, Summary: a.Description, Body: s.md.Render(page.Body),
         Cover: s.media(page.Cover), Gallery: s.mediaList(page.Gallery),
         Creators: s.Store.ArtifactCreators(ctx, a.ID), Releases: published(a.ID),
         RequiredPlan: plans.Required(a), Demo: a.DemoEnabled && settings.Demo.Enabled,
@@ -792,8 +795,8 @@ The runtime receives the entitlement through a second callback next to `Authoriz
 ### 7.4 Publishing a write-up
 
 ```text
-editor saves      PUT /api/studio/artifacts/polis/draft   {summary, body, cover, gallery}
-                  validate: summary ≤ 400, body ≤ 100 KB, media IDs exist
+editor saves      PUT /api/studio/artifacts/polis/draft   {body, cover, gallery}
+                  validate: body ≤ 100 KB, gallery ≤ 24 items, media IDs exist
 editor previews   GET /apps/polis?draft=1                 (editor only)
 editor publishes  POST /api/studio/artifacts/polis/draft/publish
                   UPDATE catalog_artifacts SET page = page_draft, page_draft = NULL

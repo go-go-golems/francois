@@ -228,23 +228,49 @@ func (e *ErrInvalid) Error() string {
 	return "invalid release"
 }
 
+// prepare completes an upload for an existing artifact: the title is only
+// required when the upload creates the artifact.
+func (p *Publisher) prepare(ctx context.Context, u *Upload) (bool, error) {
+	a, err := p.Store.Artifact(ctx, u.ArtifactID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if u.Title == "" {
+		u.Title = a.Title
+	}
+	return true, nil
+}
+
+// Check validates an upload without storing anything.
+func (p *Publisher) Check(ctx context.Context, u Upload) (map[string]json.RawMessage, []Check, error) {
+	if _, err := p.prepare(ctx, &u); err != nil {
+		return nil, nil, err
+	}
+	manifest, checks := Validate(u)
+	return manifest, checks, nil
+}
+
 // CreateDraft validates, stores blobs atomically and only then commits the
-// draft metadata. A crash between both leaves an unreferenced blob.
+// draft metadata. A crash between both leaves an unreferenced blob. A release
+// for an existing artifact leaves its catalog metadata alone; the upload's
+// title, description and tags only seed a new artifact.
 func (p *Publisher) CreateDraft(ctx context.Context, actor string, u Upload) (store.Release, []Check, error) {
+	exists, err := p.prepare(ctx, &u)
+	if err != nil {
+		return store.Release{}, nil, err
+	}
 	manifest, checks := Validate(u)
 	if Blocking(checks) {
 		return store.Release{}, checks, &ErrInvalid{Checks: checks}
 	}
-	existing, err := p.Store.Artifact(ctx, u.ArtifactID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return store.Release{}, checks, err
-	}
-	a := store.Artifact{ID: u.ArtifactID, Title: u.Title, Description: u.Description, Tags: u.Tags, Visibility: "listed"}
-	if err == nil {
-		a.Visibility = existing.Visibility
-	}
-	if _, err = p.Store.UpsertArtifact(ctx, a); err != nil {
-		return store.Release{}, checks, err
+	if !exists {
+		a := store.Artifact{ID: u.ArtifactID, Title: u.Title, Description: u.Description, Tags: u.Tags, Visibility: "listed"}
+		if _, err = p.Store.CreateArtifact(ctx, a); err != nil && !errors.Is(err, store.ErrConflict) {
+			return store.Release{}, checks, err
+		}
 	}
 	htmlKey, htmlSum, err := p.Blobs.Put(u.HTML)
 	if err != nil {
