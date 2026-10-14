@@ -681,7 +681,7 @@ A new SPA area `/studio`, visible to creators and administrators:
 
 ```text
 Studio ─┬─ Artifacts ── list (title, status, latest version, page status)
-        │               └─ editor: [Details] [Write-up] [Media] [Releases] [Demo]  + "Preview page" + "Publish page"
+        │               └─ editor: [Details] [Page] [Releases] [Demo]  + "Public page" + "Preview draft"
         ├─ Journal ──── list → post editor (title, slug, summary, cover, body, tags, author; Save, Publish/Unpublish, Preview)
         ├─ Creators ─── profiles (admins: all, link to users; creators: own profile)
         ├─ Media ────── library: upload, alt text, copy Markdown, delete
@@ -689,8 +689,8 @@ Studio ─┬─ Artifacts ── list (title, status, latest version, page stat
 ```
 
 - **Details:** title, short description, tags, visibility, featured, sort order, required plan (from settings), creators.
-- **Write-up:** Markdown body with a side-by-side preview rendered by `POST /api/studio/markdown`, cover and gallery pickers from the media library; **Save draft**, **Preview page** (opens `/apps/<id>?draft=1`), **Publish page**, **Discard draft**.
-- **Media:** upload area and grid; inserting an image adds `![alt](/media/<id>)` to the body.
+- **Page:** Markdown body with a side-by-side preview rendered by `POST /api/studio/markdown`, cover and gallery pickers from the media library (with an upload area), and **Insert image**, which adds `![alt](/media/<id>)` to the body; **Save draft**, **Publish page**, **Discard draft**; **Preview draft** opens `/apps/<id>?draft=1`.
+- The media library is a studio-wide section (upload, alt text, copy Markdown, delete) rather than a per-artifact tab, because media is shared between artifacts, posts and profiles. (Implementation note: the design originally had a separate Media tab.)
 - **Releases:** today's flow from `admin.tsx`, scoped to the artifact.
 - **Demo:** the artifact's demo flag, with the global demo settings shown for context.
 

@@ -303,3 +303,74 @@ This step gave creators a way to manage their own content. A new guard level `cr
 
 - Error codes added: `creator_required`, `creator_profile_required`, `not_editor`, `artifact_exists`, `no_draft`, `media_type` (415), `media_in_use`, `not_uploader`, `slug_taken`.
 - Limits: write-up and post body 100 KB, gallery 24, media 25 MB, alt 300, tags 12 × 32, creator links 8 (http/https only).
+
+## Step 5: Phase 4 — studio UI
+
+This step built the screens creators use every day: an artifact list scoped to what the user may edit, an editor with Details, Page, Releases and Demo tabs, a journal editor, creator profiles and a media library. I tested every main flow in a browser against the local server, signed in as the seeded creator "Manuel": editing and publishing a write-up, uploading a release and opening its preview instance, uploading media, and creating and publishing a post.
+
+Two bugs surfaced only in the browser, and both had the same root cause: `ui/catalog/api.ts` still defined the old admin release endpoints, and RTK Query's `injectEndpoints` silently keeps an existing endpoint with the same name. My studio `uploadRelease` never ran.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 4 of the design.
+**Inferred user intent:** A usable authoring workflow (upload, configure, preview, publish) for the two creators.
+**Commit (code):** 5f3da56 — "Studio UI: artifact editor, journal, creators and media library"
+
+### What I did
+
+- `ui/catalog/studio-api.ts`: studio endpoints injected into the shared API (`enhanceEndpoints({addTagTypes})` + `injectEndpoints`), types `StudioArtifact`, `ArtifactRow`, `Media`, `Creator`, `Post`, `Page`.
+- `ui/catalog/studio.tsx`: `Studio` (role gate, sections), `Artifacts`, `ArtifactEditor` (tabs via `?tab=`), `Details`, `PageEditor` with `MarkdownField` (debounced server preview), `MediaPicker`, `MediaThumb`, `Uploader`, `MediaLibrary`, `Releases`, `Demo`, `Journal`, `PostEditor`/`PostForm`, `Creators`/`CreatorForm`.
+- `ui/catalog/ui.tsx`: `useAct` moved here from `admin.tsx`.
+- `ui/catalog/admin.tsx`: Releases tab removed; role is now a select (subscriber, creator, administrator); overview links to the studio.
+- `ui/catalog/api.ts`: removed `adminReleases`, `checkUpload`, `uploadRelease`, `publishRelease`, `withdrawRelease`, `deleteDraft`, `previewRelease`, `updateArtifact`.
+- `ui/catalog/instances.tsx`: preview label "draft preview".
+- `pkg/catalog/web/static/catalog.css`: editor tabs, two-column Markdown editor, media grid and picker.
+- `scripts/02-dev-session.sh`: inserts a portal session for a local dev user and prints the cookie value (the local server has no OIDC).
+
+### Why
+
+- Cover and gallery pickers live in the Page tab and the media library is studio-wide, because media is shared between artifacts, posts and profiles; the design doc §5.11 now says so.
+- The Markdown preview calls the server renderer instead of a client library so the preview is byte-for-byte what visitors get.
+
+### What worked
+
+- Browser checks (Playwright against `http://localhost:8095`, creator session):
+  - Page tab: typing a heading, **Save draft** → public page unchanged, `?draft=1` shows it; **Publish page** → public page shows it; toast "Page published".
+  - Releases tab: upload `examples/polis.html` as `1.6.0` → row appears; **Preview** → `/instances/ins_…` with frame `http://i-….apps.localhost:8095/launch`, and Polis renders (screenshot).
+  - Media: upload → 4 → 5 tiles, alt text derived from the file name.
+  - Journal: new post, body, **Save and publish** → `/journal/designing-the-studio` returns 200.
+- `pnpm check`, `pnpm build`, `go test ./pkg/catalog/` pass.
+
+### What didn't work
+
+- `/studio` showed "The studio is for creators." with a valid session: `document.cookie = "francois_session_dev=…"` did nothing because an older HttpOnly cookie with the same name (from the compose stack on `localhost:8090`; cookies are not port-specific) blocked script writes. Listing cookies showed `["mode","zitadel.useragent(httpOnly)","francois_session_dev(httpOnly)"]`; setting the cookie through Playwright's `context.addCookies` worked.
+- The Markdown preview pane looked empty in the first screenshot; it was the 300 ms debounce plus the request. Reading `.md-preview` innerHTML a moment later showed the rendered HTML.
+- Release upload returned `400 {"error":{"code":"invalid_upload","message":"upload exceeds the size limit or is malformed: request Content-Type isn't multipart/form-data"}}`; the request had `content-type: application/json` and a 30-byte body. After passing the `FormData` directly, the release was created but the list never refreshed (no GET after the POST; Details saves did refetch). Both symptoms came from the old `api.ts` `uploadRelease` endpoint shadowing the injected one. Removing the dead admin endpoints fixed both.
+
+### What I learned
+
+- RTK Query `injectEndpoints` does not override an existing endpoint unless `overrideExisting` is set, and gives no error; endpoint names must be unique across injected modules.
+- Full-page screenshots draw sticky elements at their position in the viewport at capture time, which made the sticky form footer look misplaced.
+
+### What was tricky to build
+
+- Page editing state: the editor initialises from the draft if one exists, otherwise from the published page, and "Publish page" first saves unsaved changes so publishing never publishes a stale draft.
+
+### What warrants a second pair of eyes
+
+- `MarkdownField` uses `dangerouslySetInnerHTML` for the server-rendered preview. The HTML comes from the same renderer as public pages (no raw HTML, media-only images), on the portal origin.
+- Linking a creator profile to an account takes a raw user ID in the form; an admin user search would be friendlier.
+
+### What should be done in the future
+
+- A user picker for linking profiles; a plan select for "Required plan" once plans exist (Phase 5).
+
+### Code review instructions
+
+- `ui/catalog/studio.tsx` (`PageEditor`, `Releases`), `ui/catalog/studio-api.ts`.
+- Local check: run `scripts/01-seed-dev-storefront.sh`, start the dev server, create a session with `scripts/02-dev-session.sh storefront_dev usr_dev_manuel` and set it as `francois_session_dev` for `localhost`.
+
+### Technical details
+
+- Dev server: `francois catalog serve --database-url postgres://francois:francois@127.0.0.1:5434/storefront_dev?sslmode=disable --listen 127.0.0.1:8095 --public-url http://localhost:8095 --app-domain apps.localhost --release-dir var/storefront/releases --worker-dir var/storefront/worker --backend fake`.
