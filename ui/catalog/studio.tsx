@@ -164,6 +164,7 @@ function ArtifactEditor({ id }: { id: string }) {
 function Details({ data }: { data: { artifact: import("./studio-api").StudioArtifact; creators: string[] } }) {
   const a = data.artifact;
   const { data: creators = [] } = studio.useCreatorsQuery();
+  const { data: plans = [] } = studio.useStudioPlansQuery();
   const [patch, { isLoading }] = studio.usePatchArtifactMutation();
   const act = useAct();
   const [f, setF] = useState({
@@ -213,7 +214,18 @@ function Details({ data }: { data: { artifact: import("./studio-api").StudioArti
         </div>
         <div className="field">
           <label htmlFor="d-plan">Required plan</label>
-          <input id="d-plan" className="slug" placeholder="lowest paid plan" value={f.requiredPlan} onChange={(e) => setF({ ...f, requiredPlan: e.target.value })} />
+          <select id="d-plan" value={f.requiredPlan} onChange={(e) => setF({ ...f, requiredPlan: e.target.value })}>
+            <option value="">Lowest paid plan</option>
+            {[...plans]
+              .sort((x, y) => x.rank - y.rank)
+              .map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                  {p.key === "free" ? " (anyone signed in)" : ""}
+                  {p.public ? "" : " (grant only)"}
+                </option>
+              ))}
+          </select>
         </div>
       </div>
       <div className="row2">

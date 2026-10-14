@@ -24,7 +24,23 @@ export type Session = {
   user?: SessionUser;
   csrfToken?: string;
   access?: Decision;
+  plan?: { key: string; name: string; rank: number; source: string; paid: boolean; instances: number };
 };
+export type Plan = {
+  key: string;
+  name: string;
+  rank: number;
+  description: string;
+  highlights: string[];
+  public: boolean;
+  prices: { interval: "month" | "year"; priceId: string; label: string }[];
+  instances: number;
+  membersPerInstance: number;
+  monthlyCredits: number;
+  dailyCredits: number;
+  models: string[];
+};
+export type Entitlement = { plan: Plan; source: string; decision: Decision };
 export type ReleaseFile = {
   id: string;
   role: "html" | "manifest";
@@ -135,6 +151,7 @@ export type AccessGrant = {
 export type Account = {
   user: SessionUser & { createdAt: string };
   access: Decision;
+  entitlement: Entitlement;
   subscriptions: Subscription[];
   complimentary: AccessGrant[];
   allowance: Allowance;
@@ -190,20 +207,28 @@ export type SettingsDoc = {
     tiers: Record<string, string>;
   };
   allowance: {
-    monthlyCredits: number;
-    dailyCredits: number;
     perUserConcurrency: number;
     globalConcurrency: number;
     maxToolRounds: number;
   };
   limits: {
-    instancesPerUser: number;
-    membersPerInstance: number;
     documentsPerInstance: number;
     assetBytesPerInstance: number;
     maxHtmlBytes: number;
+    maxMediaBytes: number;
   };
   publishing: { allowPinnedAfterWithdraw: boolean };
+  plans: Plan[];
+  demo: {
+    enabled: boolean;
+    ttlMinutes: number;
+    maxActive: number;
+    perAddressPerHour: number;
+    credits: number;
+    dailyBudget: number;
+    models: string[];
+  };
+  storefront: { title: string; tagline: string; intro: string };
 };
 export type SettingsRevision = {
   revision: number;
@@ -261,8 +286,8 @@ export const api = createApi({
     catalog: b.query<CatalogEntry[], void>({ query: () => "api/catalog", providesTags: ["Catalog"] }),
     artifact: b.query<ArtifactDetail, string>({ query: (id) => `api/artifacts/${id}`, providesTags: ["Catalog"] }),
     account: b.query<Account, void>({ query: () => "api/account", providesTags: ["Account"] }),
-    checkout: b.mutation<{ url: string }, void>({
-      query: () => ({ url: "api/billing/checkout", method: "POST", body: { plan: "subscriber" } }),
+    checkout: b.mutation<{ url: string }, { plan: string; interval?: string }>({
+      query: (body) => ({ url: "api/billing/checkout", method: "POST", body }),
     }),
     portal: b.mutation<{ url: string }, void>({ query: () => ({ url: "api/billing/portal", method: "POST" }) }),
     refreshBilling: b.mutation<{ queued: boolean }, string | void>({
@@ -312,7 +337,7 @@ export const api = createApi({
       query: (id) => ({ url: `api/admin/users/${id}/revoke-sessions`, method: "POST" }),
       invalidatesTags: ["AdminUser"],
     }),
-    grantAccess: b.mutation<unknown, { id: string; days: number; reason: string }>({
+    grantAccess: b.mutation<unknown, { id: string; days: number; reason: string; plan?: string }>({
       query: ({ id, ...body }) => ({ url: `api/admin/users/${id}/access-grants`, method: "POST", body }),
       invalidatesTags: ["AdminUsers", "AdminUser"],
     }),

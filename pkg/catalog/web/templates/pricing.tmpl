@@ -1,0 +1,21 @@
+{{define "content"}}{{with .Body}}<main>
+<section class="hero"><h1>Plans <span class="muted">— subscribe to run the applications in your own private instances.</span></h1></section>
+{{if .Staff}}<p class="notice plan-note">You have staff access to every plan.</p>{{end}}
+{{if .Current}}<p class="notice plan-note">Your plan: <strong>{{.Current}}</strong>.{{if .Paid}} Change or cancel it from <a class="u" href="/account">your account</a>.{{end}}</p>{{end}}
+<section class="plans">
+{{range .Plans}}<article class="plan{{if .Current}} is-current{{end}}">
+<h2>{{.Name}}</h2>
+{{if .Description}}<p class="muted">{{.Description}}</p>{{end}}
+<ul class="plan-facts">
+{{range .Highlights}}<li>{{.}}</li>
+{{end}}{{if .Instances}}<li>{{.Instances}} private {{if eq .Instances 1}}instance{{else}}instances{{end}}, up to {{.MembersPerInstance}} people each</li>{{else}}<li>Browse, read and try demos</li>{{end}}
+{{if .MonthlyCredits}}<li>{{.MonthlyCredits}} model credits a month</li>{{end}}
+</ul>
+<div class="plan-buy" data-checkout data-plan="{{.Key}}">
+{{if .Current}}<span class="status on">Current plan</span>{{else if .Prices}}{{range .Prices}}<a class="btn btn-ink" href="/auth/login?return=/pricing" data-interval="{{.Interval}}">{{if .Label}}{{.Label}}{{else}}Subscribe ({{.Interval}}ly){{end}}</a>
+{{end}}{{else if eq .Key "free"}}<span class="muted">No subscription needed</span>{{else}}<span class="muted">By invitation</span>{{end}}
+</div>
+</article>
+{{end}}</section>
+<section class="prose small"><p>Payments are handled by Stripe. You can change plans or cancel at any time from your account; access follows your subscription.</p></section>
+</main>{{end}}{{end}}

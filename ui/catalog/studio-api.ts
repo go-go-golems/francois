@@ -148,6 +148,7 @@ export const studio = base.injectEndpoints({
       query: (id) => ({ url: `api/studio/creators/${id}`, method: "DELETE" }),
       invalidatesTags: ["Creators", "StudioMe"],
     }),
+    studioPlans: b.query<{ key: string; name: string; rank: number; public: boolean }[], void>({ query: () => "api/studio/plans" }),
     markdown: b.mutation<{ html: string }, string>({
       query: (markdown) => ({ url: "api/studio/markdown", method: "POST", body: { markdown } }),
     }),

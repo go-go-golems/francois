@@ -37,6 +37,8 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /journal/feed.xml", s.journalFeed)
 	m.HandleFunc("GET /journal/{slug}", s.guard(public, s.postPage))
 	m.HandleFunc("GET /media/{id}", s.media)
+	m.HandleFunc("GET /pricing", s.guard(public, s.pricingPage))
+	m.HandleFunc("GET /api/plans", s.publicPlans)
 	m.HandleFunc("GET /static/{name}", func(w http.ResponseWriter, r *http.Request) {
 		data, mime, ok := web.PortalAsset(r.PathValue("name"))
 		if !ok {

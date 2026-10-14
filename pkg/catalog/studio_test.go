@@ -86,12 +86,14 @@ func TestStudio(t *testing.T) {
 	}
 	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"creators": []string{ottoID}})
 	expect("drop own credit", code, out, 400, "invalid_request")
-	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"description": "Weaves.", "tags": []string{"Tools", "tools", " art "}, "featured": true, "requiredPlan": "studio"})
-	if code != 200 || out["description"] != "Weaves." || len(out["tags"].([]any)) != 2 || out["requiredPlan"] != "studio" {
+	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"description": "Weaves.", "tags": []string{"Tools", "tools", " art "}, "featured": true, "requiredPlan": "pro"})
+	if code != 200 || out["description"] != "Weaves." || len(out["tags"].([]any)) != 2 || out["requiredPlan"] != "pro" {
 		t.Fatalf("patch artifact %d %v", code, out)
 	}
 	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"requiredPlan": "Bad Plan"})
 	expect("bad plan key", code, out, 400, "invalid_request")
+	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"requiredPlan": "studio"})
+	expect("unknown plan", code, out, 400, "invalid_request")
 
 	// Releases: editors upload, preview, publish; others cannot.
 	code, rel := e.release(cleo, "loom", "1.0.0")

@@ -2,7 +2,7 @@
 <section class="intro">
 <h1>{{.Card.Title}}{{if .Card.Description}} <span>— {{.Card.Description}}</span>{{end}}</h1>
 {{if .Card.Creators}}<p class="byline">by {{range $i, $c := .Card.Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
-<div class="lead-actions" data-actions data-artifact="{{.Card.ID}}" data-release="{{.Card.ReleaseID}}" data-title="{{.Card.Title}}"{{if .Demo}} data-demo="true"{{end}}{{if .Plan}} data-plan="{{.Plan}}"{{end}}>
+<div class="lead-actions" data-actions data-artifact="{{.Card.ID}}" data-release="{{.Card.ReleaseID}}" data-title="{{.Card.Title}}"{{if .Demo}} data-demo="true"{{end}}{{if .Plan}} data-plan="{{.Plan}}"{{end}} data-rank="{{.Rank}}">
 <a class="btn btn-ink" href="/auth/login?return=/apps/{{.Card.ID}}">Sign in to run</a>
 <span class="muted">v{{.Card.Version}} · {{join .Card.Capabilities " · "}}{{if .Plan}} · {{.Plan}} plan{{end}}</span>
 </div>
