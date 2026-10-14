@@ -2,7 +2,7 @@
 
 ## TODO
 - [x] Write the intern design doc and upload it to reMarkable <!-- t:wblr -->
-- [ ] Phase 1: content model (migration 004, store, Markdown, media detection) <!-- t:svxc -->
+- [x] Phase 1: content model (migration 004, store, Markdown, media detection) <!-- t:svxc -->
 - [ ] Phase 2: public server-rendered pages, /media, RSS, public.js, SPA route changes <!-- t:vkef -->
 - [ ] Phase 3: studio API, creator role, releases moved from admin API <!-- t:czyd -->
 - [ ] Phase 4: studio UI (artifact editor, journal, creators, media, tokens) <!-- t:0d42 -->
