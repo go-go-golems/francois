@@ -14,6 +14,7 @@ const sections: [string, string][] = [
   ["journal", "Journal"],
   ["creators", "Creators"],
   ["media", "Media"],
+  ["tokens", "Tokens"],
 ];
 
 export function Studio() {
@@ -47,6 +48,7 @@ export function Studio() {
       {section === "journal" && (id ? <PostEditor id={id} /> : <Journal />)}
       {section === "creators" && <Creators />}
       {section === "media" && <MediaLibrary />}
+      {section === "tokens" && <Tokens />}
     </main>
   );
 }
@@ -1040,5 +1042,77 @@ function CreatorForm({ creator, isAdmin, onDone }: { creator: Creator; isAdmin: 
         </button>
       </div>
     </form>
+  );
+}
+
+// Tokens are personal API tokens for `francois catalog push`. The secret is
+// shown once; only its hash is stored.
+function Tokens() {
+  const { data = [], isLoading } = studio.useTokensQuery();
+  const [create] = studio.useCreateTokenMutation();
+  const [revoke] = studio.useRevokeTokenMutation();
+  const act = useAct();
+  const [name, setName] = useState("");
+  const [days, setDays] = useState("90");
+  const [secret, setSecret] = useState("");
+  return (
+    <section className="library">
+      <div className="lib-head">
+        <h2>API tokens</h2>
+        <form
+          className="inline-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const r = await act(create({ name, days: Number(days) }).unwrap(), "Token created");
+            if (r) {
+              setSecret(r.token);
+              setName("");
+            }
+          }}
+        >
+          <input placeholder="name, e.g. laptop" required value={name} onChange={(e) => setName(e.target.value)} />
+          <input aria-label="Days" className="num" type="number" min={0} max={366} value={days} onChange={(e) => setDays(e.target.value)} />
+          <span className="muted">days (0 = no expiry)</span>
+          <button className="btn btn-ink">Create token</button>
+        </form>
+      </div>
+      {secret && (
+        <div className="notice token-once">
+          <p>Copy this token now; it is not shown again.</p>
+          <pre className="code-inline">{secret}</pre>
+          <pre className="code-inline">{`francois catalog push --server ${location.origin} --token-file ~/.config/francois/token \\\n  --artifact-id <id> --version 1.0.0 --html dist/app.html --publish`}</pre>
+          <button type="button" className="tlink" onClick={() => setSecret("")}>
+            Done
+          </button>
+        </div>
+      )}
+      {isLoading ? (
+        <Empty>Loading…</Empty>
+      ) : data.length === 0 ? (
+        <Empty>No tokens. Tokens let scripts upload releases with the studio API; they cannot reach accounts, billing or instances.</Empty>
+      ) : (
+        <div className="lib-list">
+          {data.map((t) => (
+            <div className={"lib-row" + (t.revokedAt ? " is-unlisted" : "")} key={t.id}>
+              <span className="lib-main">
+                <strong>{t.name}</strong>
+                <span className="muted small">
+                  created {date(t.createdAt)} · {t.lastUsedAt ? "last used " + date(t.lastUsedAt) : "never used"}
+                  {t.expiresAt ? " · expires " + date(t.expiresAt) : ""}
+                </span>
+              </span>
+              <span className={"lib-status" + (t.revokedAt ? " bad" : " on")}>{t.revokedAt ? "revoked" : "active"}</span>
+              <div className="lib-actions">
+                {!t.revokedAt && (
+                  <button className="btn btn-soft" onClick={() => confirm(`Revoke ${t.name}?`) && act(revoke(t.id).unwrap(), "Token revoked")}>
+                    Revoke
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

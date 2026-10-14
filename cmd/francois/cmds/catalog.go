@@ -509,7 +509,7 @@ func registerCatalog(root *cobra.Command) error {
 		))}
 	list := &CatalogUsers{glazed.NewCommandDescription("list", glazed.WithShort("List accounts"), withDB(fields.New("search", fields.TypeString)))}
 	settingsCmd := &CatalogSettings{glazed.NewCommandDescription("settings", glazed.WithShort("Show or activate validated platform settings"), withDB(fields.New("file", fields.TypeString, fields.WithHelp("JSON settings document to validate and activate"))))}
-	for _, cmd := range []glazed.Command{serve, migrate, publish, settingsCmd} {
+	for _, cmd := range []glazed.Command{serve, migrate, publish, settingsCmd, newCatalogPush()} {
 		c, err := cli.BuildCobraCommandFromCommand(cmd)
 		if err != nil {
 			return err
