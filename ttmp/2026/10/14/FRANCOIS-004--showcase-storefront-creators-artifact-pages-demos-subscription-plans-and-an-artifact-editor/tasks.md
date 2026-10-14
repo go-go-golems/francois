@@ -9,4 +9,4 @@
 - [x] Phase 5: plans and entitlements (settings, resolver, gating, checkout, pricing, account/admin UI) <!-- t:yago -->
 - [x] Phase 6: visitor demos (guests, expiry, limiter, budget) <!-- t:8wl1 -->
 - [x] Phase 7: API tokens and francois catalog push <!-- t:l7yn -->
-- [ ] Phase 8: production docs and rollout notes <!-- t:9ii3 -->
+- [x] Phase 8: production docs and rollout notes <!-- t:9ii3 -->

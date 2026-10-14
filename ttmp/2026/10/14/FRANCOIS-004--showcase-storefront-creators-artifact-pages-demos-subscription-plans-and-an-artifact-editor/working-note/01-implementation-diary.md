@@ -581,3 +581,64 @@ Against the local dev server, the seeded creator "Manuel" created a token in the
 ### Technical details
 
 - Token format: `frt_` + base64url(32 random bytes) = 47 characters.
+
+## Step 9: Phase 8 — documentation, rollout notes and final validation
+
+This step brought the documentation in line with what was built and checked the whole repository. Writing the rollout order surfaced a deployment trap. Merging to `main` makes CI open a GitOps PR that changes only the image, and the new binary rejects the removed `--stripe-price-id` flag, so that PR on its own would crash-loop the pod. The playbook now prescribes a k3s PR that removes the argument and the `STRIPE_PRICE_ID` variable, and adds `--trust-proxy-headers`, merged together with the image bump.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Finish the implementation with documentation, rollout notes and validation.
+**Inferred user intent:** Something the owners can deploy safely and operate.
+**Commit (code):** e26639d — "Docs and rollout notes for the storefront, plans, demos and push"; c8232be — "Generate logcopter areas for the content and studioclient packages"
+
+### What I did
+
+- `doc/production.md`: flags, prices in plans and the Stripe billing portal, §3.7 storefront content, §4.1 first FRANCOIS-004 rollout, §5.2 roles and plan grants, §5.3 studio and `catalog push`, §5.5 plans, §5.6 demos, troubleshooting rows, known gaps.
+- `README.md`: storefront, studio, plans, demos, `catalog push`.
+- `deploy/compose/bin/catalog-serve`: no `--stripe-price-id` (the local stack would otherwise stop).
+- FRANCOIS-003 `scripts/05-yolo-e2e.mjs`: `alice-subscribe` starts from `/pricing`; `admin-models` sets credits on plans (the playbook names this script as the production verification).
+- `make logcopter-generate` for the new `content` and `studioclient` packages.
+- Pushed branch `feat/storefront` (19 commits ahead of `origin/main`); image publishing runs only on `main`, so nothing deployed.
+
+### Why
+
+- The compose stack and the E2E script are used by people following the docs; leaving them on removed flags and fields would break them at first use.
+
+### What worked
+
+- `TEST_DATABASE_URL=… go test -count=1 ./...` → every package `ok`.
+- `pnpm test` (contract tests) pass; `pnpm check` clean.
+- `make ci-check` (fmt-check, lint, logcopter-check, test, build) → exit 0, `0 issues.`
+
+### What didn't work
+
+- `make logcopter-check` failed: `logcopter-gen: generated file is not current: …/pkg/catalog/content/logcopter.go` (and `studioclient`); `make logcopter` does not exist (`No rule to make target 'logcopter'`); `make logcopter-generate` created both files.
+
+### What I learned
+
+- Every package under `pkg/` needs a generated `logcopter.go`, even if it does not log yet.
+
+### What was tricky to build
+
+- The rollout coupling (see the first paragraph).
+
+### What warrants a second pair of eyes
+
+- The k3s rollout PR must be prepared before merging `feat/storefront` to `main` (playbook §4.1).
+- Stripe billing portal configuration for plan switching is manual.
+
+### What should be done in the future
+
+- Merge `feat/storefront` with the k3s argument change; configure the billing portal; create the creators' profiles and plans in production.
+- Filter the runtime's model list by plan; demo seed data; multi-file artifacts (design §13).
+
+### Code review instructions
+
+- Start with the design doc §3 and §5, then `pkg/catalog/entitlement.go`, `server.go` `authorizeInstance`, `studio.go`, `pages.go`, `demos.go`, `auth.go` `guard`.
+- Validate: `make ci-check` and `TEST_DATABASE_URL='postgres://francois:francois@127.0.0.1:5434/francois_catalog?sslmode=disable' go test -count=1 ./pkg/catalog/...`.
+
+### Technical details
+
+- Commits on `feat/storefront`: 6f17315 (design), 19ba56b (content model), ab1598d (public pages), 68a7daf (studio API), 5f3da56 (studio UI), 0726015 and 0ef0265 (plans), 76be31e and 95af5f4 (demos), 09f6c20 (tokens and push), e26639d (docs), c8232be (logcopter), plus diary commits.
