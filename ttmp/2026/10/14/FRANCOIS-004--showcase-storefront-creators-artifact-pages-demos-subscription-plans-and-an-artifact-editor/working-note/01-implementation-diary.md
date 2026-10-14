@@ -452,3 +452,67 @@ The most important discovery was a rollout hazard. Stored settings revisions are
 
 - New error codes: `plan_required`, `over_plan_limit`, `model_not_in_plan`, `demo_limit`, `guest`.
 - Session `plan`: `{key, name, rank, source, paid, instances}`; account `entitlement`: `{plan, source, decision}`.
+
+## Step 7: Phase 6 — visitor demos
+
+This step let people without an account try an artifact. `POST /api/demos` creates a short-lived instance of the latest release. Anonymous visitors get a guest account and a portal session that ends with the demo, then go through the normal launch handshake. Signed-in visitors demo under their own account. Demos are bounded by a per-address rate limit, a global cap on live demos, a per-demo credit ledger and a shared daily credit budget. A background sweep suspends expired demos and deletes them a week later.
+
+In the browser, an anonymous visitor clicked "Try the demo" on `/apps/polis` and got a running Polis instance labelled "demo until 08:04 PM".
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 6 of the design.
+**Inferred user intent:** The storefront shows the work itself, not only descriptions, without exposing model spend.
+**Commit (code):** 76be31e — "Visitor demos: guest sessions, expiring instances, demo budgets"; 95af5f4 — "Demos: rename max parameters (predeclared identifier lint)"
+
+### What I did
+
+- `pkg/catalog/store/demos.go`: `CreateGuest` (issuer `urn:francois:guest`, role `guest`), `CreateGuestSession` (absolute expiry = demo lifetime), `CreateDemo` (advisory lock, live-demo cap, `expires_at`), `ExpireDemos` (suspend expired, revoke grants, delete after `keep`).
+- `pkg/catalog/demos.go`: `createDemo` handler (explicit `sameOrigin`, settings and artifact flags, latest published release, limiter, guest or signed-in owner), `limiter` (sliding window per key, bounded memory), `clientAddress` (`X-Real-Ip`/`X-Forwarded-For` only with `TrustProxyHeaders`), `expireDemos` loop started in `Server.Run`.
+- `Config.TrustProxyHeaders` and `catalog serve --trust-proxy-headers`.
+- `store.Users` and the admin overview leave guests out; storefront pages and the SPA header treat guests like visitors; the launcher labels demos with their end time; `instanceJSON` includes `expiresAt`.
+- `pkg/catalog/demos_test.go` `TestDemos`: demo disabled, cross-origin refused, guest session and launch, guest has no workspaces/studio and is not listed, per-demo ledger (2 credits: 202, 202, 402), subscriber demo does not touch the monthly allowance, shared daily budget (429 `demo_limit`), per-address limit (429 `rate_limited`), live cap (429 `demo_limit`), expiry (403 `demo_expired`, suspended by the sweep, slot freed).
+
+### Why
+
+- The endpoint is public (anonymous visitors have no CSRF token), so it checks `Origin` itself; otherwise any site could create demos and plant guest cookies.
+- The limiter keys on the client address, which behind Traefik is only meaningful from `X-Real-Ip`; trusting that header without a trusted proxy would let clients choose their own key, hence the opt-in flag.
+- Expired demos are suspended, not deleted immediately, because the daily budget sums calls in demo ledgers and usage reports list them.
+
+### What worked
+
+- `TestDemos` passed on its first run; full `pkg/catalog/...` suite and `pnpm check` pass.
+- Browser: settings revision 2 (demos on) and `PATCH /api/studio/artifacts/polis {"demoEnabled":true}` through the admin API, then with cookies cleared `/apps/polis` → **Try the demo** → `/instances/ins_…` with Polis running.
+
+### What didn't work
+
+- I chained the commit after the linter with `;`, so commit 76be31e went in while `golangci-lint` reported `pkg/catalog/store/demos.go:36:98: param max has same name as predeclared identifier (predeclared)` (twice). Fixed in 95af5f4 (`limit`); later commands gate the commit on the linter.
+- `ui/catalog/api.ts`: my first edit inserted `expiresAt` into the nested `usage` object type and left a stray `};`; `pnpm check` caught it (`TS2367 … '"workspace"' and '"demo"' have no overlap`); fixed.
+- The Playwright script timed out on `locator('.nav')` because the instance viewer covers the header; not an application error.
+
+### What I learned
+
+- The session idle slide (`LEAST(absolute_expires_at, now()+idle)`) already caps any session at its absolute expiry, so a guest session needs only a short absolute expiry.
+
+### What was tricky to build
+
+- Admission races: two visitors can arrive at the last free slot. `CreateDemo` takes a transaction-scoped advisory lock (`hashtext('demos')`) before counting live demos, the same pattern `CreateInstance` uses per owner.
+
+### What warrants a second pair of eyes
+
+- The limiter is in memory and per process; with one replica that is enough, with several it under-counts.
+- Guest rows are never deleted (model-call history references them).
+
+### What should be done in the future
+
+- Optional demo seed data per artifact; a purge of old guest accounts without calls.
+
+### Code review instructions
+
+- `pkg/catalog/demos.go`, `pkg/catalog/store/demos.go`, `authorizeInstance` demo branch in `server.go`, `budget` in `entitlement.go`.
+- `TEST_DATABASE_URL=… go test -count=1 -run TestDemos ./pkg/catalog/`.
+
+### Technical details
+
+- Request: `POST /api/demos {"artifactId":"polis"}` → `201 {"id":"ins_…","expiresAt":"…"}`; errors `invalid_origin`, `demo_disabled`, `account_disabled`, `rate_limited`, `demo_limit`.
