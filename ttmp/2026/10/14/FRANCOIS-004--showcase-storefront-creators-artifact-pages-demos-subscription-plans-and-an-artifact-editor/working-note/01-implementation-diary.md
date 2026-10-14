@@ -374,3 +374,81 @@ Two bugs surfaced only in the browser, and both had the same root cause: `ui/cat
 ### Technical details
 
 - Dev server: `francois catalog serve --database-url postgres://francois:francois@127.0.0.1:5434/storefront_dev?sslmode=disable --listen 127.0.0.1:8095 --public-url http://localhost:8095 --app-domain apps.localhost --release-dir var/storefront/releases --worker-dir var/storefront/worker --backend fake`.
+
+## Step 6: Phase 5 — plans and entitlements
+
+This step replaced the yes/no access check with plans. The settings document now defines plans: rank, Stripe prices, instances, people per instance, monthly and daily credits, and allowed models. A pure resolver (`resolveEntitlement`) turns an account, its billing decision and the settings into one plan. Every check asks it: creating, launching and running workspaces, sharing, downloads and model calls. On the UI side there is a pricing page, the account page shows the plan, the admin settings edit plans, demo limits and the storefront wording, grants can name a plan, and the studio picks an artifact's required plan.
+
+The most important discovery was a rollout hazard. Stored settings revisions are parsed strictly, so the production revision in the old shape would have failed to parse after deployment, and every request needing settings would have returned 503. Migration `005_plans.sql` rewrites stored revisions, and turns the existing subscription prices into the paid plan's prices so current subscribers keep their access.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 5 of the design.
+**Inferred user intent:** Several subscription tiers that actually gate what subscribers can run and use.
+**Commit (code):** 0726015 — "Plans and entitlements: plan-gated runs, limits, credits and checkout"; 0ef0265 — "Pricing page, plan-aware storefront and plan editing"
+
+### What I did
+
+- `pkg/catalog/settings/settings.go`: `Plan`, `PlanPrice`, `Demo`, `Storefront`; credit and per-user limits removed from `Allowance`/`Limits`; `Limits.MaxMediaBytes`; validation (`validatePlans`, `validateDemo`); `Defaults` with only the free plan; helpers `Plan`, `Free`, `Highest`, `PlanForPrice`, `Prices`, `RequiredRank`.
+- `pkg/catalog/store/migrations/005_plans.sql`: rewrites stored revisions (free + subscriber plans, prices from `billing_subscriptions`).
+- `pkg/catalog/billing/policy.go`: `Decision.PriceID`, `Decision.Plan`, `Comp.Plan`; `store.GrantAccess(…, plan)`, `access_grants.plan` read back.
+- `pkg/catalog/entitlement.go`: `Entitlement`, `resolveEntitlement`, `CanRun`, `AllowsModel`, `Paid`, `policyFor`, `entitlementIn`, `entitlement`, and `budget` (the runtime's `Budgeter`).
+- `pkg/catalog/hosted`: `Budget`/`Budgeter` passed to `hosted.New`; `sample` checks plan models, the shared demo budget, and reserves with plan credits or the per-demo period.
+- `pkg/catalog/store`: `Instance.ExpiresAt`, `WorkspacePosition`, `ReserveRequest.Period`, `DemoCreditsToday`.
+- `pkg/catalog/server.go` (`authorizeInstance`: editors for previews, owner and expiry for demos, plan rank and the oldest-first workspace limit for workspaces; payments `OnChange` revokes on losing paid access), `instances.go` (`createInstance`, `addMember`), `routes.go` (session/account report the plan, downloads use `CanRun`, checkout `{plan, interval}` via `checkoutPrice`), `admin.go` (plan in user list/detail, plan grants, billing shows plan prices, adjustments against the plan allowance), `pages.go` (`pricingPage`, `publicPlans`, storefront wording, plan badge), `studio.go` (`studioPlans`, required-plan validation).
+- `pkg/catalog/payments/service.go`: no configured price; `Checkout(ctx, user, price, accepted, portal)`.
+- `cmd/francois/cmds/catalog.go`: `--stripe-price-id` removed; `grant-access --plan`.
+- UI: `pricing.tmpl`, `public.ts` (plan-aware run button, Checkout or billing portal from pricing), `account.tsx`, `admin.tsx` (`PlansEditor`, `PriceField`, `NewPlan`, `ModelPicker`, demo and storefront rows, plan grants), `studio.tsx` (plan select), `api.ts` types.
+- Tests: `entitlement_test.go` (resolver table, `CanRun`, models, `checkoutPrice`), `settings/settings_test.go` (plan validation, old shape rejected), `billing/policy_test.go` (`TestDecisionNamesPriceAndPlan`), `plans_test.go` `TestPlans` (rank gating, instance and member limits, downloads, downgrade and upgrade, plan grants, pricing page, public plans without price IDs, plan badge). The test harness saves a revision with a `pro` plan.
+- `scripts/03-parse-settings/main.go`: parses a document with the strict parser, used to verify migration 005.
+
+### Why
+
+- Plans live in settings, so model approvals and plans validate together and every change is a revision with history.
+- Demo calls use a separate ledger period (`demo:<instance>`): `Reserve` upserts the period's `included` value per user, so reusing the monthly period would have overwritten a subscriber's monthly allowance with the small demo allowance.
+- Staff (creator, admin) resolve to the highest plan and run every artifact, so the two creators can always test their work.
+
+### What worked
+
+- Migration check: a database at migration 004 with an old-shaped revision and an active subscription on `price_1UPxdFLeHmcfmvuCg0zsScj5`, then `005_plans.sql`, then the strict parser → `plan free rank=0 …` and `plan subscriber rank=1 prices=[{month price_1UPxdFLeHmcfmvuCg0zsScj5 }] instances=10 members=10 credits=2000/200`.
+- `TestPlans` passed on its first run; all `pkg/catalog/...` packages pass; `golangci-lint` `0 issues.`
+- Browser: the admin settings editor added a "Supporter" plan with two prices and the storefront title "slop.boutique" → "Settings revision 1 is active."; `/pricing` rendered both plans; the anonymous HTML shows `€5 / month` and `€50 / year` buttons.
+
+### What didn't work
+
+- `go build` listed every caller of the removed fields (`rev.Document.Allowance.MonthlyCredits undefined`, `s.Config.PriceID undefined`, `not enough arguments in call to s.Store.GrantAccess`, …); fixed call site by call site.
+- The migration test first failed with `command not found: docker exec -i francois-catalog-pg psql …`: zsh does not word-split a command stored in a variable; used a shell function.
+- `TestHostedPlatform` expected `subscription_required`; the code is now `plan_required` (intended).
+- `TestStudio` failed with `Unknown plan studio` after adding required-plan validation; the test now uses the configured `pro` plan and checks the unknown case.
+- `settings_test.go:18:23: cannot call pointer method Validate on Document` (calling on a function result); fixed, and removed a dead `if err := error(nil)` block my first fix left behind.
+
+### What I learned
+
+- `Validate` has a pointer receiver because it normalises nil slices; tests must call it on an addressable value.
+
+### What was tricky to build
+
+- The downgrade rule needs a stable order: `WorkspacePosition` counts the owner's workspaces with `(created_at, id) <= (inst.created_at, inst.id)`, so ties on timestamps cannot make two instances share a position.
+- Signed-in visitors' demos and the monthly ledger (see Why).
+
+### What warrants a second pair of eyes
+
+- `resolveEntitlement` treats a subscription whose price is no longer in any plan as free; removing a price from settings therefore immediately removes paid access for those subscribers.
+- Staff entitlement skips the workspace limit.
+- Migration 005 rewrites historic revisions as well as the active one.
+
+### What should be done in the future
+
+- Configure the Stripe billing portal (products and prices) so subscribers can switch plans there.
+- Filter the runtime's model list (`rt.models`) by plan, so applications only offer models the plan allows.
+
+### Code review instructions
+
+- `pkg/catalog/entitlement.go`, `pkg/catalog/server.go` `authorizeInstance`, `pkg/catalog/settings/settings.go` `validatePlans`, `pkg/catalog/store/migrations/005_plans.sql`.
+- `go test ./pkg/catalog/settings/ ./pkg/catalog/billing/` and `TEST_DATABASE_URL=… go test -count=1 -run 'TestPlans|TestResolve|TestCanRun|TestCheckoutPrice|TestHostedPlatform' ./pkg/catalog/`.
+
+### Technical details
+
+- New error codes: `plan_required`, `over_plan_limit`, `model_not_in_plan`, `demo_limit`, `guest`.
+- Session `plan`: `{key, name, rank, source, paid, instances}`; account `entitlement`: `{plan, source, decision}`.

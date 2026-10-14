@@ -40,3 +40,12 @@ Phase 4 studio UI (5f3da56): artifact editor, journal, creators, media library; 
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/studio.tsx — Studio UI
+
+## 2026-10-14
+
+Phase 5 plans and entitlements (0726015, 0ef0265): plans in settings, migration 005, entitlement resolver, plan-gated runs/limits/credits, checkout by plan, pricing page, admin plan editor
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/entitlement.go — Entitlement resolver
+- /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/store/migrations/005_plans.sql — Settings migration to plans
