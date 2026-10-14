@@ -69,6 +69,7 @@ type CatalogServeSettings struct {
 	PublicURL          string   `glazed:"public-url"`
 	AppDomain          string   `glazed:"app-domain"`
 	Sites              []string `glazed:"site"`
+	LegalContact       string   `glazed:"legal-contact"`
 	ReleaseDir         string   `glazed:"release-dir"`
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
@@ -157,7 +158,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, SignupAllowed: s.SignupAllowed}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, PriceID: s.StripePriceID, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -467,6 +468,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("listen", fields.TypeString, fields.WithDefault("127.0.0.1:8090"), fields.WithHelp("Listen address")),
 			fields.New("public-url", fields.TypeString, fields.WithDefault("http://localhost:8090"), fields.WithHelp("Trusted portal origin")),
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
+			fields.New("legal-contact", fields.TypeString, fields.WithHelp("Contact address shown on /privacy and /terms")),
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),

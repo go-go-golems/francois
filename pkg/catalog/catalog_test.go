@@ -628,3 +628,22 @@ func TestSecondSite(t *testing.T) {
 		t.Fatalf("code redeemed on the other site's origin: %d", code)
 	}
 }
+
+// TestLegalPages serves the privacy policy and terms as plain HTML under the
+// site the request arrived on.
+func TestLegalPages(t *testing.T) {
+	e := setup(t)
+	for _, tc := range []struct{ host, path, want string }{
+		{"portal.test", "/privacy", "Privacy policy · portal.test"},
+		{"boutique.test", "/privacy", "Privacy policy · boutique.test"},
+		{"boutique.test", "/terms", "Terms of service · boutique.test"},
+	} {
+		code, b, hdr := e.do(nil, tc.host, "GET", tc.path, nil, nil)
+		if code != 200 || !strings.HasPrefix(hdr.Get("Content-Type"), "text/html") || !bytes.Contains(b, []byte(tc.want)) || !bytes.Contains(b, []byte("<h2>Contact</h2>")) {
+			t.Fatalf("%s%s: %d %q", tc.host, tc.path, code, hdr.Get("Content-Type"))
+		}
+	}
+	if code, b, _ := e.do(nil, "portal.test", "GET", "/terms", nil, nil); code != 200 || !bytes.Contains(b, []byte("Accounts are by invitation only")) {
+		t.Fatalf("terms body: %d", code)
+	}
+}

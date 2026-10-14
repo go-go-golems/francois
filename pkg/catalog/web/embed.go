@@ -28,6 +28,11 @@ var RuntimeJS []byte
 //go:embed static/icon.svg
 var Icon []byte
 
+// LegalTemplate renders /privacy and /terms (html/template).
+//
+//go:embed legal.tmpl
+var LegalTemplate string
+
 // PortalAsset serves only portal UI files, never subscriber HTML.
 func PortalAsset(name string) ([]byte, string, bool) {
 	switch name {

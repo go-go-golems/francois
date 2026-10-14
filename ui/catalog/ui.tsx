@@ -118,6 +118,11 @@ export function Footer() {
             <Link to="/account">Account</Link>
           </div>
           <div>
+            <span>Legal</span>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+          </div>
+          <div>
             <span>Notes</span>
             <span className="foot-note">
               Applications run on their own origins.

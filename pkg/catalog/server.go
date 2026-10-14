@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"html/template"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/payments"
 	"github.com/go-go-golems/francois/pkg/catalog/releases"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
+	"github.com/go-go-golems/francois/pkg/catalog/web"
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -84,6 +86,9 @@ type Config struct {
 	// SignupAllowed lets /auth/login?signup=1 open the identity provider's
 	// registration form. Invite-only deployments leave it false.
 	SignupAllowed bool
+	// LegalContact is the address /privacy and /terms tell people to write
+	// to; empty points them to the consent screen's support address.
+	LegalContact string
 }
 
 // Validate rejects site lists the host dispatcher cannot route
@@ -128,6 +133,7 @@ type Server struct {
 	Backend   piworker.Backend
 	Runtime   *hosted.Runtime
 	portal    http.Handler
+	legal     *template.Template
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -144,7 +150,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 			site.AppPort = site.PublicURL.Port()
 		}
 	}
-	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b}
+	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate))}
 	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {

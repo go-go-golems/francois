@@ -36,6 +36,8 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(data)
 	})
+	m.HandleFunc("GET /privacy", s.legalPage("privacy", "Privacy policy"))
+	m.HandleFunc("GET /terms", s.legalPage("terms", "Terms of service"))
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { httpx.OK(w, map[string]string{"status": "ok"}) })
 	m.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -78,6 +80,24 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-src "+site.AppScheme+"://*."+site.AppDomain+portSuffix(site.AppPort)+"; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		m.ServeHTTP(w, r)
 	})
+}
+
+// legalUpdated is the date shown on /privacy and /terms; change it with
+// their text in web/legal.tmpl.
+const legalUpdated = "13 October 2026"
+
+// legalPage serves the privacy policy or terms as plain HTML, named after
+// the site the request arrived on, so identity-provider consent screens and
+// crawlers can read them without JavaScript.
+func (s *Server) legalPage(page, title string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		data := map[string]string{"Page": page, "Title": title, "Site": s.site(r).PublicURL.Hostname(), "Contact": s.Config.LegalContact, "Updated": legalUpdated}
+		if err := s.legal.Execute(w, data); err != nil {
+			log.Error().Err(err).Str("page", page).Msg("render legal page")
+		}
+	}
 }
 
 func portSuffix(p string) string {
