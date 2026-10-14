@@ -21,8 +21,9 @@ if [[ -n ${STRIPE_PRICE_ID:-} ]]; then
   for _ in $(seq 1 30); do [[ -s /bootstrap/stripe-webhook-secret ]] && break; sleep 1; done
 fi
 if [[ -s /bootstrap/stripe-secret-key && -s /bootstrap/stripe-webhook-secret && -n ${STRIPE_PRICE_ID:-} ]]; then
-  args+=(--stripe-secret-key-file /bootstrap/stripe-secret-key --stripe-webhook-secret-files /bootstrap/stripe-webhook-secret --stripe-price-id "$STRIPE_PRICE_ID")
-  echo "Stripe sandbox billing enabled (price $STRIPE_PRICE_ID)"
+  args+=(--stripe-secret-key-file /bootstrap/stripe-secret-key --stripe-webhook-secret-files /bootstrap/stripe-webhook-secret)
+  # Prices belong to plans in the settings document, not to a flag.
+  echo "Stripe sandbox billing enabled; list $STRIPE_PRICE_ID in a plan (Admin → Settings → Plans) to sell it"
 else
   echo "Stripe billing disabled (start the 'stripe' profile and set STRIPE_PRICE_ID to enable)"
 fi

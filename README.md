@@ -178,7 +178,7 @@ settings go in the ignored `deploy/compose/.env`:
 
 ```sh
 STRIPE_API_KEY=sk_test_...        # sandbox key; enables the stripe profile
-STRIPE_PRICE_ID=price_...         # server-controlled recurring Price
+STRIPE_PRICE_ID=price_...         # recurring Price; list it in a plan (Admin → Settings → Plans)
 FRANCOIS_BACKEND=pi               # default: fake deterministic model
 PI_AGENT_DIR=/home/you/.pi/agent  # provider files are copied, read-only source
 ```
@@ -194,7 +194,7 @@ francois catalog migrate
 francois catalog serve --public-url https://francois.example --app-domain apps.example ...
 francois catalog publish --artifact-id polis --version 1.0.0 --html examples/polis.html --actor-user-id usr_...
 francois catalog users promote --issuer https://issuer --subject <sub>   # bootstrap admin
-francois catalog users grant-access --user-id usr_... --days 30 --reason pilot
+francois catalog users grant-access --user-id usr_... --days 30 --reason pilot [--plan key]
 francois catalog settings --file settings.json                         # validated revision
 ```
 
@@ -207,11 +207,30 @@ return URLs follow the domain a request arrives on, and `www.<portal>`
 redirects to the portal. Register `<portal>/auth/callback` and `<portal>/` on
 the OIDC client for every site. Sessions are per domain.
 
-The admin UI (`/admin`) covers HTML upload → check → draft → isolated preview →
-publish/withdraw, users (roles, disable, session revocation, complimentary
-access, credit adjustments), instances (inspect, suspend), billing events and
-reconciliation, model usage, versioned settings (approved models, thinking
-levels, credit weights, allowance and limits) and the audit log.
+Visitors see a server-rendered storefront: front page, catalog (`/apps`),
+artifact pages with write-ups, images and videos, creator pages, a journal
+with RSS (`/journal`) and a pricing page (`/pricing`). Artifacts can offer
+short-lived demos to visitors without an account.
+
+Creators and administrators work in the studio (`/studio`): artifact details,
+page drafts with a Markdown preview, releases (HTML upload → check → draft →
+isolated preview → publish/withdraw), demos, journal posts, creator profiles,
+a media library and personal API tokens. A creator edits the artifacts
+credited to their profile. `francois catalog push` uploads releases with a
+token, without database access:
+
+```sh
+francois catalog push --server https://catalog.example --token-file token \
+  --artifact-id polis --version 1.2.0 --html dist/polis.html --publish
+```
+
+The admin UI (`/admin`) covers users (roles, disable, session revocation,
+complimentary access for a plan, credit adjustments), instances (inspect,
+suspend), billing events and reconciliation, model usage, versioned settings
+(approved models, thinking levels, credit weights, plans with Stripe prices
+and limits, demo limits, storefront wording) and the audit log. Plans decide
+which artifacts an account may run (by rank), how many instances and members,
+and how many model credits.
 
 The production deployment (yolo k3s, `francois.yolo.scapegoat.dev` and
 `slop.boutique`) is described in [doc/production.md](doc/production.md).
