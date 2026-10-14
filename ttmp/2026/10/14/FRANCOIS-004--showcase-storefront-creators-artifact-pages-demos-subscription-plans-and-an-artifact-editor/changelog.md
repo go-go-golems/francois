@@ -16,3 +16,11 @@ Phase 1 content model (19ba56b): migration 004, store for pages/creators/media/p
 
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/content/markdown.go — Safe Markdown rendering
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/store/migrations/004_storefront.sql — Schema for all storefront phases
+
+## 2026-10-14
+
+Phase 2 public pages (ab1598d): server-rendered storefront, /media, RSS, public.js, SPA catalog removed
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/pages.go — Storefront handlers

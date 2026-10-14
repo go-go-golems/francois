@@ -166,3 +166,75 @@ One design change came out of reading the existing code: the `description` colum
 
 - Page document JSON: `{"body": "...", "cover": "med_…", "gallery": ["med_…"]}`; `gallery` is always an array after scanning.
 - Post state change keeps the first `published_at` when republishing (`COALESCE(published_at, now())`).
+
+## Step 3: Phase 2 — server-rendered storefront pages
+
+This step made the storefront visible. The home page, catalog, artifact pages, creator pages, journal, single posts and an RSS feed are now rendered on the server with `html/template`, and media is served from `/media/{id}`. A 2 KB script (`/static/public.js`) adds the buttons that need a session: run, try the demo (wired for Phase 6) and sign out. The SPA keeps only the signed-in areas; its catalog and artifact components are gone.
+
+I checked the pages in a browser against a local server seeded with two creators, two artifacts with covers and write-ups, and a post. Layout, Markdown, gallery and the phone-width layout looked right; there were no console messages.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 2 of the design.
+**Inferred user intent:** Pages a visitor (and a search engine) can read without signing in.
+**Commit (code):** ab1598d — "Server-rendered storefront: home, catalog, artifact, creator, journal, RSS, media"
+
+### What I did
+
+- `pkg/catalog/web/templates/`: `layout.tmpl` (head with Open Graph, header nav, footer, shared `cards`, `posts` and `media` blocks), `home.tmpl`, `catalog.tmpl`, `artifact.tmpl`, `creator.tmpl`, `journal.tmpl`, `post.tmpl`, `notfound.tmpl`; embedded as `web.Templates`.
+- `pkg/catalog/pages.go`: `parsePages` (layout + one page per template set), `render` (nav from the principal, `Cache-Control: no-cache`, `Vary: Cookie`), `cards`, `homePage`, `catalogPage` (tag filter), `artifactPage` (`?draft=1` for editors), `creatorPage`, `journalPage`, `postPage` (drafts for their author), `journalFeed` (RSS 2.0), `media` (`http.ServeContent` with sandbox CSP and immutable caching), `canEditArtifact`, `canEditPost`, `releaseCaps`.
+- `pkg/catalog/routes.go`: SPA shell only for `/account`, `/instances/`, `/studio`, `/admin`; new storefront routes; CSP `media-src 'self'`; `/api/catalog` adds `cover`, `creators`, `featured`, `requiredPlan`, `demo`, `url`.
+- `pkg/catalog/store/users.go`: `SetUserRole` accepts `creator`.
+- `ui/catalog/public.ts` (+ `scripts/build.mjs` entry, `web.PublicJS`); `ui/catalog/catalog.tsx` deleted; `main.tsx` routes; `ui.tsx` `Link` navigates normally outside SPA routes, nav gains Journal and Studio.
+- `pkg/catalog/web/static/catalog.css`: covers, `.md` prose, gallery, creator cards, posts, draft banner.
+- Test `TestStorefrontPages`; test helper `user()` now applies any role.
+- Seed script `scripts/01-seed-dev-storefront.sh` (local database `storefront_dev`, release dir `var/storefront/releases`); dev server `francois catalog serve --listen 127.0.0.1:8095 --public-url http://localhost:8095 --backend fake`.
+
+### Why
+
+- Templates are parsed per page because every page defines `content`; one shared set would make the last definition win.
+- `render` buffers the output so a template error returns a clean 503 instead of half a page.
+- `/apps/{id}` keeps the URL the SPA used, so existing links stay valid.
+
+### What worked
+
+- `TEST_DATABASE_URL=… go test -count=1 ./pkg/catalog/...` → all `ok`; `pnpm check` clean; `golangci-lint run ./pkg/catalog/...` → `0 issues.`
+- Browser: home, artifact and post pages render as intended at 1280 px and 390 px; console has 0 messages.
+
+### What didn't work
+
+- `go build` failed with `pkg/catalog/web/embed.go:16:12: pattern static/public.js: no matching files found` until the new bundle was built (`pnpm build`).
+- `TestStorefrontPages` first failed at `storefront_test.go:222: editor draft preview` because the test helper only applied the `admin` role; the `creator` user was a subscriber. Fixed the helper and `SetUserRole`, which rejected `creator`.
+- The seed script exited silently after publishing: `read -r w h < <(identify -format '%w %h' …)` returns non-zero because `identify` prints no trailing newline, and `set -e` stopped the script. Replaced with two `$(identify …)` calls. Re-runs failed on `version 1.0.0 already exists for polis: conflict`; publishing is now allowed to fail in the seed.
+- The seeded post showed literal `\n`: the SQL string was not an `E''` literal. Seed-only issue, fixed.
+- Playwright refused to save screenshots in the scratchpad (`outside allowed roots`); saved under `.playwright-mcp/`, which is git-ignored.
+
+### What I learned
+
+- The portal's global CSP wrapper sets headers before the handler runs, so the media handler can override `Content-Security-Policy` per response.
+- `html/template` already neutralises `javascript:` in `href` from creator links (`#ZgotmplZ`), but the studio API should still validate link URLs (Phase 3).
+
+### What was tricky to build
+
+- Public pages read the session cookie through `guard(public, …)` to render the right header, which makes every page personalised. `Cache-Control: no-cache` plus `Vary: Cookie` keeps shared caches from serving one visitor's header to another.
+- Draft previews: `?draft=1` alone must reveal nothing. The handler computes `draft` only when the caller can edit the artifact; otherwise hidden and unpublished artifacts return the same 404 as unknown IDs.
+
+### What warrants a second pair of eyes
+
+- `public.ts` shows "Sign in to run" even when sign-in is not configured (local dev only).
+- `media` reads the whole blob into memory per request (and verifies its hash); acceptable for images and short videos at the 25 MiB limit planned in Phase 5.
+
+### What should be done in the future
+
+- Storefront title, tagline and intro from settings (Phase 5); plan badge and demo button (Phases 5 and 6).
+
+### Code review instructions
+
+- `pkg/catalog/pages.go` (`artifactPage`, `postPage`, `media`), `pkg/catalog/web/templates/layout.tmpl`, `ui/catalog/public.ts`.
+- Validate with the test command above and the seed script plus dev server for a visual check.
+
+### Technical details
+
+- Storefront routes: `GET /{$}`, `/apps`, `/apps/{$}`, `/apps/{id}`, `/creators/{slug}`, `/journal`, `/journal/feed.xml`, `/journal/{slug}`, `/media/{id}`.
+- Media headers: `Content-Type` from detection, `Cache-Control: public, max-age=31536000, immutable`, `Content-Security-Policy: default-src 'none'; sandbox`, `X-Content-Type-Options: nosniff` (global).
