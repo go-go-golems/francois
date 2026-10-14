@@ -81,9 +81,13 @@ catalog serve --listen=0.0.0.0:8080
   --oidc-client-id-file=/run/secrets/francois/oidc-client-id
   --oidc-extra-scopes=urn:zitadel:iam:org:id:$(FRANCOIS_ZITADEL_ORG_ID)
   --stripe-secret-key-file=… --stripe-webhook-secret-files=… (current, previous)
-  --stripe-price-id=$(STRIPE_PRICE_ID) --grant-ttl=30m
+  --grant-ttl=30m --trust-proxy-headers
   --backend=pi --worker=/app/worker/dist/main.js --pi-agent-dir=/var/lib/francois/pi
 ```
+
+Prices are not a flag: they belong to the plans in the settings document
+(§5.5). `--trust-proxy-headers` makes the demo rate limit use Traefik's
+`X-Real-Ip`; without it every visitor appears as the Traefik pod.
 
 One replica, `Recreate` strategy (the PVC is `ReadWriteOnce`). The container
 command copies the Pi provider files from the read-only Secret mount
@@ -179,13 +183,20 @@ The client IDs are Terraform variable defaults; the secrets are only in Vault.
 | Object | Value |
 | --- | --- |
 | Product | `prod_VQpH0Crg2Ztp5I` (Terraform) |
-| Price | `price_1UPxdFLeHmcfmvuCg0zsScj5`, lookup key prefix `francois-subscriber` (Terraform) |
+| Price | `price_1UPxdFLeHmcfmvuCg0zsScj5`, lookup key prefix `francois-subscriber` (Terraform); listed in the `subscriber` plan |
 | Webhook endpoint | `we_1UQ9zfLeHmcfmvuC639e6BPZ` → `https://francois.yolo.scapegoat.dev/webhooks/stripe` |
 | Webhook events | `checkout.session.completed`, `checkout.session.expired`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed` |
 
 The sandbox account is shared with other deployments. Francois tags its
 customers with `francois_deployment` and ignores events for other customers.
 `bootstrap-francois-secrets.sh` refuses live keys (`sk_test_*`/`rk_test_*` only).
+The runtime record's `stripe-price-id` key is no longer read by the server.
+
+Plan changes happen in the Stripe billing portal, which must allow switching
+between the plans' products and prices (Stripe Dashboard → Settings →
+Billing → Customer portal → Subscriptions). Each Stripe Price a plan sells
+must be listed in that plan in Settings, or subscribers paying it resolve to
+the free plan.
 
 ### 3.6 Models
 
@@ -201,7 +212,22 @@ in the database (admin UI → Settings). Production values at setup:
 | `lunaroute/glm-5.3` | 3 | default, complex |
 | `lunaroute/deepseek-4.1-flash` | 1 | — |
 
-Allowance: 2000 credits per month, 200 per day.
+Credits are per plan (Settings → Plans): at the FRANCOIS-004 rollout the
+`subscriber` plan carries the earlier 2000 credits per month and 200 per day.
+
+### 3.7 Storefront content
+
+| Content | Stored in | Edited in |
+| --- | --- | --- |
+| Artifact page (write-up, cover, gallery) | `catalog_artifacts.page` / `page_draft` | Studio → artifact → Page |
+| Creator profiles | `creators`, `artifact_creators` | Studio → Creators (admins create and link accounts) |
+| Journal | `posts` | Studio → Journal |
+| Images and videos | `catalog_media` + blobs in `/var/lib/francois/releases/blobs` | Studio → Media |
+| Plans, demo limits, storefront wording | settings revision | Admin → Settings |
+
+Media blobs share the release blob directory, so the nightly backup covers
+them. Public pages: `/`, `/apps`, `/apps/{id}`, `/creators/{slug}`,
+`/journal`, `/journal/{slug}`, `/journal/feed.xml`, `/pricing`, `/media/{id}`.
 
 ## 4. Releasing code
 
@@ -240,6 +266,29 @@ the k3s repository and roll out the same way. Run
 When a Vault value and a manifest change must land together (for example a new
 key name), write Vault first, wait until the VaultStaticSecret has refreshed the
 cluster Secret, then merge. Otherwise the new pod starts with the old value.
+
+### 4.1 First rollout of the storefront (FRANCOIS-004)
+
+The FRANCOIS-004 binary removes `--stripe-price-id` (an unknown flag stops the
+server) and runs migrations 004 and 005. The automated GitOps PR changes only
+the image, so it must not be merged on its own:
+
+1. Before merging the feature branch to `main`, prepare a k3s PR that, in
+   `deployment.yaml`, removes the `--stripe-price-id=$(STRIPE_PRICE_ID)`
+   argument and the `STRIPE_PRICE_ID` environment variable, and adds
+   `--trust-proxy-headers`.
+2. Merge the francois branch. When the image PR appears, either add its
+   `image:` change to the PR from step 1 or merge both together (the step 1 PR
+   first). Never let the image roll out with the old arguments.
+3. On start, migration 005 rewrites the settings: a `free` plan and a
+   `subscriber` plan with the previous instance, member and credit limits and
+   the price existing subscriptions pay. Check Admin → Settings → Plans, rename
+   or reprice as needed, and add further plans with their Stripe prices.
+4. Create creator profiles (Studio → Creators), link them to the creators'
+   accounts, and set those accounts' role to Creator (Admin → Users).
+5. Fill the storefront wording (Admin → Settings → Storefront) and, if wanted,
+   enable demos (Settings → Demos, then per artifact in the studio).
+6. Smoke test: `/`, `/pricing`, an artifact page, a demo, a studio edit.
 
 ## 5. Day-to-day operations
 
@@ -281,7 +330,7 @@ rm -f "$h"
 ```bash
 fc users list
 fc users promote --issuer https://zitadel.yolo.scapegoat.dev --subject <zitadel user id>
-fc users grant-access --user-id usr_… --days 30 --reason pilot
+fc users grant-access --user-id usr_… --days 30 --reason pilot [--plan supporter]
 fc users disable --user-id usr_…          # also revokes runtime grants
 fc users enable --user-id usr_…
 fc users revoke-sessions --user-id usr_…
@@ -289,13 +338,28 @@ fc users revoke-sessions --user-id usr_…
 
 `promote` by issuer and subject creates the identity row if the user has not
 signed in yet, so the first login already has the admin role. Use the ZITADEL
-user ID as the subject. Roles, complimentary access, credit adjustments and
-suspensions are also in the admin UI (`/admin`).
+user ID as the subject. Roles (subscriber, creator, administrator),
+complimentary access (optionally for a named plan; without one, the highest
+plan), credit adjustments and suspensions are also in the admin UI (`/admin`).
+Creators and administrators have the highest plan without paying.
 
 ### 5.3 Publish a release of an artifact
 
-Through the admin UI: upload HTML → check → draft → isolated preview → publish.
-From the CLI, with files that exist in the image:
+Creators publish their own artifacts; administrators publish any. In the
+studio (`/studio`): artifact → Releases → upload HTML → check → draft →
+preview on an isolated origin → publish. From a laptop, with a personal API
+token created in Studio → Tokens:
+
+```bash
+francois catalog push --server https://slop.boutique --token-file ~/.config/francois/token \
+  --artifact-id polis --version 1.2.0 --html dist/polis.html \
+  [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish]
+```
+
+Tokens work only on `/api/studio/*`; a token cannot reach accounts, billing or
+instances, and cannot create tokens. Revoke one in Studio → Tokens.
+
+As an operator, from inside the pod, with files that exist in the image:
 
 ```bash
 fc publish --artifact-id polis --version 1.0.1 \
@@ -329,7 +393,26 @@ kubectl -n francois rollout restart deploy/francois
 
 Check the directory locally before writing it: `francois models list --pi-agent-dir <dir>` must list only LunaRoute models.
 
-### 5.5 Logs and status
+### 5.5 Plans and pricing
+
+Plans live in Admin → Settings → Plans: key, name, rank, Stripe prices
+(`month|year price_… label`), instances, people per instance, monthly and daily
+credits, allowed models, and whether `/pricing` shows the plan. Rank orders
+plans; an artifact's required plan (studio → Details) is the lowest plan that
+may run it, by default the lowest paid plan. A plan above free without prices
+can only be granted. After a downgrade, the oldest workspaces up to the new
+limit keep working; the others stop launching (`over_plan_limit`) until the
+subscriber upgrades or deletes some.
+
+### 5.6 Demos
+
+Settings → Demos sets the lifetime, the number of live demos, demos per
+address per hour, credits per demo and a daily credit budget for all demos;
+each artifact opts in (studio → Demo). Anonymous visitors get a guest account
+and a session that ends with the demo; guests do not appear in the admin user
+list. Expired demos are suspended within a minute and deleted after a week.
+
+### 5.7 Logs and status
 
 ```bash
 kubectl -n francois logs deploy/francois --since=1h
@@ -499,6 +582,12 @@ presented, remove that finalizer.
 | Stripe events retried for unknown customers | Shared sandbox account | Expected; Francois acknowledges and ignores foreign customers |
 | New pod uses an old secret value | Merged before VSO refreshed the Secret | Wait for the refresh, then `rollout restart` |
 | A model is approved but calls fail | No credential for its provider | Only LunaRoute selectors work (§3.6) |
+| Pod crash-loops after an image bump: `unknown flag: --stripe-price-id` | FRANCOIS-004 image with the old arguments | Remove the argument and `STRIPE_PRICE_ID` (§4.1) |
+| `plan_required` for a paying subscriber | Their Stripe price is not listed in any plan | Add the price to the plan in Settings |
+| `over_plan_limit` when launching | Workspace beyond the owner's (downgraded) plan limit | Upgrade, or delete newer workspaces |
+| `model_not_in_plan` | The plan restricts models | Add the model to the plan, or leave the plan's model list empty |
+| `demo_limit` | All live demo slots used, or the daily demo budget spent | Raise the limits in Settings → Demos, or wait |
+| `token_not_allowed` / `token_invalid` | API token used outside `/api/studio`, or revoked/expired | Use a browser session; create a new token |
 
 ## 10. Backups and restore
 
@@ -565,5 +654,11 @@ The order follows the dependencies; each step names its check.
   launch should consider a dedicated registrable domain for instances.
 - Billing runs in Stripe test mode. A live account needs its own Price with an
   explicit tax decision, and the bootstrap script's test-key check removed.
+- Plan changes by subscribers need the Stripe billing portal configured for
+  all plan products and prices.
+- The demo rate limiter is in memory and per process (correct with one
+  replica).
+- Migration 005 rewrote all stored settings revisions; a rollback to a
+  pre-FRANCOIS-004 image cannot read them.
 - The PDS records in the `scapegoat.dev` zone are not imported into Terraform
   (HK3S-0031), so a full DNS apply would try to recreate them.

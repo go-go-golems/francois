@@ -58,8 +58,10 @@ try {
     await login(page, creds.alice_username, creds.alice_password);
     let s = await session(page);
     log("before", JSON.stringify({ role: s.user?.role, allowed: s.access?.allowed, reason: s.access?.reason }));
-    await page.goto(BASE + "/account");
-    await page.getByRole("button", { name: /subscribe/i }).first().click();
+    // FRANCOIS-004: subscribing starts from the pricing page (first paid plan,
+    // monthly price).
+    await page.goto(BASE + "/pricing");
+    await page.locator("[data-checkout] a[data-interval=month]").first().click();
     await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30000 });
     log("on Stripe Checkout");
     await page.waitForTimeout(3000);
@@ -130,7 +132,7 @@ try {
     await ctx.storageState({ path: statePath("alice") });
   } else if (step === "admin-models") {
     // Approve the LunaRoute models (the only provider configured) and give
-    // subscribers a monthly and daily credit allowance.
+    // paid plans a monthly and daily credit allowance.
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page, creds.admin_username, creds.admin_password);
@@ -145,7 +147,9 @@ try {
       ].filter((m) => available.includes(m.selector));
       const doc = { ...(cur.active?.document ?? cur.defaults) };
       doc.models = { allowed: want, tiers: { quick: "lunaroute/glm-5.3-flash", default: "lunaroute/glm-5.3", complex: "lunaroute/glm-5.3" } };
-      doc.allowance = { ...doc.allowance, monthlyCredits: 2000, dailyCredits: 200 };
+      // FRANCOIS-004: credits belong to plans; give every paid plan the
+      // subscriber allowance unless it already has one.
+      doc.plans = (doc.plans ?? []).map((p) => (p.key === "free" || p.monthlyCredits ? p : { ...p, monthlyCredits: 2000, dailyCredits: 200 }));
       const r = await fetch("/api/admin/settings", { method: "PATCH", headers: { "Content-Type": "application/json", "X-CSRF-Token": s.csrfToken }, body: JSON.stringify(doc) });
       return { status: r.status, body: await r.json(), available: available.length, modelProvider: cur.secrets?.modelProvider };
     });
