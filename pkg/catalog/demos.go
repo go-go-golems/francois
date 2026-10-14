@@ -32,9 +32,9 @@ type limiter struct {
 
 func newLimiter() *limiter { return &limiter{hits: map[string][]time.Time{}} }
 
-// allow records a hit for key and reports whether it is within max hits per
-// window.
-func (l *limiter) allow(key string, max int, window time.Duration, now time.Time) bool {
+// allow records a hit for key and reports whether it is within limit hits
+// per window.
+func (l *limiter) allow(key string, limit int, window time.Duration, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	cut := now.Add(-window)
@@ -44,7 +44,7 @@ func (l *limiter) allow(key string, max int, window time.Duration, now time.Time
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= max {
+	if len(kept) >= limit {
 		l.hits[key] = kept
 		return false
 	}
