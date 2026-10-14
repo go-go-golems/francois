@@ -229,20 +229,20 @@ func (s *Server) Handler() http.Handler {
 }
 
 // authorizeInstance is the single hosted-access rule: preview instances are
-// admin-only; workspaces need current entitlement for owner and caller.
+// for the artifact's editors; workspaces need current entitlement for owner and caller.
 func (s *Server) authorizeInstance(ctx context.Context, u store.User, inst store.Instance) error {
 	if u.Disabled {
 		return hosted.Denied(403, billing.ReasonDisabled, "This account is disabled")
 	}
-	if inst.Kind == "preview" {
-		if u.Role != "admin" {
-			return hosted.Denied(403, "admin_required", "Preview instances are for administrators")
-		}
-		return nil
-	}
 	rel, err := s.Store.Release(ctx, inst.ReleaseID)
 	if err != nil {
 		return err
+	}
+	if inst.Kind == "preview" {
+		if !s.canEditArtifact(ctx, u, rel.ArtifactID) {
+			return hosted.Denied(403, "not_editor", "Preview instances are for the artifact's editors")
+		}
+		return nil
 	}
 	if rel.State == "withdrawn" {
 		rev, err := s.Store.ActiveSettings(ctx)

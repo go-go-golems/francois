@@ -165,7 +165,7 @@ func TestStorefrontPages(t *testing.T) {
 	if code != 201 {
 		t.Fatalf("upload %d %v", code, rel)
 	}
-	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
+	if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
 		t.Fatalf("publish %d %v", code, out)
 	}
 	png := tinyPNG(t)

@@ -300,33 +300,33 @@ export const api = createApi({
     // Administration.
     overview: b.query<any, void>({ query: () => "api/admin/overview", providesTags: ["Overview"] }),
     adminReleases: b.query<{ artifacts: any[]; releases: Release[] }, void>({
-      query: () => "api/admin/releases",
+      query: () => "api/studio/releases",
       providesTags: ["AdminReleases"],
     }),
     checkUpload: b.mutation<{ checks: Check[]; blocking: boolean; manifest: Record<string, unknown>; size: number }, FormData>({
-      query: (body) => ({ url: "api/admin/releases/check", method: "POST", body }),
+      query: (body) => ({ url: "api/studio/releases/check", method: "POST", body }),
     }),
     uploadRelease: b.mutation<Release, FormData>({
-      query: (body) => ({ url: "api/admin/releases", method: "POST", body }),
+      query: (body) => ({ url: "api/studio/releases", method: "POST", body }),
       invalidatesTags: ["AdminReleases", "Overview"],
     }),
     publishRelease: b.mutation<Release, string>({
-      query: (id) => ({ url: `api/admin/releases/${id}/publish`, method: "POST" }),
+      query: (id) => ({ url: `api/studio/releases/${id}/publish`, method: "POST" }),
       invalidatesTags: ["AdminReleases", "Catalog", "Overview"],
     }),
     withdrawRelease: b.mutation<unknown, { id: string; suspendPinned: boolean }>({
-      query: ({ id, suspendPinned }) => ({ url: `api/admin/releases/${id}/withdraw`, method: "POST", body: { suspendPinned } }),
+      query: ({ id, suspendPinned }) => ({ url: `api/studio/releases/${id}/withdraw`, method: "POST", body: { suspendPinned } }),
       invalidatesTags: ["AdminReleases", "Catalog", "Overview", "AdminInstances"],
     }),
     deleteDraft: b.mutation<unknown, string>({
-      query: (id) => ({ url: `api/admin/releases/${id}`, method: "DELETE" }),
+      query: (id) => ({ url: `api/studio/releases/${id}`, method: "DELETE" }),
       invalidatesTags: ["AdminReleases", "Overview"],
     }),
     previewRelease: b.mutation<Instance, string>({
-      query: (id) => ({ url: `api/admin/releases/${id}/preview`, method: "POST" }),
+      query: (id) => ({ url: `api/studio/releases/${id}/preview`, method: "POST" }),
     }),
     updateArtifact: b.mutation<unknown, { id: string; title?: string; description?: string; tags?: string[]; visibility?: string }>({
-      query: ({ id, ...body }) => ({ url: `api/admin/artifacts/${id}`, method: "PATCH", body }),
+      query: ({ id, ...body }) => ({ url: `api/studio/artifacts/${id}`, method: "PATCH", body }),
       invalidatesTags: ["AdminReleases", "Catalog"],
     }),
     adminUsers: b.query<{ user: AdminUser; access: Decision }[], string>({

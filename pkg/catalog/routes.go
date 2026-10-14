@@ -81,6 +81,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("DELETE /api/instances/{id}/members/{user}", s.guard(enabled, s.removeMember))
 	m.HandleFunc("POST /api/instances/{id}/upgrade", s.guard(enabled, s.upgrade))
 	s.adminRoutes(m)
+	s.studioRoutes(m)
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { httpx.Fail(w, 404, "not_found", "Unknown API route") })
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
