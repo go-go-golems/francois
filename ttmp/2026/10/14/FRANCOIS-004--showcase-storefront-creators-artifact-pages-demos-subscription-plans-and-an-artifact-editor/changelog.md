@@ -32,3 +32,11 @@ Phase 3 studio API (68a7daf): creator guard level, /api/studio for artifacts, dr
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/studio.go — Studio API
+
+## 2026-10-14
+
+Phase 4 studio UI (5f3da56): artifact editor, journal, creators, media library; old admin release endpoints removed
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/studio.tsx — Studio UI
