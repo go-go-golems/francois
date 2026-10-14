@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -115,14 +116,19 @@ func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request) {
 		unavailable(w, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
 	out := []map[string]any{}
 	for _, u := range users {
-		d, err := s.access(r.Context(), u)
+		e, err := s.entitlementIn(r.Context(), u, rev.Document)
 		if err != nil {
 			unavailable(w, err)
 			return
 		}
-		out = append(out, map[string]any{"user": u, "access": d})
+		out = append(out, map[string]any{"user": u, "access": e.Decision, "plan": e.Plan.Name, "source": e.Source})
 	}
 	httpx.OK(w, out)
 }
@@ -134,21 +140,24 @@ func (s *Server) adminUser(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 404, "not_found", "User not found")
 		return
 	}
-	d, _ := s.access(ctx, u)
+	e, doc, _ := s.entitlement(ctx, u)
 	subs, _ := s.Store.Subscriptions(ctx, u.ID)
 	grants, _ := s.Store.AccessGrants(ctx, u.ID)
 	insts, _ := s.Store.MemberInstances(ctx, u.ID)
 	sessions, _ := s.Store.ActiveSessions(ctx, u.ID)
 	customer, _ := s.Store.CustomerFor(ctx, u.ID)
-	rev, _ := s.Store.ActiveSettings(ctx)
-	allowance, _ := s.Store.AllowanceFor(ctx, u.ID, rev.Document.Allowance.MonthlyCredits, rev.Document.Allowance.DailyCredits)
+	allowance, _ := s.Store.AllowanceFor(ctx, u.ID, e.Plan.MonthlyCredits, e.Plan.DailyCredits)
 	calls, _ := s.Store.ModelCalls(ctx, u.ID, 20)
 	audit, _ := s.Store.AuditLog(ctx, u.ID, 20)
 	list := []map[string]any{}
 	for _, i := range insts {
 		list = append(list, s.instanceJSON(r, i))
 	}
-	httpx.OK(w, map[string]any{"user": u, "access": d, "subscriptions": subs, "complimentary": grants, "instances": list, "sessions": sessions,
+	plans := []map[string]any{}
+	for _, p := range doc.Plans {
+		plans = append(plans, map[string]any{"key": p.Key, "name": p.Name})
+	}
+	httpx.OK(w, map[string]any{"user": u, "access": e.Decision, "entitlement": e, "plans": plans, "subscriptions": subs, "complimentary": grants, "instances": list, "sessions": sessions,
 		"stripeCustomerId": customer, "allowance": allowance, "calls": calls, "audit": audit})
 }
 
@@ -202,21 +211,33 @@ func (s *Server) adminGrant(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Days   int    `json:"days"`
 		Reason string `json:"reason"`
+		Plan   string `json:"plan"`
 	}
 	if err := httpx.Read(w, r, &in, 4096); err != nil || in.Days < 1 || in.Days > 3660 || strings.TrimSpace(in.Reason) == "" || len(in.Reason) > 500 {
 		httpx.Fail(w, 400, "invalid_request", "Days (1–3660) and a reason are required")
 		return
 	}
+	if in.Plan != "" {
+		rev, err := s.Store.ActiveSettings(r.Context())
+		if err != nil {
+			unavailable(w, err)
+			return
+		}
+		if p, ok := rev.Document.Plan(in.Plan); !ok || p.Key == "free" {
+			httpx.Fail(w, 400, "invalid_request", "Unknown plan")
+			return
+		}
+	}
 	if _, err := s.Store.User(r.Context(), r.PathValue("id")); err != nil {
 		httpx.Fail(w, 404, "not_found", "User not found")
 		return
 	}
-	g, err := s.Store.GrantAccess(r.Context(), r.PathValue("id"), actor(r), time.Now().Add(time.Duration(in.Days)*24*time.Hour), in.Reason)
+	g, err := s.Store.GrantAccess(r.Context(), r.PathValue("id"), actor(r), time.Now().Add(time.Duration(in.Days)*24*time.Hour), in.Reason, in.Plan)
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
-	_ = s.Store.Audit(r.Context(), actor(r), "user.access_grant", g.UserID, map[string]any{"until": g.Until, "reason": in.Reason})
+	_ = s.Store.Audit(r.Context(), actor(r), "user.access_grant", g.UserID, map[string]any{"until": g.Until, "reason": in.Reason, "plan": in.Plan})
 	httpx.OK(w, g)
 }
 
@@ -228,7 +249,7 @@ func (s *Server) adminRevokeGrants(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.Store.Audit(r.Context(), actor(r), "user.access_revoke", id, nil)
 	if u, err := s.Store.User(r.Context(), id); err == nil {
-		if d, err := s.access(r.Context(), u); err == nil && !d.Allowed {
+		if e, _, err := s.entitlement(r.Context(), u); err == nil && !e.Paid() {
 			s.Runtime.RevokeUser(id)
 		}
 	}
@@ -338,7 +359,17 @@ func (s *Server) adminBilling(w http.ResponseWriter, r *http.Request) {
 	}
 	events, _ := s.Store.Events(r.Context(), r.URL.Query().Get("state"), 100)
 	attempts, _ := s.Store.CheckoutAttempts(r.Context(), "", 50)
-	httpx.OK(w, map[string]any{"enabled": s.Payments != nil, "priceId": s.Config.PriceID, "health": health, "events": events, "checkouts": attempts})
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	prices := []string{}
+	for id := range rev.Document.Prices() {
+		prices = append(prices, id)
+	}
+	sort.Strings(prices)
+	httpx.OK(w, map[string]any{"enabled": s.Payments != nil, "prices": prices, "health": health, "events": events, "checkouts": attempts})
 }
 
 func (s *Server) adminReconcile(w http.ResponseWriter, r *http.Request) {
@@ -402,12 +433,17 @@ func (s *Server) adminAdjust(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 404, "not_found", "User not found")
 		return
 	}
-	rev, err := s.Store.ActiveSettings(r.Context())
+	u, err := s.Store.User(r.Context(), in.UserID)
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
-	if err = s.Store.AdjustAllowance(r.Context(), in.UserID, actor(r), in.Credits, rev.Document.Allowance.MonthlyCredits, in.Reason); err != nil {
+	e, _, err := s.entitlement(r.Context(), u)
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	if err = s.Store.AdjustAllowance(r.Context(), in.UserID, actor(r), in.Credits, e.Plan.MonthlyCredits, in.Reason); err != nil {
 		unavailable(w, err)
 		return
 	}

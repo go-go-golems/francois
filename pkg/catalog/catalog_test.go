@@ -95,10 +95,25 @@ func setup(t *testing.T) *env {
 	if err = cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = s.SaveSettings(ctx, "", testDoc(100)); err != nil {
+		t.Fatal(err)
+	}
 	srv := New(ctx, cfg, s, &releases.Publisher{Store: s, Blobs: blobs}, nil, &piworker.Fake{})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { cancel(); ts.Close(); _ = srv.Runtime.Wait() })
 	return &env{t: t, srv: srv, ts: ts, store: s, client: ts.Client()}
+}
+
+// testDoc is a settings document with the free plan and a paid "pro" plan
+// (10 workspaces, 10 members, monthly credits as given).
+func testDoc(monthly int, models ...settings.Model) settings.Document {
+	d := settings.Defaults()
+	if len(models) > 0 {
+		d.Models.Allowed = models
+	}
+	d.Plans = append(d.Plans, settings.Plan{Key: "pro", Name: "Pro", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_test_pro", Label: "5 / month"}},
+		Instances: 10, MembersPerInstance: 10, MonthlyCredits: monthly})
+	return d
 }
 
 func (e *env) user(name string, role string, access bool) tactor {
@@ -114,7 +129,7 @@ func (e *env) user(name string, role string, access bool) tactor {
 		u.Role = role
 	}
 	if access {
-		if _, err = e.store.GrantAccess(ctx, u.ID, u.ID, time.Now().Add(time.Hour), "test"); err != nil {
+		if _, err = e.store.GrantAccess(ctx, u.ID, u.ID, time.Now().Add(time.Hour), "test", ""); err != nil {
 			e.t.Fatal(err)
 		}
 	}
@@ -369,7 +384,7 @@ func TestHostedPlatform(t *testing.T) {
 	}
 
 	// Instances: entitlement required; private by default.
-	if code, out := e.portal(&carol, "POST", "/api/instances", map[string]string{"releaseId": releaseID}); code != 403 || errCode(out) != "subscription_required" {
+	if code, out := e.portal(&carol, "POST", "/api/instances", map[string]string{"releaseId": releaseID}); code != 403 || errCode(out) != "plan_required" {
 		t.Fatalf("unentitled create: %d %v", code, out)
 	}
 	_, instA := e.portal(&alice, "POST", "/api/instances", map[string]string{"releaseId": releaseID})
@@ -500,12 +515,10 @@ func TestHostedPlatform(t *testing.T) {
 	}
 
 	// Model allowance: one credit admits exactly one of two racing calls.
-	_, err := e.store.SaveSettings(context.Background(), admin.user.ID, settings.Document{
-		Models:     settings.Models{Allowed: []settings.Model{{Selector: "test/fake", Label: "Fake", Credits: 1}}, Tiers: map[string]string{"default": "test/fake"}},
-		Allowance:  settings.Allowance{MonthlyCredits: 1, PerUserConcurrency: 4, GlobalConcurrency: 8, MaxToolRounds: 3},
-		Limits:     settings.Defaults().Limits,
-		Publishing: settings.Publishing{AllowPinnedAfterWithdraw: true},
-	})
+	doc := testDoc(1, settings.Model{Selector: "test/fake", Label: "Fake", Credits: 1})
+	doc.Models.Tiers = map[string]string{"default": "test/fake"}
+	doc.Allowance = settings.Allowance{PerUserConcurrency: 4, GlobalConcurrency: 8, MaxToolRounds: 3}
+	_, err := e.store.SaveSettings(context.Background(), admin.user.ID, doc)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -163,13 +163,15 @@ type AccessGrant struct {
 	GrantedBy string     `json:"grantedBy"`
 	CreatedAt time.Time  `json:"createdAt"`
 	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+	Plan      string     `json:"plan"`
 }
 
 // GrantAccess records complimentary hosted access; it never fabricates a
 // Stripe subscription.
-func (s *Store) GrantAccess(ctx context.Context, user, actor string, until time.Time, reason string) (AccessGrant, error) {
-	g := AccessGrant{ID: NewID("agr_"), UserID: user, Until: until.UTC(), Reason: reason, GrantedBy: actor}
-	err := s.Pool.QueryRow(ctx, `INSERT INTO access_grants(id,user_id,until,reason,granted_by) VALUES($1,$2,$3,$4,$5) RETURNING created_at`, g.ID, user, g.Until, reason, actor).Scan(&g.CreatedAt)
+// plan names the granted plan; empty means the highest plan.
+func (s *Store) GrantAccess(ctx context.Context, user, actor string, until time.Time, reason, plan string) (AccessGrant, error) {
+	g := AccessGrant{ID: NewID("agr_"), UserID: user, Until: until.UTC(), Reason: reason, GrantedBy: actor, Plan: plan}
+	err := s.Pool.QueryRow(ctx, `INSERT INTO access_grants(id,user_id,until,reason,granted_by,plan) VALUES($1,$2,$3,$4,$5,$6) RETURNING created_at`, g.ID, user, g.Until, reason, actor, plan).Scan(&g.CreatedAt)
 	return g, err
 }
 
@@ -179,13 +181,13 @@ func (s *Store) RevokeAccessGrants(ctx context.Context, user string) error {
 }
 
 func (s *Store) AccessGrants(ctx context.Context, user string) ([]AccessGrant, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT id,user_id,until,reason,granted_by,created_at,revoked_at FROM access_grants WHERE user_id=$1 ORDER BY created_at DESC`, user)
+	rows, err := s.Pool.Query(ctx, `SELECT id,user_id,until,reason,granted_by,created_at,revoked_at,plan FROM access_grants WHERE user_id=$1 ORDER BY created_at DESC`, user)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (AccessGrant, error) {
 		var g AccessGrant
-		err := r.Scan(&g.ID, &g.UserID, &g.Until, &g.Reason, &g.GrantedBy, &g.CreatedAt, &g.RevokedAt)
+		err := r.Scan(&g.ID, &g.UserID, &g.Until, &g.Reason, &g.GrantedBy, &g.CreatedAt, &g.RevokedAt, &g.Plan)
 		return g, err
 	})
 }

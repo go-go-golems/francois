@@ -77,11 +77,9 @@ type Config struct {
 	// primary site; all sites must share its scheme because session cookies
 	// use the __Host- prefix on HTTPS.
 	Sites []Site
-	// TrialAllowed enables access while a subscription is trialing.
+	// TrialAllowed enables access while a subscription is trialing. Prices
+	// come from the plans in the settings document.
 	TrialAllowed bool
-	// BillingRequired is false when no Stripe configuration exists; access
-	// then comes only from complimentary grants.
-	PriceID string
 	// GrantTTL bounds instance runtime grants; zero means 30 minutes.
 	GrantTTL time.Duration
 	// SignupAllowed lets /auth/login?signup=1 open the identity provider's
@@ -155,26 +153,22 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
 		pages: parsePages(), md: content.NewMarkdown()}
-	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{GrantTTL: cfg.GrantTTL})
+	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, srv.budget, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {
-			// Lost entitlement closes live views promptly; new requests
-			// are rechecked anyway.
+			// Losing paid access closes live views promptly; every request
+			// is rechecked anyway, so a plan change applies on the next one.
 			u, err := s.User(context.Background(), user)
 			if err != nil {
 				return
 			}
-			if d, err := s.Access(context.Background(), srv.policy(), u, time.Now()); err == nil && !d.Allowed {
+			if e, _, err := srv.entitlement(context.Background(), u); err == nil && !e.Paid() {
 				srv.Runtime.RevokeUser(user)
 			}
 		}
 	}
 	srv.portal = srv.routes()
 	return srv
-}
-
-func (s *Server) policy() billing.Policy {
-	return billing.Policy{AcceptedPrices: map[string]bool{s.Config.PriceID: s.Config.PriceID != ""}, TrialAllowed: s.Config.TrialAllowed}
 }
 
 type siteKey struct{}
@@ -228,8 +222,12 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
-// authorizeInstance is the single hosted-access rule: preview instances are
-// for the artifact's editors; workspaces need current entitlement for owner and caller.
+// authorizeInstance is the single hosted-access rule, applied at launch and
+// on every runtime request:
+//   - preview instances: the artifact's editors;
+//   - demo instances: their owner, until they expire;
+//   - workspaces: caller and owner plans include the artifact, and the
+//     workspace is within the owner's plan limit (oldest first).
 func (s *Server) authorizeInstance(ctx context.Context, u store.User, inst store.Instance) error {
 	if u.Disabled {
 		return hosted.Denied(403, billing.ReasonDisabled, "This account is disabled")
@@ -238,40 +236,60 @@ func (s *Server) authorizeInstance(ctx context.Context, u store.User, inst store
 	if err != nil {
 		return err
 	}
-	if inst.Kind == "preview" {
+	switch inst.Kind {
+	case "preview":
 		if !s.canEditArtifact(ctx, u, rel.ArtifactID) {
 			return hosted.Denied(403, "not_editor", "Preview instances are for the artifact's editors")
 		}
 		return nil
-	}
-	if rel.State == "withdrawn" {
-		rev, err := s.Store.ActiveSettings(ctx)
-		if err != nil {
-			return err
+	case "demo":
+		if inst.OwnerUserID != u.ID {
+			return hosted.Denied(403, "not_member", "This demo belongs to another visitor")
 		}
-		if !rev.Document.Publishing.AllowPinnedAfterWithdraw {
-			return hosted.Denied(403, "release_unavailable", "This release was withdrawn")
+		if inst.ExpiresAt == nil || !time.Now().Before(*inst.ExpiresAt) {
+			return hosted.Denied(403, "demo_expired", "This demo has ended")
 		}
+		return nil
 	}
-	now := time.Now()
-	d, err := s.Store.Access(ctx, s.policy(), u, now)
+	rev, err := s.Store.ActiveSettings(ctx)
 	if err != nil {
 		return err
 	}
-	if !d.Allowed {
-		return hosted.Denied(403, d.Reason, "A current subscription is required")
+	doc := rev.Document
+	if rel.State == "withdrawn" && !doc.Publishing.AllowPinnedAfterWithdraw {
+		return hosted.Denied(403, "release_unavailable", "This release was withdrawn")
 	}
+	a, err := s.Store.Artifact(ctx, rel.ArtifactID)
+	if err != nil {
+		return err
+	}
+	caller, err := s.entitlementIn(ctx, u, doc)
+	if err != nil {
+		return err
+	}
+	if !caller.CanRun(a, doc) {
+		return hosted.Denied(403, "plan_required", "Your plan does not include this application")
+	}
+	owner := caller
 	if inst.OwnerUserID != u.ID {
-		owner, err := s.Store.User(ctx, inst.OwnerUserID)
+		ou, err := s.Store.User(ctx, inst.OwnerUserID)
 		if err != nil {
 			return err
 		}
-		od, err := s.Store.Access(ctx, s.policy(), owner, now)
+		if owner, err = s.entitlementIn(ctx, ou, doc); err != nil {
+			return err
+		}
+		if !owner.CanRun(a, doc) {
+			return hosted.Denied(403, "owner_inactive", "The instance owner's plan does not include this application; the instance is frozen")
+		}
+	}
+	if owner.Source != SourceStaff {
+		pos, err := s.Store.WorkspacePosition(ctx, inst)
 		if err != nil {
 			return err
 		}
-		if !od.Allowed {
-			return hosted.Denied(403, "owner_inactive", "The instance owner's subscription is not active; the instance is frozen")
+		if pos > owner.Plan.Instances {
+			return hosted.Denied(403, "over_plan_limit", "This instance is beyond the owner's plan limit; upgrade or delete other instances")
 		}
 	}
 	return nil

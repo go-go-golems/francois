@@ -30,20 +30,6 @@ func (s *Server) instances(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, out)
 }
 
-// entitled writes a 403 unless the caller currently has hosted access.
-func (s *Server) entitled(w http.ResponseWriter, r *http.Request) bool {
-	d, err := s.access(r.Context(), principal(r.Context()).User)
-	if err != nil {
-		httpx.Fail(w, 503, "unavailable", "Access check failed")
-		return false
-	}
-	if !d.Allowed {
-		httpx.Fail(w, 403, d.Reason, "A current subscription is required")
-		return false
-	}
-	return true
-}
-
 func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ReleaseID string `json:"releaseId"`
@@ -53,31 +39,37 @@ func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", err.Error())
 		return
 	}
-	if !s.entitled(w, r) {
-		return
-	}
-	rel, err := s.Store.Release(r.Context(), in.ReleaseID)
+	ctx := r.Context()
+	rel, err := s.Store.Release(ctx, in.ReleaseID)
 	if err != nil || rel.State != "published" {
 		httpx.Fail(w, 404, "release_unavailable", "Release not available")
 		return
 	}
+	a, err := s.Store.Artifact(ctx, rel.ArtifactID)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Could not create instance")
+		return
+	}
+	e, doc, err := s.entitlement(ctx, principal(ctx).User)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Access check failed")
+		return
+	}
+	if !e.CanRun(a, doc) || e.Plan.Instances == 0 {
+		httpx.Fail(w, 403, "plan_required", "Your plan does not include this application")
+		return
+	}
 	in.Title = strings.TrimSpace(in.Title)
 	if in.Title == "" {
-		a, _ := s.Store.Artifact(r.Context(), rel.ArtifactID)
 		in.Title = a.Title
 	}
 	if len(in.Title) > 120 {
 		httpx.Fail(w, 400, "invalid_request", "Title is too long")
 		return
 	}
-	rev, err := s.Store.ActiveSettings(r.Context())
-	if err != nil {
-		httpx.Fail(w, 503, "unavailable", "Settings unavailable")
-		return
-	}
-	inst, err := s.Store.CreateInstance(r.Context(), principal(r.Context()).User.ID, rel.ID, in.Title, "workspace", rev.Document.Limits.InstancesPerUser)
+	inst, err := s.Store.CreateInstance(ctx, principal(ctx).User.ID, rel.ID, in.Title, "workspace", e.Plan.Instances)
 	if errors.Is(err, store.ErrLimit) {
-		httpx.Fail(w, 409, "instance_limit", "You have reached the instance limit")
+		httpx.Fail(w, 409, "instance_limit", "You have reached your plan's instance limit")
 		return
 	}
 	if err != nil {
@@ -249,13 +241,19 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 404, "user_not_found", "No registered subscriber with that verified email")
 		return
 	}
-	rev, err := s.Store.ActiveSettings(r.Context())
+	// The owner's plan sets the member limit (an admin may be acting).
+	owner, err := s.Store.User(r.Context(), inst.OwnerUserID)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Settings unavailable")
+		return
+	}
+	e, _, err := s.entitlement(r.Context(), owner)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Settings unavailable")
 		return
 	}
 	actor := principal(r.Context()).User.ID
-	if err = s.Store.SetMember(r.Context(), inst.ID, u.ID, in.Role, actor, rev.Document.Limits.MembersPerInstance); err != nil {
+	if err = s.Store.SetMember(r.Context(), inst.ID, u.ID, in.Role, actor, e.Plan.MembersPerInstance); err != nil {
 		switch {
 		case errors.Is(err, store.ErrLimit):
 			httpx.Fail(w, 409, "member_limit", "Member limit reached")

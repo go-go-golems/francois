@@ -28,6 +28,36 @@ import (
 // supplied by the portal so policy lives in one place.
 type Authorizer func(ctx context.Context, user store.User, inst store.Instance) error
 
+// Budget is the caller's model allowance for a call in an instance.
+type Budget struct {
+	Monthly, Daily int
+	// Models lists the approved selectors the caller may use; empty allows
+	// every approved model.
+	Models []string
+	// Shared is a budget shared with other callers (demos): the call is
+	// refused when SharedUsed plus its credits would exceed SharedLimit.
+	Shared                  bool
+	SharedLimit, SharedUsed int
+	// Period overrides the monthly allowance ledger (see store.ReserveRequest).
+	Period string
+}
+
+// Allows reports whether the budget includes a selector.
+func (b Budget) Allows(selector string) bool {
+	if len(b.Models) == 0 {
+		return true
+	}
+	for _, m := range b.Models {
+		if m == selector {
+			return true
+		}
+	}
+	return false
+}
+
+// Budgeter resolves a caller's budget; supplied by the portal.
+type Budgeter func(ctx context.Context, user store.User, inst store.Instance) (Budget, error)
+
 type Config struct {
 	GrantTTL time.Duration
 }
@@ -37,6 +67,7 @@ type Runtime struct {
 	Publisher *releases.Publisher
 	Backend   piworker.Backend
 	Authorize Authorizer
+	Budget    Budgeter
 	Config    Config
 
 	ctx    context.Context
@@ -48,7 +79,7 @@ type Runtime struct {
 	global int
 }
 
-func New(ctx context.Context, s *store.Store, p *releases.Publisher, b piworker.Backend, auth Authorizer, cfg Config) *Runtime {
+func New(ctx context.Context, s *store.Store, p *releases.Publisher, b piworker.Backend, auth Authorizer, budget Budgeter, cfg Config) *Runtime {
 	if cfg.GrantTTL == 0 {
 		cfg.GrantTTL = 30 * time.Minute
 	}
@@ -57,7 +88,7 @@ func New(ctx context.Context, s *store.Store, p *releases.Publisher, b piworker.
 		panic(err)
 	}
 	g, ctx := errgroup.WithContext(ctx)
-	return &Runtime{Store: s, Publisher: p, Backend: b, Authorize: auth, Config: cfg, ctx: ctx, group: g, key: key, views: map[string]*View{}, active: map[string]int{}}
+	return &Runtime{Store: s, Publisher: p, Backend: b, Authorize: auth, Budget: budget, Config: cfg, ctx: ctx, group: g, key: key, views: map[string]*View{}, active: map[string]int{}}
 }
 
 // Wait blocks until background calls finish after the parent context ends.

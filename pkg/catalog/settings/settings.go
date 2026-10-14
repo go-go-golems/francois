@@ -24,19 +24,16 @@ type Models struct {
 }
 
 type Allowance struct {
-	MonthlyCredits     int `json:"monthlyCredits"`
-	DailyCredits       int `json:"dailyCredits"`
 	PerUserConcurrency int `json:"perUserConcurrency"`
 	GlobalConcurrency  int `json:"globalConcurrency"`
 	MaxToolRounds      int `json:"maxToolRounds"`
 }
 
 type Limits struct {
-	InstancesPerUser      int   `json:"instancesPerUser"`
-	MembersPerInstance    int   `json:"membersPerInstance"`
 	DocumentsPerInstance  int   `json:"documentsPerInstance"`
 	AssetBytesPerInstance int64 `json:"assetBytesPerInstance"`
 	MaxHTMLBytes          int64 `json:"maxHtmlBytes"`
+	MaxMediaBytes         int64 `json:"maxMediaBytes"`
 }
 
 type Publishing struct {
@@ -45,11 +42,58 @@ type Publishing struct {
 	AllowPinnedAfterWithdraw bool `json:"allowPinnedAfterWithdraw"`
 }
 
+// PlanPrice is one way to pay for a plan: a Stripe recurring Price.
+type PlanPrice struct {
+	Interval string `json:"interval"` // month | year
+	PriceID  string `json:"priceId"`
+	Label    string `json:"label"` // display text such as "€5 / month"
+}
+
+// Plan is a subscription tier. Ranks order plans: a plan includes every
+// artifact that requires a plan of equal or lower rank. The free plan has
+// rank 0 and no prices; other plans without prices can only be granted.
+type Plan struct {
+	Key                string      `json:"key"`
+	Name               string      `json:"name"`
+	Rank               int         `json:"rank"`
+	Description        string      `json:"description"`
+	Highlights         []string    `json:"highlights"`
+	Public             bool        `json:"public"`
+	Prices             []PlanPrice `json:"prices"`
+	Instances          int         `json:"instances"`
+	MembersPerInstance int         `json:"membersPerInstance"`
+	MonthlyCredits     int         `json:"monthlyCredits"`
+	DailyCredits       int         `json:"dailyCredits"`
+	// Models restricts approved selectors; empty allows every approved model.
+	Models []string `json:"models"`
+}
+
+// Demo configures short-lived instances for visitors without an account.
+type Demo struct {
+	Enabled           bool     `json:"enabled"`
+	TTLMinutes        int      `json:"ttlMinutes"`
+	MaxActive         int      `json:"maxActive"`
+	PerAddressPerHour int      `json:"perAddressPerHour"`
+	Credits           int      `json:"credits"`
+	DailyBudget       int      `json:"dailyBudget"`
+	Models            []string `json:"models"`
+}
+
+// Storefront is the public wording of the front page.
+type Storefront struct {
+	Title   string `json:"title"`
+	Tagline string `json:"tagline"`
+	Intro   string `json:"intro"` // Markdown
+}
+
 type Document struct {
 	Models     Models     `json:"models"`
 	Allowance  Allowance  `json:"allowance"`
 	Limits     Limits     `json:"limits"`
 	Publishing Publishing `json:"publishing"`
+	Plans      []Plan     `json:"plans"`
+	Demo       Demo       `json:"demo"`
+	Storefront Storefront `json:"storefront"`
 }
 
 // Defaults is the deployment default used before an administrator saves a
@@ -57,10 +101,18 @@ type Document struct {
 func Defaults() Document {
 	return Document{
 		Models:     Models{Allowed: []Model{}, Tiers: map[string]string{}},
-		Allowance:  Allowance{MonthlyCredits: 0, DailyCredits: 0, PerUserConcurrency: 2, GlobalConcurrency: 8, MaxToolRounds: 5},
-		Limits:     Limits{InstancesPerUser: 10, MembersPerInstance: 10, DocumentsPerInstance: 5000, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20},
+		Allowance:  Allowance{PerUserConcurrency: 2, GlobalConcurrency: 8, MaxToolRounds: 5},
+		Limits:     Limits{DocumentsPerInstance: 5000, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20, MaxMediaBytes: 25 << 20},
 		Publishing: Publishing{AllowPinnedAfterWithdraw: true},
+		Plans:      []Plan{FreePlan()},
+		Demo:       Demo{TTLMinutes: 30, MaxActive: 20, PerAddressPerHour: 3, Credits: 5, DailyBudget: 200, Models: []string{}},
 	}
+}
+
+// FreePlan is the plan of every account without paid or granted access:
+// browse, read and try demos, but no workspaces and no model credits.
+func FreePlan() Plan {
+	return Plan{Key: "free", Name: "Free", Public: true, Highlights: []string{}, Prices: []PlanPrice{}, MembersPerInstance: 1, Models: []string{}}
 }
 
 var selector = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$`)
@@ -114,9 +166,6 @@ func (d *Document) Validate() error {
 		}
 	}
 	a := d.Allowance
-	if a.MonthlyCredits < 0 || a.MonthlyCredits > 1_000_000 || a.DailyCredits < 0 || a.DailyCredits > 1_000_000 {
-		return errors.New("allowance credits must be 0–1,000,000")
-	}
 	if a.PerUserConcurrency < 1 || a.PerUserConcurrency > 16 || a.GlobalConcurrency < 1 || a.GlobalConcurrency > 256 {
 		return errors.New("concurrency must be 1–16 per user and 1–256 globally")
 	}
@@ -124,9 +173,6 @@ func (d *Document) Validate() error {
 		return errors.New("maxToolRounds must be 1–10")
 	}
 	l := d.Limits
-	if l.InstancesPerUser < 1 || l.InstancesPerUser > 1000 || l.MembersPerInstance < 1 || l.MembersPerInstance > 100 {
-		return errors.New("instance and member limits must be positive and bounded")
-	}
 	if l.DocumentsPerInstance < 1 || l.DocumentsPerInstance > 100_000 {
 		return errors.New("documentsPerInstance must be 1–100,000")
 	}
@@ -136,7 +182,174 @@ func (d *Document) Validate() error {
 	if l.MaxHTMLBytes < 1024 || l.MaxHTMLBytes > 16<<20 {
 		return errors.New("maxHtmlBytes must be 1 KiB–16 MiB")
 	}
+	if l.MaxMediaBytes < 1<<20 || l.MaxMediaBytes > 200<<20 {
+		return errors.New("maxMediaBytes must be 1–200 MiB")
+	}
+	if err := d.validatePlans(seen); err != nil {
+		return err
+	}
+	return d.validateDemo(seen)
+}
+
+var planKey = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+
+func (d *Document) validatePlans(approved map[string]bool) error {
+	if len(d.Plans) == 0 || len(d.Plans) > 12 {
+		return errors.New("define between one and twelve plans, including the free plan")
+	}
+	keys, ranks, prices := map[string]bool{}, map[int]bool{}, map[string]bool{}
+	free := false
+	for i := range d.Plans {
+		p := &d.Plans[i]
+		if p.Highlights == nil {
+			p.Highlights = []string{}
+		}
+		if p.Prices == nil {
+			p.Prices = []PlanPrice{}
+		}
+		if p.Models == nil {
+			p.Models = []string{}
+		}
+		if !planKey.MatchString(p.Key) || keys[p.Key] {
+			return errors.Errorf("plan %d needs a unique key of lowercase letters, digits and -", i)
+		}
+		keys[p.Key] = true
+		if p.Name == "" || len(p.Name) > 40 || len(p.Description) > 400 || len(p.Highlights) > 8 {
+			return errors.Errorf("plan %s needs a name (≤40), a description (≤400) and at most 8 highlights", p.Key)
+		}
+		for _, h := range p.Highlights {
+			if len(h) > 120 {
+				return errors.Errorf("plan %s has a highlight longer than 120 characters", p.Key)
+			}
+		}
+		if p.Rank < 0 || p.Rank > 100 || ranks[p.Rank] {
+			return errors.Errorf("plan %s needs a unique rank between 0 and 100", p.Key)
+		}
+		ranks[p.Rank] = true
+		if p.Key == "free" {
+			free = true
+			if p.Rank != 0 || len(p.Prices) > 0 {
+				return errors.New("the free plan has rank 0 and no prices")
+			}
+		} else if p.Rank == 0 {
+			return errors.Errorf("rank 0 is the free plan's; plan %s needs a higher rank", p.Key)
+		}
+		for _, pr := range p.Prices {
+			if (pr.Interval != "month" && pr.Interval != "year") || !strings.HasPrefix(pr.PriceID, "price_") || prices[pr.PriceID] || len(pr.Label) > 40 {
+				return errors.Errorf("plan %s has an invalid or repeated price (interval month|year, a unique price_… ID, label ≤40)", p.Key)
+			}
+			prices[pr.PriceID] = true
+		}
+		if p.Instances < 0 || p.Instances > 1000 || p.MembersPerInstance < 1 || p.MembersPerInstance > 100 {
+			return errors.Errorf("plan %s: instances 0–1000 and members per instance 1–100", p.Key)
+		}
+		if p.MonthlyCredits < 0 || p.MonthlyCredits > 1_000_000 || p.DailyCredits < 0 || p.DailyCredits > 1_000_000 {
+			return errors.Errorf("plan %s: credits must be 0–1,000,000", p.Key)
+		}
+		for _, m := range p.Models {
+			if !approved[m] {
+				return errors.Errorf("plan %s allows %q, which is not an approved model", p.Key, m)
+			}
+		}
+	}
+	if !free {
+		return errors.New("a plan with key free is required")
+	}
 	return nil
+}
+
+func (d *Document) validateDemo(approved map[string]bool) error {
+	m := &d.Demo
+	if m.Models == nil {
+		m.Models = []string{}
+	}
+	if m.TTLMinutes < 5 || m.TTLMinutes > 24*60 || m.MaxActive < 0 || m.MaxActive > 1000 || m.PerAddressPerHour < 1 || m.PerAddressPerHour > 100 {
+		return errors.New("demo: ttlMinutes 5–1440, maxActive 0–1000, perAddressPerHour 1–100")
+	}
+	if m.Credits < 0 || m.Credits > 10_000 || m.DailyBudget < 0 || m.DailyBudget > 1_000_000 {
+		return errors.New("demo: credits 0–10,000 and dailyBudget 0–1,000,000")
+	}
+	for _, sel := range m.Models {
+		if !approved[sel] {
+			return errors.Errorf("demo allows %q, which is not an approved model", sel)
+		}
+	}
+	f := d.Storefront
+	if len(f.Title) > 80 || len(f.Tagline) > 240 || len(f.Intro) > 20<<10 {
+		return errors.New("storefront: title ≤80, tagline ≤240 and intro ≤20 KB")
+	}
+	return nil
+}
+
+// Plan finds a plan by key.
+func (d Document) Plan(key string) (Plan, bool) {
+	for _, p := range d.Plans {
+		if p.Key == key {
+			return p, true
+		}
+	}
+	return Plan{}, false
+}
+
+// Free is the free plan (Validate guarantees it exists).
+func (d Document) Free() Plan {
+	if p, ok := d.Plan("free"); ok {
+		return p
+	}
+	return FreePlan()
+}
+
+// Highest is the plan with the highest rank.
+func (d Document) Highest() Plan {
+	best := d.Free()
+	for _, p := range d.Plans {
+		if p.Rank > best.Rank {
+			best = p
+		}
+	}
+	return best
+}
+
+// PlanForPrice finds the plan a Stripe price belongs to.
+func (d Document) PlanForPrice(priceID string) (Plan, bool) {
+	for _, p := range d.Plans {
+		for _, pr := range p.Prices {
+			if pr.PriceID == priceID {
+				return p, true
+			}
+		}
+	}
+	return Plan{}, false
+}
+
+// Prices lists every plan price, the set of prices that grant access.
+func (d Document) Prices() map[string]bool {
+	out := map[string]bool{}
+	for _, p := range d.Plans {
+		for _, pr := range p.Prices {
+			out[pr.PriceID] = true
+		}
+	}
+	return out
+}
+
+// RequiredRank is the rank an artifact requires: its named plan's rank, or,
+// when the key is empty or unknown, the lowest rank above free. With no
+// plan above free, only staff can run it.
+func (d Document) RequiredRank(key string) int {
+	if p, ok := d.Plan(key); ok && key != "" {
+		return p.Rank
+	}
+	lowest := -1
+	for _, p := range d.Plans {
+		if p.Rank > 0 && (lowest < 0 || p.Rank < lowest) {
+			lowest = p.Rank
+		}
+	}
+	if lowest < 0 {
+		return 1 << 30
+	}
+	return lowest
 }
 
 // Model finds an approved model by selector (without thinking suffix).

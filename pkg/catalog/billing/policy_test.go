@@ -53,3 +53,18 @@ func TestAccessPolicy(t *testing.T) {
 		}
 	}
 }
+
+// The decision names what grants access, so the catalog can map it to a plan.
+func TestDecisionNamesPriceAndPlan(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	p := Policy{AcceptedPrices: map[string]bool{"price_a": true, "price_b": true}}
+	d := p.Access(Account{}, []Subscription{{ID: "s", PriceID: "price_b", Status: "active", Quantity: 1, ItemCount: 1, AccessUntil: &future}}, nil, now)
+	if !d.Allowed || d.PriceID != "price_b" {
+		t.Fatalf("subscription decision %+v", d)
+	}
+	d = p.Access(Account{}, nil, []Comp{{Until: future, Plan: "friends"}}, now)
+	if !d.Allowed || d.Plan != "friends" || d.Reason != ReasonComplimentary {
+		t.Fatalf("grant decision %+v", d)
+	}
+}

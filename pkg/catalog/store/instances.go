@@ -18,6 +18,8 @@ type Instance struct {
 	State       string    `json:"state"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+	// ExpiresAt is set for demo instances.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 	// Role is the requesting user's effective membership role, when scoped.
 	Role string `json:"role,omitempty"`
 	// Denormalized display fields.
@@ -27,13 +29,13 @@ type Instance struct {
 	Members    int    `json:"members"`
 }
 
-const instanceSelect = `SELECT i.id,i.hostname,i.owner_user_id,i.release_id,i.title,i.kind,i.state,i.created_at,i.updated_at,
+const instanceSelect = `SELECT i.id,i.hostname,i.owner_user_id,i.release_id,i.title,i.kind,i.state,i.created_at,i.updated_at,i.expires_at,
  r.artifact_id,r.version,COALESCE(NULLIF(o.display_name,''),o.email),
  (SELECT count(*) FROM instance_members m2 WHERE m2.instance_id=i.id)`
 
 func scanInstance(row pgx.Row, withRole bool) (Instance, error) {
 	var i Instance
-	dest := []any{&i.ID, &i.Hostname, &i.OwnerUserID, &i.ReleaseID, &i.Title, &i.Kind, &i.State, &i.CreatedAt, &i.UpdatedAt, &i.ArtifactID, &i.Version, &i.OwnerName, &i.Members}
+	dest := []any{&i.ID, &i.Hostname, &i.OwnerUserID, &i.ReleaseID, &i.Title, &i.Kind, &i.State, &i.CreatedAt, &i.UpdatedAt, &i.ExpiresAt, &i.ArtifactID, &i.Version, &i.OwnerName, &i.Members}
 	if withRole {
 		dest = append(dest, &i.Role)
 	}
@@ -72,6 +74,16 @@ func (s *Store) CreateInstance(ctx context.Context, owner, release, title, kind 
 		return Instance{}, err
 	}
 	return s.MemberInstance(ctx, owner, id)
+}
+
+// WorkspacePosition is the 1-based position of a workspace among its
+// owner's workspaces, oldest first. After a downgrade the oldest workspaces
+// up to the plan's limit keep working.
+func (s *Store) WorkspacePosition(ctx context.Context, inst Instance) (int, error) {
+	var n int
+	err := s.Pool.QueryRow(ctx, `SELECT count(*) FROM instances WHERE owner_user_id=$1 AND kind='workspace' AND (created_at, id) <= ($2, $3)`,
+		inst.OwnerUserID, inst.CreatedAt, inst.ID).Scan(&n)
+	return n, err
 }
 
 // ErrLimit signals a configured quota.

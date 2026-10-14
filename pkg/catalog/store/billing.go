@@ -50,7 +50,7 @@ func (s *Store) Comps(ctx context.Context, user string) ([]billing.Comp, error) 
 	}
 	out := make([]billing.Comp, len(grants))
 	for i, g := range grants {
-		out[i] = billing.Comp{Until: g.Until, Revoked: g.RevokedAt != nil}
+		out[i] = billing.Comp{Until: g.Until, Revoked: g.RevokedAt != nil, Plan: g.Plan}
 	}
 	return out, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/billing"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
 	"github.com/go-go-golems/francois/pkg/catalog/payments"
+	"github.com/go-go-golems/francois/pkg/catalog/settings"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/go-go-golems/francois/pkg/catalog/web"
 	"github.com/pkg/errors"
@@ -118,23 +119,20 @@ func portSuffix(p string) string {
 	return ":" + p
 }
 
-func (s *Server) access(ctx context.Context, u store.User) (billing.Decision, error) {
-	return s.Store.Access(ctx, s.policy(), u, time.Now())
-}
-
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	site := s.site(r)
 	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured(), "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain}
 	if p != nil {
-		d, err := s.access(r.Context(), p.User)
+		e, _, err := s.entitlement(r.Context(), p.User)
 		if err != nil {
 			httpx.Fail(w, 503, "unavailable", "Account unavailable")
 			return
 		}
 		out["user"] = map[string]any{"id": p.User.ID, "name": p.User.DisplayName, "email": p.User.Email, "emailVerified": p.User.EmailVerified, "role": p.User.Role, "disabled": p.User.Disabled}
 		out["csrfToken"] = p.Session.CSRF
-		out["access"] = d
+		out["access"] = e.Decision
+		out["plan"] = map[string]any{"key": e.Plan.Key, "name": e.Plan.Name, "rank": e.Plan.Rank, "source": e.Source, "paid": e.Paid(), "instances": e.Plan.Instances}
 	}
 	httpx.OK(w, out)
 }
@@ -242,13 +240,18 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 			httpx.Fail(w, 401, "login_required", "Sign in to download")
 			return
 		}
-		d, err := s.access(r.Context(), p.User)
+		a, err := s.Store.Artifact(r.Context(), rel.ArtifactID)
 		if err != nil {
 			httpx.Fail(w, 503, "unavailable", "Access check failed")
 			return
 		}
-		if !d.Allowed {
-			httpx.Fail(w, 403, d.Reason, "A current subscription is required to download")
+		e, doc, err := s.entitlement(r.Context(), p.User)
+		if err != nil {
+			httpx.Fail(w, 503, "unavailable", "Access check failed")
+			return
+		}
+		if !e.CanRun(a, doc) {
+			httpx.Fail(w, 403, "plan_required", "Your plan does not include this application")
 			return
 		}
 	}
@@ -272,7 +275,7 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	ctx := r.Context()
-	d, err := s.access(ctx, p.User)
+	e, doc, err := s.entitlement(ctx, p.User)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
@@ -282,12 +285,7 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
 	}
-	rev, err := s.Store.ActiveSettings(ctx)
-	if err != nil {
-		httpx.Fail(w, 503, "unavailable", "Account unavailable")
-		return
-	}
-	allowance, err := s.Store.AllowanceFor(ctx, p.User.ID, rev.Document.Allowance.MonthlyCredits, rev.Document.Allowance.DailyCredits)
+	allowance, err := s.Store.AllowanceFor(ctx, p.User.ID, e.Plan.MonthlyCredits, e.Plan.DailyCredits)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
@@ -297,12 +295,15 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 	attempts, _ := s.Store.CheckoutAttempts(ctx, p.User.ID, 5)
 	sessions, _ := s.Store.ActiveSessions(ctx, p.User.ID)
 	models := []map[string]any{}
-	for _, m := range rev.Document.Models.Allowed {
-		models = append(models, map[string]any{"selector": m.Selector, "label": m.Label, "credits": m.Credits, "thinking": m.Thinking})
+	for _, m := range doc.Models.Allowed {
+		if e.AllowsModel(m.Selector) {
+			models = append(models, map[string]any{"selector": m.Selector, "label": m.Label, "credits": m.Credits, "thinking": m.Thinking})
+		}
 	}
 	httpx.OK(w, map[string]any{
 		"user":           map[string]any{"id": p.User.ID, "name": p.User.DisplayName, "email": p.User.Email, "emailVerified": p.User.EmailVerified, "role": p.User.Role, "disabled": p.User.Disabled, "createdAt": p.User.CreatedAt},
-		"access":         d,
+		"access":         e.Decision,
+		"entitlement":    e,
 		"subscriptions":  subs,
 		"complimentary":  grants,
 		"allowance":      allowance,
@@ -335,10 +336,21 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Plan string `json:"plan"`
+		Plan     string `json:"plan"`
+		Interval string `json:"interval"`
 	}
-	if err := httpx.Read(w, r, &in, 1024); err != nil || in.Plan != "subscriber" {
-		httpx.Fail(w, 400, "invalid_request", "Only the subscriber plan is available")
+	if err := httpx.Read(w, r, &in, 1024); err != nil {
+		httpx.Fail(w, 400, "invalid_request", "A plan is required")
+		return
+	}
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Billing is temporarily unavailable")
+		return
+	}
+	price, ok := checkoutPrice(rev.Document, in.Plan, in.Interval)
+	if !ok {
+		httpx.Fail(w, 400, "invalid_request", "That plan cannot be bought")
 		return
 	}
 	p := principal(r.Context())
@@ -346,12 +358,32 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 403, "email_unverified", "Verify your email address with the identity provider first")
 		return
 	}
-	u, err := s.Payments.Checkout(r.Context(), p.User, s.site(r).PortalOrigin())
+	if p.User.Role == "guest" {
+		httpx.Fail(w, 403, "guest", "Sign in to subscribe")
+		return
+	}
+	u, err := s.Payments.Checkout(r.Context(), p.User, price, rev.Document.Prices(), s.site(r).PortalOrigin())
 	if err != nil {
 		s.billingFailure(w, err)
 		return
 	}
 	httpx.OK(w, map[string]string{"url": u})
+}
+
+// checkoutPrice picks the server-side price for a public plan and interval
+// (the first price of that interval; any price when no interval is given).
+// The client never names a price.
+func checkoutPrice(doc settings.Document, key, interval string) (string, bool) {
+	p, ok := doc.Plan(key)
+	if !ok || !p.Public {
+		return "", false
+	}
+	for _, pr := range p.Prices {
+		if interval == "" || pr.Interval == interval {
+			return pr.PriceID, true
+		}
+	}
+	return "", false
 }
 
 func (s *Server) portalSession(w http.ResponseWriter, r *http.Request) {
