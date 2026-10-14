@@ -516,3 +516,68 @@ In the browser, an anonymous visitor clicked "Try the demo" on `/apps/polis` and
 ### Technical details
 
 - Request: `POST /api/demos {"artifactId":"polis"}` → `201 {"id":"ins_…","expiresAt":"…"}`; errors `invalid_origin`, `demo_disabled`, `account_disabled`, `rate_limited`, `demo_limit`.
+
+## Step 8: Phase 7 — API tokens and `francois catalog push`
+
+This step let creators publish from their own machines. A creator creates a personal API token in the studio. It is shown once, stored as a hash, can expire, and can be revoked. `francois catalog push` uploads a release through the studio API with that token, runs the same checks as the browser upload, and optionally publishes. Tokens are accepted only under `/api/studio/`, so a leaked publishing token cannot reach accounts, billing or instances. A token also cannot mint or revoke tokens.
+
+Against the local dev server, the seeded creator "Manuel" created a token in the browser and pushed Polis 2.0.0 with the CLI (published). A push to an artifact credited only to Ramon was refused with `not_editor`.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 7 of the design.
+**Inferred user intent:** Publishing without `kubectl exec`, scriptable from the creators' own build steps.
+**Commit (code):** 09f6c20 — "Personal API tokens and francois catalog push"
+
+### What I did
+
+- `pkg/catalog/store/tokens.go`: `APIToken`, `CreateToken` (`frt_` + 43 base64url characters from 32 random bytes; SHA-256 stored), `Tokens`, `RevokeToken`, `ResolveToken` (live tokens only; records `last_used_at`).
+- `pkg/catalog/auth.go`: `Principal.Token`; `guard` resolves a bearer token when there is no session, refuses it outside `/api/studio/` (`token_not_allowed`), skips Origin/CSRF for it; role, disabled and object checks still apply.
+- `pkg/catalog/studio.go`: `GET/POST /api/studio/tokens`, `DELETE /api/studio/tokens/{id}`, `sessionOnly` (`session_required` for token callers).
+- `pkg/catalog/studioclient/client.go`: `Client` (`Server`, `Token`, `Host` override), `Check`, `Push(…, publish)`, `Error{Status, Code, Message, Checks}`.
+- `cmd/francois/cmds/push.go`: `francois catalog push --server --token-file|FRANCOIS_TOKEN --artifact-id --version --html [--manifest --title --description --tags --changelog --free-sample --check --publish]`, registered in the `catalog` group.
+- `ui/catalog/studio.tsx` `Tokens` section (create with lifetime, one-time secret with a ready `push` command, list with last use, revoke); `studio-api.ts` endpoints.
+- `pkg/catalog/tokens_test.go` `TestTokensAndPush`.
+
+### Why
+
+- Restricting tokens to the studio namespace is the reason the studio API exists separately from `/api/admin` (design §5.7).
+- Bearer requests skip CSRF because CSRF defends ambient cookie credentials; a token in a header is not sent by a browser on its own.
+
+### What worked
+
+- `TestTokensAndPush`: subscriber cannot create tokens (`creator_required`); token works on `/api/studio/artifacts`; `401 token_not_allowed` on `/api/account`, `/api/instances`, `/api/admin/users`; `403 session_required` when minting with a token; push creates, credits and publishes a new artifact; `Check` returns findings; duplicate version → `version_exists`; someone else's artifact → `not_editor`; list shows `lastUsedAt` and never the secret; revoked → `401 token_invalid`; another user cannot revoke it.
+- Dev server: token created in the UI; `catalog push … --artifact-id polis --version 2.0.0 --publish` → `rel_ccace3c8bcc5f63fd7ea0421 | polis | 2.0.0 | published`; `--artifact-id capabilities` → `not_editor: You are not credited on this artifact`.
+- `golangci-lint` `0 issues.` after `gofmt` on `studioclient/client.go`; full catalog suite passes.
+
+### What didn't work
+
+- `cmd/francois/cmds/push.go:92:4: undefined: log` — the package logs through `github.com/rs/zerolog/log` imported per file; added the import.
+- I first imported Glazed's `pkg/cmds` unaliased inside package `cmds`; switched to the package's `glazed` alias for readability.
+- `gofmt` finding in `studioclient/client.go` (struct alignment after adding `Host`); fixed before committing (the commit is gated on the linter now).
+
+### What I learned
+
+- The test server routes by `Host`, so an HTTP client test needs a Host override; it is also useful for servers reached through tunnels.
+
+### What was tricky to build
+
+- Ordering in `guard`: cookie sessions win; a bearer token is only consulted when there is no session, and the namespace check happens before resolving it, so tokens never reach other handlers even when valid.
+
+### What warrants a second pair of eyes
+
+- `ResolveToken` writes `last_used_at` on every request (one UPDATE per studio call); fine for creators' volumes.
+
+### What should be done in the future
+
+- Document `catalog push` in the README and production playbook (Phase 8).
+
+### Code review instructions
+
+- `pkg/catalog/auth.go` `guard`, `pkg/catalog/store/tokens.go`, `pkg/catalog/studioclient/client.go`, `cmd/francois/cmds/push.go`.
+- `TEST_DATABASE_URL=… go test -count=1 -run TestTokensAndPush ./pkg/catalog/`.
+
+### Technical details
+
+- Token format: `frt_` + base64url(32 random bytes) = 47 characters.

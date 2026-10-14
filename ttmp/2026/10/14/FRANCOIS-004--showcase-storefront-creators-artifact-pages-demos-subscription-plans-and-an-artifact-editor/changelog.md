@@ -57,3 +57,11 @@ Phase 6 visitor demos (76be31e, 95af5f4): guest sessions, expiring demo instance
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/demos.go — Demo endpoint, limiter and expiry loop
+
+## 2026-10-14
+
+Phase 7 API tokens and push (09f6c20): studio-only bearer tokens, token UI, studioclient, francois catalog push
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/cmd/francois/cmds/push.go — catalog push command
