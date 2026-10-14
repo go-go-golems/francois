@@ -238,3 +238,68 @@ I checked the pages in a browser against a local server seeded with two creators
 
 - Storefront routes: `GET /{$}`, `/apps`, `/apps/{$}`, `/apps/{id}`, `/creators/{slug}`, `/journal`, `/journal/feed.xml`, `/journal/{slug}`, `/media/{id}`.
 - Media headers: `Content-Type` from detection, `Cache-Control: public, max-age=31536000, immutable`, `Content-Security-Policy: default-src 'none'; sandbox`, `X-Content-Type-Options: nosniff` (global).
+
+## Step 4: Phase 3 — studio API and the creator role
+
+This step gave creators a way to manage their own content. A new guard level `creator` (role `creator` or `admin`) protects `/api/studio/*`, which covers artifacts and page drafts, releases, media, posts, creator profiles and a Markdown preview. Which objects a creator may touch is decided by two rules from Phase 2: `canEditArtifact` (artifacts credited to the creator profile linked to their account) and `canEditPost` (posts they created or that are authored as their profile). The release endpoints moved here from `/api/admin`, and preview instances now authorize the artifact's editors instead of administrators only.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** Implement Phase 3 of the design.
+**Inferred user intent:** Ramon (and Manuel) can publish their own work without full admin rights.
+**Commit (code):** 68a7daf — "Studio API with a creator role; releases move out of the admin API"
+
+### What I did
+
+- `pkg/catalog/auth.go`: level `creator` between `enabled` and `admin`; error `creator_required`.
+- `pkg/catalog/studio.go`: `studioRoutes` and handlers; helpers `editable`, `ownProfile`, `checkCredits`, `normalizeTags`, `checkMedia`, `releaseItems`, `mayUpload`, `releaseFor`, `ownMedia`, `applyPost`, `editablePost`, `applyCreator`.
+- `pkg/catalog/admin.go`: removed `adminReleases`, `adminCheck`, `adminUpload`, `adminPublish`, `adminWithdraw`, `adminPreview`, `adminDeleteDraft`, `adminArtifact` and their routes; `upload` (multipart parsing) stays shared.
+- `pkg/catalog/server.go`: `authorizeInstance` loads the release first and allows `preview` instances for `canEditArtifact`.
+- `pkg/catalog/releases/releases.go`: exported `ValidArtifactID`.
+- `ui/catalog/api.ts`: release and artifact endpoints point to `/api/studio`.
+- Tests: `pkg/catalog/studio_test.go` `TestStudio` (roles, profiles, ownership, credits, releases, preview launch, media type and in-use rules, drafts, posts, Markdown, admin override); `TestHostedPlatform` expects `creator_required` for a subscriber upload.
+
+### Why
+
+- Ownership goes through creator profiles rather than a per-artifact owner column, because public credits and edit rights should be the same list. A creator who could remove their own credit would lock themselves out, so `checkCredits` refuses that for non-admins.
+- Creating artifacts needs a linked profile so that every creator-created artifact has at least one editor.
+- Only administrators create profiles and link accounts: linking grants edit rights.
+
+### What worked
+
+- `TEST_DATABASE_URL=… go test -count=1 ./pkg/catalog/...` → all `ok`; `golangci-lint` → `0 issues.`; `pnpm check` clean.
+
+### What didn't work
+
+- First run of `TestStudio`: `pkg/catalog/studio_test.go:75:13: assignment mismatch: 2 variables but e.do returns 3 values` (test code), fixed.
+- `studio_test.go:114: new artifact by upload: 422 … Title is required` — correct behaviour (a new artifact needs a title); the test now checks both cases.
+- `studio_test.go:176: markdown … <h1 id="hi-scriptxscript">Hi <!-- raw HTML omitted -->x<!-- raw HTML omitted --></h1>` — the output is safe; goldmark derives heading IDs from source text including the omitted tag names. Loosened the assertion.
+- Lint: `nonamedreturns` on `mayUpload` and a `gofmt` finding; fixed.
+
+### What I learned
+
+- goldmark replaces raw HTML with `<!-- raw HTML omitted -->`, which is visible in page source but harmless.
+
+### What was tricky to build
+
+- Releases for new versus existing artifacts: `mayUpload` must check edit rights for an existing artifact but profile existence for a new one, and the new artifact must be credited after `CreateDraft` succeeds. Admins without a profile may create artifacts that then have no credits; only admins can edit those until credits are added.
+
+### What warrants a second pair of eyes
+
+- The admin UI's Releases tab still calls `GET /api/studio/releases`, which now returns a plain list instead of `{artifacts, releases}`. The tab is replaced in Phase 4; on this branch it is temporarily broken.
+- Media is a shared library: every creator can list and reference all media, but only the uploader or an admin can change or delete it.
+
+### What should be done in the future
+
+- Validate `requiredPlan` against the configured plans once plans exist (Phase 5); today only the key format is checked.
+
+### Code review instructions
+
+- `pkg/catalog/studio.go` top to bottom; `pkg/catalog/pages.go` `canEditArtifact`/`canEditPost`; `pkg/catalog/server.go` `authorizeInstance`.
+- `TEST_DATABASE_URL='postgres://francois:francois@127.0.0.1:5434/francois_catalog?sslmode=disable' go test -count=1 -run 'TestStudio|TestHostedPlatform' ./pkg/catalog/`.
+
+### Technical details
+
+- Error codes added: `creator_required`, `creator_profile_required`, `not_editor`, `artifact_exists`, `no_draft`, `media_type` (415), `media_in_use`, `not_uploader`, `slug_taken`.
+- Limits: write-up and post body 100 KB, gallery 24, media 25 MB, alt 300, tags 12 × 32, creator links 8 (http/https only).

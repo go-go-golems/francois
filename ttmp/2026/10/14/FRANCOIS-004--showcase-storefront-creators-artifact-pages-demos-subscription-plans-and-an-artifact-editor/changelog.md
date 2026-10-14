@@ -24,3 +24,11 @@ Phase 2 public pages (ab1598d): server-rendered storefront, /media, RSS, public.
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/pages.go — Storefront handlers
+
+## 2026-10-14
+
+Phase 3 studio API (68a7daf): creator guard level, /api/studio for artifacts, drafts, releases, media, posts, creators; admin release routes removed
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/studio.go — Studio API
