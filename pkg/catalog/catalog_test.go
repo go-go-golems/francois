@@ -190,7 +190,7 @@ func (e *env) upload(a tactor, html string) (int, map[string]any) {
 	f, _ := w.CreateFormFile("html", "board.html")
 	_, _ = f.Write([]byte(html))
 	_ = w.Close()
-	code, b, _ := e.do(&a, "portal.test", "POST", "/api/admin/releases", &buf, map[string]string{"Content-Type": w.FormDataContentType()})
+	code, b, _ := e.do(&a, "portal.test", "POST", "/api/studio/releases", &buf, map[string]string{"Content-Type": w.FormDataContentType()})
 	out := map[string]any{}
 	_ = json.Unmarshal(b, &out)
 	return code, out
@@ -318,7 +318,7 @@ func TestHostedPlatform(t *testing.T) {
 	html := `<!doctype html><html><head><title>Board</title></head><body>` + marker + `</body></html>`
 
 	// Admin publication; subscribers cannot reach admin APIs.
-	if code, out := e.upload(alice, html); code != 403 || errCode(out) != "admin_required" {
+	if code, out := e.upload(alice, html); code != 403 || errCode(out) != "creator_required" {
 		t.Fatalf("subscriber upload: %d %v", code, out)
 	}
 	code, rel := e.upload(admin, html)
@@ -329,14 +329,14 @@ func TestHostedPlatform(t *testing.T) {
 	if code, _ := e.upload(admin, html); code != 409 {
 		t.Fatalf("duplicate version should conflict: %d", code)
 	}
-	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+releaseID+"/publish", nil); code != 200 {
+	if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+releaseID+"/publish", nil); code != 200 {
 		t.Fatalf("publish: %d %v", code, out)
 	}
-	if _, b, _ := e.do(&admin, "portal.test", "GET", "/api/admin/releases", nil, nil); !bytes.Contains(b, []byte(releaseID)) {
+	if _, b, _ := e.do(&admin, "portal.test", "GET", "/api/studio/releases", nil, nil); !bytes.Contains(b, []byte(releaseID)) {
 		t.Fatalf("admin release list misses the release: %s", b)
 	}
 	// CSRF and Origin are enforced on cookie-authenticated mutations.
-	if code, _, _ := e.do(&admin, "portal.test", "POST", "/api/admin/releases/"+releaseID+"/publish", nil, map[string]string{"X-CSRF-Token": "nope"}); code != 403 {
+	if code, _, _ := e.do(&admin, "portal.test", "POST", "/api/studio/releases/"+releaseID+"/publish", nil, map[string]string{"X-CSRF-Token": "nope"}); code != 403 {
 		t.Fatalf("bad CSRF accepted: %d", code)
 	}
 	if code, _, _ := e.do(&admin, "portal.test", "POST", "/api/instances", strings.NewReader(`{}`), map[string]string{"Origin": "http://i-x.apps.test"}); code != 403 {
@@ -569,7 +569,7 @@ func TestSecondSite(t *testing.T) {
 	alice := e.user("alice", "subscriber", true)
 	_, rel := e.upload(admin, `<!doctype html><html><head><title>Board</title></head><body>`+marker+`</body></html>`)
 	releaseID := rel["id"].(string)
-	if code, out := e.portal(&admin, "POST", "/api/admin/releases/"+releaseID+"/publish", nil); code != 200 {
+	if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+releaseID+"/publish", nil); code != 200 {
 		t.Fatalf("publish: %d %v", code, out)
 	}
 

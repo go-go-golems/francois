@@ -67,6 +67,7 @@ const (
 	public = iota
 	session
 	enabled
+	creator // role creator or admin: the studio
 	admin
 )
 
@@ -86,6 +87,10 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 		}
 		if level >= enabled && p.User.Disabled {
 			httpx.Fail(w, 403, "account_disabled", "This account is disabled")
+			return
+		}
+		if level >= creator && p.User.Role != "creator" && p.User.Role != "admin" {
+			httpx.Fail(w, 403, "creator_required", "Creator or administrator role required")
 			return
 		}
 		if level >= admin && p.User.Role != "admin" {

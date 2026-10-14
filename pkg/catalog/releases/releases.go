@@ -105,6 +105,10 @@ func (b *Blobs) Missing(files []store.ReleaseFile) []store.ReleaseFile {
 }
 
 var artifactID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+
+// ValidArtifactID reports whether id is an acceptable artifact identifier.
+func ValidArtifactID(id string) bool { return artifactID.MatchString(id) }
+
 var versionLabel = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$`)
 
 // Known capability namespaces the hosted runtime can grant.
