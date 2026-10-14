@@ -11,6 +11,10 @@ topics:
       description: Packaging, GitOps and runtime deployment
     - slug: kubernetes
       description: Kubernetes, K3s and Argo CD
+    - slug: billing
+      description: Subscriptions, plans and entitlements
+    - slug: frontend
+      description: Portal, admin and public web pages
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
