@@ -10,25 +10,37 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
-    - Path: pkg/catalog/server.go
-      Note: Site dispatch and the single authorizeInstance rule that plans replace
-    - Path: pkg/catalog/billing/policy.go
-      Note: Pure access policy; gains the price of the standing subscription
-    - Path: pkg/catalog/settings/settings.go
-      Note: Versioned settings document; gains plans, demo and storefront blocks
-    - Path: pkg/catalog/releases/releases.go
-      Note: Validation and content-addressed blob storage reused for media
     - Path: pkg/catalog/admin.go
       Note: Current release upload/check/preview/publish API
+    - Path: pkg/catalog/billing/policy.go
+      Note: Pure access policy; gains the price of the standing subscription
     - Path: pkg/catalog/hosted/sample.go
       Note: Credit reservation that becomes plan-aware
+    - Path: pkg/catalog/releases/releases.go
+      Note: Validation and content-addressed blob storage reused for media
+    - Path: pkg/catalog/server.go
+      Note: Site dispatch and the single authorizeInstance rule that plans replace
+    - Path: pkg/catalog/settings/settings.go
+      Note: Versioned settings document; gains plans, demo and storefront blocks
+    - Path: repo://pkg/catalog/demos.go
+      Note: Visitor demos
+    - Path: repo://pkg/catalog/entitlement.go
+      Note: Entitlement resolver (plans)
+    - Path: repo://pkg/catalog/pages.go
+      Note: Server-rendered storefront
+    - Path: repo://pkg/catalog/store/migrations/004_storefront.sql
+      Note: Storefront schema
+    - Path: repo://pkg/catalog/studio.go
+      Note: Studio API
+    - Path: repo://ui/catalog/studio.tsx
+      Note: Studio UI
     - Path: ui/catalog/admin.tsx
       Note: Current publish form the studio editor replaces
 ExternalSources: []
-Summary: "Intern-oriented analysis and design for turning the hosted Francois catalog into a storefront for two creators: public artifact pages with write-ups and media, creators, a journal, visitor demos, subscription plans with entitlements, a studio editor, creator role, API tokens and a push CLI."
+Summary: 'Intern-oriented analysis and design for turning the hosted Francois catalog into a storefront for two creators: public artifact pages with write-ups and media, creators, a journal, visitor demos, subscription plans with entitlements, a studio editor, creator role, API tokens and a push CLI.'
 LastUpdated: 2026-10-14T19:30:00-04:00
-WhatFor: "Understand the hosted catalog and implement the storefront and plans in phases."
-WhenToUse: "Read before changing catalog content, public pages, entitlements, billing plans or the studio UI."
+WhatFor: Understand the hosted catalog and implement the storefront and plans in phases.
+WhenToUse: Read before changing catalog content, public pages, entitlements, billing plans or the studio UI.
 ---
 
 # Showcase storefront and subscription plans: analysis, design and implementation guide

@@ -65,3 +65,11 @@ Phase 7 API tokens and push (09f6c20): studio-only bearer tokens, token UI, stud
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/cmd/francois/cmds/push.go — catalog push command
+
+## 2026-10-14
+
+Phase 8 docs and validation (e26639d, c8232be): production playbook and README updated, rollout order for the removed --stripe-price-id flag, compose and E2E script adapted; make ci-check passes; branch feat/storefront pushed
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/doc/production.md — Production playbook with FRANCOIS-004 rollout

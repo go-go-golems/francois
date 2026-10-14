@@ -15,7 +15,7 @@ RelatedFiles:
     - Path: repo://ttmp/2026/10/14/FRANCOIS-004--showcase-storefront-creators-artifact-pages-demos-subscription-plans-and-an-artifact-editor/working-note/01-implementation-diary.md
       Note: Implementation diary
 ExternalSources: []
-Summary: ""
+Summary: "Storefront for two creators: server-rendered artifact pages with write-ups and media, creators, journal, plans with entitlements and a pricing page, visitor demos, a studio with creator role, API tokens and francois catalog push. Implemented on branch feat/storefront; not yet deployed."
 LastUpdated: 2026-10-14T18:43:21.273558737-04:00
 WhatFor: ""
 WhenToUse: ""
