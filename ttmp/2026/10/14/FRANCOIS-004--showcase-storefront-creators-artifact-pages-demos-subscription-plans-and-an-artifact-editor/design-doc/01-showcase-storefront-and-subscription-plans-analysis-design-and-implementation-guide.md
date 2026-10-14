@@ -540,8 +540,8 @@ type Storefront struct {
 
 **Validation rules** (added to `Document.Validate`):
 
-- Exactly one plan has key `free`, rank 0 and no prices. All ranks are distinct. Keys match `^[a-z][a-z0-9-]{0,31}$`.
-- Every paid plan has at least one price; intervals are `month` or `year`, at most one of each; price IDs start with `price_` and are unique across plans.
+- Exactly one plan has key `free`, rank 0 and no prices. All other ranks are above 0 and distinct. Keys match `^[a-z][a-z0-9-]{0,31}$`.
+- A plan above free without prices is valid: it can only be granted (for example a "friends" plan). Intervals are `month` or `year`; price IDs start with `price_` and are unique across plans. Checkout picks the first price of the requested interval.
 - Every selector in `plan.models` and `demo.models` is an approved model.
 - Numeric bounds as today (instances 0–1000, members 1–100, credits 0–1,000,000).
 
@@ -646,9 +646,9 @@ POST /api/demos {"artifactId":"polis"}            (public; Origin must be the po
 ```
 
 - **Authorization.** `authorizeInstance` allows a `demo` instance only for its owner and only before `expires_at`. A guest can reach `/instances/<id>` and launch because the existing launch path needs only a session; guests cannot create workspaces (their entitlement plan has zero instances) and cannot open checkout.
-- **Model budget.** Guests reserve credits against `demo.credits` (both monthly and daily allowance for that guest). Before reserving, the server checks that today's credits charged to guests are below `demo.dailyBudget`.
+- **Model budget.** Every demo instance has its own credit ledger: model calls in it reserve against `demo.credits` under the allowance period `demo:<instance id>` instead of the visitor's monthly period, so a signed-in subscriber's demo never touches their monthly allowance. Before reserving, the server checks that today's credits charged to all demo ledgers plus this call stay within `demo.dailyBudget` (`store.DemoCreditsToday`). The runtime receives this through a `hosted.Budgeter` callback next to `Authorizer`.
 - **Rate limit.** An in-memory limiter keyed by client address allows `demo.perAddressPerHour` demos. Behind Traefik the client address comes from `X-Real-Ip`, honoured only when `catalog serve --trust-proxy-headers` is set.
-- **Clean-up.** A loop started in `Server.Run` deletes expired demo instances every minute (revoking live views first). Guest users stay as rows so model-call history keeps its foreign keys; their sessions expire.
+- **Clean-up.** A loop started in `Server.Run` suspends expired demo instances every minute (revoking live views first) and deletes them a week after expiry, so the daily budget can still count their calls. Guest users stay as rows so model-call history keeps its foreign keys; their sessions expire.
 - **Signed-in visitors** get a demo instance under their own account, with the same expiry and demo budget.
 
 ### Decision: guest users instead of anonymous instances
@@ -849,7 +849,16 @@ Each phase ends with passing tests and a commit; the diary records each step.
 | 7 Tokens and push | `api_tokens`, bearer in guard, `catalog push` | `auth.go`, `store/tokens.go`, `cmd/francois/cmds/catalog.go` |
 | 8 Docs and rollout | `doc/production.md`, README, k3s args, rollout order | docs |
 
-**Rollout order for production (Phase 8 detail).** The new binary rejects `--stripe-price-id`, and the old binary's strict settings parser rejects revisions containing `plans`. So: (1) merge a k3s change that removes `--stripe-price-id` together with the image bump; (2) immediately save a settings revision with the free plan and a paid plan using the existing price ID, and the previous credits; (3) link the creators to their accounts and set their roles. Between (1) and (2) subscribers resolve to the free plan; with test users only this is acceptable.
+**Rollout order for production (Phase 8 detail).** The new binary rejects `--stripe-price-id`, so the k3s change that bumps the image must remove that argument in the same commit. Stored settings revisions are parsed strictly, so migration `005_plans.sql` rewrites every stored revision: the old per-user instance, member and credit limits become a `subscriber` plan whose prices are the distinct prices existing subscriptions pay, next to a `free` plan; demos stay disabled. Existing subscribers therefore keep access without a manual step. After the rollout: rename or reprice plans in Settings, link the creators to their accounts and set their roles.
+
+### Decision: migrate stored settings instead of a lenient parser
+
+- **Context:** Production holds settings revisions in the old shape, and `ActiveSettings` parses strictly (`DisallowUnknownFields`); after deploying, the active revision would not parse and every request needing settings would fail.
+- **Options considered:** (a) a lenient parser that maps old fields at read time; (b) a deploy-then-save procedure; (c) a SQL migration that rewrites stored revisions.
+- **Decision:** (c), `005_plans.sql`.
+- **Rationale:** It keeps one strict document shape in code (no compatibility layer), runs under the same advisory lock as other migrations, and derives the paid plan's prices from the database (`billing_subscriptions.price_id`), so current subscribers keep their plan.
+- **Consequences:** Historic revisions are rewritten too (their history view shows plans). A revision saved by an old binary during a rollback would be in the old shape again; rollbacks across this migration need the migration reversed by hand.
+- **Status:** accepted
 
 ## 11. Risks, alternatives and open questions
 
