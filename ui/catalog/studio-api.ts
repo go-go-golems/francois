@@ -58,7 +58,9 @@ export type ArtifactPatch = Partial<Pick<StudioArtifact, "title" | "description"
   creators?: string[];
 };
 
-const base = api.enhanceEndpoints({ addTagTypes: ["StudioArtifacts", "StudioArtifact", "Media", "Posts", "Post", "Creators", "StudioMe"] });
+export type Token = { id: string; name: string; createdAt: string; lastUsedAt?: string; expiresAt?: string; revokedAt?: string };
+
+const base = api.enhanceEndpoints({ addTagTypes: ["StudioArtifacts", "StudioArtifact", "Media", "Posts", "Post", "Creators", "StudioMe", "Tokens"] });
 
 export const studio = base.injectEndpoints({
   endpoints: (b) => ({
@@ -147,6 +149,15 @@ export const studio = base.injectEndpoints({
     deleteCreator: b.mutation<unknown, string>({
       query: (id) => ({ url: `api/studio/creators/${id}`, method: "DELETE" }),
       invalidatesTags: ["Creators", "StudioMe"],
+    }),
+    tokens: b.query<Token[], void>({ query: () => "api/studio/tokens", providesTags: ["Tokens"] }),
+    createToken: b.mutation<{ token: string; info: Token }, { name: string; days: number }>({
+      query: (body) => ({ url: "api/studio/tokens", method: "POST", body }),
+      invalidatesTags: ["Tokens"],
+    }),
+    revokeToken: b.mutation<unknown, string>({
+      query: (id) => ({ url: `api/studio/tokens/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Tokens"],
     }),
     studioPlans: b.query<{ key: string; name: string; rank: number; public: boolean }[], void>({ query: () => "api/studio/plans" }),
     markdown: b.mutation<{ html: string }, string>({

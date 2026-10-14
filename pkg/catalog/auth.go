@@ -13,10 +13,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Principal is the authenticated portal caller.
+// Principal is the authenticated portal caller: a browser session, or a
+// personal API token (Token set, no session) on studio routes.
 type Principal struct {
 	Session store.Session
 	User    store.User
+	Token   *store.APIToken
 }
 
 type principalKey struct{}
@@ -81,6 +83,20 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 			httpx.Fail(w, 503, "unavailable", "Session store unavailable")
 			return
 		}
+		// Personal API tokens authenticate studio routes only, so a leaked
+		// publishing token cannot reach accounts, billing or instances.
+		if bearer := r.Header.Get("Authorization"); p == nil && strings.HasPrefix(bearer, "Bearer "+store.TokenPrefix) {
+			if !strings.HasPrefix(r.URL.Path, "/api/studio/") {
+				httpx.Fail(w, 401, "token_not_allowed", "API tokens are accepted only by the studio API")
+				return
+			}
+			t, u, err := s.Store.ResolveToken(r.Context(), strings.TrimPrefix(bearer, "Bearer "))
+			if err != nil {
+				httpx.Fail(w, 401, "token_invalid", "The API token is invalid, expired or revoked")
+				return
+			}
+			p = &Principal{User: u, Token: &t}
+		}
 		if level >= session && p == nil {
 			httpx.Fail(w, 401, "login_required", "Sign in first")
 			return
@@ -97,7 +113,9 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 			httpx.Fail(w, 403, "admin_required", "Administrator role required")
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && level >= session {
+		// A bearer token is not an ambient browser credential: no Origin or
+		// CSRF check applies to it.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && level >= session && p.Token == nil {
 			if !s.sameOrigin(r) {
 				httpx.Fail(w, 403, "invalid_origin", "Cross-origin request rejected")
 				return
