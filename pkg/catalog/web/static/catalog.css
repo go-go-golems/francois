@@ -332,6 +332,30 @@ main > .rows:not(:last-child) { margin-bottom: 72px; }
 .draft-banner { margin-top: 24px; background: var(--color-plinth); padding: 12px 16px; border-top: 0; }
 .action-error { width: 100%; margin: 8px 0 0; }
 
+/* Studio — editors, media library, pickers. */
+.editor-tabs { padding: 8px 0 32px; }
+.editor-form { max-width: 1240px; }
+.lib-row:is(a):hover strong { color: var(--color-muted); }
+img.lib-thumb { object-fit: cover; }
+.md-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+.md-editor textarea { min-height: 360px; }
+.md-preview { padding: 30px 0 0; max-height: 70vh; overflow-y: auto; border-top: 1px solid var(--color-line); }
+@media (max-width: 1023px) { .md-editor { grid-template-columns: 1fr; } }
+.media-strip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.media-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.media-thumb img { width: 120px; height: 80px; object-fit: cover; background: var(--color-plinth); display: block; }
+.picker { border-top: 1px solid var(--color-ink); padding-bottom: 24px; }
+.picker .lib-head { padding-top: 16px; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 24px 0; }
+.media-tile { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; background: none; text-align: left; min-width: 0; }
+.media-tile img, .media-tile video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--color-plinth); display: block; }
+button.media-tile:hover img { outline: 1.5px solid var(--color-ink); }
+.media-tile input { border: 0; border-bottom: 1px solid var(--color-faint); padding: 4px 0; background: none; outline: none; }
+.media-tile input:focus { border-bottom-color: var(--color-ink); }
+.drop-small { height: 110px; }
+select.btn { appearance: none; cursor: pointer; }
+.creator-form { padding: 16px 0 32px; border-bottom: 1px solid var(--color-line); }
+
 /* Footer — For people | For machines. */
 .foot { display: flex; padding: 120px 0 48px; line-height: 24px; }
 .foot-half { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }

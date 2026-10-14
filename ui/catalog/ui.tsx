@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { api } from "./api";
-import { clear, navigate, State } from "./store";
+import { api, errorMessage } from "./api";
+import { clear, navigate, show, State } from "./store";
 
 // SPA routes; every other path (the storefront) is rendered by the server
 // and is reached with a normal navigation.
@@ -227,4 +227,19 @@ export function Monogram({ title, caps }: { title: string; caps: string[] }) {
       <span className="mono-caps">{caps.filter((c) => c !== "downloads").join(" · ")}</span>
     </div>
   );
+}
+
+// useAct runs a mutation and reports success or failure as a toast.
+export function useAct() {
+  const dispatch = useDispatch();
+  return async <T,>(p: Promise<T>, ok?: string): Promise<T | undefined> => {
+    try {
+      const v = await p;
+      if (ok) dispatch(show({ text: ok }));
+      return v;
+    } catch (e) {
+      dispatch(show({ text: errorMessage(e), bad: true }));
+      return undefined;
+    }
+  };
 }

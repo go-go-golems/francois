@@ -5,6 +5,7 @@ import { Account } from "./account";
 import { Admin } from "./admin";
 import { Instances, Launcher } from "./instances";
 import { store } from "./store";
+import { Studio } from "./studio";
 import { Footer, Header, Link, Notice, useRoute } from "./ui";
 
 function Routes() {
@@ -15,6 +16,7 @@ function Routes() {
   if (parts[0] === "instances") page = <Instances />;
   else if (parts[0] === "account") page = <Account />;
   else if (parts[0] === "admin") page = <Admin />;
+  else if (parts[0] === "studio") page = <Studio />;
   else
     page = (
       <main className="lost">
