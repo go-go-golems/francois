@@ -2,7 +2,7 @@
 package web
 
 import (
-	_ "embed"
+	"embed"
 
 	local "github.com/go-go-golems/francois/pkg/web"
 )
@@ -12,6 +12,9 @@ var Index []byte
 
 //go:embed static/catalog.js
 var CatalogJS []byte
+
+//go:embed static/public.js
+var PublicJS []byte
 
 //go:embed static/catalog.css
 var CatalogCSS []byte
@@ -28,6 +31,12 @@ var RuntimeJS []byte
 //go:embed static/icon.svg
 var Icon []byte
 
+// Templates are the server-rendered storefront pages (html/template): a
+// shared layout plus one file per page.
+//
+//go:embed templates/*.tmpl
+var Templates embed.FS
+
 // LegalTemplate renders /privacy and /terms (html/template).
 //
 //go:embed legal.tmpl
@@ -42,6 +51,8 @@ func PortalAsset(name string) ([]byte, string, bool) {
 		return CatalogCSS, "text/css", true
 	case "icon.svg":
 		return Icon, "image/svg+xml", true
+	case "public.js":
+		return PublicJS, "text/javascript", true
 	}
 	return nil, "", false
 }

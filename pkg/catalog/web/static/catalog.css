@@ -291,6 +291,47 @@ main { min-height: 50vh; }
   .v-info { left: 0; right: 0; bottom: 0; width: auto; }
 }
 
+/* Storefront pages — covers, write-ups, galleries, creators, journal. */
+.ri-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.byline { margin: 20px 0 0; color: var(--color-muted); }
+.artifact .intro { padding-bottom: 48px; }
+.cover { margin: 0 0 56px; background: var(--color-plinth); }
+.cover img, .cover video { display: block; width: 100%; height: auto; max-height: 80vh; object-fit: contain; }
+.md { max-width: 760px; padding: 0 0 40px; color: var(--color-text); }
+.md > :first-child { margin-top: 0; }
+.md h1, .md h2, .md h3 { margin: 40px 0 12px; font-weight: 500; color: var(--color-ink); letter-spacing: -0.02em; }
+.md h1 { font-size: 34px; line-height: 38px; } .md h2 { font-size: 26px; line-height: 30px; } .md h3 { font-size: var(--text-body); }
+.md p, .md ul, .md ol, .md blockquote, .md table, .md pre { margin: 0 0 16px; }
+.md a { color: var(--color-ink); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--color-faint); text-underline-offset: 4px; }
+.md a:hover { text-decoration-color: var(--color-ink); }
+.md img { display: block; max-width: 100%; height: auto; margin: 24px 0; background: var(--color-plinth); }
+.md blockquote { padding-left: 20px; border-left: 1px solid var(--color-ink); color: var(--color-muted); }
+.md code { font: 0.9em var(--font-mono); background: var(--color-plinth); padding: 1px 4px; }
+.md pre { padding: 14px 0; border-top: 1px solid var(--color-ink); overflow-x: auto; }
+.md pre code { background: none; padding: 0; font-size: 15px; line-height: 22px; }
+.md table { border-collapse: collapse; width: 100%; font-size: var(--text-small); }
+.md th, .md td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--color-line); }
+.md th { font-weight: 500; border-bottom-color: var(--color-ink); }
+.md hr { border: 0; border-top: 1px solid var(--color-line); margin: 32px 0; }
+.intro-md { padding-top: 40px; }
+.rows + .lib-head { padding-top: 0; }
+main > .rows:not(:last-child) { margin-bottom: 72px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; padding: 16px 0 56px; }
+.gallery figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.gallery img, .gallery video { width: 100%; height: auto; display: block; background: var(--color-plinth); }
+.gallery figcaption { color: var(--color-muted); font-size: var(--text-caption); }
+.creator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; border-top: 1px solid var(--color-ink); padding-top: 24px; }
+.creator-card { display: flex; flex-direction: column; gap: 12px; }
+.creator-card img, .creator-mono { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--color-plinth); }
+.creator-mono { display: grid; place-items: center; font-weight: 500; font-size: 64px; letter-spacing: -0.05em; color: var(--color-ink); }
+.creator-card:hover .creator-name { text-decoration: underline; text-underline-offset: 4px; }
+.creator-intro .avatar { width: 120px; height: 120px; object-fit: cover; margin-bottom: 28px; display: block; background: var(--color-plinth); }
+.post-title { margin: 0; font-weight: 500; font-size: 26px; line-height: 30px; letter-spacing: -0.02em; }
+.post-title a:hover { color: var(--color-muted); }
+.post-date { font-size: var(--text-small) !important; line-height: 22px !important; letter-spacing: 0 !important; font-weight: 400 !important; color: var(--color-muted); }
+.draft-banner { margin-top: 24px; background: var(--color-plinth); padding: 12px 16px; border-top: 0; }
+.action-error { width: 100%; margin: 8px 0 0; }
+
 /* Footer — For people | For machines. */
 .foot { display: flex; padding: 120px 0 48px; line-height: 24px; }
 .foot-half { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }

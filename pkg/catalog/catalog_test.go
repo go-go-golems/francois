@@ -107,11 +107,11 @@ func (e *env) user(name string, role string, access bool) tactor {
 	if err != nil {
 		e.t.Fatal(err)
 	}
-	if role == "admin" {
-		if err = e.store.SetUserRole(ctx, u.ID, "admin"); err != nil {
+	if role != "" && role != "subscriber" {
+		if err = e.store.SetUserRole(ctx, u.ID, role); err != nil {
 			e.t.Fatal(err)
 		}
-		u.Role = "admin"
+		u.Role = role
 	}
 	if access {
 		if _, err = e.store.GrantAccess(ctx, u.ID, u.ID, time.Now().Add(time.Hour), "test"); err != nil {

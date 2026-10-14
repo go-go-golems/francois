@@ -1,0 +1,13 @@
+{{define "content"}}<main>
+<section class="hero"><h1>{{.Body.Headline}}{{if .Body.Tagline}} <span class="muted">{{.Body.Tagline}}</span>{{end}}</h1></section>
+{{if .Body.LoginError}}<p class="notice bad">Sign-in did not complete ({{.Body.LoginError}}). Please try again.</p>{{end}}
+{{if .Body.Intro}}<div class="md intro-md">{{.Body.Intro}}</div>{{end}}
+{{if .Body.Featured}}<section class="lib-head"><h2>Featured</h2><a class="u" href="/apps">All applications</a></section>
+{{template "cards" .Body.Featured}}{{else}}<p class="empty">No applications are published yet.</p>{{end}}
+{{if .Body.Creators}}<section class="lib-head"><h2>Made by</h2></section>
+<section class="creator-grid">
+{{range .Body.Creators}}<a class="creator-card" href="/creators/{{.Slug}}">{{if .Avatar}}<img src="/media/{{.Avatar}}" alt="" loading="lazy">{{else}}<span class="creator-mono" aria-hidden="true">{{monogram .Name}}</span>{{end}}<span class="creator-name">{{.Name}}</span></a>
+{{end}}</section>{{end}}
+{{if .Body.Posts}}<section class="lib-head"><h2>Journal</h2><a class="u" href="/journal">All posts</a></section>
+{{template "posts" .Body.Posts}}{{end}}
+</main>{{end}}

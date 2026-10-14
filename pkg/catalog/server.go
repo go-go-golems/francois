@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/billing"
+	"github.com/go-go-golems/francois/pkg/catalog/content"
 	"github.com/go-go-golems/francois/pkg/catalog/hosted"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
 	"github.com/go-go-golems/francois/pkg/catalog/identity"
@@ -134,6 +135,8 @@ type Server struct {
 	Runtime   *hosted.Runtime
 	portal    http.Handler
 	legal     *template.Template
+	pages     map[string]*template.Template
+	md        *content.Markdown
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -150,7 +153,8 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 			site.AppPort = site.PublicURL.Port()
 		}
 	}
-	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate))}
+	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
+		pages: parsePages(), md: content.NewMarkdown()}
 	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {
