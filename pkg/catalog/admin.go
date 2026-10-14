@@ -11,6 +11,7 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/releases"
 	"github.com/go-go-golems/francois/pkg/catalog/settings"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
+	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
 )
 
@@ -490,7 +491,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	history, _ := s.Store.SettingsHistory(r.Context(), 10)
 	models := []map[string]any{}
-	for _, m := range s.Backend.Models() {
+	for _, m := range uniqueModels(s.Backend.Models()) {
 		models = append(models, map[string]any{"selector": m.Provider + "/" + m.ID, "name": m.Name, "thinkingLevels": m.ThinkingLevels, "images": m.Images})
 	}
 	// Secret configuration is reported as configured/not configured only.
@@ -608,4 +609,23 @@ func (s *Server) adminAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, list)
+}
+
+// uniqueModels keeps the first entry per provider/id selector. The Pi worker
+// lists its local quick/default/complex tier models ahead of the catalog, so
+// a model that backs several tiers appears several times; the hosted catalog
+// sets tiers in its own settings and needs each model once.
+func uniqueModels(in []piworker.Model) []piworker.Model {
+	seen := map[string]bool{}
+	out := make([]piworker.Model, 0, len(in))
+	for _, m := range in {
+		sel := m.Provider + "/" + m.ID
+		if seen[sel] {
+			continue
+		}
+		seen[sel] = true
+		m.Tier = ""
+		out = append(out, m)
+	}
+	return out
 }
