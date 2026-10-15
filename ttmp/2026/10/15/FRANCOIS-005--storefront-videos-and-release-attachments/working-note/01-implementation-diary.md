@@ -8,7 +8,15 @@ Topics:
 DocType: working-note
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/attachments_test.go
+      Note: attachment tests
+    - Path: repo://pkg/catalog/studioclient/client.go
+      Note: streamed Attach for push
+    - Path: repo://pkg/catalog/videos_test.go
+      Note: video tests
+    - Path: repo://ui/catalog/studio.tsx
+      Note: VideoTile and Attachments panel
 ExternalSources: []
 Summary: Step-by-step diary for FRANCOIS-005
 LastUpdated: 2026-10-15T11:53:14.627720614-04:00
@@ -162,3 +170,183 @@ Commit `7f75b7e`. Migration `006_videos_attachments.sql` in the same commit also
 ### Technical details
 
 - Range check: `GET /media/<id>` with `Range: bytes=100-199` → `206`, 100 bytes, `Content-Range: bytes 100-199/4096`.
+
+## Step 3: Release attachments
+
+A release now carries up to 20 attachments in `release_attachments`. Editors add, relabel, reorder and remove them in any release state from the studio (an *Attachments (n)* panel on each release row) or upload them with `francois catalog push --attach`. Visitors download them under the release's own rule, which is now one helper shared with the HTML download; the artifact page lists them under each version, linked when the visitor may download them and otherwise with the plan that unlocks them.
+
+Commits `e0691da` (feature) and `f7f5a4b` (page shows the file name only when a label differs).
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+
+**Assistant interpretation:** Implement design Part 2.
+
+**Inferred user intent:** Let a version ship with its manual, source pack or notes, as part of what a subscription buys.
+
+### What I did
+
+- `store/attachments.go`: `Attachment`, `CreateAttachment` (locks the release row, counts, appends at `max(position)+1`, `ErrConflict` at the limit), `Attachment`, `UpdateAttachment(label?, position?)`, `DeleteAttachment`; `Release.Attachments` loaded with the release files.
+- `routes.go`: `mayDownload(w, r, rel)` extracted from `download`; public `GET|HEAD /api/releases/{release}/attachments/{id}/download`; `publicRelease` includes `publicAttachments` (no storage key, no user IDs).
+- `attachments.go`: upload (settings `maxAttachmentBytes`, file name = base name ≤200 chars, label ≤200, type sniffed from 512 bytes, streamed with `PutReader`), patch, delete, editor download, public download; `serveAttachment` uses `mime.FormatMediaType` for the `Content-Disposition` (RFC 2231 for non-ASCII names) and `http.ServeContent` (Range).
+- Studio listing: attachment `href` points at the editor route so drafts can be downloaded.
+- Artifact page: `releaseLine.Attached`, `Locked`; template list and plan note; `size` template function; the Open Graph image falls back to a video cover's poster.
+- `studioclient.Attach` streams the multipart body through `io.Pipe`; `Push` attaches before publishing; `push --attach` (repeatable) checks the files exist before creating a draft.
+- Studio UI: `Attachments` panel (drop zone with the limit from `studio/me`, inline labels, ↑/↓ that renumber the list, download, remove).
+- Tests: `TestAttachments` (editor-only drafts, non-editor 403, RFC 2231 name, published rule 401/403/206, unknown ID 404, relabel after publish, page listing and order, links only for entitled visitors, public API hides storage and users, delete, 20-per-release 409, size 413, draft delete cascades) and `push --attach` in `TestTokensAndPush`.
+
+### Why
+
+- The release row lock: my first version used `INSERT … SELECT … WHERE count < limit` and a comment claiming concurrent uploads could not exceed the limit. Under READ COMMITTED two such statements both see the old count, so the claim was wrong; `SELECT … FOR UPDATE` on the release serializes them.
+- Reordering renumbers 0…n-1 and patches only changed rows, because positions can have gaps after deletions and swapping two indices could collide with a third item.
+
+### What worked
+
+- `TEST_DATABASE_URL=… go test -count=1 ./pkg/catalog/...` → all `ok`; `--- PASS: TestAttachments (0.29s)`, `--- PASS: TestTokensAndPush (0.18s)` on the first run.
+- `golangci-lint run ./...` → `0 issues.`; `pnpm check`, `pnpm build` clean.
+
+### What didn't work
+
+- N/A beyond the locking correction above (caught in review before any test).
+
+### What I learned
+
+- `http.ServeContent` sets `Accept-Ranges` and answers `Range` for any `io.ReadSeeker`; the `Content-Type` set beforehand (`application/octet-stream`) is kept, so downloads never sniff to `text/html` on the portal origin.
+
+### What was tricky to build
+
+- Keeping the two download paths consistent: the public route must refuse drafts while editors need them. One rule (`mayDownload`) plus two thin routes kept the policy in one place.
+
+### What warrants a second pair of eyes
+
+- Attachments are mutable after publishing (design §2.2). Subscribers could see a file change under a version label; a changelog of attachment changes might be wanted later.
+
+### What should be done in the future
+
+- Blob garbage collection for deleted attachments.
+
+### Code review instructions
+
+- `pkg/catalog/attachments.go`, `routes.go` (`mayDownload`), `store/attachments.go`, `pages.go` (`releaseLine`), `artifact.tmpl`, `studioclient/client.go` (`Attach`).
+- Validate: `TEST_DATABASE_URL=… go test -count=1 -run 'TestAttachments|TestTokensAndPush' -v ./pkg/catalog/`.
+
+### Technical details
+
+- Count and position under lock: `SELECT 1 FROM releases WHERE id=$1 FOR UPDATE`, then `SELECT count(*), COALESCE(max(position)+1,0) FROM release_attachments WHERE release_id=$1`.
+
+## Step 4: Browser verification on the local stack
+
+I rebuilt the local compose stack from this branch and exercised both features through the real UI with a real video and real files. Migration 006 ran against the local database that already held four settings revisions and backfilled `maxAttachmentBytes=104857600`.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+
+**Assistant interpretation:** Validate the features end to end, not only through tests.
+
+**Inferred user intent:** Features that work when Manuel and Ramon use them.
+
+### What I did
+
+- `docker compose --profile stripe up -d --build francois`; checked `schema_migrations` (`006_videos_attachments.sql`) and the backfilled limit.
+- Made a 13 s clip of Polis from 90 JPEG frame screenshots (`ffmpeg -framerate 7 … -c:v libx264 -crf 22 -movflags +faststart`, 1280×704, 1.3 MB).
+- Studio → Media: uploaded the MP4 through the file input, scrubbed to 11 s, *Use this frame as poster* → toast "Poster set from this frame", `poster="/media/med_…"`.
+- Set it as the Polis cover and embedded it in the write-up (token API).
+- Studio → Polis → Releases → v1.1.0 → Attachments: uploaded a PDF, a ZIP and a TXT, labelled two, moved the changelog to the top.
+- `push --attach` for capabilities 1.0.1 (subscriber plan): `attachments 2`.
+- Signed out: cover `paused:false, muted:true, loop:true`, `readyState 4`; embed has controls, poster and aria-label; Polis (free sample) attachment downloads `200`; capabilities lists attachments without links plus "Attachments are included with the Subscriber plan."
+- Reduced motion (`reducedMotion: 'reduce'`): cover `paused:true, currentTime:0`.
+- As bob (Subscriber): two links, download `200`, `attachment; filename="Playground guide.md"`.
+- Home card for Polis: `<img src="/media/<poster>" …>`.
+
+### Why
+
+- Playwright's own video recording could not be used for the clip: the WebGL canvas came out grey and the frame mis-scaled, while element screenshots capture WebGL correctly.
+
+### What worked
+
+- Every check above.
+
+### What didn't work
+
+- `recordVideo` clip: grey canvas; replaced by screenshot frames.
+- `pandoc --pdf-engine=typst` → `Error producing PDF.`; the snap-confined `typst` could not read the scratch directory (`error: input file not found`). Rendered the PDF with Chromium (`page.pdf`) instead.
+- The first recording attempt timed out on `getByText('TIMELAPSE')`, which matched hidden help text; `getByRole('button', {name: /timelapse/i})` worked.
+
+### What I learned
+
+- An unlabelled attachment rendered its name twice (title and file line); fixed in `f7f5a4b`.
+
+### What was tricky to build
+
+- N/A
+
+### What warrants a second pair of eyes
+
+- The media tile stacks three poster actions vertically; it works but is crowded at narrow tile widths.
+
+### What should be done in the future
+
+- N/A
+
+### Code review instructions
+
+- Reproduce with `scripts/01-seed-local-showcase.sh` (see its header) and the steps above.
+
+### Technical details
+
+- Clip: `ffmpeg -v error -y -framerate 7 -i frames/%04d.jpg -vf "scale=1280:-2,format=yuv420p" -c:v libx264 -preset slow -crf 22 -movflags +faststart polis-tour.mp4`.
+
+## Step 5: Documentation
+
+`doc/production.md` gains the attachment and video rows in the storefront content table, the limits and streaming behaviour, `push --attach`, the migration 006 rollout note (no flag changes; ingress body limits must stay above the upload limits) and two known gaps (no rollback below 006; no blob garbage collection). The README's storefront section mentions attachments, video embeds and posters. The ticket keeps the local showcase seed script and Tessera, the small app written for the showcase.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 1.
+
+**Assistant interpretation:** Leave the operators' playbook accurate.
+
+**Inferred user intent:** Deployable work.
+
+### What I did
+
+- Edited `doc/production.md` (§3.7, §4.1, §5.3, §12) and `README.md`.
+- Added `scripts/01-seed-local-showcase.sh`, `scripts/tessera.html`, `scripts/tessera.manifest.json`.
+
+### Why
+
+- Migration 006 changes stored settings; the playbook records it next to the FRANCOIS-004 note.
+
+### What worked
+
+- `bash -n scripts/01-seed-local-showcase.sh`.
+
+### What didn't work
+
+- My `sed` that rewrote the script header replaced `set -euo pipefail` with the comment; restored.
+
+### What I learned
+
+- N/A
+
+### What was tricky to build
+
+- N/A
+
+### What warrants a second pair of eyes
+
+- N/A
+
+### What should be done in the future
+
+- Deploy: merge `feat/storefront` with the k3s argument changes from FRANCOIS-004 §4.1.
+
+### Code review instructions
+
+- `git diff` of `doc/production.md` and `README.md`.
+
+### Technical details
+
+- N/A

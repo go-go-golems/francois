@@ -8,12 +8,24 @@ Topics:
 DocType: design-doc
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/attachments.go
+      Note: attachment upload, edit and download routes
+    - Path: repo://pkg/catalog/content/markdown.go
+      Note: Markdown video embeds via parser context
+    - Path: repo://pkg/catalog/routes.go
+      Note: mayDownload shared download rule
+    - Path: repo://pkg/catalog/store/attachments.go
+      Note: attachment store with release-row lock
+    - Path: repo://pkg/catalog/store/migrations/006_videos_attachments.sql
+      Note: poster column, attachments table, settings backfill
+    - Path: repo://pkg/catalog/web/templates/layout.tmpl
+      Note: media, hero and thumb templates
 ExternalSources: []
 Summary: Video embedding, posters and streaming; per-release attachments with plan-gated downloads
 LastUpdated: 2026-10-15T11:53:14.449750007-04:00
-WhatFor: "Understanding how storefront videos and release attachments work and why"
-WhenToUse: "Before changing media serving, the Markdown renderer, release downloads or the studio Releases tab"
+WhatFor: Understanding how storefront videos and release attachments work and why
+WhenToUse: Before changing media serving, the Markdown renderer, release downloads or the studio Releases tab
 ---
 
 # Videos and release attachments design

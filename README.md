@@ -214,14 +214,19 @@ short-lived demos to visitors without an account.
 
 Creators and administrators work in the studio (`/studio`): artifact details,
 page drafts with a Markdown preview, releases (HTML upload → check → draft →
-isolated preview → publish/withdraw), demos, journal posts, creator profiles,
-a media library and personal API tokens. A creator edits the artifacts
-credited to their profile. `francois catalog push` uploads releases with a
-token, without database access:
+isolated preview → publish/withdraw) with attachments (manuals, archives,
+notes, downloadable under the release's rule and changeable after
+publishing), demos, journal posts, creator profiles, a media library and
+personal API tokens. Videos (MP4, WebM) work as covers, gallery items and
+Markdown embeds (`![caption](/media/<id>)`), with a poster taken from one of
+their frames. A creator edits the artifacts credited to their profile.
+`francois catalog push` uploads releases with a token, without database
+access:
 
 ```sh
 francois catalog push --server https://catalog.example --token-file token \
-  --artifact-id polis --version 1.2.0 --html dist/polis.html --publish
+  --artifact-id polis --version 1.2.0 --html dist/polis.html \
+  --attach docs/manual.pdf --publish
 ```
 
 The admin UI (`/admin`) covers users (roles, disable, session revocation,

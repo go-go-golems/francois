@@ -222,11 +222,21 @@ Credits are per plan (Settings → Plans): at the FRANCOIS-004 rollout the
 | Artifact page (write-up, cover, gallery) | `catalog_artifacts.page` / `page_draft` | Studio → artifact → Page |
 | Creator profiles | `creators`, `artifact_creators` | Studio → Creators (admins create and link accounts) |
 | Journal | `posts` | Studio → Journal |
-| Images and videos | `catalog_media` + blobs in `/var/lib/francois/releases/blobs` | Studio → Media |
+| Images and videos (with video posters) | `catalog_media` + blobs in `/var/lib/francois/releases/blobs` | Studio → Media |
+| Release attachments (manuals, archives, notes) | `release_attachments` + the same blobs | Studio → artifact → Releases → Attachments, or `push --attach` |
 | Plans, demo limits, storefront wording | settings revision | Admin → Settings |
 
-Media blobs share the release blob directory, so the nightly backup covers
-them. Public pages: `/`, `/apps`, `/apps/{id}`, `/creators/{slug}`,
+Media and attachment blobs share the release blob directory, so the nightly
+backup covers them. Upload limits are settings (Admin → Settings → Limits):
+`maxMediaBytes` (default 25 MiB, up to 1 GiB) and `maxAttachmentBytes`
+(default 100 MiB, up to 2 GiB); a release holds at most 20 attachments.
+Uploads stream to disk and `/media/{id}` and attachment downloads answer Range
+requests from the file, so large videos and archives do not load into memory.
+Attachments are downloaded under the release's rule (free sample, or a plan
+that can run the artifact) at
+`/api/releases/{release}/attachments/{id}/download`; unlike the HTML they can
+be changed after publishing. Deleting media or attachments leaves their blobs
+(there is no blob garbage collector yet). Public pages: `/`, `/apps`, `/apps/{id}`, `/creators/{slug}`,
 `/journal`, `/journal/{slug}`, `/journal/feed.xml`, `/pricing`, `/media/{id}`.
 
 ## 4. Releasing code
@@ -289,6 +299,13 @@ the image, so it must not be merged on its own:
 5. Fill the storefront wording (Admin → Settings → Storefront) and, if wanted,
    enable demos (Settings → Demos, then per artifact in the studio).
 6. Smoke test: `/`, `/pricing`, an artifact page, a demo, a studio edit.
+
+FRANCOIS-005 (videos and attachments) adds migration 006: a poster column on
+media, the `release_attachments` table, and `limits.maxAttachmentBytes`
+written into every stored settings revision (settings parse strictly). No
+flags change. Uploads can now be as large as the limits allow; if a request
+body limit is ever added to the ingress (Traefik has none by default), keep
+it above both limits.
 
 ## 5. Day-to-day operations
 
@@ -353,8 +370,12 @@ token created in Studio → Tokens:
 ```bash
 francois catalog push --server https://slop.boutique --token-file ~/.config/francois/token \
   --artifact-id polis --version 1.2.0 --html dist/polis.html \
-  [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish]
+  [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish] \
+  [--attach docs/manual.pdf --attach plates.zip]
 ```
+
+`--attach` files are uploaded to the draft before it is published; a missing
+file stops the push before anything is created.
 
 Tokens work only on `/api/studio/*`; a token cannot reach accounts, billing or
 instances, and cannot create tokens. Revoke one in Studio → Tokens.
@@ -659,6 +680,9 @@ The order follows the dependencies; each step names its check.
 - The demo rate limiter is in memory and per process (correct with one
   replica).
 - Migration 005 rewrote all stored settings revisions; a rollback to a
-  pre-FRANCOIS-004 image cannot read them.
+  pre-FRANCOIS-004 image cannot read them. Migration 006 likewise adds
+  `limits.maxAttachmentBytes`, which a pre-FRANCOIS-005 image rejects.
+- Blobs of deleted media and attachments stay on the volume; there is no
+  garbage collector.
 - The PDS records in the `scapegoat.dev` zone are not imported into Terraform
   (HK3S-0031), so a full DNS apply would try to recreate them.
