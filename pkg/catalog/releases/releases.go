@@ -177,6 +177,8 @@ type Upload struct {
 	Manifest    []byte
 	FreeSample  bool
 	MaxHTML     int64
+	// Creators are credited on the artifact when this upload creates it.
+	Creators []string
 }
 
 // Check is one publication validation finding shown to the operator.
@@ -309,6 +311,11 @@ func (p *Publisher) Check(ctx context.Context, u Upload) (map[string]json.RawMes
 	return manifest, checks, nil
 }
 
+// ErrArtifactTaken: another upload created the artifact between the caller's
+// authorization and this draft. The caller must authorize again as an editor
+// of the existing artifact before retrying.
+var ErrArtifactTaken = errors.New("the artifact was created by another upload")
+
 // CreateDraft validates, stores blobs atomically and only then commits the
 // draft metadata. A crash between both leaves an unreferenced blob. A release
 // for an existing artifact leaves its catalog metadata alone; the upload's
@@ -324,7 +331,10 @@ func (p *Publisher) CreateDraft(ctx context.Context, actor string, u Upload) (st
 	}
 	if !exists {
 		a := store.Artifact{ID: u.ArtifactID, Title: u.Title, Description: u.Description, Tags: u.Tags, Visibility: "listed"}
-		if _, err = p.Store.CreateArtifact(ctx, a); err != nil && !errors.Is(err, store.ErrConflict) {
+		if _, err = p.Store.CreateArtifact(ctx, a, u.Creators...); errors.Is(err, store.ErrConflict) {
+			return store.Release{}, checks, ErrArtifactTaken
+		}
+		if err != nil {
 			return store.Release{}, checks, err
 		}
 	}

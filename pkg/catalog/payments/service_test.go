@@ -22,6 +22,9 @@ type fakeGateway struct {
 	creates   int
 	failOnce  bool
 	deploy    map[string]string // customer -> francois_deployment tag
+	// onCreate runs once at the start of the next CreateCheckout, outside the
+	// lock, to interleave a concurrent request.
+	onCreate func()
 }
 
 func newFake() *fakeGateway {
@@ -50,6 +53,13 @@ func (f *fakeGateway) CustomerDeployment(_ context.Context, c string) (string, e
 // the same Session.
 func (f *fakeGateway) CreateCheckout(_ context.Context, r CheckoutRequest) (CheckoutSession, error) {
 	f.mu.Lock()
+	hook := f.onCreate
+	f.onCreate = nil
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	f.mu.Lock()
 	defer f.mu.Unlock()
 	if s, ok := f.sessions[r.IdempotencyKey]; ok {
 		return s, nil
@@ -74,6 +84,39 @@ func (f *fakeGateway) RetrieveCheckout(_ context.Context, id string) (CheckoutSe
 	}
 	return CheckoutSession{}, errors.New("no such session")
 }
+func (f *fakeGateway) ExpireCheckout(_ context.Context, id string) error {
+	return f.setStatus(id, "open", "expired")
+}
+
+// setStatus moves a Session from one status to another, like Stripe, which
+// only expires open Sessions.
+func (f *fakeGateway) setStatus(id, from, to string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k, s := range f.sessions {
+		if s.ID == id {
+			if s.Status != from {
+				return errors.Errorf("session %s is %s", id, s.Status)
+			}
+			s.Status = to
+			f.sessions[k] = s
+			return nil
+		}
+	}
+	return errors.New("no such session")
+}
+
+func (f *fakeGateway) status(id string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range f.sessions {
+		if s.ID == id {
+			return s.Status
+		}
+	}
+	return ""
+}
+
 func (f *fakeGateway) CreatePortal(_ context.Context, c, _ string) (string, error) {
 	return "https://portal.test/" + c, nil
 }
@@ -201,6 +244,87 @@ func TestCheckoutIdempotencyAndOwnership(t *testing.T) {
 	d, _ := s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now())
 	if d.Allowed {
 		t.Fatal("access granted before webhook projection")
+	}
+}
+
+func TestCheckoutIsBoundToPrice(t *testing.T) {
+	s := testStore(t)
+	g := newFake()
+	svc := NewService(g, s, Config{Deployment: "test"})
+	ctx := context.Background()
+	both := map[string]bool{"price_month": true, "price_year": true}
+	maya, eve := user(t, s, "maya"), user(t, s, "eve")
+	checkout := func(u store.User, price string) (string, error) {
+		return svc.Checkout(ctx, u, price, both, "http://portal.test")
+	}
+	sessionOf := func(u store.User) (store.CheckoutAttempt, string) {
+		t.Helper()
+		a, err := s.CheckoutAttempts(ctx, u.ID, 1)
+		if err != nil || len(a) != 1 || a[0].SessionID == nil {
+			t.Fatalf("latest attempt: %v %v", a, err)
+		}
+		return a[0], *a[0].SessionID
+	}
+
+	monthly, err := checkout(maya, "price_month")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, monthSession := sessionOf(maya)
+	if again, _ := checkout(maya, "price_month"); again != monthly {
+		t.Fatalf("same price, new Session: %s %s", again, monthly)
+	}
+
+	// Another price retires the open attempt and expires its Session.
+	yearly, err := checkout(maya, "price_year")
+	if err != nil || yearly == monthly {
+		t.Fatalf("switch to yearly: %q %v", yearly, err)
+	}
+	if st := g.status(monthSession); st != "expired" {
+		t.Fatalf("earlier Session still %s", st)
+	}
+	attempts, _ := s.CheckoutAttempts(ctx, maya.ID, 10)
+	if len(attempts) != 2 || attempts[1].State != "expired" || attempts[1].ErrorCode == nil || *attempts[1].ErrorCode != "superseded" || attempts[0].Price != "price_year" {
+		t.Fatalf("attempts after switch: %+v", attempts)
+	}
+	if again, _ := checkout(maya, "price_year"); again != yearly {
+		t.Fatalf("same price after switch, new Session: %s %s", again, yearly)
+	}
+
+	// A paid earlier Session sends the user to billing management.
+	yearAttempt, yearSession := sessionOf(maya)
+	if err = g.setStatus(yearSession, "open", "complete"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = checkout(maya, "price_month"); !errors.Is(err, ErrSubscriptionOpen) {
+		t.Fatalf("switch after payment: %v", err)
+	}
+	if a, _ := s.CheckoutBySession(ctx, yearSession); a.ID != yearAttempt.ID || a.State != "completed" {
+		t.Fatalf("paid attempt: %+v", a)
+	}
+
+	// A switch while the first Session is still being created: the first
+	// request must not hand out its URL, and its Session is expired.
+	var second string
+	g.onCreate = func() {
+		var err error
+		if second, err = checkout(eve, "price_year"); err != nil {
+			t.Errorf("concurrent switch: %v", err)
+		}
+	}
+	if first, err := checkout(eve, "price_month"); !errors.Is(err, ErrCheckoutSuperseded) {
+		t.Fatalf("superseded request returned %q %v", first, err)
+	}
+	attempts, _ = s.CheckoutAttempts(ctx, eve.ID, 10)
+	if len(attempts) != 2 || attempts[0].State != "open" || attempts[0].Price != "price_year" || attempts[0].SessionURL == nil || *attempts[0].SessionURL != second {
+		t.Fatalf("attempts after race: %+v", attempts)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for _, cs := range g.sessions {
+		if cs.ID != *attempts[0].SessionID && cs.CustomerID == "cus_"+eve.ID && cs.Status != "expired" {
+			t.Fatalf("superseded Session %s is %s", cs.ID, cs.Status)
+		}
 	}
 }
 

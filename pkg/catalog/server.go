@@ -213,7 +213,7 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 			if host == "www."+portal {
-				http.Redirect(w, r, site.PortalOrigin()+r.URL.RequestURI(), http.StatusPermanentRedirect)
+				http.Redirect(w, r, site.PortalOrigin()+r.URL.RequestURI(), http.StatusPermanentRedirect) // #nosec G710 -- the destination is always this site's portal origin; RequestURI adds only path and query
 				return
 			}
 		}

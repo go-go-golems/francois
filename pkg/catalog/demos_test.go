@@ -3,12 +3,16 @@ package catalog
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/settings"
+	"github.com/go-go-golems/francois/pkg/catalog/store"
 )
 
 // demoFrom starts a demo as an anonymous visitor from address addr and
@@ -162,4 +166,38 @@ func waitSettled(t *testing.T, e *env, user string, n int) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("calls of %s did not settle", user)
+}
+
+// Concurrent demo reservations from different visitors, each on its own demo
+// ledger, never overspend the shared daily budget.
+func TestSharedDemoBudgetUnderConcurrency(t *testing.T) {
+	e := setup(t)
+	const limit, racers = 3, 12
+	visitors := make([]tactor, racers)
+	for i := range visitors {
+		visitors[i] = e.user("visitor"+strconv.Itoa(i), "", false)
+	}
+	errs := make([]error, racers)
+	var wg sync.WaitGroup
+	for i, v := range visitors {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = e.store.Reserve(t.Context(), store.ReserveRequest{UserID: v.user.ID, InstanceID: "inst" + strconv.Itoa(i), CallID: "c", Model: "test/fake",
+				Credits: 1, Included: 2, Period: "demo:inst" + strconv.Itoa(i), Shared: true, SharedLimit: limit})
+		}()
+	}
+	wg.Wait()
+	reserved := 0
+	for i, err := range errs {
+		switch {
+		case err == nil:
+			reserved++
+		case !errors.Is(err, store.ErrSharedBudget):
+			t.Fatalf("visitor %d: %v", i, err)
+		}
+	}
+	if reserved != limit {
+		t.Fatalf("%d reservations against a shared budget of %d", reserved, limit)
+	}
 }

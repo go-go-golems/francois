@@ -14,6 +14,9 @@ var ErrAllowance = errors.New("allowance exhausted")
 // ErrDaily means the daily admission safeguard was reached.
 var ErrDaily = errors.New("daily limit reached")
 
+// ErrSharedBudget means demos have used today's shared budget.
+var ErrSharedBudget = errors.New("shared daily budget reached")
+
 // Period is the calendar-UTC month used for included allowance.
 func Period(t time.Time) string { return t.UTC().Format("2006-01") }
 
@@ -38,11 +41,16 @@ type ReserveRequest struct {
 	// Period overrides the monthly ledger key; demos use "demo:<instance>"
 	// so their budget never touches the visitor's monthly allowance.
 	Period string
+	// Shared calls (demos) also draw on SharedLimit credits per UTC day,
+	// summed over every demo ledger.
+	Shared      bool
+	SharedLimit int
 }
 
 // Reserve atomically reserves credits for one call. Concurrent callers for
 // the same user serialize on the period row, so the last credits are spent
-// at most once.
+// at most once; shared calls also serialize on one lock for the shared
+// budget, taken before the row.
 func (s *Store) Reserve(ctx context.Context, r ReserveRequest) (Reservation, error) {
 	period := Period(time.Now())
 	if r.Period != "" {
@@ -53,6 +61,18 @@ func (s *Store) Reserve(ctx context.Context, r ReserveRequest) (Reservation, err
 		return Reservation{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if r.Shared {
+		if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('demo-budget'))`); err != nil {
+			return Reservation{}, err
+		}
+		var today int
+		if err = tx.QueryRow(ctx, demoCreditsToday).Scan(&today); err != nil {
+			return Reservation{}, err
+		}
+		if today+r.Credits > r.SharedLimit {
+			return Reservation{}, ErrSharedBudget
+		}
+	}
 	var included, adjustments, reserved, used int
 	err = tx.QueryRow(ctx, `INSERT INTO model_allowance_periods(user_id,period,included) VALUES($1,$2,$3)
 ON CONFLICT(user_id,period) DO UPDATE SET included=EXCLUDED.included
@@ -268,11 +288,7 @@ func (s *Store) UsageSummary(ctx context.Context) (UsageSummary, error) {
 	return u, err
 }
 
-// DemoCreditsToday sums the credits charged to demo calls since midnight UTC,
+// demoCreditsToday sums the credits charged to demo calls since midnight UTC,
 // across all visitors: the shared daily demo budget.
-func (s *Store) DemoCreditsToday(ctx context.Context) (int, error) {
-	var n int
-	err := s.Pool.QueryRow(ctx, `SELECT COALESCE(sum(credits),0) FROM model_calls WHERE period LIKE 'demo:%' AND state<>'released'
- AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`).Scan(&n)
-	return n, err
-}
+const demoCreditsToday = `SELECT COALESCE(sum(credits),0) FROM model_calls WHERE period LIKE 'demo:%' AND state<>'released'
+ AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`

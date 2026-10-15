@@ -89,7 +89,7 @@ WHERE billing_subscriptions.user_id=EXCLUDED.user_id`,
 type CheckoutAttempt struct {
 	ID         string     `json:"id"`
 	UserID     string     `json:"userId"`
-	Plan       string     `json:"plan"`
+	Price      string     `json:"price"`
 	State      string     `json:"state"`
 	SessionID  *string    `json:"sessionId,omitempty"`
 	SessionURL *string    `json:"-"`
@@ -98,22 +98,23 @@ type CheckoutAttempt struct {
 	CreatedAt  time.Time  `json:"createdAt"`
 }
 
-const attemptColumns = `id,user_id,plan,state,session_id,session_url,expires_at,error_code,created_at`
+const attemptColumns = `id,user_id,price,state,session_id,session_url,expires_at,error_code,created_at`
 
 func scanAttempt(r pgx.Row) (CheckoutAttempt, error) {
 	var a CheckoutAttempt
-	err := r.Scan(&a.ID, &a.UserID, &a.Plan, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt)
+	err := r.Scan(&a.ID, &a.UserID, &a.Price, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt)
 	return a, notFound(err)
 }
 
 // AdmitCheckout returns the user's admitted attempt, creating a pending one
-// when none is open. created reports whether this call reserved it.
-func (s *Store) AdmitCheckout(ctx context.Context, user, plan string) (CheckoutAttempt, bool, error) {
+// for price when none is open. created reports whether this call reserved
+// it; an existing attempt may be for another price.
+func (s *Store) AdmitCheckout(ctx context.Context, user, price string) (CheckoutAttempt, bool, error) {
 	// Expire open attempts whose Session lifetime has passed.
 	if _, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state='expired',updated_at=now() WHERE user_id=$1 AND state='open' AND expires_at < now()`, user); err != nil {
 		return CheckoutAttempt{}, false, err
 	}
-	a, err := scanAttempt(s.Pool.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,plan,state) VALUES($1,$2,$3,'pending') ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, plan))
+	a, err := scanAttempt(s.Pool.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,price,state) VALUES($1,$2,$3,'pending') ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, price))
 	if err == nil {
 		return a, true, nil
 	}
@@ -124,8 +125,13 @@ func (s *Store) AdmitCheckout(ctx context.Context, user, plan string) (CheckoutA
 	return a, false, err
 }
 
+// OpenCheckout records the Session of an admitted attempt. ErrNotFound means
+// the attempt was retired meanwhile (superseded by another price).
 func (s *Store) OpenCheckout(ctx context.Context, id, session, url string, expires time.Time) error {
-	_, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state='open',session_id=$2,session_url=$3,expires_at=$4,updated_at=now() WHERE id=$1 AND state IN ('pending','open')`, id, session, url, expires)
+	tag, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state='open',session_id=$2,session_url=$3,expires_at=$4,updated_at=now() WHERE id=$1 AND state IN ('pending','open')`, id, session, url, expires)
+	if err == nil && tag.RowsAffected() == 0 {
+		err = ErrNotFound
+	}
 	return err
 }
 

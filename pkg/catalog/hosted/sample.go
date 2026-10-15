@@ -131,10 +131,6 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		httpx.Fail(w, 403, "model_not_in_plan", "Model "+model.Selector+" is not included in your plan")
 		return
 	}
-	if budget.Shared && budget.SharedUsed+model.Credits > budget.SharedLimit {
-		httpx.Fail(w, 429, "demo_limit", "Demos have used today's model budget; try again tomorrow")
-		return
-	}
 	req.Options.Model = selector
 	req.MaxRounds = rev.Document.Allowance.MaxToolRounds
 	a := rev.Document.Allowance
@@ -143,7 +139,8 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		return
 	}
 	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, CallID: req.CallID, Model: selector,
-		Credits: model.Credits, Included: budget.Monthly, Daily: budget.Daily, SettingsRevision: rev.Revision, Period: budget.Period})
+		Credits: model.Credits, Included: budget.Monthly, Daily: budget.Daily, SettingsRevision: rev.Revision, Period: budget.Period,
+		Shared: budget.Shared, SharedLimit: budget.SharedLimit})
 	if err != nil {
 		rt.release(p.User.ID)
 		switch {
@@ -151,6 +148,8 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 			httpx.Fail(w, 402, "allowance_exhausted", "Your included model allowance for this period is used up")
 		case errors.Is(err, store.ErrDaily):
 			httpx.Fail(w, 429, "daily_limit", "The daily model limit has been reached")
+		case errors.Is(err, store.ErrSharedBudget):
+			httpx.Fail(w, 429, "demo_limit", "Demos have used today's model budget; try again tomorrow")
 		default:
 			failErr(w, err)
 		}
