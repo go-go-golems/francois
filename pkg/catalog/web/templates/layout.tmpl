@@ -13,6 +13,7 @@
 <link rel="canonical" href="{{.Canonical}}">
 <link rel="icon" href="/static/icon.svg">
 <link rel="alternate" type="application/rss+xml" title="{{.Brand}} journal" href="/journal/feed.xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/static/catalog.css">
 <script src="/static/public.js" defer></script>
 </head>
@@ -44,6 +45,7 @@
 <div><span>Runtime</span><span class="foot-note">window.claude: db, room,<br>user, sample, assets</span></div>
 </div>
 </div>
+{{if .TypeCredit}}<p class="foot-credit">Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, a free typeface by <a href="https://abcdinamo.com">Dinamo</a>, made for <a href="https://www.are.na">Are.na</a>. Thank you.</p>{{end}}
 </footer>
 </div>
 </body>

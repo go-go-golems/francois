@@ -277,6 +277,26 @@ When a Vault value and a manifest change must land together (for example a new
 key name), write Vault first, wait until the VaultStaticSecret has refreshed the
 cluster Secret, then merge. Otherwise the new pod starts with the old value.
 
+### 3.8 Typeface (ABC Areal)
+
+The storefront is set in ABC Areal, a free typeface by Dinamo made for
+Are.na (download: https://abcdinamo.com/free/areal). Its license covers web
+use with self-hosted WOFF2 files but forbids putting the fonts "in public
+repositories" or "on public servers" as files to download, so this public
+repository contains none (`.gitignore` blocks `ABCAreal*` and `*.woff2`).
+
+`--font-dir` points the server at a private directory of the WOFF2 files.
+The server serves only known file names under `/fonts/`, generates
+`/fonts/fonts.css`, and shows the footer credit; without the flag it serves
+an empty stylesheet and pages fall back to Helvetica. A configured directory
+without any known file stops the server at startup.
+
+- Locally: keep the files in `~/.config/francois/fonts` and set
+  `FONT_DIR=~/.config/francois/fonts` in `deploy/compose/.env`.
+- On the cluster (not yet done): store the eight WOFF2 files (about 450 KB)
+  in Vault, sync them into a Secret, mount it read-only at
+  `/etc/francois/fonts` and add `--font-dir=/etc/francois/fonts`.
+
 ### 4.1 First rollout of the storefront (FRANCOIS-004)
 
 The FRANCOIS-004 binary removes `--stripe-price-id` (an unknown flag stops the

@@ -62,6 +62,8 @@ func (s *Server) routes() http.Handler {
 		}
 		httpx.OK(w, map[string]any{"status": "ready", "models": len(s.Backend.Models()) > 0})
 	})
+	m.HandleFunc("GET /fonts/fonts.css", s.fontCSS)
+	m.HandleFunc("GET /fonts/{name}", s.fontFile)
 	m.HandleFunc("GET /auth/login", s.login)
 	m.HandleFunc("GET /auth/callback", s.callback)
 	m.HandleFunc("POST /auth/logout", s.guard(session, s.logout))
