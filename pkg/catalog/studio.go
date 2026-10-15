@@ -48,6 +48,10 @@ func (s *Server) studioRoutes(m *http.ServeMux) {
 	m.HandleFunc("POST /api/studio/releases/{id}/withdraw", c(s.studioWithdraw))
 	m.HandleFunc("POST /api/studio/releases/{id}/preview", c(s.studioPreview))
 	m.HandleFunc("DELETE /api/studio/releases/{id}", c(s.studioDeleteDraft))
+	m.HandleFunc("POST /api/studio/releases/{id}/attachments", c(s.studioUploadAttachment))
+	m.HandleFunc("PATCH /api/studio/attachments/{id}", c(s.studioPatchAttachment))
+	m.HandleFunc("DELETE /api/studio/attachments/{id}", c(s.studioDeleteAttachment))
+	m.HandleFunc("GET /api/studio/attachments/{id}/download", c(s.studioDownloadAttachment))
 	m.HandleFunc("GET /api/studio/media", c(s.studioMedia))
 	m.HandleFunc("POST /api/studio/media", c(s.studioUploadMedia))
 	m.HandleFunc("PATCH /api/studio/media/{id}", c(s.studioPatchMedia))
@@ -493,6 +497,12 @@ func (s *Server) releaseItems(ctx context.Context, artifact string) ([]map[strin
 		item["freeSample"] = rel.FreeSample
 		item["pinnedInstances"] = pinned[rel.ID]
 		item["manifest"] = rel.Manifest
+		atts := publicAttachments(rel)
+		for i, a := range atts {
+			a["href"] = "/api/studio/attachments/" + rel.Attachments[i].ID + "/download"
+			a["createdAt"] = rel.Attachments[i].CreatedAt
+		}
+		item["attachments"] = atts
 		list = append(list, item)
 	}
 	return list, nil
@@ -716,7 +726,7 @@ func (s *Server) studioUploadMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit := rev.Document.Limits.MaxMediaBytes
-	f, ok := s.uploadedFile(w, r, limit)
+	f, _, ok := s.uploadedFile(w, r, limit)
 	if !ok {
 		return
 	}
@@ -751,7 +761,7 @@ func (s *Server) studioUploadMedia(w http.ResponseWriter, r *http.Request) {
 // uploadedFile parses a multipart upload of at most limit bytes and returns
 // its "file" part. Parts beyond 1 MiB are spooled to disk by the parser, so
 // large files are never held in memory.
-func (s *Server) uploadedFile(w http.ResponseWriter, r *http.Request, limit int64) (multipart.File, bool) {
+func (s *Server) uploadedFile(w http.ResponseWriter, r *http.Request, limit int64) (multipart.File, *multipart.FileHeader, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, limit+(1<<20))
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
 		var tooBig *http.MaxBytesError
@@ -760,14 +770,14 @@ func (s *Server) uploadedFile(w http.ResponseWriter, r *http.Request, limit int6
 		} else {
 			httpx.Fail(w, 400, "invalid_upload", "The upload form is malformed")
 		}
-		return nil, false
+		return nil, nil, false
 	}
-	f, _, err := r.FormFile("file")
+	f, h, err := r.FormFile("file")
 	if err != nil {
 		httpx.Fail(w, 400, "invalid_upload", "Choose a file")
-		return nil, false
+		return nil, nil, false
 	}
-	return f, true
+	return f, h, true
 }
 
 func mib(n int64) string { return strconv.FormatInt(n>>20, 10) + " MiB" }

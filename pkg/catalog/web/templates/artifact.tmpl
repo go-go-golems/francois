@@ -19,6 +19,9 @@
 <div class="release-body">
 <p class="changelog">{{if .Changelog}}{{.Changelog}}{{else}}No release notes.{{end}}</p>
 {{if .Downloads}}<p class="ri-actions">{{range .Downloads}}<a class="tlink quiet" href="{{.Href}}">{{.Label}}</a>{{end}}</p>{{end}}
+{{if .Attached}}<ul class="attachments" aria-label="Attachments">
+{{range .Attached}}<li>{{if .Href}}<a class="tlink" href="{{.Href}}" download="{{.Name}}">{{.Title}}</a>{{else}}<span>{{.Title}}</span>{{end}} <span class="muted">{{.Name}} · {{size .Size}}</span></li>
+{{end}}</ul>{{if .Locked}}<p class="muted small">{{if $.Body.Plan}}Attachments are included with the {{$.Body.Plan}} plan.{{else}}Sign in with a plan to download the attachments.{{end}}</p>{{end}}{{end}}
 </div>
 </div>
 {{end}}</section>

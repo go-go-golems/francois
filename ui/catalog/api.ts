@@ -49,6 +49,7 @@ export type ReleaseFile = {
   size: number;
   sha256: string;
 };
+export type Attachment = { id: string; name: string; label: string; mediaType: string; size: number; sha256: string; position: number; href: string; createdAt?: string };
 export type Release = {
   id: string;
   artifactId: string;
@@ -60,6 +61,7 @@ export type Release = {
   withdrawnAt?: string;
   capabilities: string[];
   files: ReleaseFile[];
+  attachments: Attachment[];
   downloadAccess: "subscriber_required" | "free_sample";
   freeSample?: boolean;
   pinnedInstances?: number;

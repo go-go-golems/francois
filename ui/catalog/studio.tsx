@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, Check, errorMessage, Release } from "./api";
 import { navigate, show } from "./store";
@@ -598,6 +598,7 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
   const [over, setOver] = useState(false);
   const [form, setForm] = useState({ version: "", changelog: "", manifest: "", freeSample: false });
   const [checks, setChecks] = useState<Check[] | null>(null);
+  const [open, setOpen] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const latestManifest = useMemo(() => releases.find((r) => r.manifest)?.manifest, [releases]);
   const manifest = form.manifest || (latestManifest ? JSON.stringify(latestManifest, null, 2) : defaultManifest);
@@ -718,7 +719,8 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
             {releases.map((r) => {
               const html = r.files.find((f) => f.role === "html");
               return (
-                <div className={"lib-row" + (r.state === "withdrawn" ? " is-unlisted" : "")} key={r.id}>
+                <Fragment key={r.id}>
+                <div className={"lib-row" + (r.state === "withdrawn" ? " is-unlisted" : "")}>
                   <div className="lib-main">
                     <strong>v{r.version}</strong>
                     <span className="muted small">
@@ -765,14 +767,110 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
                         Withdraw
                       </button>
                     )}
+                    <button className="btn btn-soft" aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? "" : r.id)}>
+                      Attachments ({r.attachments.length})
+                    </button>
                   </div>
                 </div>
+                {open === r.id && <Attachments artifact={artifact} release={r} />}
+                </Fragment>
               );
             })}
           </div>
         )}
       </section>
     </>
+  );
+}
+
+// Attachments are supplementary files on a release. Unlike the HTML they
+// can change after publishing; visitors download them under the release's
+// download rule.
+function Attachments({ artifact, release }: { artifact: string; release: Release }) {
+  const [upload, { isLoading }] = studio.useUploadAttachmentMutation();
+  const [patch] = studio.usePatchAttachmentMutation();
+  const [del] = studio.useDeleteAttachmentMutation();
+  const { data: me } = studio.useStudioMeQuery();
+  const act = useAct();
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const send = async (files?: FileList | null) => {
+    for (const f of Array.from(files ?? [])) {
+      const form = new FormData();
+      form.set("file", f);
+      await act(upload({ artifact, release: release.id, form }).unwrap(), "Attached " + f.name);
+    }
+  };
+  const list = release.attachments;
+  // Reordering renumbers the list 0…n-1 and saves the positions that change.
+  const move = (i: number, d: number) => {
+    const order = [...list];
+    [order[i], order[i + d]] = [order[i + d], order[i]];
+    void act(Promise.all(order.flatMap((a, pos) => (a.position === pos ? [] : [patch({ artifact, id: a.id, position: pos }).unwrap()]))));
+  };
+  return (
+    <div className="attach-panel">
+      <div
+        className={"drop drop-small" + (over ? " is-over" : "")}
+        role="button"
+        tabIndex={0}
+        onClick={() => input.current?.click()}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          void send(e.dataTransfer.files);
+        }}
+      >
+        <span>{isLoading ? "Uploading…" : `Drop files to attach to v${release.version}, or click to choose`}</span>
+        <span className="muted small">
+          Manuals, archives, notes · up to 20 files{me ? ", " + bytes(me.limits.maxAttachmentBytes) + " each" : ""} · downloadable by whoever may download this
+          release
+        </span>
+        <input ref={input} type="file" multiple hidden onChange={(e) => send(e.target.files)} />
+      </div>
+      {list.length === 0 ? (
+        <Empty>No attachments.</Empty>
+      ) : (
+        <div className="lib-list">
+          {list.map((a, i) => (
+            <div className="lib-row" key={a.id}>
+              <div className="lib-main">
+                <input
+                  aria-label={"Label for " + a.name}
+                  defaultValue={a.label}
+                  placeholder={a.name}
+                  onBlur={(e) => e.target.value !== a.label && act(patch({ artifact, id: a.id, label: e.target.value }).unwrap(), "Label saved")}
+                />
+                <span className="muted small">
+                  {a.name} · {a.mediaType}
+                </span>
+              </div>
+              <span className="lib-size">{bytes(a.size)}</span>
+              <div className="lib-actions">
+                <button className="tlink" disabled={i === 0} aria-label="Move up" onClick={() => move(i, -1)}>
+                  ↑
+                </button>
+                <button className="tlink" disabled={i === list.length - 1} aria-label="Move down" onClick={() => move(i, 1)}>
+                  ↓
+                </button>
+                <a className="tlink" href={a.href} download={a.name}>
+                  Download
+                </a>
+                <button className="tlink quiet danger" onClick={() => confirm(`Remove ${a.name}?`) && act(del({ artifact, id: a.id }).unwrap(), "Removed")}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

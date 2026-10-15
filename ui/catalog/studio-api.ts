@@ -108,6 +108,18 @@ export const studio = base.injectEndpoints({
           : { url: `api/studio/releases/${id}/${action}`, method: "POST", body: action === "withdraw" ? { suspendPinned } : undefined },
       invalidatesTags: (_r, _e, a) => ["StudioArtifacts", { type: "StudioArtifact", id: a.artifact }, "Catalog"],
     }),
+    uploadAttachment: b.mutation<unknown, { artifact: string; release: string; form: FormData }>({
+      query: ({ release, form }) => ({ url: `api/studio/releases/${release}/attachments`, method: "POST", body: form }),
+      invalidatesTags: (_r, _e, a) => [{ type: "StudioArtifact", id: a.artifact }],
+    }),
+    patchAttachment: b.mutation<unknown, { artifact: string; id: string; label?: string; position?: number }>({
+      query: ({ id, label, position }) => ({ url: `api/studio/attachments/${id}`, method: "PATCH", body: { label, position } }),
+      invalidatesTags: (_r, _e, a) => [{ type: "StudioArtifact", id: a.artifact }],
+    }),
+    deleteAttachment: b.mutation<unknown, { artifact: string; id: string }>({
+      query: ({ id }) => ({ url: `api/studio/attachments/${id}`, method: "DELETE" }),
+      invalidatesTags: (_r, _e, a) => [{ type: "StudioArtifact", id: a.artifact }],
+    }),
     previewRelease: b.mutation<Instance, string>({
       query: (id) => ({ url: `api/studio/releases/${id}/preview`, method: "POST" }),
     }),

@@ -9,6 +9,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,16 @@ type Release struct {
 	Tags                                               []string
 	HTML, Manifest                                     []byte
 	FreeSample                                         bool
+	// Attachments are local file paths uploaded to the draft before it is
+	// published.
+	Attachments []string
+}
+
+// Attachment is a file attached to a release.
+type Attachment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
 }
 
 // Check is a server-side validation finding.
@@ -36,6 +48,7 @@ type Check struct {
 type Result struct {
 	ReleaseID, State string
 	Checks           []Check
+	Attachments      []Attachment
 }
 
 // Error is a studio API failure with its stable code.
@@ -136,7 +149,38 @@ func (c *Client) Check(ctx context.Context, r Release) ([]Check, error) {
 	return out.Checks, err
 }
 
-// Push creates a draft release and, when publish is set, publishes it.
+// Attach uploads the file at path to a release. The body is streamed, so
+// large files are not held in memory.
+func (c *Client) Attach(ctx context.Context, releaseID, path, label string) (Attachment, error) {
+	f, err := os.Open(path) // #nosec G304 -- the operator names the file
+	if err != nil {
+		return Attachment{}, err
+	}
+	defer func() { _ = f.Close() }()
+	pr, pw := io.Pipe()
+	w := multipart.NewWriter(pw)
+	go func() {
+		err := w.WriteField("label", label)
+		var part io.Writer
+		if err == nil {
+			part, err = w.CreateFormFile("file", filepath.Base(path))
+		}
+		if err == nil {
+			_, err = io.Copy(part, f)
+		}
+		if err == nil {
+			err = w.Close()
+		}
+		_ = pw.CloseWithError(err)
+	}()
+	var out Attachment
+	err = c.do(ctx, http.MethodPost, "/api/studio/releases/"+releaseID+"/attachments", w.FormDataContentType(), pr, &out)
+	_ = pr.Close()
+	return out, err
+}
+
+// Push creates a draft release, uploads its attachments and, when publish
+// is set, publishes it.
 func (c *Client) Push(ctx context.Context, r Release, publish bool) (Result, error) {
 	body, ct, err := form(r)
 	if err != nil {
@@ -151,6 +195,13 @@ func (c *Client) Push(ctx context.Context, r Release, publish bool) (Result, err
 		return Result{}, err
 	}
 	res := Result{ReleaseID: rel.ID, State: rel.State, Checks: rel.Checks}
+	for _, p := range r.Attachments {
+		a, err := c.Attach(ctx, rel.ID, p, "")
+		if err != nil {
+			return res, errors.Wrapf(err, "the draft was created but attaching %s failed", p)
+		}
+		res.Attachments = append(res.Attachments, a)
+	}
 	if publish {
 		var pub struct {
 			State string `json:"state"`
