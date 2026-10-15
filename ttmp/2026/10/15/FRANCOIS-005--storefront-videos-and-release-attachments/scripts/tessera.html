@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tessera</title>
+<style>
+  :root { --paper: #ece8df; --ink: #1b1a17; --mute: #7b766b; --line: #c9c3b6; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .app { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+  aside { border-right: 1px solid var(--line); padding: 22px 20px; overflow: auto; }
+  h1 { font: 500 26px/1 Georgia, "Times New Roman", serif; letter-spacing: .32em; margin: 0 0 4px; }
+  .sub { color: var(--mute); letter-spacing: .14em; text-transform: uppercase; font-size: 10px; margin-bottom: 26px; }
+  label { display: block; text-transform: uppercase; letter-spacing: .12em; font-size: 10px; color: var(--mute); margin: 16px 0 6px; }
+  label span { float: right; color: var(--ink); }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; background: transparent; color: var(--ink); border: 1px solid var(--ink); padding: 7px 10px; cursor: pointer; }
+  button.on, button:hover { background: var(--ink); color: var(--paper); }
+  main { position: relative; display: grid; place-items: center; padding: 28px; }
+  .plate { position: relative; background: var(--paper); border: 1px solid var(--ink); padding: 14px; box-shadow: 0 0 0 6px var(--paper), 0 0 0 7px var(--line); }
+  canvas { display: block; }
+  .caption { display: flex; justify-content: space-between; margin-top: 10px; text-transform: uppercase; letter-spacing: .16em; font-size: 10px; color: var(--mute); }
+  .caption b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>TESSERA</h1>
+    <div class="sub">Truchet plates · engraving</div>
+    <label>Motif</label>
+    <div class="row" id="motifs">
+      <button data-m="arcs" class="on">Arcs</button><button data-m="diagonals">Diagonals</button><button data-m="weave">Weave</button>
+    </div>
+    <label>Grid <span id="vGrid"></span></label><input id="grid" type="range" min="6" max="40" value="18">
+    <label>Seed <span id="vSeed"></span></label><input id="seed" type="range" min="1" max="999" value="217">
+    <label>Bias <span id="vBias"></span></label><input id="bias" type="range" min="0" max="100" value="50">
+    <label>Hatching <span id="vHatch"></span></label><input id="hatch" type="range" min="0" max="12" value="5">
+    <label>Line weight <span id="vWeight"></span></label><input id="weight" type="range" min="1" max="8" value="3">
+    <label>Palette</label>
+    <div class="row" id="palettes">
+      <button data-p="paper" class="on">Paper</button><button data-p="night">Night</button><button data-p="ochre">Ochre</button>
+    </div>
+    <label>&nbsp;</label>
+    <div class="row"><button id="reroll">Reroll</button><button id="save">Save PNG</button></div>
+  </aside>
+  <main>
+    <div>
+      <div class="plate"><canvas id="c" width="1200" height="1200"></canvas></div>
+      <div class="caption"><span>Plate <b id="cPlate"></b></span><span id="cInfo"></span></div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const palettes = { paper: ["#ece8df", "#1b1a17"], night: ["#14161a", "#e8e2d2"], ochre: ["#e9d9b4", "#3b2a14"] };
+const state = { motif: "arcs", palette: "paper" };
+function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function draw() {
+  const c = $("c"), g = c.getContext("2d");
+  const n = +$("grid").value, seed = +$("seed").value, bias = +$("bias").value / 100, hatch = +$("hatch").value, w = +$("weight").value;
+  const [bg, ink] = palettes[state.palette];
+  const size = Math.min(innerHeight - 120, innerWidth - 380, 900);
+  c.style.width = c.style.height = size + "px";
+  const S = c.width, cell = S / n, r = rng(seed);
+  g.fillStyle = bg; g.fillRect(0, 0, S, S);
+  g.strokeStyle = ink; g.lineCap = "round"; g.lineWidth = w * (S / 900);
+  let flips = 0;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const px = x * cell, py = y * cell, flip = r() < bias; if (flip) flips++;
+    g.save(); g.translate(px + cell / 2, py + cell / 2); if (flip) g.rotate(Math.PI / 2); g.translate(-cell / 2, -cell / 2);
+    g.beginPath();
+    if (state.motif === "arcs") {
+      for (let k = 0; k <= hatch; k++) {
+        const rad = cell / 2 * (1 - k / (hatch + 2));
+        g.moveTo(rad, 0); g.arc(0, 0, rad, 0, Math.PI / 2);
+        g.moveTo(cell - rad, cell); g.arc(cell, cell, rad, Math.PI, Math.PI * 1.5);
+      }
+    } else if (state.motif === "diagonals") {
+      g.moveTo(0, 0); g.lineTo(cell, cell);
+      for (let k = 1; k <= hatch; k++) { const o = cell * k / (hatch + 1); g.moveTo(o, 0); g.lineTo(cell, cell - o); }
+    } else {
+      g.moveTo(0, cell / 2); g.bezierCurveTo(cell / 2, cell / 2, cell / 2, 0, cell / 2, 0);
+      g.moveTo(cell / 2, cell); g.bezierCurveTo(cell / 2, cell / 2, cell, cell / 2, cell, cell / 2);
+      for (let k = 1; k <= hatch; k++) { const o = cell * k / (2 * hatch + 2); g.moveTo(0, cell / 2 - o); g.quadraticCurveTo(cell / 2 - o, cell / 2 - o, cell / 2 - o, 0); }
+    }
+    g.stroke(); g.restore();
+  }
+  g.lineWidth = 2; g.strokeRect(1, 1, S - 2, S - 2);
+  $("vGrid").textContent = n + " × " + n; $("vSeed").textContent = seed; $("vBias").textContent = Math.round(bias * 100) + "%";
+  $("vHatch").textContent = hatch; $("vWeight").textContent = w;
+  $("cPlate").textContent = state.motif.toUpperCase() + " · " + String(seed).padStart(3, "0");
+  $("cInfo").textContent = n * n + " tiles · " + flips + " turned";
+}
+for (const id of ["grid", "seed", "bias", "hatch", "weight"]) $(id).addEventListener("input", draw);
+function group(root, key) { $(root).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state[key] = b.dataset[key[0]]; for (const x of $(root).children) x.classList.toggle("on", x === b); draw(); }); }
+group("motifs", "motif"); group("palettes", "palette");
+$("reroll").onclick = () => { $("seed").value = 1 + Math.floor(Math.random() * 999); draw(); };
+$("save").onclick = () => { const a = document.createElement("a"); a.download = "tessera-" + $("seed").value + ".png"; a.href = $("c").toDataURL("image/png"); a.click(); };
+addEventListener("resize", draw);
+draw();
+</script>
+</body>
+</html>
