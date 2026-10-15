@@ -91,7 +91,9 @@ type pageData struct {
 	LoginAvailable                                     bool
 	LoginHref                                          string
 	Draft                                              bool
-	Body                                               any
+	// TypeCredit shows the typeface credit when the licensed fonts are served.
+	TypeCredit bool
+	Body       any
 }
 
 // card is an artifact as listed on the storefront.
@@ -125,6 +127,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 	d.Brand = s.brand(r, rev.Document)
+	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + r.URL.Path
 	d.LoginAvailable = site.OIDC.Configured()
 	d.LoginHref = "/auth/login?return=" + url.QueryEscape(r.URL.RequestURI())

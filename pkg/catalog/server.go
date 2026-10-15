@@ -91,6 +91,9 @@ type Config struct {
 	// TrustProxyHeaders takes visitors' addresses from X-Real-Ip or
 	// X-Forwarded-For (set by the ingress) for demo rate limits.
 	TrustProxyHeaders bool
+	// FontDir is a private directory of licensed WOFF2 web fonts (see
+	// fonts.go); empty serves none.
+	FontDir string
 }
 
 // Validate rejects site lists the host dispatcher cannot route
@@ -98,6 +101,9 @@ type Config struct {
 func (c Config) Validate() error {
 	if len(c.Sites) == 0 {
 		return errors.New("at least one site is required")
+	}
+	if _, err := loadFonts(c.FontDir); err != nil {
+		return err
 	}
 	portals := map[string]bool{}
 	domains := map[string]bool{}
@@ -139,6 +145,7 @@ type Server struct {
 	pages       map[string]*template.Template
 	md          *content.Markdown
 	demoLimiter *limiter
+	fonts       *fonts
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -157,6 +164,12 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
 		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter()}
+	var err error
+	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {
+		// Validate already checked the directory; serve no fonts rather than fail.
+		log.Error().Err(err).Msg("Web fonts unavailable")
+		srv.fonts, _ = loadFonts("")
+	}
 	srv.Runtime = hosted.New(ctx, s, p, b, srv.authorizeInstance, srv.budget, hosted.Config{GrantTTL: cfg.GrantTTL})
 	if pay != nil {
 		pay.OnChange = func(user string) {

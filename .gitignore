@@ -25,3 +25,7 @@ worker/dist/
 coverage/
 .playwright-mcp/
 deploy/compose/.env
+
+# Licensed fonts (ABC Areal): never commit; see doc/production.md
+ABCAreal*
+*.woff2

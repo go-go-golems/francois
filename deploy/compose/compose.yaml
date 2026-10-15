@@ -20,6 +20,8 @@ x-francois: &francois
     - bootstrap:/bootstrap
     - releases:/var/lib/francois
     - ${PI_AGENT_DIR:-./no-pi}:/etc/francois/pi:ro
+    # Licensed web fonts live outside the repository (see doc/production.md).
+    - ${FONT_DIR:-./no-fonts}:/etc/francois/fonts:ro
 
 services:
   postgres:
