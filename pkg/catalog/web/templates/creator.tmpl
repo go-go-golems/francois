@@ -1,12 +1,12 @@
 {{define "content"}}{{with .Body}}<main>
 <section class="intro creator-intro">
 {{if .Creator.Avatar}}<img class="avatar" src="/media/{{.Creator.Avatar}}" alt="">{{end}}
-<h1>{{.Creator.Name}}</h1>
+<h1>{{period .Creator.Name}}</h1>
 {{if .Creator.Links}}<p class="lead-actions">{{range .Creator.Links}}<a class="u" href="{{.URL}}" rel="me noopener">{{.Label}}</a>{{end}}</p>{{end}}
 </section>
 {{if .Bio}}<div class="md">{{.Bio}}</div>{{end}}
-{{if .Cards}}<section class="lib-head"><h2>Applications</h2></section>
+{{if .Cards}}<section class="lib-head label"><h2>Applications</h2></section>
 {{template "cards" .Cards}}{{end}}
-{{if .Posts}}<section class="lib-head"><h2>Journal</h2></section>
+{{if .Posts}}<section class="lib-head label"><h2>Journal</h2></section>
 {{template "posts" .Posts}}{{end}}
 </main>{{end}}{{end}}

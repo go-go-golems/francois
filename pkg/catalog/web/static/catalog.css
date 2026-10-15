@@ -45,8 +45,8 @@ button:disabled { cursor: not-allowed; opacity: .4; }
 main { min-height: 50vh; }
 
 /* Links that look like links; text buttons are just words. */
-.u, .prose a, .foot a, .tlink { color: var(--color-ink); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--color-faint); text-underline-offset: 4px; transition: text-decoration-color .15s; }
-.u:hover, .prose a:hover, .foot a:hover, .tlink:hover { text-decoration-color: var(--color-ink); }
+.u, .prose a, .tlink { color: var(--color-ink); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--color-faint); text-underline-offset: 4px; transition: text-decoration-color .15s; }
+.u:hover, .prose a:hover, .tlink:hover { text-decoration-color: var(--color-ink); }
 .tlink { border: 0; padding: 0; background: none; white-space: nowrap; }
 .tlink.quiet, .tlink.plain { color: var(--color-muted); text-decoration-color: transparent; }
 .tlink.quiet:hover, .tlink.plain:hover { color: var(--color-ink); }
@@ -60,10 +60,12 @@ main { min-height: 50vh; }
 .addr { display: flex; align-items: center; flex: 1; min-width: 0; color: var(--color-ink); }
 .addr-host:hover { color: var(--color-muted); }
 .addr-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nav { display: flex; align-items: center; gap: 28px; color: var(--color-ink); }
-.nav a { text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 4px; }
-.nav a:hover { text-decoration-color: var(--color-faint); }
-.nav a[aria-current="page"] { text-decoration-color: var(--color-ink); }
+/* Navigation is one muted line ("Catalog · Journal · Sign in"); the crumb,
+   not the nav, says where you are. */
+.nav { display: flex; align-items: baseline; flex-wrap: wrap; color: var(--color-muted); }
+.nav > * + *::before { content: "·"; display: inline-block; padding: 0 8px; color: var(--color-muted); }
+.nav a, .nav .tlink, .nav button { color: var(--color-muted); text-decoration: none; font: inherit; }
+.nav a:hover, .nav .tlink:hover, .nav button:hover { color: var(--color-ink); }
 @media (max-width: 639px) {
   .bar-inner { flex-wrap: wrap; gap: 12px 10px; padding-top: 20px; font-size: 16px; }
   .nav { width: 100%; gap: 20px; flex-wrap: wrap; }
@@ -71,12 +73,15 @@ main { min-height: 50vh; }
 
 /* Hero and intros — a sentence, set big. */
 .hero { padding: var(--hero) 0 0; }
-.hero h1, .intro h1, .lost h1, .stats-head h1, .h-display { margin: 0; max-width: 1240px; font-weight: 500; font-size: var(--text-display); line-height: 1.03; letter-spacing: -0.035em; color: var(--color-ink); overflow-wrap: anywhere; }
-.hero h1 .muted, .intro h1 span { color: var(--color-muted); }
+/* Titles: one 60px statement on the front page (.hero), 48px titles ending
+   in a period everywhere else, with a 17px muted subtitle (.sub). */
+.hero h1 { margin: 0; max-width: 1180px; font-weight: 500; font-size: 60px; line-height: 62px; letter-spacing: -0.025em; color: var(--color-ink); overflow-wrap: anywhere; }
+.intro h1, .lost h1, .stats-head h1, .h-display { margin: 0; max-width: 1000px; font-weight: 500; font-size: 48px; line-height: 52px; letter-spacing: -0.02em; color: var(--color-ink); overflow-wrap: anywhere; }
+.sub { margin: 12px 0 0; max-width: 620px; font-size: var(--text-body); line-height: var(--leading-body); color: var(--color-muted); }
 .intro { padding: var(--hero) 0 72px; }
 .lead-actions { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; margin: 40px 0 0; }
 .lost { padding: var(--hero) 0 120px; display: flex; flex-direction: column; gap: 24px; align-items: flex-start; }
-@media (max-width: 639px) { .hero, .intro, .lost { padding-top: 64px; } .hero h1, .intro h1, .lost h1 { font-size: 34px; letter-spacing: -0.03em; } }
+@media (max-width: 639px) { .hero, .intro, .lost { padding-top: 64px; } .hero h1, .intro h1, .lost h1 { font-size: 34px; line-height: 38px; } }
 
 /* Controls — sort, count, tags as a grey sentence. */
 .controls { display: flex; flex-direction: column; gap: 28px; padding: 64px 0 56px; }
@@ -318,7 +323,12 @@ main { min-height: 50vh; }
 .md th, .md td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--color-line); }
 .md th { font-weight: 500; border-bottom-color: var(--color-ink); }
 .md hr { border: 0; border-top: 1px solid var(--color-line); margin: 32px 0; }
-.intro-md { padding-top: 40px; }
+.intro-md { padding-top: 0; color: var(--color-muted); }
+/* Section labels on public pages: 17px, then the list's ink rule. */
+.lib-head.label { padding: 80px 0 12px; }
+.lib-head.label h2 { font-weight: 400; font-size: var(--text-body); line-height: var(--leading-body); letter-spacing: 0; }
+.intro-md p { margin: 0 0 8px; }
+.login-error { display: flex; flex-wrap: wrap; align-items: baseline; gap: 20px; }
 .rows + .lib-head { padding-top: 0; }
 main > .rows:not(:last-child) { margin-bottom: 72px; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; padding: 16px 0 56px; }
@@ -354,14 +364,14 @@ main > .rows:not(:last-child) { margin-bottom: 72px; }
 .editor-tabs { padding: 8px 0 32px; }
 .editor-form { max-width: 1240px; }
 .lib-row:is(a):hover strong { color: var(--color-muted); }
-img.lib-thumb { object-fit: cover; }
+img.lib-thumb, video.lib-thumb { object-fit: cover; }
 .md-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
 .md-editor textarea { min-height: 360px; }
 .md-preview { padding: 30px 0 0; max-height: 70vh; overflow-y: auto; border-top: 1px solid var(--color-line); }
 @media (max-width: 1023px) { .md-editor { grid-template-columns: 1fr; } }
 .media-strip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .media-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.media-thumb img { width: 120px; height: 80px; object-fit: cover; background: var(--color-plinth); display: block; }
+.media-thumb img, .media-thumb video { width: 120px; height: 80px; object-fit: cover; background: var(--color-plinth); display: block; }
 .picker { border-top: 1px solid var(--color-ink); padding-bottom: 24px; }
 .picker .lib-head { padding-top: 16px; }
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 24px 0; }
@@ -375,15 +385,12 @@ select.btn { appearance: none; cursor: pointer; }
 .creator-form { padding: 16px 0 32px; border-bottom: 1px solid var(--color-line); }
 
 /* Footer — For people | For machines. */
-.foot { display: flex; flex-wrap: wrap; padding: 120px 0 48px; line-height: 24px; }
-.foot-credit { flex-basis: 100%; margin: 48px 0 0; color: var(--color-muted); }
-.foot-half { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.foot-half + .foot-half { padding-left: var(--gap); margin-left: var(--gap); border-left: 1px solid var(--color-line); }
-.foot h2 { margin: 0; font-weight: 500; font-size: var(--text-body); color: var(--color-ink); }
-.foot-cols { display: flex; flex-wrap: wrap; gap: 24px 40px; }
-.foot-cols > div { width: 220px; display: flex; flex-direction: column; align-items: flex-start; }
-.foot-cols > div > span:first-child { color: var(--color-muted); }
-.foot .path { font-family: var(--font-mono); font-size: 15px; }
-.foot-note { color: var(--color-muted); }
-@media (max-width: 767px) { .foot { flex-direction: column; gap: 48px; padding-top: 96px; } .foot-credit { margin-top: 0; } .foot-half + .foot-half { padding-left: 0; margin-left: 0; border-left: 0; } }
+/* Footer: one line, Privacy · Terms on the left, the typeface credit on
+   the right. */
+.foot { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 20px; padding: 120px 0 32px; font-size: var(--text-caption); line-height: 20px; color: var(--color-muted); }
+.foot-links { display: flex; gap: 20px; }
+.foot a { color: var(--color-muted); text-decoration: none; }
+.foot a:hover { color: var(--color-ink); }
+.foot-credit { margin: 0; }
+.foot-credit a { text-decoration: underline 1px var(--color-faint); text-underline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

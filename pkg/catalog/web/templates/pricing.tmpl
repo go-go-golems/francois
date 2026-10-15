@@ -1,5 +1,5 @@
 {{define "content"}}{{with .Body}}<main>
-<section class="hero"><h1>Plans <span class="muted">— subscribe to run the applications in your own private instances.</span></h1></section>
+<section class="intro"><h1>Plans.</h1><p class="sub">Subscribe to run the applications in your own private instances.</p></section>
 {{if .Staff}}<p class="notice plan-note">You have staff access to every plan.</p>{{end}}
 {{if .Current}}<p class="notice plan-note">Your plan: <strong>{{.Current}}</strong>.{{if .Paid}} Change or cancel it from <a class="u" href="/account">your account</a>.{{end}}</p>{{end}}
 <section class="plans">

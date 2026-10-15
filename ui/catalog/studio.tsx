@@ -59,8 +59,19 @@ function ProfileNotice() {
   return <p className="notice">Your account is not linked to a creator profile yet. Ask an administrator to link it before creating artifacts.</p>;
 }
 
+// Still shows a media item as a still: an image, a video's poster, or a
+// video's first frame when it has no poster.
+function Still({ id, className }: { id: string; className?: string }) {
+  const { data = [] } = studio.useMediaQuery();
+  const m = data.find((x) => x.id === id);
+  if (m && m.mediaType.startsWith("video/")) {
+    return m.poster ? <img className={className} src={"/media/" + m.poster} alt="" /> : <video className={className} src={"/media/" + id} muted preload="metadata" />;
+  }
+  return <img className={className} src={"/media/" + id} alt="" />;
+}
+
 function Thumb({ media, title }: { media?: string; title: string }) {
-  if (media) return <img className="lib-thumb" src={"/media/" + media} alt="" />;
+  if (media) return <Still className="lib-thumb" id={media} />;
   return <div className="lib-thumb mono-mini">{title.slice(0, 2).toUpperCase()}</div>;
 }
 
@@ -383,7 +394,7 @@ function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasD
 function MediaThumb({ id, onRemove }: { id: string; onRemove?: () => void }) {
   return (
     <span className="media-thumb">
-      <img src={"/media/" + id} alt="" />
+      <Still id={id} />
       {onRemove && (
         <button type="button" className="tlink quiet" onClick={onRemove}>
           remove

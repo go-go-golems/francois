@@ -1,5 +1,5 @@
 {{define "content"}}<main>
-<section class="hero"><h1>Journal <span class="muted">— notes on how the applications are made.</span></h1></section>
+<section class="intro"><h1>Journal.</h1><p class="sub">Notes on how the applications are made.</p></section>
 <section class="controls"><div class="views"><a class="u" href="/journal/feed.xml">RSS</a></div></section>
 {{if .Body}}{{template "posts" .Body}}{{else}}<p class="empty">Nothing published yet.</p>{{end}}
 </main>{{end}}

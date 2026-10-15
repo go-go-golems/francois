@@ -28,6 +28,15 @@ import (
 var pageFuncs = template.FuncMap{
 	"join":    strings.Join,
 	"isVideo": content.IsVideo,
+	// period ends a title with a full stop unless it already ends in
+	// punctuation ("Polis IDE." but "What is Polis?").
+	"period": func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" || strings.ContainsAny(s[len(s)-1:], ".!?…:") {
+			return s
+		}
+		return s + "."
+	},
 	"size": func(n int64) string {
 		switch {
 		case n >= 1<<30:
@@ -284,13 +293,11 @@ func (s *Server) homePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	front := rev.Document.Storefront
-	headline, tagline := front.Title, front.Tagline
-	if headline == "" {
-		headline, tagline = "Single-file HTML applications, hosted for you:", "a private origin, a real database, shared rooms and model calls — no setup, no keys."
-	}
+	// The front page leads with one statement; the brand is already in the
+	// header's crumb.
+	statement := firstNonEmpty(front.Tagline, front.Title, "Single-file HTML applications, hosted for you: a private origin, a real database, shared rooms and model calls — no setup, no keys.")
 	body := map[string]any{
-		"Headline":   headline,
-		"Tagline":    tagline,
+		"Statement":  statement,
 		"Intro":      s.markdown(r.Context(), front.Intro),
 		"Featured":   featured,
 		"Creators":   creators,
