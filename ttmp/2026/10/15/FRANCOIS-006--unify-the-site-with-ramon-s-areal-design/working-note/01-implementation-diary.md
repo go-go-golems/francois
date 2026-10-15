@@ -94,3 +94,29 @@ Drew S5 creator, A1 account, A2 instances, A3 demo running, T1–T4 studio (arti
 ### What should be done in the future
 
 - ZITADEL branding (label policy, then possibly a custom Login V2), production fonts via Vault, and Ramon's review of the new boards.
+
+## Step 4: Fonts in Vault, rollout PR, and the missing pages
+
+Fonts for production go through Vault like the other secrets: five WOFF2 files, base64-encoded (KV values are text), at `kv/apps/francois/prod/fonts`; a VaultStaticSecret decodes them with a `b64dec` transformation template into Secret `francois-fonts`, mounted at `/etc/francois/fonts`. The francois-prod policy may read the path (applied with `vault policy write`). k3s PR #353 carries the secret plus the deployment arguments the storefront image needs (no `--stripe-price-id`; `--trust-proxy-headers`, `--font-dir`). Because Argo auto-syncs and the running image rejects the new flags, #353 can only merge together with the storefront image; the owner chose to deploy the storefront, which a background agent is doing (PR go-go-golems/francois#1 → image → #353).
+
+Then the pages that were missing: catalogue and journal index; artifact page states (subscriber, plan required, editor draft); the subscriber's instance (running, people and sharing, paused over the plan limit, frozen when the owner's plan lapsed); demo ended and demo slots full; checkout confirming, welcome and cancelled; mobile home and artifact page at 390 px on a new "Mobile" page. Snapshot: `sources/design-snapshot-2026-10-15-states-mobile/`.
+
+### Prompt Context
+
+**User prompt (verbatim):** "yes vault, continue. What pages do you think are we missing in the design?" then "merge #353, i killed paper, now implement the pages in paper." and "yeah do that in one agent and do the paper stuff while we are waiting"
+
+### What I did
+
+- `vault kv put kv/apps/francois/prod/fonts <name>.woff2=@<b64 file> …` (version 1); read back and decoded: sizes 60336/63848/65728/63828/39760 bytes, equal to the files.
+- Applied only `fonts-secret.yaml` to the cluster: the synced Secret's five keys decoded to `wOF2` files of the original sizes; deleted the test object afterwards.
+- Opened k3s #353 (draft). Declined to merge it alone (Argo `automated: prune, selfHeal`; running image `sha-67dbfc7` rejects the new flags); asked; the owner chose a full storefront deploy.
+- Paper: 17 boards; message screens built once and duplicated (six copies), then retitled.
+
+### What didn't work
+
+- Paper still reports no ABC Areal after the old 0.5.15 instance was closed; the fonts were installed under `~/.local/share/fonts`, which Paper does not scan. Copied them to `~/.fonts`; Paper needs another restart.
+- Two batch exports timed out; most files were written anyway, the rest were re-exported individually.
+
+### What warrants a second pair of eyes
+
+- Copper on "paused" and "busy" (cannot run now) versus muted on "ended" and "not charged" (finished, nothing wrong).
