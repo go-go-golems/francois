@@ -58,29 +58,11 @@ async function renderActions(box: HTMLElement) {
   const plan = s.plan;
   // Mirrors Entitlement.CanRun plus the instance allowance; the server decides.
   const canRun = !!plan && (plan.source === "staff" || (plan.source !== "guest" && plan.source !== "disabled" && plan.rank >= required && plan.instances > 0));
-  if (release) {
-    if (!s.authenticated) {
-      box.append(el("a", { class: "btn btn-ink", href: loginHref() }, "Sign in to run"));
-    } else if (canRun) {
-      const run = el("button", { class: "btn btn-ink", type: "button" }, "Run in a new instance");
-      run.addEventListener("click", async () => {
-        run.setAttribute("disabled", "");
-        try {
-          const inst = await post<{ id: string }>("/api/instances", { releaseId: release, title });
-          location.assign("/instances/" + inst.id);
-        } catch (e) {
-          run.removeAttribute("disabled");
-          fail(box, (e as Error).message);
-        }
-      });
-      box.append(run);
-    } else {
-      const name = box.dataset.plan;
-      box.append(el("a", { class: "btn btn-ink", href: "/pricing" }, name ? `Get ${name} to run` : "See plans"));
-    }
-  }
-  if (demo === "true") {
-    const btn = el("button", { class: "btn btn-soft", type: "button" }, "Try the demo");
+  // One black button per screen: running when the plan allows it, otherwise
+  // the demo when there is one; everything else is a text link.
+  const hasDemo = demo === "true";
+  const demoAction = (primary: boolean) => {
+    const btn = el("button", { class: primary ? "btn btn-ink" : "tlink", type: "button" }, "Try the demo");
     btn.addEventListener("click", async () => {
       btn.setAttribute("disabled", "");
       try {
@@ -91,7 +73,33 @@ async function renderActions(box: HTMLElement) {
         fail(box, (e as Error).message);
       }
     });
-    box.append(btn);
+    return btn;
+  };
+  if (release && canRun) {
+    const run = el("button", { class: "btn btn-ink", type: "button" }, "Run in a new instance");
+    run.addEventListener("click", async () => {
+      run.setAttribute("disabled", "");
+      try {
+        const inst = await post<{ id: string }>("/api/instances", { releaseId: release, title });
+        location.assign("/instances/" + inst.id);
+      } catch (e) {
+        run.removeAttribute("disabled");
+        fail(box, (e as Error).message);
+      }
+    });
+    box.append(run);
+    if (hasDemo) box.append(demoAction(false));
+  } else {
+    if (hasDemo) box.append(demoAction(true));
+    if (release) {
+      const cls = hasDemo ? "tlink" : "btn btn-ink";
+      const name = box.dataset.plan;
+      box.append(
+        s.authenticated
+          ? el("a", { class: cls, href: "/pricing" }, name ? `Get ${name} to run` : "See plans")
+          : el("a", { class: cls, href: loginHref() }, "Sign in to run"),
+      );
+    }
   }
   if (meta) box.append(meta);
 }

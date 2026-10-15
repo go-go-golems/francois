@@ -129,7 +129,12 @@ func portSuffix(p string) string {
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	site := s.site(r)
-	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured(), "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain}
+	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured(), "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
+		"typeCredit": s.fonts.present}
+	// The SPA shows the same brand in its crumb as the server-rendered pages.
+	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {
+		out["brand"] = s.brand(r, rev.Document)
+	}
 	if p != nil {
 		e, _, err := s.entitlement(r.Context(), p.User)
 		if err != nil {

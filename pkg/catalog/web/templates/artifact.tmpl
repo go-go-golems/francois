@@ -1,6 +1,7 @@
 {{define "content"}}{{with .Body}}<main class="artifact">
 <section class="intro">
-<h1>{{.Card.Title}}{{if .Card.Description}} <span>— {{.Card.Description}}</span>{{end}}</h1>
+<h1>{{period .Card.Title}}</h1>
+{{if .Card.Description}}<p class="sub">{{.Card.Description}}</p>{{end}}
 {{if .Card.Creators}}<p class="byline">by {{range $i, $c := .Card.Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
 <div class="lead-actions" data-actions data-artifact="{{.Card.ID}}" data-release="{{.Card.ReleaseID}}" data-title="{{.Card.Title}}"{{if .Demo}} data-demo="true"{{end}}{{if .Plan}} data-plan="{{.Plan}}"{{end}} data-rank="{{.Rank}}">
 <a class="btn btn-ink" href="/auth/login?return=/apps/{{.Card.ID}}">Sign in to run</a>
@@ -12,7 +13,7 @@
 {{if .Gallery}}<section class="gallery" aria-label="Gallery">
 {{range .Gallery}}<figure>{{template "media" .}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>
 {{end}}</section>{{end}}
-<section class="lib-head"><h2>Versions</h2></section>
+<section class="lib-head label"><h2>Versions</h2></section>
 <section class="lines">
 {{range .Releases}}<div class="line release">
 <div><strong>v{{.Version}}</strong><span class="muted">{{date .PublishedAt}}</span></div>

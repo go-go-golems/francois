@@ -49,6 +49,7 @@ export function Header() {
     ["/apps", "Catalog"],
     ["/journal", "Journal"],
   ];
+  if (session?.billingEnabled) nav.push(["/pricing", "Pricing"]);
   const guest = session?.user?.role === "guest";
   if (session?.authenticated && !guest) nav.push(["/instances/", "Instances"], ["/account", "Account"]);
   if (session?.user?.role === "creator" || session?.user?.role === "admin") nav.push(["/studio", "Studio"]);
@@ -63,7 +64,7 @@ export function Header() {
         </Link>
         <div className="addr">
           <Link className="addr-host" to="/">
-            francois/
+            {session?.brand ?? "francois"}/
           </Link>
           <span className="addr-path">{crumb}</span>
         </div>
@@ -115,56 +116,22 @@ export function Notice() {
   );
 }
 
+// Footer is one line, like the server-rendered pages: legal links on the
+// left, the typeface credit on the right when the licensed fonts are served.
 export function Footer() {
+  const { data: session } = api.useSessionQuery();
   return (
     <footer className="foot">
-      <div className="foot-half">
-        <h2>For people</h2>
-        <div className="foot-cols">
-          <div>
-            <span>Here</span>
-            <a href="/apps">Catalog</a>
-            <a href="/journal">Journal</a>
-            <Link to="/instances/">Instances</Link>
-            <Link to="/account">Account</Link>
-          </div>
-          <div>
-            <span>Legal</span>
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms</a>
-          </div>
-          <div>
-            <span>Notes</span>
-            <span className="foot-note">
-              Applications run on their own origins.
-              <br />
-              Your data stays in your instance.
-            </span>
-          </div>
-        </div>
+      <div className="foot-links">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
       </div>
-      <div className="foot-half">
-        <h2>For machines</h2>
-        <div className="foot-cols">
-          <div>
-            <span>Start</span>
-            <a className="path" href="/api/catalog">
-              /api/catalog
-            </a>
-            <a className="path" href="/healthz">
-              /healthz
-            </a>
-          </div>
-          <div>
-            <span>Runtime</span>
-            <span className="foot-note">
-              window.claude: db, room,
-              <br />
-              user, sample, assets
-            </span>
-          </div>
-        </div>
-      </div>
+      {session?.typeCredit && (
+        <p className="foot-credit">
+          Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a> by <a href="https://abcdinamo.com">Dinamo</a>, made for{" "}
+          <a href="https://www.are.na">Are.na</a>
+        </p>
+      )}
     </footer>
   );
 }

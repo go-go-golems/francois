@@ -1,5 +1,5 @@
 {{define "content"}}<main>
-<section class="hero"><h1>Applications <span class="muted">— each runs on its own origin, with its own database, rooms and model calls.</span></h1></section>
+<section class="intro"><h1>Applications.</h1><p class="sub">Each runs on its own origin, with its own database, rooms and model calls.</p></section>
 <section class="controls">
 <div class="views"><span class="result-count">{{len .Body.Cards}} {{if eq (len .Body.Cards) 1}}application{{else}}applications{{end}}</span>{{if .Body.Tag}}<a class="u" href="/apps">Show all</a>{{end}}</div>
 {{if .Body.Tags}}<div class="tags" role="group" aria-label="Filter by tag">

@@ -21,6 +21,8 @@ export type Session = {
   signupAvailable: boolean;
   billingEnabled: boolean;
   appDomain: string;
+  brand?: string;
+  typeCredit?: boolean;
   user?: SessionUser;
   csrfToken?: string;
   access?: Decision;
