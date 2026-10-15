@@ -60,6 +60,7 @@ type Release struct {
 	PublishedAt *time.Time                 `json:"publishedAt,omitempty"`
 	WithdrawnAt *time.Time                 `json:"withdrawnAt,omitempty"`
 	Files       []ReleaseFile              `json:"files"`
+	Attachments []Attachment               `json:"attachments"`
 }
 
 // ErrConflict signals a uniqueness or state-transition conflict.
@@ -241,7 +242,11 @@ func (s *Store) files(ctx context.Context, releases []Release) error {
 		i := index[f.ReleaseID]
 		releases[i].Files = append(releases[i].Files, f)
 	}
-	return rows.Err()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	return s.attachments(ctx, releases, index)
 }
 
 func (s *Store) Release(ctx context.Context, id string) (Release, error) {

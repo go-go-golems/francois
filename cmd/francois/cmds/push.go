@@ -40,6 +40,7 @@ func newCatalogPush() *CatalogPush {
 			fields.New("tags", fields.TypeStringList, fields.WithHelp("Tags, for a new artifact")),
 			fields.New("changelog", fields.TypeString),
 			fields.New("free-sample", fields.TypeBool, fields.WithDefault(false)),
+			fields.New("attach", fields.TypeStringList, fields.WithHelp("Files to attach to the release (manuals, archives, notes); repeatable")),
 			fields.New("check", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Only validate; store nothing")),
 			fields.New("publish", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Publish the new draft")),
 		))}
@@ -58,6 +59,7 @@ func (c *CatalogPush) RunIntoGlazeProcessor(ctx context.Context, p *values.Value
 		Tags        []string `glazed:"tags"`
 		Changelog   string   `glazed:"changelog"`
 		Free        bool     `glazed:"free-sample"`
+		Attach      []string `glazed:"attach"`
 		Check       bool     `glazed:"check"`
 		Publish     bool     `glazed:"publish"`
 	}
@@ -85,8 +87,14 @@ func (c *CatalogPush) RunIntoGlazeProcessor(ctx context.Context, p *values.Value
 			return err
 		}
 	}
+	// Fail before creating a draft when an attachment is missing.
+	for _, a := range s.Attach {
+		if fi, err := os.Stat(a); err != nil || fi.IsDir() {
+			return errors.Errorf("attachment %s is not a readable file", a)
+		}
+	}
 	rel := studioclient.Release{ArtifactID: s.ArtifactID, Version: s.Version, Title: s.Title, Description: s.Description, Tags: s.Tags,
-		Changelog: s.Changelog, HTML: html, Manifest: manifest, FreeSample: s.Free}
+		Changelog: s.Changelog, HTML: html, Manifest: manifest, FreeSample: s.Free, Attachments: s.Attach}
 	client := studioclient.New(s.Server, token)
 	report := func(checks []studioclient.Check) {
 		for _, ch := range checks {
@@ -107,5 +115,6 @@ func (c *CatalogPush) RunIntoGlazeProcessor(ctx context.Context, p *values.Value
 	if err != nil {
 		return err
 	}
-	return out.AddRow(ctx, types.NewRow(types.MRP("release_id", res.ReleaseID), types.MRP("artifact", s.ArtifactID), types.MRP("version", s.Version), types.MRP("state", res.State)))
+	return out.AddRow(ctx, types.NewRow(types.MRP("release_id", res.ReleaseID), types.MRP("artifact", s.ArtifactID), types.MRP("version", s.Version), types.MRP("state", res.State),
+		types.MRP("attachments", len(res.Attachments))))
 }

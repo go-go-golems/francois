@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,17 @@ import (
 var pageFuncs = template.FuncMap{
 	"join":    strings.Join,
 	"isVideo": content.IsVideo,
+	"size": func(n int64) string {
+		switch {
+		case n >= 1<<30:
+			return strconv.FormatFloat(float64(n)/(1<<30), 'f', 1, 64) + " GB"
+		case n >= 1<<20:
+			return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MB"
+		case n >= 1<<10:
+			return strconv.FormatInt(n>>10, 10) + " KB"
+		}
+		return strconv.FormatInt(n, 10) + " B"
+	},
 	"date": func(v any) string {
 		switch t := v.(type) {
 		case time.Time:
@@ -351,6 +363,15 @@ type download struct{ Href, Label string }
 type releaseLine struct {
 	store.Release
 	Downloads []download
+	// Attached lists the release's attachments; Href is empty when the
+	// visitor may not download them (Locked).
+	Attached []attachmentLine
+	Locked   bool
+}
+
+type attachmentLine struct {
+	Title, Name, Href string
+	Size              int64
 }
 
 func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
@@ -412,7 +433,14 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	}
 	lines := []releaseLine{}
 	for _, rel := range rels {
-		l := releaseLine{Release: rel}
+		l := releaseLine{Release: rel, Locked: !rel.FreeSample && !mayDownload}
+		for _, a := range rel.Attachments {
+			al := attachmentLine{Title: firstNonEmpty(a.Label, a.Name), Name: a.Name, Size: a.Size}
+			if !l.Locked {
+				al.Href = "/api/releases/" + rel.ID + "/attachments/" + a.ID + "/download"
+			}
+			l.Attached = append(l.Attached, al)
+		}
 		if rel.FreeSample || mayDownload {
 			for _, f := range rel.Files {
 				label := "Download HTML"
@@ -442,6 +470,8 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
+	} else if c.Cover != nil && c.Cover.Poster != "" {
+		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.Poster
 	}
 	s.render(w, r, http.StatusOK, "artifact", d)
 }

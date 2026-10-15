@@ -69,6 +69,8 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /api/catalog", s.guard(public, s.catalog))
 	m.HandleFunc("GET /api/artifacts/{id}", s.guard(public, s.artifact))
 	m.HandleFunc("GET /api/releases/{release}/files/{file}/download", s.guard(public, s.download))
+	m.HandleFunc("GET /api/releases/{release}/attachments/{id}/download", s.guard(public, s.downloadAttachment))
+	m.HandleFunc("HEAD /api/releases/{release}/attachments/{id}/download", s.guard(public, s.downloadAttachment))
 	m.HandleFunc("HEAD /api/releases/{release}/files/{file}/download", s.guard(public, s.download))
 	m.HandleFunc("GET /api/account", s.guard(session, s.account))
 	m.HandleFunc("POST /api/billing/checkout", s.guard(enabled, s.checkout))
@@ -149,7 +151,7 @@ func publicRelease(r store.Release) map[string]any {
 		access = "free_sample"
 	}
 	return map[string]any{"id": r.ID, "artifactId": r.ArtifactID, "version": r.Version, "changelog": r.Changelog, "state": r.State,
-		"publishedAt": r.PublishedAt, "capabilities": caps, "files": r.Files, "downloadAccess": access}
+		"publishedAt": r.PublishedAt, "capabilities": caps, "files": r.Files, "attachments": publicAttachments(r), "downloadAccess": access}
 }
 
 func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +218,40 @@ func (s *Server) artifact(w http.ResponseWriter, r *http.Request) {
 
 var safeName = regexp.MustCompile(`[^A-Za-z0-9._-]`)
 
+// mayDownload applies the download rule for a published release's files and
+// attachments, writing the JSON denial when it fails: anyone may download a
+// free sample; otherwise the caller must be signed in with a plan that can
+// run the artifact.
+func (s *Server) mayDownload(w http.ResponseWriter, r *http.Request, rel store.Release) bool {
+	p := principal(r.Context())
+	if p != nil && p.User.Disabled {
+		httpx.Fail(w, 403, billing.ReasonDisabled, "This account is disabled")
+		return false
+	}
+	if rel.FreeSample {
+		return true
+	}
+	if p == nil {
+		httpx.Fail(w, 401, "login_required", "Sign in to download")
+		return false
+	}
+	a, err := s.Store.Artifact(r.Context(), rel.ArtifactID)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Access check failed")
+		return false
+	}
+	e, doc, err := s.entitlement(r.Context(), p.User)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Access check failed")
+		return false
+	}
+	if !e.CanRun(a, doc) {
+		httpx.Fail(w, 403, "plan_required", "Your plan does not include this application")
+		return false
+	}
+	return true
+}
+
 // download authorizes before opening or writing any bytes; denials are JSON.
 func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	rel, err := s.Store.Release(r.Context(), r.PathValue("release"))
@@ -233,30 +269,8 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 404, "not_found", "File not found")
 		return
 	}
-	p := principal(r.Context())
-	if p != nil && p.User.Disabled {
-		httpx.Fail(w, 403, billing.ReasonDisabled, "This account is disabled")
+	if !s.mayDownload(w, r, rel) {
 		return
-	}
-	if !rel.FreeSample {
-		if p == nil {
-			httpx.Fail(w, 401, "login_required", "Sign in to download")
-			return
-		}
-		a, err := s.Store.Artifact(r.Context(), rel.ArtifactID)
-		if err != nil {
-			httpx.Fail(w, 503, "unavailable", "Access check failed")
-			return
-		}
-		e, doc, err := s.entitlement(r.Context(), p.User)
-		if err != nil {
-			httpx.Fail(w, 503, "unavailable", "Access check failed")
-			return
-		}
-		if !e.CanRun(a, doc) {
-			httpx.Fail(w, 403, "plan_required", "Your plan does not include this application")
-			return
-		}
 	}
 	data, err := s.Publisher.Blobs.Read(*file)
 	if err != nil {

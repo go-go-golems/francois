@@ -161,6 +161,9 @@ main { min-height: 50vh; }
 .release-body { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
 .release-body p { margin: 0; }
 .changelog { white-space: pre-wrap; max-width: 760px; }
+.attachments { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.attachments li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; overflow-wrap: anywhere; }
+.attachments .muted { font-size: 13px; }
 @media (max-width: 899px) { .line { flex-direction: column; gap: 6px; } .line > :first-child { width: auto; } }
 .prose { max-width: 760px; padding: 72px 0 0; }
 .prose h2 { margin: 0 0 10px; font-weight: 500; font-size: var(--text-body); color: var(--color-ink); }
@@ -183,6 +186,8 @@ main { min-height: 50vh; }
 .lib-list { display: flex; flex-direction: column; border-top: 1px solid var(--color-ink); }
 .lib-row { display: flex; align-items: center; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
 .lib-row.is-unlisted .lib-thumb, .lib-row.is-unlisted .lib-main { opacity: .45; }
+.attach-panel { display: flex; flex-direction: column; gap: 12px; padding: 16px 0 20px 24px; border-left: 2px solid var(--color-line); margin: 0 0 8px 8px; }
+.attach-panel .lib-main input { font: inherit; border: 0; border-bottom: 1px solid var(--color-line); background: transparent; padding: 2px 0; min-width: 0; }
 .lib-thumb { width: 64px; height: 48px; flex-shrink: 0; background: var(--color-plinth); }
 .mono-mini { display: grid; place-items: center; font-weight: 500; font-size: 20px; letter-spacing: -0.04em; color: var(--color-ink); }
 .lib-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

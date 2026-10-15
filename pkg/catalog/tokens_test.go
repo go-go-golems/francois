@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -58,9 +60,17 @@ func TestTokensAndPush(t *testing.T) {
 	// Push a new artifact and publish it.
 	client := studioclient.New(e.ts.URL, secret)
 	client.Host = "portal.test"
-	res, err := client.Push(ctx, studioclient.Release{ArtifactID: "loom", Title: "Loom", Version: "1.0.0", HTML: []byte(testHTML), Manifest: []byte(`{"db":{}}`)}, true)
-	if err != nil || res.State != "published" || res.ReleaseID == "" {
+	dir := t.TempDir()
+	manual, notes := filepath.Join(dir, "Manual.pdf"), filepath.Join(dir, "notes.txt")
+	_ = os.WriteFile(manual, []byte("%PDF-1.4 manual"), 0o600)
+	_ = os.WriteFile(notes, []byte("release notes"), 0o600)
+	res, err := client.Push(ctx, studioclient.Release{ArtifactID: "loom", Title: "Loom", Version: "1.0.0", HTML: []byte(testHTML), Manifest: []byte(`{"db":{}}`),
+		Attachments: []string{manual, notes}}, true)
+	if err != nil || res.State != "published" || res.ReleaseID == "" || len(res.Attachments) != 2 || res.Attachments[0].Name != "Manual.pdf" {
 		t.Fatalf("push %+v %v", res, err)
+	}
+	if rel, _ := e.store.Release(ctx, res.ReleaseID); len(rel.Attachments) != 2 || rel.Attachments[1].Size != int64(len("release notes")) {
+		t.Fatalf("pushed attachments %+v", rel.Attachments)
 	}
 	if ok, _ := e.store.IsArtifactCreator(ctx, "loom", cleo.user.ID); !ok {
 		t.Fatal("pushed artifact not credited to the token owner")
