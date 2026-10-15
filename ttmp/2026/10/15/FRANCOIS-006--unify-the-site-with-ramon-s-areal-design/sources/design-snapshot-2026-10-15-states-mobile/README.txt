@@ -10,4 +10,4 @@ overview-desktop.jpg · overview-mobile.jpg
 
 Message screens (A6–A12) use Ramon's single-message layout: 48px title, 17px subtitle, one status line under an ink
 rule (copper only when something cannot run, green when active), one black button.
-Rendered in the fallback font (Paper has not loaded ABC Areal yet).
+Re-rendered in ABC Areal on 15 Oct 2026 (scripts/01-refresh-snapshots.sh); the first export used a fallback font.
