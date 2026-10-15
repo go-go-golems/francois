@@ -276,7 +276,7 @@ func (s *Server) homePage(w http.ResponseWriter, r *http.Request) {
 	body := map[string]any{
 		"Headline":   headline,
 		"Tagline":    tagline,
-		"Intro":      s.md.Render(front.Intro),
+		"Intro":      s.markdown(r.Context(), front.Intro),
 		"Featured":   featured,
 		"Creators":   creators,
 		"Posts":      posts,
@@ -438,7 +438,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
-		Body: map[string]any{"Card": c, "Body": s.md.Render(page.Body), "Gallery": gallery, "Releases": lines,
+		Body: map[string]any{"Card": c, "Body": s.markdown(ctx, page.Body), "Gallery": gallery, "Releases": lines,
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
@@ -482,7 +482,7 @@ func (s *Server) creatorPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := pageData{Title: c.Name, Crumb: "creators/" + c.Slug, Description: content.Excerpt(c.Bio, 200),
-		Body: map[string]any{"Creator": c, "Bio": s.md.Render(c.Bio), "Cards": cards, "Posts": posts}}
+		Body: map[string]any{"Creator": c, "Bio": s.markdown(ctx, c.Bio), "Cards": cards, "Posts": posts}}
 	if c.Avatar != "" {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Avatar
 	}
@@ -534,7 +534,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	body := map[string]any{"Post": post, "Body": s.md.Render(post.Body)}
+	body := map[string]any{"Post": post, "Body": s.markdown(ctx, post.Body)}
 	var author *store.Creator
 	if post.AuthorID != "" {
 		if c, err := s.Store.Creator(ctx, post.AuthorID); err == nil {
@@ -609,22 +609,41 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 
 // media serves uploaded storefront media. A media ID always names the same
 // bytes, so responses are cacheable indefinitely; ranges let video seek.
+// markdown renders author Markdown, embedding referenced portal videos as
+// players. If the media lookup fails, references render as images.
+func (s *Server) markdown(ctx context.Context, source string) template.HTML {
+	embeds := map[string]content.Embed{}
+	if ids := content.MediaRefs(source); len(ids) > 0 {
+		media, err := s.Store.MediaByIDs(ctx, ids)
+		if err != nil {
+			log.Warn().Err(err).Msg("Markdown media lookup failed")
+		}
+		for id, m := range media {
+			embeds[id] = content.Embed{Type: m.MediaType, Poster: m.Poster}
+		}
+	}
+	return s.md.Render(source, embeds)
+}
+
 func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 	m, err := s.Store.Media(r.Context(), r.PathValue("id"))
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	data, err := s.Publisher.Blobs.Read(store.ReleaseFile{StorageKey: m.StorageKey, SHA256: m.SHA256})
+	f, err := s.Publisher.Blobs.Open(m.StorageKey)
 	if err != nil {
 		log.Error().Err(err).Str("media", m.ID).Msg("media unreadable")
 		http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	defer func() { _ = f.Close() }()
 	w.Header().Set("Content-Type", m.MediaType)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
-	http.ServeContent(w, r, "", m.CreatedAt, bytes.NewReader(data))
+	w.Header().Set("ETag", `"`+m.SHA256+`"`)
+	// ServeContent answers Range requests by seeking, so videos stream.
+	http.ServeContent(w, r, "", m.CreatedAt, f)
 }
 
 type planView struct {

@@ -393,8 +393,9 @@ function MediaThumb({ id, onRemove }: { id: string; onRemove?: () => void }) {
   );
 }
 
-function MediaPicker({ onPick, onClose }: { onPick: (m: Media) => void; onClose: () => void }) {
-  const { data = [] } = studio.useMediaQuery();
+function MediaPicker({ onPick, onClose, images }: { onPick: (m: Media) => void; onClose: () => void; images?: boolean }) {
+  const { data: all = [] } = studio.useMediaQuery();
+  const data = images ? all.filter((m) => !isVideo(m)) : all;
   return (
     <div className="picker">
       <div className="lib-head">
@@ -416,12 +417,79 @@ function MediaPicker({ onPick, onClose }: { onPick: (m: Media) => void; onClose:
   );
 }
 
+const isVideo = (m: Media) => m.mediaType.startsWith("video/");
+
 function MediaPreview({ m }: { m: Media }) {
-  return m.mediaType.startsWith("video/") ? <video src={"/media/" + m.id} muted preload="metadata" /> : <img src={"/media/" + m.id} alt={m.alt} loading="lazy" />;
+  return isVideo(m) ? (
+    <video src={"/media/" + m.id} poster={m.poster ? "/media/" + m.poster : undefined} muted preload="metadata" />
+  ) : (
+    <img src={"/media/" + m.id} alt={m.alt} loading="lazy" />
+  );
+}
+
+// captureFrame draws the video's current frame to a canvas. Media is
+// same-origin, so the canvas is not tainted and can be exported.
+function captureFrame(v: HTMLVideoElement): Promise<Blob> {
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  c.getContext("2d")?.drawImage(v, 0, 0);
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not capture the frame"))), "image/jpeg", 0.9));
+}
+
+// VideoTile lets the editor scrub to a frame and use it as the poster, or
+// pick an image from the library.
+function VideoTile({ m, editable }: { m: Media; editable: boolean }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [upload] = studio.useUploadMediaMutation();
+  const [patch] = studio.usePatchMediaMutation();
+  const [picking, setPicking] = useState(false);
+  const act = useAct();
+  const frameAsPoster = async () => {
+    const v = video.current;
+    if (!v || !v.videoWidth) return;
+    const blob = await captureFrame(v);
+    const fd = new FormData();
+    fd.set("file", new File([blob], "poster.jpg", { type: "image/jpeg" }));
+    fd.set("alt", ("Poster: " + m.alt).slice(0, 300));
+    const poster = await upload(fd).unwrap();
+    await patch({ id: m.id, poster: poster.id }).unwrap();
+  };
+  return (
+    <>
+      <video ref={video} src={"/media/" + m.id} poster={m.poster ? "/media/" + m.poster : undefined} controls muted preload="metadata" />
+      {editable && (
+        <span className="actions">
+          <button type="button" className="tlink" onClick={() => act(frameAsPoster(), "Poster set from this frame")}>
+            Use this frame as poster
+          </button>
+          <button type="button" className="tlink" onClick={() => setPicking(true)}>
+            Choose poster
+          </button>
+          {m.poster && (
+            <button type="button" className="tlink quiet" onClick={() => act(patch({ id: m.id, poster: "" }).unwrap(), "Poster removed")}>
+              No poster
+            </button>
+          )}
+        </span>
+      )}
+      {picking && (
+        <MediaPicker
+          images
+          onClose={() => setPicking(false)}
+          onPick={(p) => {
+            setPicking(false);
+            void act(patch({ id: m.id, poster: p.id }).unwrap(), "Poster set");
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 function Uploader() {
   const [upload, { isLoading }] = studio.useUploadMediaMutation();
+  const { data: me } = studio.useStudioMeQuery();
   const act = useAct();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -452,7 +520,7 @@ function Uploader() {
       }}
     >
       <span>{isLoading ? "Uploading…" : "Drop images or videos, or click to choose"}</span>
-      <span className="muted small">PNG, JPEG, GIF, WebP, MP4, WebM · up to 25 MB</span>
+      <span className="muted small">PNG, JPEG, GIF, WebP, MP4, WebM{me ? " · up to " + bytes(me.limits.maxMediaBytes) : ""}</span>
       <input ref={input} type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" hidden onChange={(e) => send(e.target.files)} />
     </div>
   );
@@ -480,7 +548,7 @@ function MediaLibrary() {
         <div className="media-grid">
           {data.map((m) => (
             <div className="media-tile" key={m.id}>
-              <MediaPreview m={m} />
+              {isVideo(m) ? <VideoTile m={m} editable={mine(m)} /> : <MediaPreview m={m} />}
               <input
                 aria-label="Alt text"
                 disabled={!mine(m)}

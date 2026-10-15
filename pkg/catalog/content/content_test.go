@@ -26,9 +26,15 @@ func TestMarkdown(t *testing.T) {
 		{"nested media path is not media", "![x](/media/a/../../admin)", nil, []string{"<img"}},
 		{"javascript image dropped", "![x](javascript:alert(1))", []string{"x"}, []string{"javascript:", "<img", "<a"}},
 		{"alt escaped", "![\"><script>](/media/med_1)", nil, []string{"<script>"}},
+		{"video with poster", "![A walkthrough](/media/med_vid)", []string{`<video src="/media/med_vid" controls preload="metadata" playsinline poster="/media/med_img" aria-label="A walkthrough"></video>`}, []string{"<img"}},
+		{"video without poster", "![](/media/med_vid2)", []string{`<video src="/media/med_vid2"`}, []string{"poster="}},
+		{"image stays image", "![x](/media/med_img)", []string{`<img src="/media/med_img"`}, []string{"<video"}},
+		{"unknown media stays image", "![x](/media/med_gone)", []string{`<img src="/media/med_gone"`}, nil},
+		{"video alt escaped", "![\"><script>](/media/med_vid)", nil, []string{"<script>"}},
 	}
+	embeds := map[string]Embed{"med_vid": {Type: "video/mp4", Poster: "med_img"}, "med_vid2": {Type: "video/webm"}, "med_img": {Type: "image/png"}}
 	for _, c := range cases {
-		out := string(md.Render(c.in))
+		out := string(md.Render(c.in, embeds))
 		for _, w := range c.want {
 			if !strings.Contains(out, w) {
 				t.Errorf("%s: %q missing from %q", c.name, w, out)
@@ -39,6 +45,16 @@ func TestMarkdown(t *testing.T) {
 				t.Errorf("%s: %q present in %q", c.name, a, out)
 			}
 		}
+	}
+}
+
+func TestMediaRefs(t *testing.T) {
+	got := MediaRefs("![a](/media/med_a) [b](/media/med_b) ![a again](/media/med_a) /media/other")
+	if strings.Join(got, ",") != "med_a,med_b" {
+		t.Fatalf("refs %v", got)
+	}
+	if out := string(NewMarkdown().Render("![v](/media/med_v)", nil)); !strings.Contains(out, "<img") {
+		t.Fatalf("nil embeds should render images: %s", out)
 	}
 }
 
@@ -58,16 +74,16 @@ func TestDetectMedia(t *testing.T) {
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatal(err)
 	}
-	info, err := DetectMedia(buf.Bytes())
+	info, err := DetectMedia(bytes.NewReader(buf.Bytes()))
 	if err != nil || info.Type != "image/png" || info.Width != 3 || info.Height != 2 {
 		t.Fatalf("png: %+v %v", info, err)
 	}
 	webp := append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...)
-	if info, err = DetectMedia(webp); err != nil || info.Type != "image/webp" {
+	if info, err = DetectMedia(bytes.NewReader(webp)); err != nil || info.Type != "image/webp" {
 		t.Fatalf("webp: %+v %v", info, err)
 	}
 	mp4 := append([]byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"), make([]byte, 32)...)
-	if info, err = DetectMedia(mp4); err != nil || info.Type != "video/mp4" || !IsVideo(info.Type) {
+	if info, err = DetectMedia(bytes.NewReader(mp4)); err != nil || info.Type != "video/mp4" || !IsVideo(info.Type) {
 		t.Fatalf("mp4: %+v %v", info, err)
 	}
 	for name, data := range map[string][]byte{
@@ -76,11 +92,11 @@ func TestDetectMedia(t *testing.T) {
 		"text":  []byte("hello"),
 		"empty": nil,
 	} {
-		if _, err := DetectMedia(data); err == nil {
+		if _, err := DetectMedia(bytes.NewReader(data)); err == nil {
 			t.Errorf("%s accepted", name)
 		}
 	}
-	if _, err := DetectMedia([]byte("\x89PNG\r\n\x1a\n broken")); err == nil {
+	if _, err := DetectMedia(bytes.NewReader([]byte("\x89PNG\r\n\x1a\n broken"))); err == nil {
 		t.Error("broken png accepted")
 	}
 }

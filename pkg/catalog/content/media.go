@@ -1,11 +1,11 @@
 package content
 
 import (
-	"bytes"
 	"image"
 	_ "image/gif"  // register decoder for DecodeConfig
 	_ "image/jpeg" // register decoder for DecodeConfig
 	_ "image/png"  // register decoder for DecodeConfig
+	"io"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -31,27 +31,35 @@ type MediaInfo struct {
 	Width, Height int
 }
 
-// DetectMedia sniffs the type and, for PNG, JPEG and GIF, the dimensions.
-func DetectMedia(data []byte) (MediaInfo, error) {
-	if len(data) == 0 {
+// DetectMedia sniffs the type from the first 512 bytes and, for PNG, JPEG
+// and GIF, decodes the dimensions. It leaves r positioned at the start.
+func DetectMedia(r io.ReadSeeker) (MediaInfo, error) {
+	head := make([]byte, 512)
+	n, err := io.ReadFull(r, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return MediaInfo{}, err
+	}
+	if n == 0 {
 		return MediaInfo{}, ErrMediaType
 	}
-	head := data
-	if len(head) > 512 {
-		head = head[:512]
-	}
-	t := http.DetectContentType(head)
+	t := http.DetectContentType(head[:n])
 	if !MediaTypes[t] {
 		return MediaInfo{}, ErrMediaType
 	}
 	info := MediaInfo{Type: t}
+	if _, err = r.Seek(0, io.SeekStart); err != nil {
+		return MediaInfo{}, err
+	}
 	switch t {
 	case "image/png", "image/jpeg", "image/gif":
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+		cfg, _, err := image.DecodeConfig(r)
 		if err != nil {
 			return MediaInfo{}, errors.Wrap(err, "the image could not be read")
 		}
 		info.Width, info.Height = cfg.Width, cfg.Height
+		if _, err = r.Seek(0, io.SeekStart); err != nil {
+			return MediaInfo{}, err
+		}
 	}
 	return info, nil
 }

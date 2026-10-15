@@ -34,6 +34,7 @@ type Limits struct {
 	AssetBytesPerInstance int64 `json:"assetBytesPerInstance"`
 	MaxHTMLBytes          int64 `json:"maxHtmlBytes"`
 	MaxMediaBytes         int64 `json:"maxMediaBytes"`
+	MaxAttachmentBytes    int64 `json:"maxAttachmentBytes"`
 }
 
 type Publishing struct {
@@ -102,7 +103,7 @@ func Defaults() Document {
 	return Document{
 		Models:     Models{Allowed: []Model{}, Tiers: map[string]string{}},
 		Allowance:  Allowance{PerUserConcurrency: 2, GlobalConcurrency: 8, MaxToolRounds: 5},
-		Limits:     Limits{DocumentsPerInstance: 5000, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20, MaxMediaBytes: 25 << 20},
+		Limits:     Limits{DocumentsPerInstance: 5000, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20, MaxMediaBytes: 25 << 20, MaxAttachmentBytes: 100 << 20},
 		Publishing: Publishing{AllowPinnedAfterWithdraw: true},
 		Plans:      []Plan{FreePlan()},
 		Demo:       Demo{TTLMinutes: 30, MaxActive: 20, PerAddressPerHour: 3, Credits: 5, DailyBudget: 200, Models: []string{}},
@@ -182,8 +183,11 @@ func (d *Document) Validate() error {
 	if l.MaxHTMLBytes < 1024 || l.MaxHTMLBytes > 16<<20 {
 		return errors.New("maxHtmlBytes must be 1 KiB–16 MiB")
 	}
-	if l.MaxMediaBytes < 1<<20 || l.MaxMediaBytes > 200<<20 {
-		return errors.New("maxMediaBytes must be 1–200 MiB")
+	if l.MaxMediaBytes < 1<<20 || l.MaxMediaBytes > 1<<30 {
+		return errors.New("maxMediaBytes must be 1–1024 MiB")
+	}
+	if l.MaxAttachmentBytes < 1<<20 || l.MaxAttachmentBytes > 2<<30 {
+		return errors.New("maxAttachmentBytes must be 1 MiB–2 GiB")
 	}
 	if err := d.validatePlans(seen); err != nil {
 		return err

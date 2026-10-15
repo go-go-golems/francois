@@ -51,7 +51,7 @@
 
 {{define "cards"}}<section class="rows" aria-label="Applications">
 {{range .}}<article class="ri">
-<a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1">{{if .Cover}}<img src="/media/{{.Cover.ID}}" alt="{{.Cover.Alt}}" loading="lazy">{{else}}<div class="mono-thumb" aria-hidden="true"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
+<a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1">{{if .Cover}}{{template "thumb" .Cover}}{{else}}<div class="mono-thumb" aria-hidden="true"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
 <div class="ri-text">
 <div class="ri-head">
 <h2 class="ri-title"><a href="/apps/{{.ID}}">{{.Title}}</a></h2>
@@ -76,4 +76,10 @@
 </article>
 {{end}}</section>{{end}}
 
-{{define "media"}}{{if isVideo .MediaType}}<video src="/media/{{.ID}}" controls preload="metadata"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}>{{end}}{{end}}
+{{define "media"}}{{if isVideo .MediaType}}<video src="/media/{{.ID}}" controls preload="metadata" playsinline{{if .Poster}} poster="/media/{{.Poster}}"{{end}} aria-label="{{.Alt}}"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy"{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}}>{{end}}{{end}}
+
+{{/* A cover: videos loop silently (public.js pauses them for reduced motion). */}}
+{{define "hero"}}{{if isVideo .MediaType}}<video src="/media/{{.ID}}" autoplay muted loop playsinline controls preload="auto"{{if .Poster}} poster="/media/{{.Poster}}"{{end}} aria-label="{{.Alt}}"></video>{{else}}{{template "media" .}}{{end}}{{end}}
+
+{{/* A card thumbnail: a video shows its poster, or its first frame. */}}
+{{define "thumb"}}{{if and (isVideo .MediaType) .Poster}}<img src="/media/{{.Poster}}" alt="{{.Alt}}" loading="lazy">{{else if isVideo .MediaType}}<video src="/media/{{.ID}}" muted playsinline preload="metadata" aria-label="{{.Alt}}"></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy">{{end}}{{end}}

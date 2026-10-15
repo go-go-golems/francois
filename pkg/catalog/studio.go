@@ -2,9 +2,11 @@ package catalog
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,9 +24,8 @@ import (
 // stay under /api/admin.
 
 const (
-	maxBodyBytes  = 100 << 10
-	maxGallery    = 24
-	maxMediaBytes = 25 << 20
+	maxBodyBytes = 100 << 10
+	maxGallery   = 24
 )
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
@@ -104,6 +105,12 @@ func (s *Server) ownProfile(ctx context.Context, u store.User) (store.Creator, b
 func (s *Server) studioMe(w http.ResponseWriter, r *http.Request) {
 	u := me(r)
 	out := map[string]any{"user": map[string]any{"id": u.ID, "name": u.DisplayName, "role": u.Role}, "creator": nil}
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	out["limits"] = map[string]int64{"maxMediaBytes": rev.Document.Limits.MaxMediaBytes, "maxAttachmentBytes": rev.Document.Limits.MaxAttachmentBytes}
 	if c, ok, err := s.ownProfile(r.Context(), u); err != nil {
 		unavailable(w, err)
 		return
@@ -367,6 +374,21 @@ func normalizeTags(in []string) []string {
 		}
 	}
 	return out
+}
+
+// checkImage verifies that id is empty or an image (avatars render as <img>).
+func (s *Server) checkImage(ctx context.Context, id string) error {
+	if id == "" {
+		return nil
+	}
+	m, err := s.Store.Media(ctx, id)
+	if err != nil {
+		return errors.Errorf("unknown media %q", id)
+	}
+	if content.IsVideo(m.MediaType) {
+		return errors.New("an avatar must be an image")
+	}
+	return nil
 }
 
 // checkMedia verifies that every referenced media ID exists.
@@ -688,23 +710,18 @@ func (s *Server) studioMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) studioUploadMedia(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxMediaBytes+(1<<20))
-	if err := r.ParseMultipartForm(1 << 20); err != nil {
-		httpx.Fail(w, 413, "invalid_upload", "The file exceeds 25 MB or the form is malformed")
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
 		return
 	}
-	f, _, err := r.FormFile("file")
-	if err != nil {
-		httpx.Fail(w, 400, "invalid_upload", "Choose a file")
+	limit := rev.Document.Limits.MaxMediaBytes
+	f, ok := s.uploadedFile(w, r, limit)
+	if !ok {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	data, err := releases.ReadLimited(f, maxMediaBytes)
-	if err != nil {
-		httpx.Fail(w, 413, "invalid_upload", "The file exceeds 25 MB")
-		return
-	}
-	info, err := content.DetectMedia(data)
+	info, err := content.DetectMedia(f)
 	if err != nil {
 		httpx.Fail(w, 415, "media_type", err.Error())
 		return
@@ -714,18 +731,46 @@ func (s *Server) studioUploadMedia(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", "Alt text is limited to 300 characters")
 		return
 	}
-	key, sum, err := s.Publisher.Blobs.Put(data)
+	key, sum, size, err := s.Publisher.Blobs.PutReader(f, limit)
+	if errors.Is(err, releases.ErrTooLarge) {
+		httpx.Fail(w, 413, "too_large", "The file exceeds "+mib(limit))
+		return
+	}
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
-	m, err := s.Store.CreateMedia(r.Context(), store.Media{SHA256: sum, StorageKey: key, MediaType: info.Type, Size: int64(len(data)), Width: info.Width, Height: info.Height, Alt: alt, UploadedBy: actor(r)})
+	m, err := s.Store.CreateMedia(r.Context(), store.Media{SHA256: sum, StorageKey: key, MediaType: info.Type, Size: size, Width: info.Width, Height: info.Height, Alt: alt, UploadedBy: actor(r)})
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
 	httpx.JSON(w, 201, m)
 }
+
+// uploadedFile parses a multipart upload of at most limit bytes and returns
+// its "file" part. Parts beyond 1 MiB are spooled to disk by the parser, so
+// large files are never held in memory.
+func (s *Server) uploadedFile(w http.ResponseWriter, r *http.Request, limit int64) (multipart.File, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, limit+(1<<20))
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			httpx.Fail(w, 413, "too_large", "The file exceeds "+mib(limit))
+		} else {
+			httpx.Fail(w, 400, "invalid_upload", "The upload form is malformed")
+		}
+		return nil, false
+	}
+	f, _, err := r.FormFile("file")
+	if err != nil {
+		httpx.Fail(w, 400, "invalid_upload", "Choose a file")
+		return nil, false
+	}
+	return f, true
+}
+
+func mib(n int64) string { return strconv.FormatInt(n>>20, 10) + " MiB" }
 
 // ownMedia loads media the caller uploaded (or any media for admins).
 func (s *Server) ownMedia(w http.ResponseWriter, r *http.Request) (store.Media, bool) {
@@ -747,15 +792,32 @@ func (s *Server) studioPatchMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Alt string `json:"alt"`
+		Alt    *string `json:"alt"`
+		Poster *string `json:"poster"`
 	}
-	if err := httpx.Read(w, r, &in, 4096); err != nil || len(in.Alt) > 300 {
+	if err := httpx.Read(w, r, &in, 4096); err != nil || (in.Alt != nil && len(*in.Alt) > 300) {
 		httpx.Fail(w, 400, "invalid_request", "Alt text is limited to 300 characters")
 		return
 	}
-	if err := s.Store.SetMediaAlt(r.Context(), m.ID, strings.TrimSpace(in.Alt)); err != nil {
-		unavailable(w, err)
-		return
+	ctx := r.Context()
+	if in.Poster != nil && *in.Poster != "" {
+		p, err := s.Store.Media(ctx, *in.Poster)
+		if !content.IsVideo(m.MediaType) || err != nil || content.IsVideo(p.MediaType) {
+			httpx.Fail(w, 400, "invalid_poster", "A poster is an image from the media library, set on a video")
+			return
+		}
+	}
+	if in.Alt != nil {
+		if err := s.Store.SetMediaAlt(ctx, m.ID, strings.TrimSpace(*in.Alt)); err != nil {
+			unavailable(w, err)
+			return
+		}
+	}
+	if in.Poster != nil {
+		if err := s.Store.SetMediaPoster(ctx, m.ID, *in.Poster); err != nil {
+			unavailable(w, err)
+			return
+		}
 	}
 	httpx.OK(w, map[string]bool{"saved": true})
 }
@@ -1009,7 +1071,7 @@ func (s *Server) applyCreator(ctx context.Context, r *http.Request, c *store.Cre
 			return errors.Errorf("link %q needs a label and an http(s) URL", l.Label)
 		}
 	}
-	if err := s.checkMedia(ctx, c.Avatar); err != nil {
+	if err := s.checkImage(ctx, c.Avatar); err != nil {
 		return err
 	}
 	if c.UserID != "" {
@@ -1103,7 +1165,7 @@ func (s *Server) studioMarkdown(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", err.Error())
 		return
 	}
-	httpx.OK(w, map[string]string{"html": string(s.md.Render(in.Markdown))})
+	httpx.OK(w, map[string]string{"html": string(s.markdown(r.Context(), in.Markdown))})
 }
 
 // studioPlans lists every plan (including grant-only ones) for the required
