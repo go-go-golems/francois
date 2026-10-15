@@ -293,9 +293,12 @@ without any known file stops the server at startup.
 
 - Locally: keep the files in `~/.config/francois/fonts` and set
   `FONT_DIR=~/.config/francois/fonts` in `deploy/compose/.env`.
-- On the cluster (not yet done): store the eight WOFF2 files (about 450 KB)
-  in Vault, sync them into a Secret, mount it read-only at
-  `/etc/francois/fonts` and add `--font-dir=/etc/francois/fonts`.
+- On the cluster: five WOFF2 files (Regular, Italic, Medium, Bold, Mono)
+  are in `kv/apps/francois/prod/fonts`, base64-encoded because KV values are
+  text; the `francois-fonts` VaultStaticSecret decodes them with a `b64dec`
+  template into Secret `francois-fonts`, mounted at `/etc/francois/fonts`
+  with `--font-dir=/etc/francois/fonts` (k3s PR #353, merged with the
+  storefront rollout). `francois-prod` may read the path.
 
 ### 4.1 First rollout of the storefront (FRANCOIS-004)
 
@@ -303,10 +306,10 @@ The FRANCOIS-004 binary removes `--stripe-price-id` (an unknown flag stops the
 server) and runs migrations 004 and 005. The automated GitOps PR changes only
 the image, so it must not be merged on its own:
 
-1. Before merging the feature branch to `main`, prepare a k3s PR that, in
-   `deployment.yaml`, removes the `--stripe-price-id=$(STRIPE_PRICE_ID)`
-   argument and the `STRIPE_PRICE_ID` environment variable, and adds
-   `--trust-proxy-headers`.
+1. The k3s PR for the rollout is wesen/2026-03-27--hetzner-k3s#353 (draft):
+   in `deployment.yaml` it removes `--stripe-price-id=$(STRIPE_PRICE_ID)` and
+   the `STRIPE_PRICE_ID` environment variable and adds
+   `--trust-proxy-headers` and `--font-dir` with the fonts Secret.
 2. Merge the francois branch. When the image PR appears, either add its
    `image:` change to the PR from step 1 or merge both together (the step 1 PR
    first). Never let the image roll out with the old arguments.
