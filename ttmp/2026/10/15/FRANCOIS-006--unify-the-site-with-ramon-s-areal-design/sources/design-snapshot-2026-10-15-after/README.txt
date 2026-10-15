@@ -9,4 +9,5 @@ T1 studio artifacts · T2 page editor · T3 releases + attachments · T4 media l
 D1 design system sheet (colour tokens, type scale, components)
 overview.jpg — all boards side by side
 
-Rendered before Paper loaded ABC Areal (restart Paper Desktop after installing the font), so text shows a fallback.
+Re-rendered in ABC Areal on 15 Oct 2026 (scripts/01-refresh-snapshots.sh); the first export used a fallback font
+because Paper had not loaded Areal yet (that version is in git history).

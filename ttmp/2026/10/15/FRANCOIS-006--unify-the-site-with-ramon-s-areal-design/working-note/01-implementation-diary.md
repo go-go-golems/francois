@@ -120,3 +120,25 @@ Then the pages that were missing: catalogue and journal index; artifact page sta
 ### What warrants a second pair of eyes
 
 - Copper on "paused" and "busy" (cannot run now) versus muted on "ended" and "not charged" (finished, nothing wrong).
+
+## Step 5: Snapshots re-rendered in ABC Areal
+
+After Paper Desktop was restarted with the fonts in `~/.fonts`, `get_font_family_info` lists all six ABC Areal styles and boards render in it. Every board of the after and states/mobile snapshots (29) was exported again and copied over the fallback-font images under the same names; the overview sheets were rebuilt. The before snapshot is unchanged: it records Ramon's original file.
+
+### Prompt Context
+
+**User prompt (verbatim):** "paper restarted"
+
+### What I did
+
+- Exported boards per page with `export` (JPEG, 1x); Paper writes them to `~/Downloads` named after the board.
+- `scripts/01-refresh-snapshots.sh` copies the newest export of each board over its snapshot file and rebuilds `overview.jpg`, `overview-desktop.jpg` and `overview-mobile.jpg` with ImageMagick `montage`, so a later re-export is one command.
+- Removed the exports from `~/Downloads` afterwards.
+
+### What didn't work
+
+- Exports spanning several pages, or more than about six boards, time out (`Tool call timed out. Please check your file then try again.`) although Paper keeps writing the files; repeats get a ` (1)` suffix. The script therefore takes the newest file per board code.
+
+### What should be done in the future
+
+- Areal is narrower than the fallback: the 60px home statement now breaks after "applications by". Check the live site's wrapping against the board.

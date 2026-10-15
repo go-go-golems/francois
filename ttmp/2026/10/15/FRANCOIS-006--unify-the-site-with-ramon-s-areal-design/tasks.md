@@ -9,4 +9,5 @@
 - [ ] ZITADEL login: label policy (font, logo, colours) first, then a custom Login V2 for Ramon's exact layouts
 - [x] Paper: mobile home and artifact, catalogue and journal index, artifact states, instance running/sharing/paused/frozen, demo ended/full, checkout confirming/welcome/cancelled
 - [x] Production fonts in Vault (kv/apps/francois/prod/fonts) and rollout PR k3s #353
+- [x] Re-export the after and states/mobile snapshots in ABC Areal
 - [ ] Paper: remaining studio tabs, admin, 404/legal, empty states, link-preview image, ZITADEL emails
