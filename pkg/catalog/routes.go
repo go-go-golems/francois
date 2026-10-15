@@ -346,6 +346,8 @@ func (s *Server) billingFailure(w http.ResponseWriter, err error) {
 		httpx.Fail(w, 409, "subscription_open", "You already have a subscription; manage it from billing")
 	case errors.Is(err, payments.ErrNoCustomer):
 		httpx.Fail(w, 409, "no_billing_account", "There is no billing account yet; subscribe first")
+	case errors.Is(err, payments.ErrCheckoutSuperseded):
+		httpx.Fail(w, 409, "checkout_superseded", "A checkout for another plan replaced this one")
 	case errors.Is(err, payments.ErrForeignSession):
 		httpx.Fail(w, 403, "foreign_session", "That checkout does not belong to this account")
 	default:

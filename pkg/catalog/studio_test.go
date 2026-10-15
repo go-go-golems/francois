@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"mime/multipart"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -183,4 +185,53 @@ func TestStudio(t *testing.T) {
 	expect("admin edits creator artifact", code, out, 200, "")
 	code, out = e.portal(&cleo, "GET", "/api/admin/users", nil)
 	expect("creator in admin API", code, out, 403, "admin_required")
+}
+
+// Two creators uploading the first release of the same new artifact at once:
+// whoever creates it is credited, the other is refused as a non-editor and
+// never replaces the credits.
+func TestConcurrentNewArtifactUpload(t *testing.T) {
+	e := setup(t)
+	admin := e.user("ada", "admin", false)
+	cleo := e.user("cleo", "creator", false)
+	otto := e.user("otto", "creator", false)
+	profile := map[string]string{}
+	for _, c := range []tactor{cleo, otto} {
+		code, p := e.portal(&admin, "POST", "/api/studio/creators", map[string]any{"slug": c.user.DisplayName, "name": c.user.DisplayName, "userId": c.user.ID})
+		if code != 201 {
+			t.Fatalf("profile %d %v", code, p)
+		}
+		profile[c.user.ID] = p["id"].(string)
+	}
+	for round := 0; round < 8; round++ {
+		id := "race-" + strconv.Itoa(round)
+		racers := []tactor{cleo, otto}
+		codes, outs := make([]int, 2), make([]map[string]any, 2)
+		var wg sync.WaitGroup
+		for i, c := range racers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				codes[i], outs[i] = e.multipartTo(c, "/api/studio/releases", map[string]string{"artifactId": id, "title": "Race", "version": "1.0.0", "manifestJson": `{}`}, "html", "a.html", []byte(testHTML))
+			}()
+		}
+		wg.Wait()
+		winner := -1
+		for i := range racers {
+			switch {
+			case codes[i] == 201 && winner == -1:
+				winner = i
+			case codes[i] == 403 && errCode(outs[i]) == "not_editor":
+			default:
+				t.Fatalf("%s upload %d: %d %v", id, i, codes[i], outs[i])
+			}
+		}
+		if winner == -1 {
+			t.Fatalf("%s: nobody won %v", id, codes)
+		}
+		credits, err := e.store.ArtifactCreators(t.Context(), []string{id})
+		if err != nil || len(credits[id]) != 1 || credits[id][0].ID != profile[racers[winner].user.ID] {
+			t.Fatalf("%s credits %v %v (winner %s)", id, credits[id], err, racers[winner].user.DisplayName)
+		}
+	}
 }

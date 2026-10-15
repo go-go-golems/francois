@@ -35,9 +35,10 @@ type Budget struct {
 	// every approved model.
 	Models []string
 	// Shared is a budget shared with other callers (demos): the call is
-	// refused when SharedUsed plus its credits would exceed SharedLimit.
-	Shared                  bool
-	SharedLimit, SharedUsed int
+	// refused when today's shared usage plus its credits would exceed
+	// SharedLimit (checked inside the reservation).
+	Shared      bool
+	SharedLimit int
 	// Period overrides the monthly allowance ledger (see store.ReserveRequest).
 	Period string
 }

@@ -209,7 +209,11 @@ func (s *Server) studioCreateArtifact(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 409, "creator_profile_required", "Ask an administrator to link your account to a creator profile first")
 		return
 	}
-	a, err := s.Store.CreateArtifact(ctx, store.Artifact{ID: in.ID, Title: in.Title, Description: in.Description, Visibility: "listed"})
+	var credit []string
+	if hasProfile {
+		credit = []string{profile.ID}
+	}
+	a, err := s.Store.CreateArtifact(ctx, store.Artifact{ID: in.ID, Title: in.Title, Description: in.Description, Visibility: "listed"}, credit...)
 	if errors.Is(err, store.ErrConflict) {
 		httpx.Fail(w, 409, "artifact_exists", "That ID is taken")
 		return
@@ -217,12 +221,6 @@ func (s *Server) studioCreateArtifact(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		unavailable(w, err)
 		return
-	}
-	if hasProfile {
-		if err = s.Store.SetArtifactCreators(ctx, a.ID, []string{profile.ID}); err != nil {
-			unavailable(w, err)
-			return
-		}
 	}
 	_ = s.Store.Audit(ctx, actor(r), "artifact.create", a.ID, nil)
 	httpx.JSON(w, 201, a)
@@ -583,12 +581,25 @@ func (s *Server) studioUpload(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_upload", err.Error())
 		return
 	}
-	isNew, profile, ok := s.mayUpload(w, r, u.ArtifactID)
-	if !ok {
-		return
-	}
 	ctx := r.Context()
-	rel, checks, err := s.Publisher.CreateDraft(ctx, actor(r), u)
+	var rel store.Release
+	var checks []releases.Check
+	for try := 0; ; try++ {
+		isNew, profile, ok := s.mayUpload(w, r, u.ArtifactID)
+		if !ok {
+			return
+		}
+		u.Creators = nil
+		if isNew && profile != nil {
+			u.Creators = []string{profile.ID}
+		}
+		rel, checks, err = s.Publisher.CreateDraft(ctx, actor(r), u)
+		// A concurrent upload created the artifact (crediting its creator)
+		// after mayUpload: authorize again as an editor of that artifact.
+		if !errors.Is(err, releases.ErrArtifactTaken) || try == 1 {
+			break
+		}
+	}
 	var invalid *releases.ErrInvalid
 	switch {
 	case errors.As(err, &invalid):
@@ -600,12 +611,6 @@ func (s *Server) studioUpload(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		unavailable(w, err)
 		return
-	}
-	if isNew && profile != nil {
-		if err = s.Store.SetArtifactCreators(ctx, rel.ArtifactID, []string{profile.ID}); err != nil {
-			unavailable(w, err)
-			return
-		}
 	}
 	item := publicRelease(rel)
 	item["checks"] = checks

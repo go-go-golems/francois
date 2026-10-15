@@ -71,9 +71,10 @@ func isUnique(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "23505"
 }
 
-// CreateArtifact inserts a new artifact; an existing ID fails with
-// ErrConflict.
-func (s *Store) CreateArtifact(ctx context.Context, a Artifact) (Artifact, error) {
+// CreateArtifact inserts a new artifact credited to creators in one
+// transaction, so whoever creates an artifact is credited before anyone else
+// can see it; an existing ID fails with ErrConflict.
+func (s *Store) CreateArtifact(ctx context.Context, a Artifact, creators ...string) (Artifact, error) {
 	if a.Tags == nil {
 		a.Tags = []string{}
 	}
@@ -84,13 +85,26 @@ func (s *Store) CreateArtifact(ctx context.Context, a Artifact) (Artifact, error
 		a.Page.Gallery = []string{}
 	}
 	page, _ := json.Marshal(a.Page)
-	err := s.Pool.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,required_plan,demo_enabled)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return a, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	err = tx.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,required_plan,demo_enabled)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at,updated_at`,
 		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.RequiredPlan, a.DemoEnabled).Scan(&a.CreatedAt, &a.UpdatedAt)
 	if isUnique(err) {
 		return a, errors.Wrapf(ErrConflict, "artifact %s already exists", a.ID)
 	}
-	return a, err
+	if err != nil {
+		return a, err
+	}
+	for i, c := range creators {
+		if _, err = tx.Exec(ctx, `INSERT INTO artifact_creators(artifact_id,creator_id,position) VALUES($1,$2,$3)`, a.ID, c, i); err != nil {
+			return a, err
+		}
+	}
+	return a, tx.Commit(ctx)
 }
 
 // UpdateArtifact writes the settings that apply immediately. It never

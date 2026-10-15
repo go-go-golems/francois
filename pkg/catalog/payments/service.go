@@ -15,6 +15,9 @@ var (
 	ErrSubscriptionOpen = errors.New("an open subscription already exists")
 	ErrNoCustomer       = errors.New("no billing account yet")
 	ErrForeignSession   = errors.New("checkout session does not belong to this account")
+	// ErrCheckoutSuperseded: a concurrent request for another plan replaced
+	// this Checkout.
+	ErrCheckoutSuperseded = errors.New("checkout superseded by another plan")
 )
 
 type Config struct {
@@ -63,7 +66,9 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 // (the origin the user started from). accepted lists every plan price: an
 // open subscription on any of them sends the user to the billing portal
 // (plan changes happen there) instead of a second subscription. Double
-// clicks and retries resolve to the same admitted attempt/Session.
+// clicks and retries for one price resolve to the same admitted
+// attempt/Session; a request for another price retires the earlier attempt
+// first, so its Session can no longer be paid.
 func (s *Service) Checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string) (string, error) {
 	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
@@ -82,9 +87,20 @@ func (s *Service) Checkout(ctx context.Context, u store.User, price string, acce
 	if err != nil {
 		return "", err
 	}
-	attempt, _, err := s.Store.AdmitCheckout(ctx, u.ID, "subscriber")
+	attempt, _, err := s.Store.AdmitCheckout(ctx, u.ID, price)
 	if err != nil {
 		return "", err
+	}
+	if attempt.Price != price {
+		if err = s.supersede(ctx, attempt); err != nil {
+			return "", err
+		}
+		if attempt, _, err = s.Store.AdmitCheckout(ctx, u.ID, price); err != nil {
+			return "", err
+		}
+		if attempt.Price != price {
+			return "", ErrCheckoutSuperseded
+		}
 	}
 	if attempt.State == "open" && attempt.SessionURL != nil && attempt.ExpiresAt != nil && time.Now().Before(*attempt.ExpiresAt) {
 		return *attempt.SessionURL, nil
@@ -100,10 +116,46 @@ func (s *Service) Checkout(ctx context.Context, u store.User, price string, acce
 	if err != nil {
 		return "", errors.Wrap(err, "create Checkout session")
 	}
-	if err = s.Store.OpenCheckout(ctx, attempt.ID, cs.ID, cs.URL, cs.ExpiresAt); err != nil {
+	if err = s.Store.OpenCheckout(ctx, attempt.ID, cs.ID, cs.URL, cs.ExpiresAt); errors.Is(err, store.ErrNotFound) {
+		// A request for another price retired this attempt while the Session
+		// was being created; its URL must not reach the browser.
+		if xerr := s.Gateway.ExpireCheckout(ctx, cs.ID); xerr != nil {
+			log.Warn().Err(xerr).Str("session", cs.ID).Msg("expire superseded Checkout session")
+		}
+		return "", ErrCheckoutSuperseded
+	}
+	if err != nil {
 		return "", err
 	}
 	return cs.URL, nil
+}
+
+// supersede retires an admitted attempt for another price. An open Session is
+// expired at Stripe; a completed one means a subscription is on its way, so
+// the user goes to billing management. A pending attempt without a Session
+// is retired as is: if an uncertain try did create one, its URL never reached
+// the browser, and OpenCheckout refuses it if that try is still running.
+func (s *Service) supersede(ctx context.Context, a store.CheckoutAttempt) error {
+	if a.SessionID != nil {
+		cs, err := s.Gateway.RetrieveCheckout(ctx, *a.SessionID)
+		if err != nil {
+			return errors.Wrap(err, "retrieve earlier Checkout session")
+		}
+		switch cs.Status {
+		case "complete":
+			_ = s.Store.FinishCheckout(ctx, a.ID, "completed", "")
+			if cs.CustomerID != "" {
+				_ = s.Store.EnqueueRefresh(ctx, cs.CustomerID, "checkout")
+				s.Wake()
+			}
+			return ErrSubscriptionOpen
+		case "open":
+			if err = s.Gateway.ExpireCheckout(ctx, cs.ID); err != nil {
+				return errors.Wrap(err, "expire earlier Checkout session")
+			}
+		}
+	}
+	return s.Store.FinishCheckout(ctx, a.ID, "expired", "superseded")
 }
 
 // Portal creates a Customer Portal session for the caller's own Customer that

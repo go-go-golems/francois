@@ -44,6 +44,8 @@ type Gateway interface {
 	CustomerDeployment(ctx context.Context, customerID string) (string, error)
 	CreateCheckout(ctx context.Context, r CheckoutRequest) (CheckoutSession, error)
 	RetrieveCheckout(ctx context.Context, id string) (CheckoutSession, error)
+	// ExpireCheckout closes an open Session so it can no longer be paid.
+	ExpireCheckout(ctx context.Context, id string) error
 	CreatePortal(ctx context.Context, customerID, returnURL string) (string, error)
 	SubscriptionCustomer(ctx context.Context, subscriptionID string) (string, error)
 	CustomerSubscriptions(ctx context.Context, customerID string) ([]billing.Subscription, error)
@@ -117,6 +119,11 @@ func (g *stripeGateway) RetrieveCheckout(ctx context.Context, id string) (Checko
 		return CheckoutSession{}, err
 	}
 	return session(s), nil
+}
+
+func (g *stripeGateway) ExpireCheckout(ctx context.Context, id string) error {
+	_, err := g.client.V1CheckoutSessions.Expire(ctx, id, &stripe.CheckoutSessionExpireParams{})
+	return err
 }
 
 func (g *stripeGateway) CreatePortal(ctx context.Context, customer, returnURL string) (string, error) {

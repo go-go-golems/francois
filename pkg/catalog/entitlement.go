@@ -141,9 +141,8 @@ func (s *Server) budget(ctx context.Context, u store.User, inst store.Instance) 
 	}
 	doc := rev.Document
 	if inst.Kind == "demo" {
-		used, err := s.Store.DemoCreditsToday(ctx)
-		return hosted.Budget{Monthly: doc.Demo.Credits, Models: doc.Demo.Models, Shared: true, SharedLimit: doc.Demo.DailyBudget, SharedUsed: used,
-			Period: "demo:" + inst.ID}, err
+		return hosted.Budget{Monthly: doc.Demo.Credits, Models: doc.Demo.Models, Shared: true, SharedLimit: doc.Demo.DailyBudget,
+			Period: "demo:" + inst.ID}, nil
 	}
 	e, err := s.entitlementIn(ctx, u, doc)
 	if err != nil {
