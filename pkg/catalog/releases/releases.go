@@ -76,7 +76,59 @@ func (b *Blobs) Put(data []byte) (string, string, error) {
 	return key, sum, os.Rename(tmp.Name(), final)
 }
 
-// Open returns the stored bytes after verifying their recorded hash.
+// PutReader streams r (at most limit bytes) into a temporary file while
+// hashing it, then renames it into its content-addressed key. It returns
+// ErrTooLarge when r holds more than limit bytes.
+func (b *Blobs) PutReader(r io.Reader, limit int64) (string, string, int64, error) {
+	tmp, err := os.CreateTemp(filepath.Join(b.Root, "blobs"), ".upload-*")
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	h := sha256.New()
+	size, err := io.Copy(io.MultiWriter(tmp, h), io.LimitReader(r, limit+1))
+	if err == nil && size > limit {
+		err = ErrTooLarge
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return "", "", 0, err
+	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	key := "blobs/" + sum[:2] + "/" + sum
+	final, err := b.path(key)
+	if err != nil {
+		return "", "", 0, err
+	}
+	if fi, e := os.Stat(final); e == nil && fi.Size() == size {
+		return key, sum, size, nil
+	}
+	if err = os.MkdirAll(filepath.Dir(final), 0o700); err != nil {
+		return "", "", 0, err
+	}
+	return key, sum, size, os.Rename(tmp.Name(), final)
+}
+
+// ErrTooLarge reports an upload over its size limit.
+var ErrTooLarge = errors.New("file exceeds the size limit")
+
+// Open returns the stored file for streaming (Range requests seek instead
+// of reading it whole). The content-addressed key was verified on write;
+// Read verifies the hash for files small enough to check on every use.
+func (b *Blobs) Open(key string) (*os.File, error) {
+	p, err := b.path(key)
+	if err != nil {
+		return nil, err
+	}
+	return os.Open(p) // #nosec G304 -- key is validated against keyPattern
+}
+
+// Read returns the stored bytes after verifying their recorded hash.
 func (b *Blobs) Read(f store.ReleaseFile) ([]byte, error) {
 	p, err := b.path(f.StorageKey)
 	if err != nil {

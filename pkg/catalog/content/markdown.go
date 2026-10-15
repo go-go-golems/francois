@@ -6,6 +6,7 @@ package content
 import (
 	"bytes"
 	"html/template"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -14,6 +15,7 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
 
@@ -24,29 +26,90 @@ const MediaPrefix = "/media/"
 
 // Markdown renders GitHub-flavoured Markdown. Raw HTML is omitted and
 // dangerous link schemes are dropped (goldmark's default without
-// html.WithUnsafe); images outside MediaPrefix become plain links.
+// html.WithUnsafe); images outside MediaPrefix become plain links, and
+// portal media that are videos become video players.
 type Markdown struct{ md goldmark.Markdown }
 
 func NewMarkdown() *Markdown {
 	return &Markdown{md: goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
+		goldmark.WithParserOptions(parser.WithAutoHeadingID(), parser.WithASTTransformers(util.Prioritized(embedTransformer{}, 100))),
 		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(imageRenderer{}, 100))),
 	)}
 }
 
-// Render returns sanitised HTML. Rendering errors cannot leak input: on
-// failure the text is shown escaped.
-func (m *Markdown) Render(source string) template.HTML {
+// Embed describes a portal media item a document references, so the
+// renderer can tell videos from images.
+type Embed struct {
+	Type   string // media type
+	Poster string // poster media ID for videos, or ""
+}
+
+var mediaRef = regexp.MustCompile(`/media/(med_[A-Za-z0-9]+)`)
+
+// MediaRefs lists the media IDs a document references by URL.
+func MediaRefs(source string) []string {
+	ids := []string{}
+	seen := map[string]bool{}
+	for _, m := range mediaRef.FindAllStringSubmatch(source, -1) {
+		if !seen[m[1]] {
+			seen[m[1]] = true
+			ids = append(ids, m[1])
+		}
+	}
+	return ids
+}
+
+var embedsKey = parser.NewContextKey()
+
+// Render returns sanitised HTML. embeds maps referenced media IDs to their
+// types; a nil map renders every portal media reference as an image.
+// Rendering errors cannot leak input: on failure the text is shown escaped.
+func (m *Markdown) Render(source string, embeds map[string]Embed) template.HTML {
 	var buf bytes.Buffer
-	if err := m.md.Convert([]byte(source), &buf); err != nil {
+	pc := parser.NewContext()
+	pc.Set(embedsKey, embeds)
+	if err := m.md.Convert([]byte(source), &buf, parser.WithContext(pc)); err != nil {
 		return template.HTML("<p>" + template.HTMLEscapeString(source) + "</p>") // #nosec G203 -- escaped above
 	}
 	return template.HTML(buf.String()) // #nosec G203 -- goldmark without WithUnsafe emits no raw HTML
 }
 
-// imageRenderer renders portal media as lazy images and any other image
-// reference as a link to it.
+// embedTransformer marks image nodes that refer to portal videos, using the
+// embeds passed to Render, so the renderer can emit a video player.
+type embedTransformer struct{}
+
+func (embedTransformer) Transform(doc *ast.Document, _ text.Reader, pc parser.Context) {
+	embeds, _ := pc.Get(embedsKey).(map[string]Embed)
+	if len(embeds) == 0 {
+		return
+	}
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		img, ok := n.(*ast.Image)
+		if !entering || !ok {
+			return ast.WalkContinue, nil
+		}
+		id, ok := portalMedia(string(img.Destination))
+		if e, found := embeds[id]; ok && found && IsVideo(e.Type) {
+			img.SetAttributeString("video", true)
+			if e.Poster != "" {
+				img.SetAttributeString("poster", e.Poster)
+			}
+		}
+		return ast.WalkSkipChildren, nil
+	})
+}
+
+// portalMedia returns the media ID of a /media/<id> URL.
+func portalMedia(dest string) (string, bool) {
+	if !strings.HasPrefix(dest, MediaPrefix) || strings.ContainsAny(dest[len(MediaPrefix):], "/?#\\") || len(dest) == len(MediaPrefix) {
+		return "", false
+	}
+	return dest[len(MediaPrefix):], true
+}
+
+// imageRenderer renders portal media as lazy images (or video players) and
+// any other image reference as a link to it.
 type imageRenderer struct{}
 
 func (imageRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
@@ -60,7 +123,17 @@ func renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) 
 	n := node.(*ast.Image)
 	dest := string(n.Destination)
 	alt := plainText(n, source)
-	if strings.HasPrefix(dest, MediaPrefix) && !strings.ContainsAny(dest[len(MediaPrefix):], "/?#\\") {
+	if _, ok := portalMedia(dest); ok {
+		if _, video := n.AttributeString("video"); video {
+			_, _ = w.WriteString(`<video src="`)
+			_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
+			_, _ = w.WriteString(`" controls preload="metadata" playsinline`)
+			if poster, ok := n.AttributeString("poster"); ok {
+				_, _ = w.WriteString(` poster="` + MediaPrefix + template.HTMLEscapeString(poster.(string)) + `"`)
+			}
+			_, _ = w.WriteString(` aria-label="` + template.HTMLEscapeString(alt) + `"></video>`)
+			return ast.WalkSkipChildren, nil
+		}
 		_, _ = w.WriteString(`<img src="`)
 		_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
 		_, _ = w.WriteString(`" alt="`)

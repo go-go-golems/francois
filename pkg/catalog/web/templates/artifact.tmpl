@@ -7,7 +7,7 @@
 <span class="muted">v{{.Card.Version}} · {{join .Card.Capabilities " · "}}{{if .Plan}} · {{.Plan}} plan{{end}}</span>
 </div>
 </section>
-{{if .Card.Cover}}<figure class="cover">{{template "media" .Card.Cover}}</figure>{{end}}
+{{if .Card.Cover}}<figure class="cover">{{template "hero" .Card.Cover}}</figure>{{end}}
 {{if .Body}}<article class="md artifact-md">{{.Body}}</article>{{end}}
 {{if .Gallery}}<section class="gallery" aria-label="Gallery">
 {{range .Gallery}}<figure>{{template "media" .}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>

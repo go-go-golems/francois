@@ -217,6 +217,7 @@ export type SettingsDoc = {
     assetBytesPerInstance: number;
     maxHtmlBytes: number;
     maxMediaBytes: number;
+    maxAttachmentBytes: number;
   };
   publishing: { allowPinnedAfterWithdraw: boolean };
   plans: Plan[];

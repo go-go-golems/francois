@@ -22,13 +22,15 @@ type Media struct {
 	Alt        string    `json:"alt"`
 	UploadedBy string    `json:"uploadedBy"`
 	CreatedAt  time.Time `json:"createdAt"`
+	// Poster is the still frame (an image media ID) of a video, or "".
+	Poster string `json:"poster"`
 }
 
-const mediaColumns = `id,sha256,storage_key,media_type,size,width,height,alt,uploaded_by,created_at`
+const mediaColumns = `id,sha256,storage_key,media_type,size,width,height,alt,uploaded_by,created_at,COALESCE(poster_media_id,'')`
 
 func scanMedia(r pgx.Row) (Media, error) {
 	var m Media
-	err := r.Scan(&m.ID, &m.SHA256, &m.StorageKey, &m.MediaType, &m.Size, &m.Width, &m.Height, &m.Alt, &m.UploadedBy, &m.CreatedAt)
+	err := r.Scan(&m.ID, &m.SHA256, &m.StorageKey, &m.MediaType, &m.Size, &m.Width, &m.Height, &m.Alt, &m.UploadedBy, &m.CreatedAt, &m.Poster)
 	return m, notFound(err)
 }
 
@@ -77,8 +79,18 @@ func (s *Store) SetMediaAlt(ctx context.Context, id, alt string) error {
 	return err
 }
 
+// SetMediaPoster sets (or, with "", clears) a video's poster image.
+func (s *Store) SetMediaPoster(ctx context.Context, id, poster string) error {
+	tag, err := s.Pool.Exec(ctx, `UPDATE catalog_media SET poster_media_id=NULLIF($2,'') WHERE id=$1`, id, poster)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
+}
+
 // MediaReferenced reports whether any page, draft, creator or post refers to
-// the media, either as a field or by its /media/<id> URL in Markdown.
+// the media, either as a field or by its /media/<id> URL in Markdown (the
+// storefront intro included), or a video uses it as its poster.
 func (s *Store) MediaReferenced(ctx context.Context, id string) (bool, error) {
 	url := "%/media/" + id + "%"
 	var used bool
@@ -86,7 +98,9 @@ func (s *Store) MediaReferenced(ctx context.Context, id string) (bool, error) {
   EXISTS(SELECT 1 FROM catalog_artifacts WHERE page->>'cover'=$1 OR page->'gallery' ? $1 OR page->>'body' LIKE $2
                                          OR page_draft->>'cover'=$1 OR page_draft->'gallery' ? $1 OR page_draft->>'body' LIKE $2)
   OR EXISTS(SELECT 1 FROM creators WHERE avatar_media_id=$1 OR bio LIKE $2)
-  OR EXISTS(SELECT 1 FROM posts WHERE cover_media_id=$1 OR body LIKE $2)`, id, url).Scan(&used)
+  OR EXISTS(SELECT 1 FROM posts WHERE cover_media_id=$1 OR body LIKE $2)
+  OR EXISTS(SELECT 1 FROM catalog_media WHERE poster_media_id=$1)
+  OR EXISTS(SELECT 1 FROM (SELECT document FROM platform_settings ORDER BY revision DESC LIMIT 1) a WHERE a.document->'storefront'->>'intro' LIKE $2)`, id, url).Scan(&used)
 	return used, err
 }
 

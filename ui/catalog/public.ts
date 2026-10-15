@@ -138,6 +138,13 @@ function bindSignOut(btn: HTMLElement) {
 }
 
 function main() {
+  // Looping cover videos stay still for visitors who prefer reduced motion.
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.querySelectorAll<HTMLVideoElement>("video[autoplay]").forEach((v) => {
+      v.autoplay = false;
+      v.pause();
+    });
+  }
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
   document.querySelectorAll<HTMLElement>("[data-checkout]").forEach((box) => {
     bindCheckout(box).catch(() => {

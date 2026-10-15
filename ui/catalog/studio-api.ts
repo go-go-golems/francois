@@ -37,7 +37,8 @@ export type ArtifactRow = {
   latestVersion: string;
   updatedAt: string;
 };
-export type Media = { id: string; mediaType: string; size: number; width: number; height: number; alt: string; uploadedBy: string; createdAt: string };
+export type Media = { id: string; mediaType: string; size: number; width: number; height: number; alt: string; uploadedBy: string; createdAt: string; poster: string };
+export type Limits = { maxMediaBytes: number; maxAttachmentBytes: number };
 export type Link = { label: string; url: string };
 export type Creator = { id: string; slug: string; name: string; bio: string; avatar?: string; links: Link[]; userId?: string; sortOrder: number };
 export type Post = {
@@ -64,7 +65,7 @@ const base = api.enhanceEndpoints({ addTagTypes: ["StudioArtifacts", "StudioArti
 
 export const studio = base.injectEndpoints({
   endpoints: (b) => ({
-    studioMe: b.query<{ user: { id: string; name: string; role: string }; creator: Creator | null }, void>({
+    studioMe: b.query<{ user: { id: string; name: string; role: string }; creator: Creator | null; limits: Limits }, void>({
       query: () => "api/studio/me",
       providesTags: ["StudioMe"],
     }),
@@ -115,8 +116,8 @@ export const studio = base.injectEndpoints({
       query: (body) => ({ url: "api/studio/media", method: "POST", body }),
       invalidatesTags: ["Media"],
     }),
-    patchMedia: b.mutation<unknown, { id: string; alt: string }>({
-      query: ({ id, alt }) => ({ url: `api/studio/media/${id}`, method: "PATCH", body: { alt } }),
+    patchMedia: b.mutation<unknown, { id: string; alt?: string; poster?: string }>({
+      query: ({ id, ...body }) => ({ url: `api/studio/media/${id}`, method: "PATCH", body }),
       invalidatesTags: ["Media"],
     }),
     deleteMedia: b.mutation<unknown, string>({

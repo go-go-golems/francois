@@ -727,6 +727,7 @@ function Settings() {
               <NumField label="Asset MiB per instance" value={Math.round(doc.limits.assetBytesPerInstance / (1 << 20))} set={(v) => upd((d) => (d.limits.assetBytesPerInstance = v * (1 << 20)))} />
               <NumField label="Max HTML KiB" value={Math.round(doc.limits.maxHtmlBytes / 1024)} set={(v) => upd((d) => (d.limits.maxHtmlBytes = v * 1024))} />
               <NumField label="Max media MiB" value={Math.round(doc.limits.maxMediaBytes / (1 << 20))} set={(v) => upd((d) => (d.limits.maxMediaBytes = v * (1 << 20)))} />
+              <NumField label="Max attachment MiB" value={Math.round(doc.limits.maxAttachmentBytes / (1 << 20))} set={(v) => upd((d) => (d.limits.maxAttachmentBytes = v * (1 << 20)))} />
             </div>
           </Row>
           <Row label="Publishing">
