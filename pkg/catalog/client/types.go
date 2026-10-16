@@ -114,17 +114,25 @@ type ArtifactDetail struct {
 	Releases []Release `json:"releases"`
 }
 
+// Patch inputs use pointers: nil leaves a field unchanged, a pointer to an
+// empty value clears it (the server distinguishes absent from empty).
+
+// String, Strings and Int make pointers for patch inputs.
+func String(s string) *string      { return &s }
+func Strings(v []string) *[]string { return &v }
+func Int(n int) *int               { return &n }
+
 // ArtifactPatch changes only the fields that are set.
 type ArtifactPatch struct {
-	Title        *string  `json:"title,omitempty"`
-	Description  *string  `json:"description,omitempty"`
-	Tags         []string `json:"tags,omitempty"`
-	Visibility   *string  `json:"visibility,omitempty"`
-	Featured     *bool    `json:"featured,omitempty"`
-	SortOrder    *int     `json:"sortOrder,omitempty"`
-	RequiredPlan *string  `json:"requiredPlan,omitempty"`
-	DemoEnabled  *bool    `json:"demoEnabled,omitempty"`
-	Creators     []string `json:"creators,omitempty"`
+	Title        *string   `json:"title,omitempty"`
+	Description  *string   `json:"description,omitempty"`
+	Tags         *[]string `json:"tags,omitempty"`
+	Visibility   *string   `json:"visibility,omitempty"`
+	Featured     *bool     `json:"featured,omitempty"`
+	SortOrder    *int      `json:"sortOrder,omitempty"`
+	RequiredPlan *string   `json:"requiredPlan,omitempty"`
+	DemoEnabled  *bool     `json:"demoEnabled,omitempty"`
+	Creators     *[]string `json:"creators,omitempty"`
 }
 
 type ReleaseFile struct {
@@ -208,15 +216,15 @@ type Post struct {
 	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
-// PostInput creates or edits a journal post.
+// PostInput creates or edits a journal post; nil fields are left unchanged.
 type PostInput struct {
-	Slug     string   `json:"slug,omitempty"`
-	Title    string   `json:"title,omitempty"`
-	Summary  string   `json:"summary,omitempty"`
-	Body     string   `json:"body,omitempty"`
-	Cover    string   `json:"cover,omitempty"`
-	AuthorID string   `json:"authorId,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
+	Slug     *string   `json:"slug,omitempty"`
+	Title    *string   `json:"title,omitempty"`
+	Summary  *string   `json:"summary,omitempty"`
+	Body     *string   `json:"body,omitempty"`
+	Cover    *string   `json:"cover,omitempty"`
+	AuthorID *string   `json:"authorId,omitempty"`
+	Tags     *[]string `json:"tags,omitempty"`
 }
 
 type Link struct {
@@ -237,16 +245,16 @@ type Creator struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// CreatorInput creates or edits a creator profile; userId and sortOrder are
-// admin-only.
+// CreatorInput creates or edits a creator profile; nil fields are left
+// unchanged. userId and sortOrder are admin-only.
 type CreatorInput struct {
-	Slug      string `json:"slug,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Bio       string `json:"bio,omitempty"`
-	Avatar    string `json:"avatar,omitempty"`
-	Links     []Link `json:"links,omitempty"`
-	UserID    string `json:"userId,omitempty"`
-	SortOrder *int   `json:"sortOrder,omitempty"`
+	Slug      *string `json:"slug,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Bio       *string `json:"bio,omitempty"`
+	Avatar    *string `json:"avatar,omitempty"`
+	Links     *[]Link `json:"links,omitempty"`
+	UserID    *string `json:"userId,omitempty"`
+	SortOrder *int    `json:"sortOrder,omitempty"`
 }
 
 // PlanName is GET /api/studio/plans.

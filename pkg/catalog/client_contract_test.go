@@ -51,8 +51,13 @@ func TestClientContract(t *testing.T) {
 	_, err = s.CreateArtifact(ctx, client.ArtifactCreate{ID: "loom", Title: "Loom"})
 	ok("create artifact", err)
 	title := "Loom 2"
-	_, err = s.PatchArtifact(ctx, "loom", client.ArtifactPatch{Title: &title})
+	_, err = s.PatchArtifact(ctx, "loom", client.ArtifactPatch{Title: &title, Tags: client.Strings([]string{"weaving"})})
 	ok("patch artifact", err)
+	cleared, err := s.PatchArtifact(ctx, "loom", client.ArtifactPatch{Tags: client.Strings([]string{})})
+	ok("clear tags", err)
+	if len(cleared.Tags) != 0 || cleared.Title != title {
+		t.Fatalf("clearing tags: %+v", cleared)
+	}
 	ok("save draft", s.SaveDraft(ctx, "loom", client.Page{Body: "# Loom", Gallery: []string{}}))
 	ok("publish draft", s.PublishDraft(ctx, "loom"))
 	ok("save draft again", s.SaveDraft(ctx, "loom", client.Page{Body: "draft", Gallery: []string{}}))
@@ -98,16 +103,19 @@ func TestClientContract(t *testing.T) {
 	_, err = s.Media(ctx)
 	ok("media", err)
 	ok("delete media", s.DeleteMedia(ctx, m.ID))
-	cr, err := s.CreateCreator(ctx, client.CreatorInput{Slug: "ada", Name: "Ada", UserID: ada.user.ID})
+	cr, err := s.CreateCreator(ctx, client.CreatorInput{Slug: client.String("ada"), Name: client.String("Ada"), UserID: client.String(ada.user.ID)})
 	ok("create creator", err)
-	_, err = s.PatchCreator(ctx, cr.ID, client.CreatorInput{Bio: "Builds looms."})
+	_, err = s.PatchCreator(ctx, cr.ID, client.CreatorInput{Bio: client.String("Builds looms.")})
 	ok("patch creator", err)
 	_, err = s.Creators(ctx)
 	ok("creators", err)
-	post, err := s.CreatePost(ctx, client.PostInput{Slug: "hello", Title: "Hello", Body: "Hi"})
+	post, err := s.CreatePost(ctx, client.PostInput{Slug: client.String("hello"), Title: client.String("Hello"), Body: client.String("Hi"), Summary: client.String("A summary")})
 	ok("create post", err)
-	_, err = s.PatchPost(ctx, post.ID, client.PostInput{Title: "Hello again"})
+	patched, err := s.PatchPost(ctx, post.ID, client.PostInput{Title: client.String("Hello again"), Summary: client.String("")})
 	ok("patch post", err)
+	if patched.Summary != "" || patched.Body != "Hi" {
+		t.Fatalf("explicit empty summary not applied, or omitted body changed: %+v", patched)
+	}
 	ok("publish post", s.SetPostPublished(ctx, post.ID, true))
 	_, err = s.Post(ctx, post.ID)
 	ok("post", err)

@@ -146,3 +146,27 @@ func TestSettingsIfMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestUserFiltersBeforeLimit: an older matching customer is found even when
+// newer non-matching users fill the limit.
+func TestUserFiltersBeforeLimit(t *testing.T) {
+	e := setup(t)
+	ada := e.user("ada", "admin", false)
+	cleo := e.user("cleo", "creator", false)
+	sam := e.user("sam", "subscriber", false)
+	e.subscribe(sam, "price_test_pro")
+	for _, n := range []string{"u1", "u2", "u3"} {
+		e.user(n, "subscriber", false)
+	}
+	for path, want := range map[string]string{
+		"/api/admin/users?role=creator&limit=1":               cleo.user.ID,
+		"/api/admin/users?plan=pro&role=subscriber&limit=1":   sam.user.ID,
+		"/api/admin/users?plan=pro&role=subscriber&limit=500": sam.user.ID,
+	} {
+		code, raw, _ := e.do(&ada, "portal.test", "GET", path, nil, nil)
+		var rows []struct{ User struct{ ID string } }
+		if code != 200 || json.Unmarshal(raw, &rows) != nil || len(rows) != 1 || rows[0].User.ID != want {
+			t.Errorf("%s: %d %s", path, code, raw)
+		}
+	}
+}

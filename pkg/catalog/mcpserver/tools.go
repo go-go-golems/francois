@@ -56,16 +56,16 @@ func identityTools() []spec {
 // --- studio -------------------------------------------------------------
 
 type artifactPatchIn struct {
-	ID           string   `json:"id" jsonschema:"artifact ID"`
-	Title        *string  `json:"title,omitempty"`
-	Description  *string  `json:"description,omitempty"`
-	Tags         []string `json:"tags,omitempty" jsonschema:"replaces all tags"`
-	Visibility   *string  `json:"visibility,omitempty" jsonschema:"listed or hidden"`
-	Featured     *bool    `json:"featured,omitempty"`
-	SortOrder    *int     `json:"sortOrder,omitempty"`
-	RequiredPlan *string  `json:"requiredPlan,omitempty" jsonschema:"plan key needed to run it"`
-	DemoEnabled  *bool    `json:"demoEnabled,omitempty"`
-	Creators     []string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
+	ID           string    `json:"id" jsonschema:"artifact ID"`
+	Title        *string   `json:"title,omitempty"`
+	Description  *string   `json:"description,omitempty"`
+	Tags         *[]string `json:"tags,omitempty" jsonschema:"replaces all tags; [] clears them"`
+	Visibility   *string   `json:"visibility,omitempty" jsonschema:"listed or hidden"`
+	Featured     *bool     `json:"featured,omitempty"`
+	SortOrder    *int      `json:"sortOrder,omitempty"`
+	RequiredPlan *string   `json:"requiredPlan,omitempty" jsonschema:"plan key needed to run it"`
+	DemoEnabled  *bool     `json:"demoEnabled,omitempty"`
+	Creators     *[]string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
 }
 
 type pageIn struct {

@@ -127,27 +127,38 @@ func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
-	users, err := s.Store.Users(r.Context(), q.Get("q"), limit)
-	if err != nil {
-		unavailable(w, err)
-		return
-	}
 	rev, err := s.Store.ActiveSettings(r.Context())
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
+	// Role is filtered in SQL. The plan is only known after resolving each
+	// user's entitlement, so read candidates in pages until limit match.
+	const page = 200
 	out := []map[string]any{}
-	for _, u := range users {
-		e, err := s.entitlementIn(r.Context(), u, rev.Document)
+	for offset := 0; len(out) < limit; offset += page {
+		users, err := s.Store.UserPage(r.Context(), store.UserFilter{Search: q.Get("q"), Role: q.Get("role"), Limit: page, Offset: offset})
 		if err != nil {
 			unavailable(w, err)
 			return
 		}
-		if (q.Get("role") != "" && u.Role != q.Get("role")) || (q.Get("plan") != "" && e.Plan.Key != q.Get("plan")) {
-			continue
+		for _, u := range users {
+			e, err := s.entitlementIn(r.Context(), u, rev.Document)
+			if err != nil {
+				unavailable(w, err)
+				return
+			}
+			if q.Get("plan") != "" && e.Plan.Key != q.Get("plan") {
+				continue
+			}
+			out = append(out, map[string]any{"user": u, "access": e.Decision, "plan": e.Plan.Name, "planKey": e.Plan.Key, "source": e.Source})
+			if len(out) == limit {
+				break
+			}
 		}
-		out = append(out, map[string]any{"user": u, "access": e.Decision, "plan": e.Plan.Name, "planKey": e.Plan.Key, "source": e.Source})
+		if len(users) < page {
+			break
+		}
 	}
 	httpx.OK(w, out)
 }

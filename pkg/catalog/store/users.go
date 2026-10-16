@@ -71,12 +71,23 @@ func (s *Store) UserByVerifiedEmail(ctx context.Context, email string) (User, er
 
 // Users lists accounts for administrators; demo guests are left out.
 func (s *Store) Users(ctx context.Context, search string, limit int) ([]User, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+	return s.UserPage(ctx, UserFilter{Search: search, Limit: limit})
+}
+
+// UserFilter selects non-guest users, newest first. Role "" matches every
+// role; Offset pages through the result.
+type UserFilter struct {
+	Search, Role  string
+	Limit, Offset int
+}
+
+func (s *Store) UserPage(ctx context.Context, f UserFilter) ([]User, error) {
+	if f.Limit <= 0 || f.Limit > 500 {
+		f.Limit = 100
 	}
 	rows, err := s.Pool.Query(ctx, `SELECT `+userColumns+` FROM users
-WHERE role<>'guest' AND ($1='' OR email ILIKE '%'||$1||'%' OR display_name ILIKE '%'||$1||'%' OR id=$1 OR subject=$1)
-ORDER BY created_at DESC LIMIT $2`, search, limit)
+WHERE role<>'guest' AND ($1='' OR email ILIKE '%'||$1||'%' OR display_name ILIKE '%'||$1||'%' OR id=$1 OR subject=$1) AND ($2='' OR role=$2)
+ORDER BY created_at DESC, id LIMIT $3 OFFSET $4`, f.Search, f.Role, f.Limit, f.Offset)
 	if err != nil {
 		return nil, err
 	}

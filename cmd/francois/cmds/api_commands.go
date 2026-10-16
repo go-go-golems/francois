@@ -46,11 +46,11 @@ func artifactCommands() (*cobra.Command, error) {
 			}},
 		def{name: "update", short: "Change an artifact's metadata (only the flags given)",
 			flags: append(argID("artifact ID"), flag("title", "Title"), flag("description", "Description"), list("tags", "Tags (replaces all)"),
-				flag("visibility", "listed or hidden"), flag("featured", "true or false"), flag("sort-order", "Position on the storefront"),
+				boolean("clear-tags", "Remove all tags"), flag("visibility", "listed or hidden"), flag("featured", "true or false"), flag("sort-order", "Position on the storefront"),
 				flag("required-plan", "Plan key needed to run it"), flag("demo-enabled", "true or false"), list("creators", "Creator profile IDs (replaces all)")),
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
-				p := client.ArtifactPatch{Title: a.optS("title"), Description: a.optS("description"), Tags: a.L("tags"), Visibility: a.optS("visibility"),
-					RequiredPlan: a.optS("required-plan"), Creators: a.L("creators")}
+				p := client.ArtifactPatch{Title: a.optS("title"), Description: a.optS("description"), Tags: a.optL("tags", "clear-tags"), Visibility: a.optS("visibility"),
+					RequiredPlan: a.optS("required-plan"), Creators: a.optL("creators", "")}
 				var err error
 				if p.Featured, err = a.optB("featured"); err != nil {
 					return nil, err
@@ -179,20 +179,34 @@ func mediaCommands() (*cobra.Command, error) {
 	)
 }
 
+// postInput sets only the fields given; --clear names fields to empty.
 func postInput(a in) (client.PostInput, error) {
-	p := client.PostInput{Slug: a.S("slug"), Title: a.S("title"), Summary: a.S("summary"), Cover: a.S("cover"), AuthorID: a.S("author"), Tags: a.L("tags")}
+	p := client.PostInput{Slug: a.optS("slug"), Title: a.optS("title"), Summary: a.optS("summary"), Cover: a.optS("cover"), AuthorID: a.optS("author"), Tags: a.optL("tags", "")}
 	if f := a.S("body-file"); f != "" {
 		body, err := os.ReadFile(f) // #nosec G304 -- the operator names the file
 		if err != nil {
 			return p, err
 		}
-		p.Body = string(body)
+		p.Body = client.String(string(body))
+	}
+	for _, c := range a.L("clear") {
+		switch c {
+		case "summary":
+			p.Summary = client.String("")
+		case "cover":
+			p.Cover = client.String("")
+		case "tags":
+			p.Tags = client.Strings([]string{})
+		default:
+			return p, errors.Errorf("--clear accepts summary, cover, tags; not %s", c)
+		}
 	}
 	return p, nil
 }
 
 func postFlags() []*fieldsDef {
-	return []*fieldsDef{flag("summary", "Summary"), flag("body-file", "Markdown file for the body"), flag("cover", "Cover media ID"), flag("author", "Author creator ID"), list("tags", "Tags")}
+	return []*fieldsDef{flag("summary", "Summary"), flag("body-file", "Markdown file for the body"), flag("cover", "Cover media ID"), flag("author", "Author creator ID"), list("tags", "Tags"),
+		list("clear", "Fields to empty: summary, cover, tags")}
 }
 
 func postCommands() (*cobra.Command, error) {
@@ -231,13 +245,30 @@ func postCommands() (*cobra.Command, error) {
 	)
 }
 
+// creatorInput sets only the fields given; --clear names fields to empty.
 func creatorInput(a in) (client.CreatorInput, error) {
 	sort, err := a.optI("sort-order")
-	return client.CreatorInput{Slug: a.S("slug"), Name: a.S("name"), Bio: a.S("bio"), Avatar: a.S("avatar"), UserID: a.S("user-id"), SortOrder: sort}, err
+	ci := client.CreatorInput{Slug: a.optS("slug"), Name: a.optS("name"), Bio: a.optS("bio"), Avatar: a.optS("avatar"), UserID: a.optS("user-id"), SortOrder: sort}
+	for _, c := range a.L("clear") {
+		switch c {
+		case "bio":
+			ci.Bio = client.String("")
+		case "avatar":
+			ci.Avatar = client.String("")
+		case "links":
+			ci.Links = &[]client.Link{}
+		case "user-id":
+			ci.UserID = client.String("")
+		default:
+			return ci, errors.Errorf("--clear accepts bio, avatar, links, user-id; not %s", c)
+		}
+	}
+	return ci, err
 }
 
 func creatorFlags() []*fieldsDef {
-	return []*fieldsDef{flag("bio", "Biography (Markdown)"), flag("avatar", "Avatar media ID"), flag("user-id", "Linked account (admin only)"), flag("sort-order", "Order on the storefront (admin only)")}
+	return []*fieldsDef{flag("bio", "Biography (Markdown)"), flag("avatar", "Avatar media ID"), flag("user-id", "Linked account (admin only)"), flag("sort-order", "Order on the storefront (admin only)"),
+		list("clear", "Fields to empty: bio, avatar, links, user-id")}
 }
 
 func creatorCommands() (*cobra.Command, error) {

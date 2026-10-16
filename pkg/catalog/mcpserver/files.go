@@ -38,7 +38,13 @@ func (e *env) localPath(p string) (string, error) {
 		dirs = []string{wd}
 	}
 	for _, d := range dirs {
-		root, err := filepath.EvalSymlinks(d)
+		// Relative directories (--allow-dir .) are relative to the working
+		// directory, like the requested file.
+		absDir, err := filepath.Abs(d)
+		if err != nil {
+			continue
+		}
+		root, err := filepath.EvalSymlinks(absDir)
 		if err != nil {
 			continue
 		}

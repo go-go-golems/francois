@@ -66,6 +66,18 @@ func (a in) optS(name string) *string {
 	return nil
 }
 
+// optL is nil when a list flag is not given ("leave unchanged"); clearFlag,
+// when set, yields an explicit empty list.
+func (a in) optL(name, clearFlag string) *[]string {
+	if clearFlag != "" && a.B(clearFlag) {
+		return &[]string{}
+	}
+	if l := a.L(name); len(l) > 0 {
+		return &l
+	}
+	return nil
+}
+
 // optB parses a tri-state flag ("", "true", "false").
 func (a in) optB(name string) (*bool, error) {
 	s := a.S(name)
