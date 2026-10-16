@@ -67,3 +67,7 @@ Opened PR #7 and waited for completed Codex review: two unresolved P2 findings i
 ## 2026-10-16
 
 Addressed both PR #7 P2 findings: recover unusable release pins without changing workspace identity/data, and charge tour starts only after successful serialized creation. PostgreSQL regressions/full Go suite and lint pass. Identified the secret-scan finding as a dummy referrer fixture; narrow inline ignore added. Existing production backup Job completed before rollout.
+
+## 2026-10-16
+
+Addressed new P2 expired-lease quota finding by purging expired leases in the existing locked write transaction. Targeted PostgreSQL storage regressions and lint pass. Existing in-cluster production backup completed with upload receipt; deployment has not yet changed.

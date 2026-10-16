@@ -1140,3 +1140,67 @@ Start with store/instances.go, instances.go, demos.go and the three regression c
 ### Technical details
 
 Test database credentials are disposable local fixtures. Production backup uses the pre-existing CronJob's own secret mounts/environment internally. No secret values, production dump or raw scanner results are included in Git. The vault report remains the historical snapshot published before these review fixes.
+
+
+## Step 17: Clear the additional expired-lease review finding
+
+A third P2 review finding arrived while the first two fixes ran through CI. Expired leases were included indefinitely in logical storage totals. I added cleanup to the existing locked write transaction, so live leases remain charged and expired payloads stop consuming capacity when an instance next writes.
+
+### Prompt Context
+
+**User prompt:** See Step 16; continuing review fixes before the authorized merge and production rollout.
+
+**Assistant interpretation:** Address the newly arrived storage review issue before releasing.
+
+**Inferred user intent:** Deploy reviewed, verified behavior rather than leave a known quota defect.
+
+**Commit (prior fixes):** `4ac3e59` — Fix default workspace recovery and concurrent tour start accounting.
+
+### What I did
+
+- Read the new finding at https://github.com/go-go-golems/francois/pull/7#discussion_r4299193185 and traced lease acquisition and aggregate quota accounting.
+- Added per-instance expired-lease deletion after storage-mode validation and under the existing storage advisory transaction lock. Every writable persistent mutation now clears stale leases before measuring usage; paused storage still performs no mutation.
+- Added `TestExpiredLeasesReleaseStorageQuota`: a live lease blocks growth, forced expiry restores capacity for a document and a lease on another path, and the old row is physically removed.
+- Resolved the first two GitHub review threads after their code/test commit; the lease thread is resolved after its fix is pushed.
+- Confirmed the safe production backup uploaded successfully with no pg_dump/pg_dumpall/fatal upload error in its receipt. No dump was downloaded.
+- Recorded aggregate production baseline: 3 users, 4 instances, 1 release, 1 model call, 0 documents. Migrations 001–008 are present; 009–011 remain pending before this rollout.
+
+### Why
+
+Lease payloads are temporary application state. Retaining expired rows in quota accounting eventually prevents unrelated writes; purging them during normal writes both restores logical capacity and prevents indefinite stale-row accumulation without another cleanup service.
+
+### What worked
+
+- Targeted PostgreSQL tests for expired leases, aggregate quota/cleanup and existing-view operations passed (`pkg/catalog 0.397s`).
+- Catalog lint passed with zero issues.
+- Refreshed PR CI passes Dependency Review, frontend checks, Go tests, lint and vulnerability checking so far. Enabling the repository capability corrected Dependency Review without disabling the check.
+- Backup Job `postgres-backup-francois-008-20261016` completed and its upload receipt is present.
+
+### What didn't work
+
+- Aggregate inspection initially used the conventional PostgreSQL role `postgres`, but this cluster uses a custom role: `FATAL: role "postgres" does not exist`. The scoped read then used the pod's configured role internally and printed only counts/migration names.
+- The PR's full-history secret scan still encounters the original dummy URI fixture in commit `0a66114`, before its new inline ignore. No real secret was identified. A squash merge preserves the reviewed final tree with the exact-line ignore; verify the main-branch scan before deploying that image. No broad detector suppression or history rewrite was introduced.
+
+### What I learned
+
+Accounting for temporary data requires an expiry boundary, not merely summing rows. The transaction already serializes all writers, so it is also the appropriate place to remove expired lease rows before computing quota.
+
+### What was tricky to build
+
+Cleanup must occur after policy checks, so read-only/off modes remain nonmutating, and before both quota measurements so cleanup and new growth are compared consistently. The regression test manipulates expiry in PostgreSQL rather than waiting for wall-clock expiration.
+
+### What warrants a second pair of eyes
+
+Check that live leases remain quota-accounted and that cleanup is limited to the instance locked by this transaction. Existing data with unexpired leases is preserved.
+
+### What should be done in the future
+
+Merge the final reviewed tree after CI completes, require the main secret scan to pass, then roll out through the GitOps image-pin PR and verify production. Subsequent rollout receipts are recorded in Step 18.
+
+### Code review instructions
+
+Review the small storage.go change and `TestExpiredLeasesReleaseStorageQuota`, then the already-committed fixes in Step 16. The primary production backup remains in the established backup destination.
+
+### Technical details
+
+The cleanup SQL is `DELETE FROM instance_leases WHERE instance_id=$1 AND expires_at<=now()` within `beginStorageWrite`. No schema migration, additional goroutine or new service is needed for this fix.

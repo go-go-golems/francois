@@ -44,6 +44,11 @@ func (s *Store) beginStorageWrite(ctx context.Context, instance string) (pgx.Tx,
 	case "off":
 		return fail(&StoragePaused{"off", d.Operations.Message("Saved work is temporarily unavailable.")})
 	}
+	// Expired cooperative leases no longer retain application state. Purge
+	// them under the same lock before measuring quota for any mutation.
+	if _, err = tx.Exec(ctx, `DELETE FROM instance_leases WHERE instance_id=$1 AND expires_at<=now()`, instance); err != nil {
+		return fail(err)
+	}
 	return tx, d.Limits, nil
 }
 

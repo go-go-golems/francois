@@ -517,3 +517,39 @@ func TestFailedTourCreationDoesNotSpendStart(t *testing.T) {
 		t.Fatalf("failed creation spent start: %d %v", code, out)
 	}
 }
+
+func TestExpiredLeasesReleaseStorageQuota(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	owner := e.user("lease-owner", "admin", false)
+	release := e.publishArtifact(owner, "board", "")
+	inst, err := e.store.CreateInstance(ctx, owner.user.ID, release, "Board", "workspace", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := testDoc(100)
+	d.Limits.StorageBytesPerInstance = 64
+	if _, err = e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := e.store.AcquireLease(ctx, inst.ID, owner.user.ID, "notes/old", "holder", 60000, strings.Repeat("x", 40)); err != nil || !ok {
+		t.Fatalf("lease %v %v", ok, err)
+	}
+	body := map[string]any{"s": strings.Repeat("y", 40)}
+	if err = e.store.WriteDocument(ctx, inst.ID, owner.user.ID, "notes/saved", "set", body, 500); !errors.Is(err, store.ErrLimit) {
+		t.Fatalf("live lease not counted: %v", err)
+	}
+	if _, err = e.store.Pool.Exec(ctx, `UPDATE instance_leases SET expires_at=now()-interval '1 second' WHERE instance_id=$1`, inst.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = e.store.WriteDocument(ctx, inst.ID, owner.user.ID, "notes/saved", "set", body, 500); err != nil {
+		t.Fatalf("expired lease retained quota: %v", err)
+	}
+	if ok, err := e.store.AcquireLease(ctx, inst.ID, owner.user.ID, "notes/new", "holder", 60000, "z"); err != nil || !ok {
+		t.Fatalf("new lease %v %v", ok, err)
+	}
+	var stale int
+	if err = e.store.Pool.QueryRow(ctx, `SELECT count(*) FROM instance_leases WHERE instance_id=$1 AND path='notes/old'`, inst.ID).Scan(&stale); err != nil || stale != 0 {
+		t.Fatalf("expired lease not purged: %d %v", stale, err)
+	}
+}
