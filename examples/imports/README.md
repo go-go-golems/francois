@@ -26,6 +26,7 @@ never modified.
 
 The builder preserves the visual design and makes only explicit hosting edits:
 local script/resource embedding, Deck's fire-and-forget presence handling,
-RAG's initial lexical preset/query and its default single-call map concurrency.
+RAG's initial lexical preset/query and its default single-call map concurrency,
+and toolbar space for the host Close link.
 Pinned external CDN scripts and Google Fonts links remain as in the exports.
 See the ticket's guide, diary and browser evidence for validation/publication.

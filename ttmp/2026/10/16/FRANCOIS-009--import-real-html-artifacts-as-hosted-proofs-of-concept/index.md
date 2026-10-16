@@ -1,7 +1,7 @@
 ---
 Title: Import real HTML artifacts as hosted proofs of concept
 Ticket: FRANCOIS-009
-Status: active
+Status: complete
 Topics:
     - backend
 DocType: index
@@ -10,7 +10,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-16T19:07:30.326609485-04:00
+LastUpdated: 2026-10-16T19:38:25.505350568-04:00
 WhatFor: ""
 WhenToUse: ""
 ---

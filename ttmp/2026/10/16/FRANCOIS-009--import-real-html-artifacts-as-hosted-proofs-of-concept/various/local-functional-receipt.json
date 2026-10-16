@@ -64,5 +64,13 @@
     "tool": "trufflehog filesystem --no-verification",
     "findings": 0
   },
-  "limits": "Representative workflows tested; not exhaustive preset, collaboration or browser compatibility coverage."
+  "limits": "Representative workflows tested; not exhaustive preset, collaboration or browser compatibility coverage. A Download book event probe timed out; export formats are not qualified.",
+  "finalToolbarBuild": {
+    "tabula-workbench": "1.0.2",
+    "lattice-deck": "1.0.2",
+    "rag-workbench": "1.0.2",
+    "startupPageErrors": 0,
+    "startupFailedRequests": 0,
+    "evidence": "All five rerun through scripts/03-local-browser-check.js after final toolbar changes; screenshots refreshed."
+  }
 }

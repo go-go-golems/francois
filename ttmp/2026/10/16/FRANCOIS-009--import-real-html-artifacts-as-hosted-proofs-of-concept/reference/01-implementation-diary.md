@@ -146,3 +146,89 @@ Read scripts/02-build-imports.py, 04-publish-production.mjs and 05-verify-produc
 ### Technical details
 
 Production 0.1.0 IDs: Rift rel_cdc4426a42fefb2c512d77f6 (superseded by 0.1.1 rel_1e376f5c236cec83a1ee6f53); Phantasmagoria rel_7666279d21ac37718f31e4e7; Tabula rel_a9d88eeef8c8cc334341e117; Deck rel_08a7a6168371c71f285397d6; RAG rel_48bc7b49c104ed89526e6249. No global access or quota settings were changed by publication.
+
+
+## Step 3: Prepare report evidence and finish production qualification
+
+The user requested a diary and screenshots specifically for a later vault report. Added a dedicated evidence index with caption guidance, exact receipt links and explicit boundaries between visible rendering, scripted execution, persistence and real model sampling. Preserved the export sources and extended the same narrow Close-link clearance to the three workbench toolbars after inspecting the production screenshots.
+
+### Prompt Context
+
+**User prompt (verbatim):** “write a diary and take screenshots and all so we can use them for our vault report when we are done”
+
+**Assistant interpretation:** Preserve detailed chronological implementation evidence and actual local/production screenshots, organized so a later technical vault report can be written from verified facts.
+
+**Inferred user intent:** A report-ready record of implementation decisions, real application behavior and visual results, including problems and their resolution.
+
+**Commit (code):** a63e9ab — Qualify imported apps and publish production proofs of concept.
+
+### What I did
+
+- Added reference/02-screenshot-and-report-evidence-index.md with figure captions, local/production screenshot links, receipts, source/build inventory references and interpretation limits.
+- Captured unauthenticated production catalog and RAG detail-page screenshots with scripts/06-public-evidence.mjs. Verified all five public pages return HTTP 200 and all five artifacts are present in /api/catalog and /apps/feed.xml.
+- Visually inspected production Rift, Phantasmagoria, Tabula and Deck captures. Rift's Freeze control is separate from Close after the fix. Tabula/Deck retained controls close to that overlay, so applied the same minimal 96px top-toolbar clearance to Tabula, Deck and RAG.
+- Published those toolbar builds locally as 1.0.2, explicitly upgraded the existing instances and reran all five local startup/screenshot checks: zero page errors and zero failed requests. RAG shows five bundled guides plus the persisted public upload.
+- Published final production 0.1.1 releases for Tabula, Deck and RAG, retaining Rift 0.1.1 and Phantasmagoria 0.1.0. The operator script checks stored HTML SHA256 on version reuse.
+- Replaced fixed reload sleeps with explicit workbook/index readiness assertions. Added incremental per-app receipt saving, a --verify-only mode and bounded model-ledger projection without user emails or prompts.
+- Rewrote the import guide around the final system: immutable release/pinned workspace model, safe source boundary, exact builder adaptations, Mermaid flow diagram, API contract table, operator steps, actual URLs and qualification limits.
+- Rebuilt twice and compared every release hash plus sources/builds.json: identical output. Python AST parsing and node --check pass for the authored scripts.
+
+### Why
+
+Screenshots should support a specific technical claim rather than stand in for functional testing. The evidence index explains which claims come from images and which come from browser/API assertions. Per-app result saving avoids losing successful evidence when a later workflow exposes a problem. Application toolbar edits are small enough to remain explicit in the deterministic builder; no platform styling changes or new abstraction is necessary.
+
+### What worked
+
+The final local source-to-release build is deterministic. Public discovery and release RSS work without authentication. Production browser checks exercise physical controls, a reactive workbook, executable scripted slide changes and real model calls on isolated app origins. Final results, including the remaining RAG storage/model checks, are recorded in the checkpoint below after the run completes.
+
+### What didn't work
+
+- The first production reload test for Tabula evaluated too early: `frame.evaluate: TypeError: Cannot read properties of undefined (reading 'S')`. Waiting for window.__tabula.S.session replaces the timing assumption.
+- The first RAG result read ran before a ranked result was available: `TypeError: Cannot read properties of undefined (reading 'doc')`. The test now enters the known public query and waits for matching query text plus a nonempty result list.
+- One publication retry still exercised the old pinned Rift workspace and reproduced the Close-link timeout. Added explicit current-release inspection and upgrade before reloading the frame; the corrected pointer toggle subsequently passed.
+- A local Tabula Download book probe timed out waiting for the browser download event (`Timeout 15000ms exceeded`). A follow-up exact-menu-button probe also timed out after toggling menu state. No application export success is claimed; all export formats remain outside qualification.
+- docmgr doctor rejected the public Markdown upload fixture because it initially lacked frontmatter. Added normal ticket metadata. The remaining missing_numeric_prefix warning is intentional: poc-note.md is a user-facing upload fixture rather than a numbered authored document.
+- Some multi-file patch contexts were stale and were rejected without partial edits; corrected them against the actual text. A few guessed source paths/globs failed; searches then used concrete repository paths. No platform behavior was changed to work around tool issues.
+
+### What I learned
+
+Document readyState does not mean asynchronous capability setup or reactive query computation has completed. Correct browser checks wait for the actual application state they need. A release upload does not upgrade a pinned instance. Browser aborts caused by deliberate reload/upgrade and closing long-lived event streams are expected and remain visible in the raw receipt.
+
+### What was tricky to build
+
+The first successful stage-agent result is scripted executable code, while the separate sampling probe is a real provider call. The report must keep those claims distinct. Likewise, Tabula uses browser-local draft persistence, while RAG uses hosted document storage; a single generic “persistence works” claim would hide a meaningful difference.
+
+### What warrants a second pair of eyes
+
+Review the excluded corpus, explicit capabilities, byte-preserving sources and deterministic embedding. Inspect final screenshots for toolbar usability. Confirm final receipt HTML digests match sources/builds.json, and verify model ledger rows correspond to the tested artifact instances. Advanced presets, multi-user room collaboration and all export formats are explicitly not certified.
+
+### What should be done in the future
+
+Use the evidence index and guide as the source package for the requested later vault report. The report itself is not authored in this ticket step. Decide separately whether to enable the existing bounded anonymous tours; global policy remains unchanged while that preference is pending.
+
+### Code review instructions
+
+Start with the guide and evidence index, then inspect scripts/02-build-imports.py and 04–06 operator/browser scripts. Compare each generated release digest to the build/production receipts. Images live under various/screenshots. Do not commit credentials or authenticated browser state; none is needed to consume these evidence files.
+
+### Technical details
+
+Final workbench local release IDs: Tabula rel_a7a9b9710959392d6ab3596a, Deck rel_4bfc816142e8dc13bb77dac4, RAG rel_b3360f57a4727f524f10439e. Final production workbench IDs: Tabula rel_d8227318d8645a1409d1a73c, Deck rel_7eb142a73b88a690d042c952, RAG rel_87f08be07833f2a4c43ac4e1. Production remains the existing platform deployment; these changes publish content and require no k3s rollout.
+
+
+#### RAG test diagnosis correction
+
+The RAG failure above was initially interpreted as a readiness race. Source inspection of source/rag.js:decorateResult showed the actual cause: W.lastResult is a runtime result object with signals.q and a non-enumerable top(n) method. Its toJSON() exposes q and a top array. The earlier local inspection used JSON.stringify, so reusing that serialized shape for direct object inspection was incorrect. The production test now waits for lastResult.signals.q and calls lastResult.top(1)[0]. This corrects the test without changing the application, corpus, runtime or release. Only RAG is rerun using --verify-only --artifact=rag-workbench; the four completed checks are preserved. This is a meaningful test-authoring mistake, not evidence of an application retrieval failure.
+
+
+#### Final production checkpoint
+
+All five production browser checks pass. Generated HTML SHA256 values match the five published release receipts. There are no page errors; recorded failed requests are only expected ERR_ABORTED launch/event-stream requests from explicit reload/upgrade. RAG ranks Model Limits / Concurrency first and retains poc-note.md after reload. Three model-capable apps returned pong through lunaroute/glm-5.3-flash, and the bounded production model ledger contains all three artifact attributions with token counts.
+
+- tabula-workbench: real quick-tier call 2299 ms; response pong.
+- lattice-deck: real quick-tier call 1585 ms; response pong.
+- rag-workbench: real quick-tier call 1010 ms; response pong.
+
+Final release versions: Rift, Tabula, Deck and RAG 0.1.1; Phantasmagoria 0.1.0. The complete screenshot/evidence index is reference/02-screenshot-and-report-evidence-index.md. Expected browser-abort observations are retained; no failed feature assertion is concealed. No global access settings were changed. Anonymous tours remain disabled and authenticated workspace access is available. The production ledger omits user emails, prompts and session data.
+
+
+Ticket tasks are complete and docmgr closed FRANCOIS-009 successfully (close-cd083c793c7c7fde5538b8ddbd4b9b5a, committed). Its completed recovery journal was verified and archived under /tmp/francois-009-completed-docmgr-operations; permanent status/changelog remain in the ticket. Final doctor reports only the intentional upload-fixture filename warning. Authored diffs pass whitespace checks; scripts pass syntax checks; no Go/platform code changed, so a backend test-suite rerun is not relevant to these content imports. Thirteen PNG screenshots are preserved, including a diagnostic capture. Milestone commits and the final evidence commit are on feat/francois-009-real-artifact-imports.

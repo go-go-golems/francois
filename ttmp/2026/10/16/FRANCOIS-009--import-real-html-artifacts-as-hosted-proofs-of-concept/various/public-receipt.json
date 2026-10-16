@@ -1,0 +1,39 @@
+{
+  "at": "2026-10-16T23:38:56.915Z",
+  "base": "https://slop.boutique",
+  "catalogStatus": 200,
+  "feedStatus": 200,
+  "allFiveInCatalogAndRSS": true,
+  "pages": [
+    {
+      "id": "lattice-rift",
+      "status": 200,
+      "title": "Lattice Rift · slop.boutique",
+      "tourButtons": []
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "status": 200,
+      "title": "Lattice Phantasmagoria · slop.boutique",
+      "tourButtons": []
+    },
+    {
+      "id": "tabula-workbench",
+      "status": 200,
+      "title": "Tabula Workbench · slop.boutique",
+      "tourButtons": []
+    },
+    {
+      "id": "lattice-deck",
+      "status": 200,
+      "title": "Lattice Deck · slop.boutique",
+      "tourButtons": []
+    },
+    {
+      "id": "rag-workbench",
+      "status": 200,
+      "title": "RAG Workbench · slop.boutique",
+      "tourButtons": []
+    }
+  ]
+}

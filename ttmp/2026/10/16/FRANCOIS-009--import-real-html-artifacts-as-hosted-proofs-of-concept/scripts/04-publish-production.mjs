@@ -17,7 +17,8 @@ const apps=[
   ['lattice-deck','Lattice Deck','A programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.'],
   ['rag-workbench','RAG Workbench','An editable retrieval pipeline with public sample documentation, Markdown uploads, lexical search and hosted model access.']
 ];
-const receipt={base,version:'0.1.0',at:new Date().toISOString(),releases:[],checks:[]};
+const verifyOnly=process.argv.includes('--verify-only');
+const receipt=verifyOnly?JSON.parse(readFileSync(path.join(ticket,'various/production-receipt.json'),'utf8')):{base,version:'0.1.0',at:new Date().toISOString(),releases:[],checks:[]};
 const save=()=>writeFileSync(path.join(ticket,'various/production-receipt.json'),JSON.stringify(receipt,null,2)+'\n');
 const browser=await chromium.launch({executablePath:'/home/manuel/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',headless:true});
 try {
@@ -50,8 +51,8 @@ try {
     if(!r.ok())throw new Error(method+' '+url+' HTTP '+r.status()+': '+(await r.text()).slice(0,300));
     return await r.json();
   }
-  for(const [id,title,description] of apps) {
-    const version=id==='lattice-rift'?'0.1.1':receipt.version;
+  for(const [id,title,description] of verifyOnly?[]:apps) {
+    const version=id==='lattice-phantasmagoria'?receipt.version:'0.1.1';
     const dir=path.resolve('examples/imports',id);
     const multipart={artifactId:id,title,version,description,tags:'proof-of-concept,'+(id.startsWith('lattice-')?'graphics':'workbench'),manifestJson:readFileSync(path.join(dir,'manifest.json'),'utf8'),html:{name:'index.html',mimeType:'text/html',buffer:readFileSync(path.join(dir,'release.html'))}};
     const check=await context.request.post(base+'/api/studio/releases/check',{headers,multipart});
@@ -81,5 +82,12 @@ try {
   receipt.access={demoEnabled:settings.active.document.demo.enabled,demo:settings.active.document.demo,revision:settings.active.revision};save();
   // Reuse this authenticated context for browser checks, without persisting it.
   const {verify}=await import('./05-verify-production.mjs');
-  receipt.browser=await verify(context,base,ticket,receipt.releases);save();
+  const only=process.argv.find(x=>x.startsWith('--artifact='))?.split('=')[1];
+  const selected=receipt.releases.filter(r=>!only||r.id===only);
+  if(!selected.length)throw new Error('No matching release to verify');
+  receipt.browser=(receipt.browser??[]).filter(r=>!selected.some(s=>s.id===r.id));save();
+  await verify(context,base,ticket,selected,result=>{receipt.browser.push(result);save();});
+  const usage=await api('GET','/api/admin/usage?limit=100');
+  const instances=new Map(receipt.browser.map(r=>[r.instance.split('/').pop(),r.id]));
+  receipt.modelLedger=usage.calls.filter(c=>instances.has(c.instanceId)).map(c=>({artifact:instances.get(c.instanceId),state:c.state,model:c.modelUsed||c.model,inputTokens:c.inputTokens,outputTokens:c.outputTokens,credits:c.credits,createdAt:c.createdAt}));save();
 } finally {await browser.close();}

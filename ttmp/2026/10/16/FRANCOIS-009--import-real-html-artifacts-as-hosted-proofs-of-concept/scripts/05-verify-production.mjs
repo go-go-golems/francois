@@ -1,7 +1,7 @@
 // Uses the normal in-memory signed-in browser context supplied by step 04.
 import path from 'node:path';
 import assert from 'node:assert/strict';
-export async function verify(context,base,ticket,releases) {
+export async function verify(context,base,ticket,releases,onResult=()=>{}) {
   const results=[];
   for(const {id,releaseId} of releases) {
     const page=await context.newPage();
@@ -36,11 +36,13 @@ export async function verify(context,base,ticket,releases) {
         await frame.waitForFunction(()=>document.querySelector('#scName').textContent!=='Boot');
         result.interaction={before,after:await frame.locator('#scName').textContent()};
       } else if(id==='tabula-workbench') {
+        await frame.waitForFunction(()=>!!window.__tabula?.S?.session);
         const input=frame.getByRole('spinbutton',{name:'Inputs!B2',exact:true});
         await input.fill('421');await input.press('Tab');
         await frame.waitForFunction(()=>window.__tabula.S.session.get('Inputs!B2')===421);
         await page.waitForTimeout(1000);await page.reload();await page.waitForTimeout(2500);
         frame=await(await page.locator('iframe').elementHandle()).contentFrame();
+        await frame.waitForFunction(()=>!!window.__tabula?.S?.session);
         const reloaded=await frame.evaluate(()=>window.__tabula.S.session.get('Inputs!B2'));
         assert.equal(reloaded,421);
         result.interaction={edited:421,reloaded,nodes:await frame.evaluate(()=>window.__tabula.S.build.nodes)};
@@ -52,13 +54,15 @@ export async function verify(context,base,ticket,releases) {
         assert.equal(result.interaction.errors.length,0);
         assert.match(result.interaction.results.join(' '),/speed.*2\.4/);
       } else if(id==='rag-workbench') {
-        await frame.waitForFunction(()=>!!window.__wb.lastResult);
-        const top=await frame.evaluate(()=>window.__wb.lastResult.top[0]);
+        await frame.getByPlaceholder('Search the reports…',{exact:true}).fill('model concurrency');
+        await frame.waitForFunction(()=>window.__wb?.lastResult?.signals.q==='model concurrency'&&window.__wb.lastResult.top(1).length>0);
+        const top=await frame.evaluate(()=>window.__wb.lastResult.top(1)[0]);
         assert.equal(top.doc,'Model Limits');
         await frame.locator('#file-in').setInputFiles(path.join(ticket,'various/poc-note.md'));
         await frame.waitForFunction(()=>window.__wb.uploaded.some(x=>x.name==='poc-note.md'));
         await page.waitForTimeout(1500);await page.reload();await page.waitForTimeout(3000);
         frame=await(await page.locator('iframe').elementHandle()).contentFrame();
+        await frame.waitForFunction(()=>window.__wb?.uploaded.some(x=>x.name==='poc-note.md'));
         const uploaded=await frame.evaluate(()=>window.__wb.uploaded.map(x=>x.name));
         assert.ok(uploaded.includes('poc-note.md'));
         result.interaction={top,uploadedAfterReload:uploaded};
@@ -74,7 +78,14 @@ export async function verify(context,base,ticket,releases) {
       await page.screenshot({path:path.join(ticket,'various/screenshots',id+'-production.png'),fullPage:true});
       result.errors=errors;result.failed=failed;
       assert.equal(errors.length,0,'Unexpected application error: '+errors.join(';'));
-      results.push(result);console.log('Verified',id,JSON.stringify(result.interaction));
+      results.push(result);onResult(result);console.log('Verified',id,JSON.stringify(result.interaction));
+    } catch(error) {
+      await page.screenshot({path:path.join(ticket,'various/screenshots',id+'-production-debug.png'),fullPage:true}).catch(()=>{});
+      if(id==='rag-workbench') {
+        const frame=page.frames().find(f=>f!==page.mainFrame());
+        console.log('RAG diagnostic',JSON.stringify(await frame?.evaluate(()=>({query:window.__wb?.lastResult?.signals.q,hits:window.__wb?.lastResult?.hits.length,errors:window.__wb?.lastResult?.errors,bundled:window.__wb?.bundled.length,uploaded:window.__wb?.uploaded.length,preset:window.__wb?.preset?.id})).catch(()=>({unavailable:true}))));
+      }
+      throw error;
     } finally {await page.close();}
   }
   return results;
