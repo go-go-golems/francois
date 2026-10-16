@@ -777,3 +777,72 @@ Every API operation now has a command under `francois catalog`, built on one gen
 ### Technical details
 
 - Output: `--format json|yaml|csv|table`, `--output-fields a,b`.
+
+## Step 12: Phase 5: `francois mcp` over stdio, on go-go-mcp v0.3.0
+
+`pkg/catalog/mcpserver` exposes 68 tools on go-go-mcp v0.3.0's embeddable server, and `francois mcp` runs them over stdio for a local agent. Tools are filtered by the token's scopes, the selected toolsets and a read-only switch, and upload tools are confined to allowed directories. It was verified over real stdio JSON-RPC against the local stack, and by an automated test with an MCP client over streamable HTTP.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 9.
+
+**Assistant interpretation:** Phase 5 of the guide, with the go-go-mcp decision from Step 6.
+
+**Inferred user intent:** Claude Code can manage the shop with a scoped token.
+
+### What I did
+
+- `GOWORK=off go get github.com/go-go-golems/go-go-mcp@v0.3.0`. This raised `go` from 1.26.1 to 1.26.3 and Glazed from v1.4.1 to `v1.4.4-0.20260823170018-a7fdfda5e3c6`. `make ci-check` ran on the bump alone before any MCP code: green.
+- `pkg/catalog/mcpserver`:
+  - `server.go`: `Settings{Mode, Scopes, Toolsets, ReadOnly, AllowDirs}`, `Options(ClientFunc, Settings)` and `ToolNames`. In remote mode, each tool also gets `embeddable.WithToolAuthorization` with its scope.
+  - `typed.go`: the generic `tool[In, Out]` adapter. The input schema comes from `jsonschema.For[In]` and is converted to a map; results with a struct `Out` carry structured content plus an output schema; text content is the summary plus JSON, capped at 60,000 characters; errors become `IsError` results with `code: message` and release checks.
+  - `files.go`: `localPath` (absolute path → `EvalSymlinks` → must lie under an `--allow-dir` root) and inline base64 uploads limited to 10 MiB.
+  - `tools.go`: identity (1), studio (32), customers (28) and account (7) tools, with read-only and destructive annotations.
+- `cmd/francois/cmds/mcp.go`: `francois mcp` checks the token with `GET /api/me`, filters by its scopes, and runs `embeddable.NewBackend(cfg).Start` with stdio. Flags: `--toolsets`, `--read-only`, `--allow-dir`, `--list-tools`, plus the connection flags.
+- `pkg/doc/topics/02-catalog-mcp.md`: Claude Code setup (`claude mcp add francois -- francois mcp --server … --token-file … --allow-dir …`), scopes, read-only mode and file rules.
+- `pkg/catalog/mcp_test.go` (`TestMCPTools`):
+  - tool filtering for studio, read-only `admin:read` and account settings;
+  - a go-sdk client over streamable HTTP: the tool list, the grant tool's schema and annotations, `find_customers`, `grant_complimentary_access` (audited with the token), a bad plan returned as a tool error;
+  - `push_release` from an allowed file;
+  - attachments refused both from outside the allowed directory and through a symlink pointing outside;
+  - a creator's `create_creator` refused by the API.
+
+### Why
+
+- The adapter keeps tools typed even though go-go-mcp handlers take `map[string]any` (decision in guide §6.7).
+
+### What worked
+
+- `francois mcp --list-tools`: 68 tools for the admin token. With `--toolsets customers --read-only`: whoami plus 12 read tools.
+- Real stdio session against the local stack: `initialize` → `{name: francois}`; `tools/list` → 68 tools; the grant tool's schema has `required: [userId, days, reason]` and annotations `destructiveHint false, readOnlyHint false`. `find_customers {query: alice}` → 1 customer; the grant → `Granted subscriber until 2026-10-19`; a bad plan → `isError=True invalid_request: Unknown plan`.
+- `make ci-check` → `0 issues.`, every package `ok`; `CGO_ENABLED=0 go build ./cmd/francois` passes; `go list -deps ./cmd/francois` contains no `go-sqlite3`, `fosite` or `go-go-mcp/pkg/auth/oidc`. This confirms the point of GO-GO-MCP-EMBEDDABLE-AUTH.
+
+### What didn't work
+
+- Lint: `pkg/catalog/mcpserver/files.go:28:2: variable real has same name as predeclared identifier (predeclared)` (three times, plus one in `tools.go`). Renamed to `resolved`.
+
+### What I learned
+
+- go-go-mcp's `WithSchema` silently replaces anything that is neither a map nor a JSON string with an empty object schema (`ensureObjectSchema`). Passing `*jsonschema.Schema` directly would have produced tools with no parameters. The adapter converts schemas to maps.
+- Structured content must be a JSON object, so list results are wrapped as `{items: [...]}`.
+
+### What was tricky to build
+
+- One catalogue serving both modes. Local mode filters tools by scope before registering them. Remote mode, with one server for all callers, keeps every tool and attaches per-tool scope policies; `guard` checks again on every call.
+
+### What warrants a second pair of eyes
+
+- 68 tools is a lot of model context. The help page recommends toolsets and `--read-only`.
+- `revoke_customer_sessions`, `set_customer_disabled` and similar tools rely on the MCP client asking the human because of `destructiveHint`.
+
+### What should be done in the future
+
+- Phase 6: remote `/mcp`.
+
+### Code review instructions
+
+- `pkg/catalog/mcpserver/typed.go`, `files.go`, then skim `tools.go`; `francois mcp --list-tools`; `francois help catalog-mcp`; `TestMCPTools`.
+
+### Technical details
+
+- Claude Code: `claude mcp add francois -- francois mcp --server https://slop.boutique --token-file ~/.config/francois/agent-token --allow-dir ~/code/my-artifacts`.
