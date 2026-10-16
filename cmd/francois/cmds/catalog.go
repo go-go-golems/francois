@@ -72,6 +72,7 @@ type CatalogServeSettings struct {
 	LegalContact       string   `glazed:"legal-contact"`
 	TrustProxyHeaders  bool     `glazed:"trust-proxy-headers"`
 	FontDir            string   `glazed:"font-dir"`
+	MCP                bool     `glazed:"mcp"`
 	ReleaseDir         string   `glazed:"release-dir"`
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
@@ -159,7 +160,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -473,6 +474,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
 			fields.New("legal-contact", fields.TypeString, fields.WithHelp("Contact address shown on /privacy and /terms")),
 			fields.New("trust-proxy-headers", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Take visitor addresses from X-Real-Ip/X-Forwarded-For (only behind a trusted ingress); used for demo rate limits")),
+			fields.New("mcp", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Serve MCP tools at /mcp for remote agents with a personal API token")),
 			fields.New("font-dir", fields.TypeString, fields.WithHelp("Private directory of licensed WOFF2 web fonts (ABC Areal); never commit these files")),
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),

@@ -846,3 +846,65 @@ Every API operation now has a command under `francois catalog`, built on one gen
 ### Technical details
 
 - Claude Code: `claude mcp add francois -- francois mcp --server https://slop.boutique --token-file ~/.config/francois/agent-token --allow-dir ~/code/my-artifacts`.
+
+## Step 13: Phase 6: remote `/mcp` inside `catalog serve`
+
+With `catalog serve --mcp`, every portal serves the same tools at `/mcp` (streamable HTTP, stateless), authenticated by personal API tokens. Each tool call replays the caller's token through an in-process API client into `Server.Handler()`, so the API's checks and audit attribution are the ones every other caller gets. It is opt-in: production does not set the flag yet.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 9.
+
+**Assistant interpretation:** Phase 6 of the guide, then push everything to PR #6.
+
+**Inferred user intent:** Remote agents can operate the shop without a local process.
+
+### What I did
+
+- `pkg/catalog/mcp.go`:
+  - `mountMCP` builds the go-go-mcp config (streamable HTTP, `WithHTTPAuthVerifier(tokenVerifier)`, the remote-mode tool catalogue with per-tool scope policies) and calls `embeddable.MountHTTPHandlers` on the portal mux;
+  - `mcpClient(ctx)` reads the verified principal (`embeddable.GetAuthPrincipal`) and the site from the request context, and returns `client.New(site origin, token, client.WithHandler(s.Handler()))`;
+  - `tokenVerifier`: `Store.ResolveToken`; scopes are expanded so `admin:write` also carries `admin:read`, because go-go-mcp compares scope names literally; expiration is the token's, or one minute for non-expiring tokens; the raw token is kept in `Claims` (process memory only) for replay.
+- `Config.MCP`; `routes()` mounts it before the `/api/` catch-all; the `catalog serve --mcp` flag; the local compose `catalog-serve` script passes `--mcp`.
+- `setup(t, opts ...func(*Config))` in the tests. `TestRemoteMCP` covers: an anonymous `POST /mcp` → 401 with a `resource_metadata` challenge; the admin token's `whoami` and a grant, audited with that token's ID; `push_release` with `htmlPath` refused ("not accepted by the remote server"), inline `html` accepted; a studio token refused on `find_customers` but allowed `list_artifacts`.
+- Docs: a remote section in `francois help catalog-mcp` (`claude mcp add --transport http … --header "Authorization: Bearer …"`), and a note in `doc/production.md`.
+
+### Why
+
+- Calling the API in-process instead of the store keeps one authorization path for browser, CLI, local MCP and remote MCP.
+
+### What worked
+
+- `TestRemoteMCP` passes; `make ci-check` → `0 issues.`, every package `ok`; `CGO_ENABLED=0` build passes.
+- Local stack rebuilt with `--mcp`: a curl `initialize` → `"serverInfo":{"name":"francois","version":"1.0.0"}`; `tools/call list_plans` → `"3 plans."`; an anonymous POST → 401.
+
+### What didn't work
+
+- The first `TestRemoteMCP` run: `calling "initialize": sending "initialize": Forbidden`. Cause: go-sdk's DNS-rebinding protection (`streamable.go:326-331`) rejects requests whose connection arrived on a loopback address but whose `Host` is not localhost. `httptest` listens on 127.0.0.1 and the test sends `Host: portal.test`. Production does not meet this condition, because Traefik connects to the pod's IP. The test now serves through a wrapper that sets `http.LocalAddrContextKey` to a pod address (10.42.0.7:8080), which models the ingress.
+
+### What I learned
+
+- Running `catalog serve` on loopback behind a same-host reverse proxy with a public `Host` would trip the same protection. This is worth remembering for non-k3s deployments; the local compose stack is unaffected because browsers send `Host: localhost`.
+
+### What was tricky to build
+
+- The remote server is one go-go-mcp server for all callers, so tool filtering cannot depend on the caller. Scope enforcement happens per call, in go-go-mcp's tool policy and then in `guard`.
+
+### What warrants a second pair of eyes
+
+- `client.WithHandler` buffers each in-process response (`httptest.ResponseRecorder`); remote downloads are not offered as tools, so responses stay JSON-sized.
+- The raw token travels in `AuthPrincipal.Claims` inside the process; go-go-mcp's logging redacts tool arguments but not principals. Check that nothing logs the principal's claims.
+
+### What should be done in the future
+
+- Enabling `--mcp` in production is a k3s change (deployment args) for the owner to approve.
+- OAuth for claude.ai connectors (separate ticket): `external_oidc` with `TokenValidation: auto` against ZITADEL.
+- The k3s README still documents `catalog users promote` (now `catalog db users promote`).
+
+### Code review instructions
+
+- `pkg/catalog/mcp.go`, then `TestRemoteMCP` in `pkg/catalog/mcp_test.go`.
+
+### Technical details
+
+- Claude Code (remote): `claude mcp add --transport http francois https://slop.boutique/mcp --header "Authorization: Bearer frt_…"`.

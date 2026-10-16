@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -150,3 +151,87 @@ func TestMCPTools(t *testing.T) {
 }
 
 func auditFilter(action string) store.AuditFilter { return store.AuditFilter{Action: action, Limit: 5} }
+
+// bearerTransport sends every request to the portal host with a token.
+type bearerTransport struct{ token string }
+
+func (b bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Host = "portal.test"
+	if b.token != "" {
+		r.Header.Set("Authorization", "Bearer "+b.token)
+	}
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+// remoteMCP connects to /mcp the way production traffic arrives: through an
+// ingress that reaches the pod on a non-loopback address with the public
+// Host. (go-sdk rejects a non-localhost Host on a loopback listener as DNS
+// rebinding; httptest listens on loopback.)
+func (e *env) remoteMCP(token string) (*mcp.ClientSession, error) {
+	podAddr := &net.TCPAddr{IP: net.ParseIP("10.42.0.7"), Port: 8080}
+	ingress := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		e.srv.Handler().ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, podAddr)))
+	}))
+	e.t.Cleanup(ingress.Close)
+	return mcp.NewClient(&mcp.Implementation{Name: "remote", Version: "1"}, nil).Connect(context.Background(),
+		&mcp.StreamableClientTransport{Endpoint: ingress.URL + "/mcp", HTTPClient: &http.Client{Transport: bearerTransport{token}}, MaxRetries: -1}, nil)
+}
+
+// TestRemoteMCP checks /mcp inside catalog serve: personal tokens
+// authenticate, tool calls go through the API in-process, scopes apply and
+// file paths are refused.
+func TestRemoteMCP(t *testing.T) {
+	e := setup(t, func(c *Config) { c.MCP = true })
+	ctx := context.Background()
+	ada := e.user("ada", "admin", false)
+	sam := e.user("sam", "subscriber", true)
+	cleo := e.user("cleo", "creator", false)
+	adminSecret, adminToken := e.mint(&ada, 30, "studio", "admin:write")
+	cleoSecret, _ := e.mint(&cleo, 0, "studio")
+
+	if _, err := e.remoteMCP(""); err == nil {
+		t.Fatal("connected without a token")
+	}
+	code, _, h := e.do(nil, "portal.test", "POST", "/mcp", strings.NewReader(`{}`), nil)
+	if code != 401 || !strings.Contains(h.Get("WWW-Authenticate"), "resource_metadata") {
+		t.Fatalf("anonymous /mcp: %d %q", code, h.Get("WWW-Authenticate"))
+	}
+
+	s, err := e.remoteMCP(adminSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if text, isErr := callTool(t, s, "whoami", nil); isErr || !strings.Contains(text, "admin") {
+		t.Fatalf("whoami %v %s", isErr, text)
+	}
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 7, "reason": "remote", "plan": "pro"}); isErr {
+		t.Fatalf("grant %s", text)
+	}
+	entries, _ := e.store.AuditQuery(ctx, auditFilter("user.access_grant"))
+	if len(entries) == 0 || entries[0].TokenID == nil || *entries[0].TokenID != adminToken {
+		t.Fatalf("remote grant not attributed to the token: %+v", entries)
+	}
+	// Remote servers take content inline, never local paths.
+	if text, isErr := callTool(t, s, "push_release", map[string]any{"artifactId": "loom", "version": "1.0.0", "htmlPath": "/etc/passwd"}); !isErr || !strings.Contains(text, "not accepted by the remote server") {
+		t.Fatalf("remote path %v %s", isErr, text)
+	}
+	if text, isErr := callTool(t, s, "push_release", map[string]any{"artifactId": "loom", "version": "1.0.0", "html": testHTML, "title": "Loom"}); isErr || !strings.Contains(text, "draft") {
+		t.Fatalf("remote inline push %v %s", isErr, text)
+	}
+
+	// A studio token cannot use customer tools.
+	cs, err := e.remoteMCP(cleoSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cs.Close() }()
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "find_customers", Arguments: map[string]any{"query": "sam"}})
+	if err == nil && !res.IsError {
+		t.Fatalf("studio token used a customer tool: %+v", res)
+	}
+	if text, isErr := callTool(t, cs, "list_artifacts", nil); isErr || !strings.Contains(text, "artifacts") {
+		t.Fatalf("studio tool %v %s", isErr, text)
+	}
+}

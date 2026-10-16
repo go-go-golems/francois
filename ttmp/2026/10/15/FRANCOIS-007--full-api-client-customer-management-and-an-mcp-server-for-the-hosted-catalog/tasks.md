@@ -8,4 +8,4 @@
 - [x] Phase 3: pkg/catalog/client replacing studioclient, with contract tests <!-- t:zjah -->
 - [x] Phase 4: francois catalog command tree, catalog db move, help pages <!-- t:a9dg -->
 - [x] Phase 5: francois mcp (stdio) with toolsets, read-only mode and allow-dirs <!-- t:oesc -->
-- [ ] Phase 6: remote /mcp in catalog serve <!-- t:cbmy -->
+- [x] Phase 6: remote /mcp in catalog serve <!-- t:cbmy -->

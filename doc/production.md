@@ -403,6 +403,11 @@ francois catalog audit list --actor usr_… --limit 20
 Commands that change or remove data ask for confirmation on a terminal and
 need `--yes` in scripts.
 
+`francois mcp` offers the same operations to a local agent such as Claude Code
+(`francois help catalog-mcp`). `catalog serve --mcp` also serves them at
+`/mcp` for remote agents with a personal token; production does not enable it
+yet.
+
 ### 5.3 Publish a release of an artifact
 
 Creators publish their own artifacts; administrators publish any. In the

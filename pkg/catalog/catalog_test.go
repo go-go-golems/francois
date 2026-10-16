@@ -77,7 +77,7 @@ type tactor struct {
 	csrf  string
 }
 
-func setup(t *testing.T) *env {
+func setup(t *testing.T, opts ...func(*Config)) *env {
 	s := testDB(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	blobs, err := releases.OpenBlobs(t.TempDir())
@@ -92,6 +92,9 @@ func setup(t *testing.T) *env {
 		{PublicURL: public, AppDomain: "apps.test", OIDC: identity.New(identity.Config{})},
 		{PublicURL: boutique, AppDomain: "boutique.test", OIDC: identity.New(identity.Config{})},
 	}}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	if err = cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}

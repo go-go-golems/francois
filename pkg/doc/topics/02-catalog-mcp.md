@@ -56,3 +56,21 @@ Upload tools (`push_release`, `add_attachment`, `upload_media`) read local
 files only under `--allow-dir` (default: the directory the server was started
 in), after following symlinks. They also accept inline content
 (`html`, `contentBase64` with `filename`).
+
+## Remote MCP (`catalog serve --mcp`)
+
+With `--mcp`, the server itself offers the same tools at `https://<portal>/mcp`
+(streamable HTTP, stateless). Agents authenticate with a personal API token in
+the `Authorization: Bearer` header; for Claude Code:
+
+```bash
+claude mcp add --transport http francois https://slop.boutique/mcp \
+  --header "Authorization: Bearer frt_…"
+```
+
+Each tool call is replayed through the API in-process with the caller's
+token, so permission checks and the audit log behave as for any API call.
+Every tool is listed, and the token's scopes are enforced when a tool is
+called. Remote tools take uploads inline (`html`, `contentBase64`); local
+paths are refused. Claude.ai connectors need OAuth sign-in instead of a
+pasted token; that is not supported yet.

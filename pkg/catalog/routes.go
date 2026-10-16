@@ -91,6 +91,11 @@ func (s *Server) routes() http.Handler {
 	s.adminRoutes(m)
 	s.studioRoutes(m)
 	s.tokenRoutes(m)
+	if s.Config.MCP {
+		if err := s.mountMCP(m); err != nil {
+			log.Error().Err(err).Msg("mount /mcp")
+		}
+	}
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { httpx.Fail(w, 404, "not_found", "Unknown API route") })
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

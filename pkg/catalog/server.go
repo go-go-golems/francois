@@ -94,6 +94,9 @@ type Config struct {
 	// FontDir is a private directory of licensed WOFF2 web fonts (see
 	// fonts.go); empty serves none.
 	FontDir string
+	// MCP serves the MCP tools at /mcp on every portal for remote agents
+	// holding a personal API token.
+	MCP bool
 }
 
 // Validate rejects site lists the host dispatcher cannot route

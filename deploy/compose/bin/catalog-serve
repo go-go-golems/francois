@@ -15,7 +15,8 @@ fi
 args=(catalog serve --listen 127.0.0.1:8090 --public-url "$PUBLIC_URL" --app-domain "$APP_DOMAIN" --signup-allowed
   --database-url "$DATABASE_URL" --release-dir /var/lib/francois/releases --worker-dir /var/lib/francois/worker
   --oidc-issuer "$ISSUER" --oidc-client-id-file /bootstrap/oidc-client-id
-  --backend "$BACKEND" --grant-ttl "${GRANT_TTL:-30m}" --pi-agent-dir "$PI_DIR" --worker /app/worker/dist/main.js)
+  --backend "$BACKEND" --grant-ttl "${GRANT_TTL:-30m}" --pi-agent-dir "$PI_DIR" --worker /app/worker/dist/main.js
+  --mcp)
 if compgen -G "/etc/francois/fonts/*.woff2" >/dev/null; then
   args+=(--font-dir /etc/francois/fonts)
 fi
