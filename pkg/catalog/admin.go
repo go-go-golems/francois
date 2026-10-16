@@ -29,6 +29,11 @@ func (s *Server) adminRoutes(m *http.ServeMux) {
 	m.HandleFunc("DELETE /api/admin/tokens/{id}", a(s.adminRevokeToken))
 	m.HandleFunc("POST /api/admin/users/{id}/access-grants", a(s.adminGrant))
 	m.HandleFunc("DELETE /api/admin/users/{id}/access-grants", a(s.adminRevokeGrants))
+	m.HandleFunc("DELETE /api/admin/access-grants/{id}", a(s.adminRevokeGrant))
+	m.HandleFunc("GET /api/admin/subscriptions", a(s.adminSubscriptions))
+	m.HandleFunc("POST /api/admin/subscriptions/{id}/cancel", a(s.adminSubscriptionCancel(true)))
+	m.HandleFunc("POST /api/admin/subscriptions/{id}/resume", a(s.adminSubscriptionCancel(false)))
+	m.HandleFunc("DELETE /api/admin/instances/{id}", a(s.adminDeleteInstance))
 	m.HandleFunc("GET /api/admin/instances", a(s.adminInstances))
 	m.HandleFunc("GET /api/admin/instances/{id}", a(s.adminInstance))
 	m.HandleFunc("POST /api/admin/instances/{id}/suspend", a(s.adminInstanceState("suspended")))
@@ -114,8 +119,15 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) (releases.Upload
 	return u, nil
 }
 
+// adminUsers searches customers: q matches email, name, ID or subject; role
+// and plan (key) narrow the result; limit is at most 500.
 func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.Store.Users(r.Context(), r.URL.Query().Get("q"), 200)
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	users, err := s.Store.Users(r.Context(), q.Get("q"), limit)
 	if err != nil {
 		unavailable(w, err)
 		return
@@ -132,7 +144,10 @@ func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request) {
 			unavailable(w, err)
 			return
 		}
-		out = append(out, map[string]any{"user": u, "access": e.Decision, "plan": e.Plan.Name, "source": e.Source})
+		if (q.Get("role") != "" && u.Role != q.Get("role")) || (q.Get("plan") != "" && e.Plan.Key != q.Get("plan")) {
+			continue
+		}
+		out = append(out, map[string]any{"user": u, "access": e.Decision, "plan": e.Plan.Name, "planKey": e.Plan.Key, "source": e.Source})
 	}
 	httpx.OK(w, out)
 }
@@ -314,6 +329,100 @@ func (s *Server) adminRevokeGrants(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, map[string]bool{"ok": true})
 }
 
+// adminRevokeGrant revokes one complimentary grant and, when the customer is
+// no longer paid, ends their live views.
+func (s *Server) adminRevokeGrant(w http.ResponseWriter, r *http.Request) {
+	g, err := s.Store.RevokeAccessGrant(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		httpx.Fail(w, 404, "not_found", "No live grant with this ID")
+		return
+	}
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	_ = s.Store.Audit(r.Context(), actor(r), "user.access_revoke", g.UserID, map[string]any{"grant": g.ID, "plan": g.Plan})
+	if u, err := s.Store.User(r.Context(), g.UserID); err == nil {
+		if e, _, err := s.entitlement(r.Context(), u); err == nil && !e.Paid() {
+			s.Runtime.RevokeUser(g.UserID)
+		}
+	}
+	httpx.OK(w, g)
+}
+
+// adminSubscriptions lists subscription projections across customers.
+func (s *Server) adminSubscriptions(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	list, err := s.Store.AllSubscriptions(r.Context(), r.URL.Query().Get("status"), limit)
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	out := []map[string]any{}
+	for _, sub := range list {
+		plan := ""
+		if p, ok := rev.Document.PlanForPrice(sub.PriceID); ok {
+			plan = p.Key
+		}
+		out = append(out, map[string]any{"subscription": sub.Subscription, "userId": sub.UserID, "email": sub.Email, "plan": plan})
+	}
+	httpx.OK(w, out)
+}
+
+// adminSubscriptionCancel schedules or withdraws the end of a subscription at
+// its period end. Refunds, immediate cancellation and price changes stay in
+// the Stripe dashboard.
+func (s *Server) adminSubscriptionCancel(cancel bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.Payments == nil {
+			httpx.Fail(w, 503, "billing_unavailable", "Billing is not configured")
+			return
+		}
+		id := r.PathValue("id")
+		err := s.Payments.SetCancelAtPeriodEnd(r.Context(), id, cancel)
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Fail(w, 404, "not_found", "Subscription not found")
+			return
+		}
+		if err != nil {
+			log.Error().Err(err).Str("subscription", id).Msg("set cancel_at_period_end")
+			httpx.Fail(w, 502, "billing_unavailable", "Stripe did not accept the change")
+			return
+		}
+		action := "billing.cancel_at_period_end"
+		if !cancel {
+			action = "billing.resume"
+		}
+		_ = s.Store.Audit(r.Context(), actor(r), action, id, nil)
+		httpx.OK(w, map[string]any{"queued": true, "cancelAtPeriodEnd": cancel})
+	}
+}
+
+// adminDeleteInstance deletes any instance and its data, ending its views.
+func (s *Server) adminDeleteInstance(w http.ResponseWriter, r *http.Request) {
+	inst, err := s.Store.Instance(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		httpx.Fail(w, 404, "not_found", "Instance not found")
+		return
+	}
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	s.Runtime.RevokeInstance(inst.ID)
+	if err = s.Store.DeleteInstance(r.Context(), inst.ID); err != nil {
+		unavailable(w, err)
+		return
+	}
+	_ = s.Store.Audit(r.Context(), actor(r), "instance.delete", inst.ID, map[string]any{"owner": inst.OwnerUserID, "kind": inst.Kind, "title": inst.Title})
+	httpx.OK(w, map[string]bool{"deleted": true})
+}
+
 func (s *Server) adminInstances(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Store.AllInstances(r.Context(), r.URL.Query().Get("q"), 300)
 	if err != nil {
@@ -387,10 +496,28 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	// Secret configuration is reported as configured/not configured only.
 	secrets := map[string]bool{"oidc": s.site(r).OIDC.Configured(), "stripe": s.Payments != nil, "modelProvider": len(s.Backend.Models()) > 0}
+	w.Header().Set("ETag", strconv.Quote(strconv.FormatInt(rev.Revision, 10)))
 	httpx.OK(w, map[string]any{"active": rev, "history": history, "providerModels": models, "secrets": secrets, "defaults": settings.Defaults()})
 }
 
+// adminSaveSettings replaces the settings document. If-Match must name the
+// revision the edit started from (the ETag of GET /api/admin/settings), so a
+// save cannot silently undo one made in between.
 func (s *Server) adminSaveSettings(w http.ResponseWriter, r *http.Request) {
+	match := r.Header.Get("If-Match")
+	if match == "" {
+		httpx.Fail(w, 428, "revision_required", "Send If-Match with the settings revision you edited")
+		return
+	}
+	unq, err := strconv.Unquote(match)
+	if err != nil {
+		unq = match
+	}
+	base, err := strconv.ParseInt(unq, 10, 64)
+	if err != nil || base < 0 {
+		httpx.Fail(w, 400, "invalid_request", "If-Match must be a settings revision")
+		return
+	}
 	var raw json.RawMessage
 	if err := httpx.Read(w, r, &raw, 64<<10); err != nil {
 		httpx.Fail(w, 400, "invalid_request", err.Error())
@@ -401,11 +528,16 @@ func (s *Server) adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 422, "invalid_settings", err.Error())
 		return
 	}
-	rev, err := s.Store.SaveSettings(r.Context(), actor(r), doc)
+	rev, err := s.Store.SaveSettingsIf(r.Context(), actor(r), base, doc)
+	if errors.Is(err, store.ErrConflict) {
+		httpx.Fail(w, 412, "settings_conflict", "Settings changed since you loaded them; reload and apply your change again")
+		return
+	}
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
+	w.Header().Set("ETag", strconv.Quote(strconv.FormatInt(rev.Revision, 10)))
 	httpx.OK(w, rev)
 }
 
@@ -509,7 +641,13 @@ func (s *Server) adminAdjust(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminAudit(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.AuditLog(r.Context(), r.URL.Query().Get("subject"), 200)
+	q := r.URL.Query()
+	before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 {
+		limit = 200
+	}
+	list, err := s.Store.AuditQuery(r.Context(), store.AuditFilter{Subject: q.Get("subject"), Actor: q.Get("actor"), Action: q.Get("action"), Before: before, Limit: limit})
 	if err != nil {
 		unavailable(w, err)
 		return

@@ -143,10 +143,24 @@ type AuditEntry struct {
 }
 
 func (s *Store) AuditLog(ctx context.Context, subject string, limit int) ([]AuditEntry, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+	return s.AuditQuery(ctx, AuditFilter{Subject: subject, Limit: limit})
+}
+
+// AuditFilter selects audit entries; empty fields match everything. Before
+// pages backwards: entries with an ID below it.
+type AuditFilter struct {
+	Subject, Actor, Action string
+	Before                 int64
+	Limit                  int
+}
+
+func (s *Store) AuditQuery(ctx context.Context, f AuditFilter) ([]AuditEntry, error) {
+	if f.Limit <= 0 || f.Limit > 500 {
+		f.Limit = 100
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT id,actor_id,token_id,action,subject,summary,created_at FROM admin_audit WHERE $1='' OR subject=$1 ORDER BY id DESC LIMIT $2`, subject, limit)
+	rows, err := s.Pool.Query(ctx, `SELECT id,actor_id,token_id,action,subject,summary,created_at FROM admin_audit
+WHERE ($1='' OR subject=$1) AND ($2='' OR actor_id=$2) AND ($3='' OR action=$3) AND ($4=0 OR id<$4)
+ORDER BY id DESC LIMIT $5`, f.Subject, f.Actor, f.Action, f.Before, f.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +189,14 @@ func (s *Store) GrantAccess(ctx context.Context, user, actor string, until time.
 	g := AccessGrant{ID: NewID("agr_"), UserID: user, Until: until.UTC(), Reason: reason, GrantedBy: actor, Plan: plan}
 	err := s.Pool.QueryRow(ctx, `INSERT INTO access_grants(id,user_id,until,reason,granted_by,plan) VALUES($1,$2,$3,$4,$5,$6) RETURNING created_at`, g.ID, user, g.Until, reason, actor, plan).Scan(&g.CreatedAt)
 	return g, err
+}
+
+// RevokeAccessGrant revokes one live grant and returns it.
+func (s *Store) RevokeAccessGrant(ctx context.Context, id string) (AccessGrant, error) {
+	var g AccessGrant
+	err := s.Pool.QueryRow(ctx, `UPDATE access_grants SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL
+RETURNING id,user_id,until,reason,granted_by,created_at,revoked_at,plan`, id).Scan(&g.ID, &g.UserID, &g.Until, &g.Reason, &g.GrantedBy, &g.CreatedAt, &g.RevokedAt, &g.Plan)
+	return g, notFound(err)
 }
 
 func (s *Store) RevokeAccessGrants(ctx context.Context, user string) error {

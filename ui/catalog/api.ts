@@ -369,8 +369,10 @@ export const api = createApi({
       query: () => "api/admin/settings",
       providesTags: ["Settings"],
     }),
-    saveSettings: b.mutation<SettingsRevision, SettingsDoc>({
-      query: (body) => ({ url: "api/admin/settings", method: "PATCH", body }),
+    // If-Match names the revision the edit started from; the server answers
+    // 412 settings_conflict when another revision was activated in between.
+    saveSettings: b.mutation<SettingsRevision, { doc: SettingsDoc; revision: number }>({
+      query: ({ doc, revision }) => ({ url: "api/admin/settings", method: "PATCH", body: doc, headers: { "If-Match": `"${revision}"` } }),
       invalidatesTags: ["Settings", "Account"],
     }),
     billing: b.query<any, string>({ query: (state) => `api/admin/billing?state=${state}`, providesTags: ["Billing"] }),

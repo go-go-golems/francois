@@ -32,8 +32,17 @@ func (s *Store) ActiveSettings(ctx context.Context) (SettingsRevision, error) {
 	return r, err
 }
 
-// SaveSettings validates and activates a new revision with an audit record.
+// SaveSettings validates and activates a new revision with an audit record,
+// whatever the current revision is (operators and tests).
 func (s *Store) SaveSettings(ctx context.Context, actor string, d settings.Document) (SettingsRevision, error) {
+	return s.SaveSettingsIf(ctx, actor, -1, d)
+}
+
+// SaveSettingsIf activates d only if base is still the newest revision, so a
+// read-modify-write cannot undo a concurrent save; it returns ErrConflict
+// otherwise. Revision 0 means "only defaults so far"; a negative base skips
+// the check.
+func (s *Store) SaveSettingsIf(ctx context.Context, actor string, base int64, d settings.Document) (SettingsRevision, error) {
 	if err := d.Validate(); err != nil {
 		return SettingsRevision{}, err
 	}
@@ -46,6 +55,18 @@ func (s *Store) SaveSettings(ctx context.Context, actor string, d settings.Docum
 		return SettingsRevision{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('platform_settings'))`); err != nil {
+		return SettingsRevision{}, err
+	}
+	if base >= 0 {
+		var current int64
+		if err = tx.QueryRow(ctx, `SELECT COALESCE(max(revision),0) FROM platform_settings`).Scan(&current); err != nil {
+			return SettingsRevision{}, err
+		}
+		if current != base {
+			return SettingsRevision{}, ErrConflict
+		}
+	}
 	r := SettingsRevision{Document: d}
 	var a any
 	if actor != "" {

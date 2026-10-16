@@ -573,7 +573,7 @@ function Settings() {
     setError("");
     try {
       const body = raw ? JSON.parse(rawText) : doc;
-      const rev = await save(body).unwrap();
+      const rev = await save({ doc: body, revision: data.active.revision }).unwrap();
       dispatch(show({ text: `Settings revision ${rev.revision} is active.` }));
     } catch (e) {
       setError(e instanceof SyntaxError ? "Settings JSON is invalid: " + e.message : errorMessage(e));

@@ -555,3 +555,83 @@ Token management moved from the studio to the account page, so that subscribers,
 ### Technical details
 
 - Local stack: `deploy/compose/compose.yaml`; francois on `:8090`, its Postgres on `127.0.0.1:5435`; tests use `127.0.0.1:5434`.
+
+## Step 9: Phase 2: customer-management endpoints
+
+Phase 2 fills the customer-management gaps from the guide's gap table (G6–G11):
+- revoke a single complimentary grant;
+- list subscriptions across customers;
+- schedule or withdraw a cancellation at period end;
+- delete an instance as an administrator;
+- edit settings without losing a concurrent edit;
+- filter the audit log and the user list.
+
+Everything went in as one commit, as the owner asked for less granular steps.
+
+### Prompt Context
+
+**User prompt (verbatim):** "do 2-6, and then push to th ePR. No need to make it so grnaular. commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+
+**Assistant interpretation:** Implement phases 2–6 on `feat/francois-007-scoped-tokens`, commit per phase or so, keep this diary, push to PR #6.
+
+**Inferred user intent:** Reach a working client, CLI and MCP server in one reviewable PR.
+
+### What I did
+
+- Store:
+  - `SaveSettingsIf(ctx, actor, base, doc)` takes `pg_advisory_xact_lock(hashtext('platform_settings'))` and returns `ErrConflict` unless `base` is the newest revision. A negative `base` skips the check, which is what `SaveSettings` uses for the CLI and tests. Revision 0 means "only defaults so far" and is checked.
+  - `AuditQuery(AuditFilter{Subject, Actor, Action, Before, Limit})`, with `AuditLog` kept as its subject-only form.
+  - `RevokeAccessGrant(id)`.
+  - `SubscriptionRow`, `AllSubscriptions(status, limit)` and `SubscriptionByID`.
+- Payments: `Gateway.SetCancelAtPeriodEnd` (Stripe `V1Subscriptions.Update` with `CancelAtPeriodEnd`) and `Service.SetCancelAtPeriodEnd`, which looks up the projection, calls Stripe, then `EnqueueRefresh` + `Wake`. The projection only changes through the normal event path.
+- Admin API:
+  - `DELETE /api/admin/access-grants/{id}` revokes views when the customer is no longer paid;
+  - `GET /api/admin/subscriptions?status=&limit=` returns rows with `userId`, `email` and the plan key;
+  - `POST /api/admin/subscriptions/{id}/cancel|resume` gives 503 without billing, 502 when Stripe refuses, and is audited `billing.cancel_at_period_end` / `billing.resume`;
+  - `DELETE /api/admin/instances/{id}` is audited `instance.delete`;
+  - settings `GET` returns `ETag: "<revision>"`; `PATCH` needs `If-Match` (428 `revision_required`, 412 `settings_conflict`);
+  - `GET /api/admin/audit?subject=&actor=&action=&before=&limit=`;
+  - `GET /api/admin/users?q=&role=&plan=&limit=`, with rows gaining `planKey`.
+- UI: `saveSettings` takes `{doc, revision}` and sends `If-Match`; the admin settings page passes `data.active.revision`.
+- Tests:
+  - `payments.TestSetCancelAtPeriodEnd` uses the fake gateway: cancel and resume each change the projection after a refresh, access continues until the period ends, and an unknown subscription gives `ErrNotFound`;
+  - `catalog.TestCustomerManagement` covers per-grant revoke, subscriptions, cancel without billing, filters, admin instance delete and the audit filters with paging;
+  - `catalog.TestSettingsIfMatch` covers 428, a save, a stale 412, and a save from the new revision.
+
+### Why
+
+- Cancel-at-period-end is the only Stripe write, per the guide's decision record: it is reversible and moves no money.
+- Optimistic concurrency closes the read-modify-write race that the planned `plans set` command would otherwise have.
+
+### What worked
+
+- `make ci-check` (with `TEST_DATABASE_URL`): `0 issues.`, every package `ok`; `pnpm check`, `pnpm build`, `pnpm test` (5/0).
+
+### What didn't work
+
+- First run of `TestCustomerManagement`: `admin_customers_test.go:64: plan filter 200 [... "planKey":"pro","source":"staff" ...]`. The test was wrong, not the code: staff resolve to the highest plan (`entitlement.go:46-47`), so `plan=pro` matches the admin and the creator too. The test now combines `plan=pro&role=subscriber`.
+- `make ci-check` failed at `fmt-check` (`make: *** [Makefile:29: fmt-check] Error 1`) on `service_test.go` and `admin_customers_test.go`; `gofmt -w` fixed both.
+
+### What I learned
+
+- The plan filter alone does not single out paying customers; combining it with the role does.
+
+### What was tricky to build
+
+- The meaning of revision 0. `0` cannot serve as "skip the check" because it is also the revision a fresh deployment reports (defaults, no rows). The sentinel is a negative base.
+
+### What warrants a second pair of eyes
+
+- `adminSubscriptionCancel` maps every Stripe error to 502 `billing_unavailable`, including "no such subscription" when Stripe and the projection disagree.
+
+### What should be done in the future
+
+- Phase 3: the client.
+
+### Code review instructions
+
+- `pkg/catalog/admin.go` (the new handlers), `pkg/catalog/store/settings.go` (`SaveSettingsIf`), `pkg/catalog/payments/service.go` (`SetCancelAtPeriodEnd`).
+
+### Technical details
+
+- New codes: 428 `revision_required`, 412 `settings_conflict`, 502 `billing_unavailable`.
