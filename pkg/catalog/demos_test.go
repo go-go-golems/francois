@@ -52,7 +52,7 @@ func TestDemos(t *testing.T) {
 	ctx := context.Background()
 	doc := testDoc(100, settings.Model{Selector: "test/fake", Label: "Fake", Credits: 1})
 	doc.Models.Tiers = map[string]string{"default": "test/fake"}
-	doc.Demo = settings.Demo{Enabled: true, TTLMinutes: 30, MaxActive: 3, PerAddressPerHour: 2, Credits: 2, DailyBudget: 3, Models: []string{}}
+	doc.Demo = settings.Demo{PerUserPerHour: 3, Enabled: true, TTLMinutes: 30, MaxActive: 3, PerAddressPerHour: 2, Credits: 2, DailyBudget: 3, Models: []string{}}
 	if _, err := e.store.SaveSettings(ctx, "", doc); err != nil {
 		t.Fatal(err)
 	}

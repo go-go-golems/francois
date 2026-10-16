@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
 	"github.com/go-go-golems/francois/pkg/catalog/releases"
+	"github.com/go-go-golems/francois/pkg/catalog/settings"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
@@ -169,6 +170,20 @@ func (rt *Runtime) principal(ctx context.Context, userID, instanceID string, gra
 func Denied(status int, code, msg string) error { return &denied{status, code, msg} }
 
 func failErr(w http.ResponseWriter, err error) {
+	var paused *store.StoragePaused
+	if errors.As(err, &paused) {
+		code := "storage_read_only"
+		if paused.Mode == "off" {
+			code = "storage_unavailable"
+		}
+		httpx.Fail(w, 503, code, paused.Message)
+		return
+	}
+	var ec *errCode
+	if errors.As(err, &ec) {
+		httpx.Fail(w, ec.status, ec.code, ec.msg)
+		return
+	}
 	var d *denied
 	if errors.As(err, &d) {
 		httpx.Fail(w, d.status, d.code, d.msg)
@@ -254,4 +269,22 @@ func (rt *Runtime) verifyBlob(instance, id, exp, sig string) bool {
 	m.Write([]byte(instance + "|" + id + "|" + exp))
 	want := hex.EncodeToString(m.Sum(nil))
 	return hmac.Equal([]byte(want), []byte(sig))
+}
+
+// storagePolicy is checked for every persistent operation, including signed blob reads.
+func storagePolicy(ops settings.Operations, write bool) error {
+	if ops.StorageMode == "off" {
+		return &errCode{503, "storage_unavailable", ops.Message("Saved work is temporarily unavailable.")}
+	}
+	if write && ops.StorageMode == "read-only" {
+		return &errCode{503, "storage_read_only", ops.Message("Saving is temporarily paused. Your existing work is still available.")}
+	}
+	return nil
+}
+func (rt *Runtime) checkStorage(ctx context.Context, write bool) error {
+	rev, err := rt.Store.ActiveSettings(ctx)
+	if err != nil {
+		return err
+	}
+	return storagePolicy(rev.Document.Operations, write)
 }

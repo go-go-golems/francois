@@ -33,12 +33,18 @@ func TestPlanValidation(t *testing.T) {
 		"repeated price": func(d *Document) {
 			d.Plans = append(d.Plans, Plan{Key: "x", Name: "X", Rank: 2, MembersPerInstance: 1, Prices: []PlanPrice{{Interval: "year", PriceID: "price_a"}}})
 		},
-		"unapproved model": func(d *Document) { d.Plans[1].Models = []string{"p/other"} },
-		"zero members":     func(d *Document) { d.Plans[1].MembersPerInstance = 0 },
-		"demo bad ttl":     func(d *Document) { d.Demo.TTLMinutes = 1 },
-		"demo unapproved":  func(d *Document) { d.Demo.Models = []string{"p/other"} },
-		"long storefront":  func(d *Document) { d.Storefront.Title = strings.Repeat("x", 81) },
-		"tiny media limit": func(d *Document) { d.Limits.MaxMediaBytes = 10 },
+		"unapproved model":     func(d *Document) { d.Plans[1].Models = []string{"p/other"} },
+		"zero members":         func(d *Document) { d.Plans[1].MembersPerInstance = 0 },
+		"demo bad ttl":         func(d *Document) { d.Demo.TTLMinutes = 1 },
+		"demo unapproved":      func(d *Document) { d.Demo.Models = []string{"p/other"} },
+		"long storefront":      func(d *Document) { d.Storefront.Title = strings.Repeat("x", 81) },
+		"too many lanes":       func(d *Document) { d.Allowance.GlobalConcurrency = 7 },
+		"multiple user calls":  func(d *Document) { d.Allowance.PerUserConcurrency = 2 },
+		"invalid storage mode": func(d *Document) { d.Operations.StorageMode = "maybe" },
+		"notice too long":      func(d *Document) { d.Operations.Notice = strings.Repeat("x", 501) },
+		"missing byte cap":     func(d *Document) { d.Limits.StorageBytesPerInstance = 0 },
+		"missing view cap":     func(d *Document) { d.Limits.ViewsPerUser = 0 },
+		"tiny media limit":     func(d *Document) { d.Limits.MaxMediaBytes = 10 },
 	}
 	for name, mutate := range cases {
 		d := base()

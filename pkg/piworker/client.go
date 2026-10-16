@@ -3,6 +3,7 @@ package piworker
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"os/exec"
@@ -141,40 +142,70 @@ func (c *Client) Close() error {
 }
 func (c *Client) Sample(ctx context.Context, r Request, emit func(Event), execute ExecuteTool) error {
 	ch := make(chan Event, 64)
+	wireID := rand.Text()
 	c.mu.Lock()
-	c.pending[r.CallID] = ch
+	c.pending[wireID] = ch
 	c.mu.Unlock()
-	defer func() { c.mu.Lock(); delete(c.pending, r.CallID); c.mu.Unlock() }()
+	defer func() { c.mu.Lock(); delete(c.pending, wireID); c.mu.Unlock() }()
 	wire := struct {
 		Type string `json:"type"`
 		Request
 	}{Type: "sample", Request: r}
+	wire.Request.CallID = wireID
 	if err := c.send(wire); err != nil {
 		return err
 	}
 	toolBase, stopTools := context.WithCancel(ctx)
 	tools, toolCtx := errgroup.WithContext(toolBase)
 	defer func() { stopTools(); _ = tools.Wait() }()
+	ctxDone := ctx.Done()
+	var cancelErr error
+	var cancelTimer *time.Timer
+	var cancelDeadline <-chan time.Time
+	defer func() {
+		if cancelTimer != nil {
+			cancelTimer.Stop()
+		}
+	}()
 	for {
 		select {
 		case e := <-ch:
+			if e.Type == "ended" {
+				return cancelErr
+			}
+			e.CallID = r.CallID
+			if cancelErr != nil {
+				if e.Type == "usage" {
+					emit(e)
+				}
+				continue
+			}
 			if e.Type == "tool" {
 				tools.Go(func() error {
 					res, err := execute(toolCtx, e)
 					if err != nil {
 						res = ToolResult{Value: json.RawMessage(`"Tool cancelled or unavailable"`), IsError: true}
 					}
-					return c.send(map[string]any{"type": "tool_result", "callId": r.CallID, "toolCallId": e.ToolCallID, "value": res.Value, "isError": res.IsError})
+					return c.send(map[string]any{"type": "tool_result", "callId": wireID, "toolCallId": e.ToolCallID, "value": res.Value, "isError": res.IsError})
 				})
 				continue
 			}
 			emit(e)
-			if e.Type == "result" || e.Type == "error" {
-				return nil
+		case <-ctxDone:
+			cancelErr = ctx.Err()
+			ctxDone = nil
+			stopTools()
+			if err := c.send(map[string]any{"type": "cancel", "callId": wireID}); err != nil {
+				return err
 			}
-		case <-ctx.Done():
-			_ = c.send(map[string]any{"type": "cancel", "callId": r.CallID})
-			return ctx.Err()
+			cancelTimer = time.NewTimer(5 * time.Second)
+			cancelDeadline = cancelTimer.C
+		case <-cancelDeadline:
+			// An unresponsive worker must stop before its admission slot is reused.
+			c.setError(errors.New("Pi worker did not acknowledge cancellation"))
+			c.cancel()
+			<-c.done
+			return cancelErr
 		case <-c.done:
 			return c.lastError()
 		}

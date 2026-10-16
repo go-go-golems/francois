@@ -103,6 +103,10 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		failErr(w, err)
 		return
 	}
+	if !rev.Document.Operations.SamplingEnabled {
+		httpx.Fail(w, 503, "sampling_paused", rev.Document.Operations.Message("AI is temporarily paused."))
+		return
+	}
 	availableModels := map[string]piworker.Model{}
 	for _, m := range rt.Backend.Models() {
 		availableModels[m.Provider+"/"+m.ID] = m
@@ -135,7 +139,7 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 	req.MaxRounds = rev.Document.Allowance.MaxToolRounds
 	a := rev.Document.Allowance
 	if !rt.admit(p.User.ID, a.PerUserConcurrency, a.GlobalConcurrency) {
-		httpx.Fail(w, 429, "rate_limited", "Too many model calls are running; try again shortly")
+		httpx.Fail(w, 429, "rate_limited", "All spots are busy. Please try again shortly.")
 		return
 	}
 	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, ArtifactID: inst.ArtifactID, CallID: req.CallID, Model: selector,
@@ -145,9 +149,9 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		rt.release(p.User.ID)
 		switch {
 		case errors.Is(err, store.ErrAllowance):
-			httpx.Fail(w, 402, "allowance_exhausted", "Your included model allowance for this period is used up")
+			httpx.Fail(w, 402, "allowance_exhausted", "You have reached the limit for this period. Please come back later.")
 		case errors.Is(err, store.ErrDaily):
-			httpx.Fail(w, 429, "daily_limit", "The daily model limit has been reached")
+			httpx.Fail(w, 429, "daily_limit", "You have reached today's limit. Please come back tomorrow.")
 		case errors.Is(err, store.ErrSharedBudget):
 			httpx.Fail(w, 429, "demo_limit", "Demos have used today's model budget; try again tomorrow")
 		default:

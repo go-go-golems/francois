@@ -116,7 +116,26 @@ func (s *Server) createDemo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 403, "account_disabled", "This account is disabled")
 		return
 	}
-	if !s.demoLimiter.allow(s.clientAddress(r), cfg.PerAddressPerHour, time.Hour, time.Now()) {
+	if p != nil {
+		inst, err := s.Store.LiveDemo(ctx, p.User.ID, a.ID)
+		if err == nil {
+			httpx.JSON(w, 201, map[string]any{"id": inst.ID, "expiresAt": inst.ExpiresAt})
+			return
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			httpx.Fail(w, 503, "unavailable", "Could not open the visit")
+			return
+		}
+	}
+	if !rev.Document.Operations.AcceptNewVisits {
+		httpx.Fail(w, 503, "visits_paused", rev.Document.Operations.Message("New visits are temporarily paused."))
+		return
+	}
+	if p != nil && !s.demoLimiter.allow("user:"+p.User.ID, cfg.PerUserPerHour, time.Hour, time.Now()) {
+		httpx.Fail(w, 429, "rate_limited", "Please come back a little later.")
+		return
+	}
+	if !s.demoLimiter.allow("address:"+s.clientAddress(r), cfg.PerAddressPerHour, time.Hour, time.Now()) {
 		httpx.Fail(w, 429, "rate_limited", "Too many demos from your network; try again later")
 		return
 	}

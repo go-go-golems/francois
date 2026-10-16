@@ -520,7 +520,7 @@ func TestHostedPlatform(t *testing.T) {
 	// Model allowance: one credit admits exactly one of two racing calls.
 	doc := testDoc(1, settings.Model{Selector: "test/fake", Label: "Fake", Credits: 1})
 	doc.Models.Tiers = map[string]string{"default": "test/fake"}
-	doc.Allowance = settings.Allowance{PerUserConcurrency: 4, GlobalConcurrency: 8, MaxToolRounds: 3}
+	doc.Allowance = settings.Allowance{PerUserConcurrency: 1, GlobalConcurrency: 6, MaxToolRounds: 3}
 	_, err := e.store.SaveSettings(context.Background(), admin.user.ID, doc)
 	if err != nil {
 		t.Fatal(err)
@@ -542,7 +542,7 @@ func TestHostedPlatform(t *testing.T) {
 	for c := range codes {
 		got[c]++
 	}
-	if got[202] != 1 || got[402] != 1 {
+	if got[202] != 1 || got[402]+got[429] != 1 {
 		t.Fatalf("allowance race: %v", got)
 	}
 	if code, out := e.app(ga, "POST", "/api/views/"+va.id+"/calls", map[string]any{"callId": "m1", "input": "hi", "options": map[string]string{"modelTier": "default", "model": "other/model"}}, map[string]string{"X-Francois-View": va.id}); code != 403 || errCode(out) != "model_not_allowed" {

@@ -69,6 +69,15 @@ func (rt *Runtime) rpc(w http.ResponseWriter, r *http.Request, inst store.Instan
 	}
 	result, err := rt.operation(r.Context(), v, p, req.Method, args)
 	if err != nil {
+		var paused *store.StoragePaused
+		if errors.As(err, &paused) {
+			failErr(w, err)
+			return
+		}
+		if errors.Is(err, store.ErrLimit) {
+			httpx.Fail(w, 413, "storage_limit", "Saved work has reached its storage limit.")
+			return
+		}
 		var ec *errCode
 		if errors.As(err, &ec) {
 			httpx.Fail(w, ec.status, ec.code, ec.msg)
@@ -97,6 +106,16 @@ func writable(p Principal, path string) error {
 
 func (rt *Runtime) operation(ctx context.Context, v *View, p Principal, method string, args rpcArgs) (any, error) {
 	instance := p.Instance.ID
+	switch method {
+	case "db.get", "db.query", "assets.list", "comments.list":
+		if err := rt.checkStorage(ctx, false); err != nil {
+			return nil, err
+		}
+	case "db.set", "db.update", "db.delete", "db.acquire", "assets.delete", "comments.create", "comments.reply", "comments.resolve", "comments.delete":
+		if err := rt.checkStorage(ctx, true); err != nil {
+			return nil, err
+		}
+	}
 	switch method {
 	case "db.get":
 		if err := local.ValidatePath(args.Path, true); err != nil {

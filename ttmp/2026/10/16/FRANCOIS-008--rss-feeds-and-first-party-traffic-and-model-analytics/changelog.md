@@ -47,3 +47,7 @@ Recorded revised minimal public experience and proposed six-lane fairness, rever
 ## 2026-10-16
 
 Rewrote the capacity design as direct changes to existing settings and handlers; removed speculative queue/scheduling/distributed coordination and duration-budget designs. Reuse existing allowance and demo mechanisms.
+
+## 2026-10-16
+
+Implemented backend operation switches, six-call admission with worker termination acknowledgement, atomic workspace/tour reuse, live-view caps and transactional aggregate storage limits; targeted integration checks pass.

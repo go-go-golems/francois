@@ -230,6 +230,10 @@ func (rt *Runtime) upload(w http.ResponseWriter, r *http.Request, inst store.Ins
 		httpx.Fail(w, 403, "read_only", "Viewers cannot upload assets")
 		return
 	}
+	if err := rt.checkStorage(r.Context(), true); err != nil {
+		failErr(w, err)
+		return
+	}
 	kind := r.Header.Get("Content-Type")
 	limit, ok := accepted[kind]
 	if !ok {
@@ -262,6 +266,10 @@ func (rt *Runtime) blob(w http.ResponseWriter, r *http.Request, inst store.Insta
 	id := r.PathValue("id")
 	if !rt.verifyBlob(inst.ID, id, r.URL.Query().Get("e"), r.URL.Query().Get("s")) {
 		http.NotFound(w, r)
+		return
+	}
+	if err := rt.checkStorage(r.Context(), false); err != nil {
+		failErr(w, err)
 		return
 	}
 	kind, data, err := rt.Store.AssetBytes(r.Context(), inst.ID, id)

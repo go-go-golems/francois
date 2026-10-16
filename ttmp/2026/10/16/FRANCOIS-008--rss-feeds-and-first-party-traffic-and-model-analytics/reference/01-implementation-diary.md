@@ -726,3 +726,67 @@ This is a diary-only checkpoint. Review the launch-versus-window distinction and
 ### Technical details
 
 Successful launch log: `/home/manuel/.cache/md-view/launch-1245874169.log`. Its WebKit signal-handler notice did not prevent the process/window from running. The design remains the document committed in `fed4b07`.
+
+## Step 11: Implement settings, runtime controls and bounded saved work
+
+The user authorized implementation of the simplified design. I kept the work in the existing Go service, PostgreSQL store and Pi worker. This checkpoint adds operation settings, six-call/one-user admission, tour/workspace reuse and transactional storage limits. Public UI wiring follows in the next checkpoint.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Ok, implement, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+
+**Assistant interpretation:** Implement the rewritten design completely, maintain this detailed diary and commit at meaningful integration boundaries.
+
+**Inferred user intent:** Working private operational controls and a minimal public experience, using the current application mechanisms.
+
+**Prior commit:** `4609126` records the viewer recovery; design checkpoint is `fed4b07`.
+
+### What I did
+
+- Added operations settings and validation, reduced defaults to six global calls/one per user, 20-minute tours, three views, 500 documents and 16 MiB aggregate instance payloads.
+- Added migration 011 to explicitly transform stored settings into the new strict shape, following migration 005's existing schema-transition convention. It preserves plans, user data and model accounting; configured concurrency/document/TTL caps become no greater than the new defaults.
+- Added runtime sampling/storage gates, including signed blob reads, and a view cap under the runtime mutex. Store mutation checks also enforce storage mode directly.
+- Added `POST /api/instances/open` for atomic default-workspace resolution under the existing owner lock. Explicit creation remains its existing operation and obeys the new-activity pause. Existing workspace identities, release pins and URLs remain intact.
+- Added live-tour lookup/reuse without expiry extension, with a repeated lookup under demo admission locking and a per-user key in the existing in-memory start limiter.
+- Added shared per-instance transaction locking and aggregate logical-byte accounting across documents, assets, thread anchors/comments and leases. Cleanup/shrinking remains possible after a quota reduction.
+- Made the worker emit an `ended` frame from its finalizer. The Go client holds admission until that frame, including after cancellation; an unresponsive worker is stopped after five seconds. Worker call IDs are now private random IDs so caller-supplied IDs cannot collide across users.
+- Created the Paper page “Minimal site — service notices,” with a full-page busy notice and inline variants, before UI coding. Reviewed screenshots and exported exact typography/spacing. Kept the existing white/black ABC Areal aesthetic.
+
+### Why
+
+The existing settings, mutexes, transactions and model ledger supply the necessary mechanisms. Correct lifetime boundaries matter more than additional infrastructure: do not refresh a tour's expiry, duplicate a default workspace, acknowledge rejected storage writes or release a model slot before termination.
+
+### What worked
+
+- `go test ./pkg/catalog/settings ./pkg/piworker` passed, including cancellation waiting for worker completion.
+- Existing catalog integration tests passed against a disposable PostgreSQL 17 container on port 15438, with isolated databases created by the test harness. This includes the real migration runner.
+- Targeted new integration tests passed: pauses affect existing views, reads survive read-only mode, signed URLs obey storage-off, paused calls create no ledger row, direct store writes obey pause, concurrent storage growth admits only fitting writes, quota reductions permit shrinking/deletion, and concurrent workspace/tour reuse preserves identity/expiry.
+- Paper screenshot review: consistent spacing, readable type, restrained contrast, aligned text, no clipping; a single warning treatment rather than additional product UI.
+
+### What didn't work
+
+The first broad `go test ./pkg/catalog/... ./pkg/piworker` could not write `/home/manuel/.cache/go-build/...`: `read-only file system`. Scoped escalation to use the existing Go cache resolved it. The first successful broad run without `TEST_DATABASE_URL` established compilation/unit behavior only; a subsequent run explicitly set the disposable test URL and executed the database integration tests.
+
+### What I learned
+
+The worker protocol needed termination acknowledgement, rather than returning on the UI result or sending cancellation and immediately releasing a slot. Also, preserving explicit instance creation while giving the normal Open action an idempotent endpoint avoids changing the semantics of existing management operations.
+
+### What was tricky to build
+
+All persistent writers must take the same instance lock for the aggregate quota to be meaningful. Quota checks occur in the mutation transaction and include replacement deltas; failed growth rolls back the inserted content. The existing credit race can now reject at either the concurrency gate or the allowance gate, so its assertion accepts either rejection while requiring exactly one admitted call.
+
+### What warrants a second pair of eyes
+
+Review cancellation acknowledgement/fail-stop behavior, all storage mutation paths, migration 011's explicit policy defaults and signed asset policy checks. The provider's remote execution contract remains external; local acknowledgement proves worker termination, not an independently measured provider-side session count.
+
+### What should be done in the future
+
+Finish the existing settings editor, shared runtime notices/autosave behavior, automatic Open action and public simplification. Run affected frontend and full integration validation, then update local deployment and documentation.
+
+### Code review instructions
+
+Start with settings, migration 011, `store/storage.go`, `operations_test.go`, `hosted/sample.go` and `piworker/client.go`. Tests use disposable database URL `postgres://francois:francois-test@127.0.0.1:15438/francois_test?sslmode=disable`; this is test-only data and credentials. No live site settings have been changed at this checkpoint.
+
+### Technical details
+
+Paper page: https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-D-0. Global controls are `acceptNewVisits`, `samplingEnabled`, `storageMode` and optional notice. Sampling pause drains existing calls. Tour start counters remain process-local. The model-call ledger remains private and authoritative for call/token accounting.

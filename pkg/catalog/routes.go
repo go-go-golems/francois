@@ -81,6 +81,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("POST /api/billing/refresh", s.guard(session, scopeAccount, s.refresh))
 	m.HandleFunc("POST /webhooks/stripe", s.webhook)
 	m.HandleFunc("GET /api/instances", s.guard(session, scopeAccount, s.instances))
+	m.HandleFunc("POST /api/instances/open", s.guard(enabled, scopeAccount, s.createInstance))
 	m.HandleFunc("POST /api/instances", s.guard(enabled, scopeAccount, s.createInstance))
 	m.HandleFunc("GET /api/instances/{id}", s.guard(session, scopeAccount, s.instance))
 	m.HandleFunc("PATCH /api/instances/{id}", s.guard(enabled, scopeAccount, s.renameInstance))

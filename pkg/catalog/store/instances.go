@@ -76,6 +76,50 @@ func (s *Store) CreateInstance(ctx context.Context, owner, release, title, kind 
 	return s.MemberInstance(ctx, owner, id)
 }
 
+// OpenWorkspace resumes the oldest active workspace of this artifact, or
+// creates one while holding the same per-owner lock as explicit creation.
+func (s *Store) OpenWorkspace(ctx context.Context, owner, release, title string, limit int, allowNew bool) (Instance, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return Instance{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('instances:'||$1))`, owner); err != nil {
+		return Instance{}, err
+	}
+	var id string
+	err = tx.QueryRow(ctx, `SELECT i.id FROM instances i JOIN releases r ON r.id=i.release_id JOIN releases target ON target.id=$2 WHERE i.owner_user_id=$1 AND i.kind='workspace' AND i.state='active' AND r.artifact_id=target.artifact_id ORDER BY i.created_at,i.id LIMIT 1`, owner, release).Scan(&id)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return Instance{}, err
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		if !allowNew {
+			return Instance{}, ErrActivityPaused
+		}
+		var n int
+		if err = tx.QueryRow(ctx, `SELECT count(*) FROM instances WHERE owner_user_id=$1 AND kind='workspace'`, owner).Scan(&n); err != nil {
+			return Instance{}, err
+		}
+		if n >= limit {
+			return Instance{}, ErrLimit
+		}
+		hex := RandomHex(10)
+		id = "ins_" + hex
+		if _, err = tx.Exec(ctx, `INSERT INTO instances(id,hostname,owner_user_id,release_id,title,kind) VALUES($1,$2,$3,$4,$5,'workspace')`, id, "i-"+hex, owner, release, title); err != nil {
+			return Instance{}, err
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO instance_members(instance_id,user_id,role,added_by) VALUES($1,$2,'owner',$2)`, id, owner); err != nil {
+			return Instance{}, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Instance{}, err
+	}
+	return s.MemberInstance(ctx, owner, id)
+}
+
+var ErrActivityPaused = errors.New("new visits paused")
+
 // WorkspacePosition is the 1-based position of a workspace among its
 // owner's workspaces, oldest first. After a downgrade the oldest workspaces
 // up to the plan's limit keep working.
