@@ -30,7 +30,7 @@ Implemented release RSS and first-party portal document analytics with an admin 
 - [Paper designs and implementation guide](design-doc/02-analytics-paper-designs-and-implementation-mapping.md): graph/filter/date contracts, SQL/API details, durable artifact attribution, implementation phases and tests.
 - [Paper Traffic](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-A-0) and [Paper Model usage](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-B-0).
 
-Initial implementation is committed as `0a66114`. The expanded graph/filter/date/artifact work is now implemented and validated; see the diary and implementation guide for checkpoint evidence.
+Initial implementation is committed as `0a66114`; the backend follow-up is `2f53554` and the frontend is `f072af7`. The expanded graph/filter/date/artifact work is now implemented and validated; see the diary and implementation guide for checkpoint evidence.
 
 ## Feature entry points
 

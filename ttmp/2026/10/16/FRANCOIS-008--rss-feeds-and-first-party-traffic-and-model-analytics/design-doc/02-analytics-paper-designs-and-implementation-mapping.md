@@ -34,7 +34,7 @@ The new Analytics group is separated by dividers in the existing unified design 
 - [Analytics — Traffic](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-A-0): traffic overview plus the date-range dialog state.
 - [Analytics — Model usage](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-B-0): token/cost graphs and detailed usage table.
 
-The user required Paper-first design. These artboards were created and reviewed before the follow-up graph/filter implementation. Their data is explicitly labeled SAMPLE DATA. The baseline commit `0a66114` added basic analytics. The backend follow-up is implemented in `2f53554`; the completed frontend now includes these graphs, filters, date dialog and per-artifact reporting.
+The user required Paper-first design. These artboards were created and reviewed before the follow-up graph/filter implementation. Their data is explicitly labeled SAMPLE DATA. The baseline commit `0a66114` added basic analytics. The backend follow-up is implemented in `2f53554`; the frontend checkpoint `f072af7` now includes these graphs, filters, date dialog and per-artifact reporting.
 
 ## Visual system
 
@@ -295,7 +295,7 @@ Required regression cases:
 
 ## Implementation status and validation
 
-The full follow-up is implemented. The initial feature is `0a66114`, Paper/design checkpoint is `6909bee`, and filtered-series/artifact backend is `2f53554`. The detailed diary records the frontend checkpoint.
+The full follow-up is implemented. The initial feature is `0a66114`, Paper/design checkpoint is `6909bee`, and filtered-series/artifact backend is `2f53554`. The frontend checkpoint is `f072af7`; its detailed diary and browser receipt record the validation.
 
 | Responsibility | Implementation |
 | --- | --- |

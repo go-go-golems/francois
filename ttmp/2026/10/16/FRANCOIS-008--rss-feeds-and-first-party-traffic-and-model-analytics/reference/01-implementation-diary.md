@@ -440,3 +440,22 @@ Start with analytics-data.ts and tests/analytics.test.ts, then analytics-charts.
 ### Technical details
 
 No new runtime or test dependency was added. Top-three-plus-Other stacks preserve every filtered view. All calendar arithmetic is UTC, the date UI includes the selected end day, and transport remains half-open. Model reporting stays catalog-wide under traffic filters. Changes are not deployed.
+
+
+### Step 6 checkpoint receipt
+
+- Backend: `2f53554` — Add filtered analytics series and durable artifact usage.
+- Frontend: `f072af7` — Implement analytics graphs, traffic filters and date range dialog.
+- After the final width/layout correction, the three focused frontend contracts and all 18 Chromium checks passed again; the refreshed embedded binary build passed.
+- The staged whitespace check caught a trailing blank line in the newly added browser evidence Markdown. The shell continued to the frontend commit; the final documentation checkpoint removes that whitespace. No runtime code was affected.
+- The updated guide will be uploaded under a new v2 name to preserve the annotations on the original reMarkable upload.
+
+
+### Final delivery receipt
+
+- Updated intern/system guide and the Paper implementation guide were bundled without overwriting the original upload.
+- Exact result: `OK: uploaded FRANCOIS-008 RSS and Analytics Implementation Guide v2.pdf -> /ai/2026/10/16/FRANCOIS-008`.
+- This proves reMarkable cloud delivery, not physical-tablet synchronization.
+- Temporary preview stopped through `lsof-who -p 18908 -k`; its tmux session ended with the process.
+- Final documentation hygiene: docmgr doctor passed and trailing evidence whitespace was removed.
+- All requested runtime features are implemented. Applying migrations and deploying production remain operator rollout actions, not work performed in this session.

@@ -31,4 +31,3 @@ Reproduction scripts: `scripts/01-analytics-preview.mjs` (run in tmux on localho
 - [Date dialog mobile](screenshots/03-date-mobile.png): native date controls, presets and actions fit 390px viewport; no page overflow.
 
 The screenshot fixture uses fallback system fonts because licensed Areal web fonts are not included in the repository. The application uses the existing Areal font configuration when deployed.
-

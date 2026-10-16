@@ -23,3 +23,11 @@ Expanded the Paper-first design into an implementation-ready contract for traffi
 ## 2026-10-16
 
 Implemented all Paper-designed graphs, page/referrer filters and complete stacks, shared native date dialog, and per-artifact usage. Backend committed as 2f53554. Full Go/PostgreSQL suite/build, repository lint, eight frontend tests and 18 Chromium checks pass. Corrected top-segment stroke widths in Paper and React; detailed diary and screenshots retained.
+
+## 2026-10-16
+
+Completed follow-up implementation: backend 2f53554 and frontend f072af7. Final Go/PostgreSQL tests, lint, supported-Node frontend tests/build, 18 Chromium checks, and Paper width correction are documented. No production rollout performed.
+
+## 2026-10-16
+
+Uploaded the completed combined implementation guide v2 to /ai/2026/10/16/FRANCOIS-008 with OK uploaded receipt; preserved the original document and stopped the temporary preview. All feature tasks complete, production rollout not performed.
