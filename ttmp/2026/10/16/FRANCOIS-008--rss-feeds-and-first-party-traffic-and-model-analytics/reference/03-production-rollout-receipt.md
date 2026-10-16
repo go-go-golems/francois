@@ -91,3 +91,10 @@ The script uses a curl-prefixed agent excluded by traffic recording and makes no
 - The earlier intermittent new-artifact-upload race is recorded in the detailed diary; it was not hidden by changing its assertions.
 
 The detailed investigation and release chronology are in [the diary](01-implementation-diary.md), Steps 16–18. The report in go-go-parc commit `afc8140` intentionally remains the earlier reviewed snapshot; this receipt records its subsequently completed review fixes and production release.
+
+
+## Dependency alerts surfaced after enabling repository review
+
+The documentation push reported 11 open Dependabot advisories (two high, six moderate, three low). The two high alerts concern undici in pnpm-lock.yaml: [unrequested WebSocket subprotocol denial of service](https://github.com/go-go-golems/francois/security/dependabot/9) and [BalancedPool TLS option propagation](https://github.com/go-go-golems/francois/security/dependabot/5); both report a fix in 8.10.2. They require separate dependency/exposure triage and were not fixed in this release.
+
+Comparison of source base 64c7ece and deployed fda5382 confirms pnpm-lock.yaml, go.mod, go.sum and worker/package.json are unchanged. The package.json change only updates the frontend test command. These are pre-existing locked dependencies surfaced by enabling alerts, distinct from a newly introduced dependency change or a failing release check. The verified production image remains sha-fda5382 with one ready replica after the documentation push.

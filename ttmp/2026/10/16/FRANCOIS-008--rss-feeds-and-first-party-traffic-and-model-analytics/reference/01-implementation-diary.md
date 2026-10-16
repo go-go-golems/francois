@@ -1281,3 +1281,8 @@ Source PR: https://github.com/go-go-golems/francois/pull/7. Main image workflow:
 - No local database dump transfer took place. The previously rejected export was replaced by the successful established in-cluster backup Job.
 
 - Final docmgr doctor and whitespace checks passed; ticket status is complete. The completed close-operation recovery journal (state committed) is retained privately in /tmp rather than adding generated projection snapshots to Git. Pending journals were not removed.
+
+
+### Step 18 post-publication dependency-alert note
+
+The deployment receipt and ticket closure were committed/pushed as `94d256f`. GitHub's push response then reported 11 dependency alerts newly visible after repository alerts were enabled. REST inspection identifies the two high alerts as undici advisories #9 (WebSocket subprotocol DoS) and #5 (BalancedPool TLS option propagation), patched in 8.10.2. The deployed release did not change the lockfile or dependency manifests; package.json only changes the test command. Recorded these as separate unresolved dependency/exposure follow-ups in the production receipt without claiming they were fixed or silently modifying the verified image. The deployment remains sha-fda5382, one ready replica. The requested review fixes, merge and rollout remain complete.
