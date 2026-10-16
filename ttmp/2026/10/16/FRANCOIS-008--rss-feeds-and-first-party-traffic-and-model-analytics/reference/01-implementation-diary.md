@@ -665,3 +665,64 @@ Read the rewritten design and task text. Verify that requirements are explained 
 ### Technical details
 
 The proposed operations object contains `acceptNewVisits`, `samplingEnabled`, `storageMode` and `notice`. Model concurrency uses existing `Allowance` fields; limits use existing plan/demo allowances plus `Demo.PerUserPerHour`, `Limits.ViewsPerUser` and `Limits.StorageBytesPerInstance`. Existing model-call timestamps support private duration inspection without a new accounting subsystem.
+
+## Step 10: Open the design in md-view and verify the desktop window
+
+The requested viewer detached successfully but then crashed during GTK initialization. My first response incorrectly treated process launch as a visible window. After the user questioned it, I checked the log, identified the missing display setting, relaunched against the active X session and verified the actual window before bringing it forward.
+
+### Prompt Context
+
+**User prompts (verbatim):** "open the doc with md-view view"; "did it not work?"
+
+**Assistant interpretation:** Open the rewritten design document and diagnose the missing viewer window.
+
+**Inferred user intent:** Read the current design in the desktop Markdown viewer.
+
+**Prior commit:** `fed4b07` — Simplify capacity design to existing settings and handlers.
+
+### What I did
+
+- Ran `md-view view` with the current design document path.
+- Checked detached PID 964880 and its launch log after the user reported the missing window.
+- Notified the user before reading the display-related environment allowlist. DISPLAY and XAUTHORITY were unset; the active local Xorg session uses display `:0` and `/run/user/1000/gdm/Xauthority`.
+- Relaunched with `DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority md-view view ...` using the same document path.
+- Verified PID 978852 was running and `wmctrl -lp` listed `md-view: Minimal public experience and operational capacity controls` for that PID, then used `wmctrl -i -R` to bring that window forward.
+
+### Why
+
+A detached-launch success only proves the child was started. A GUI command also needs access to the graphical session and verification after initialization.
+
+### What worked
+
+The retry remained running and had an actual desktop window. Existing X authentication was used without printing its contents. No application source, runtime policy or design content changed.
+
+### What didn't work
+
+- The initial sandboxed launch reported `create background log: open /home/manuel/.cache/md-view/launch-4287680827.log: read-only file system`. Escalation permitted the requested viewer's cache write.
+- Detached PID 964880 exited. Its log reported `panic: failed to init GTK`. The calling environment lacked DISPLAY; setting the verified display/auth paths fixed startup.
+- Unescalated `loginctl list-sessions --no-legend` reported `Failed to connect to bus: Operation not permitted`; the scoped escalated session inspection succeeded.
+- A first window-list check omitted the display override and reported `Cannot open display.` Repeating it with the same display/auth settings as the viewer succeeded.
+
+### What I learned
+
+This command environment does not inherit the desktop DISPLAY even though a local X session is active. Check both process survival and window presence before reporting that a GUI document has opened.
+
+### What was tricky to build
+
+No code was built. Detached execution hid the GTK startup failure from the parent command; the launch log supplied the missing evidence.
+
+### What warrants a second pair of eyes
+
+N/A. Window title and PID were verified on the active desktop session.
+
+### What should be done in the future
+
+Use the verified desktop display for subsequent viewer launches and confirm window creation.
+
+### Code review instructions
+
+This is a diary-only checkpoint. Review the launch-versus-window distinction and failure evidence; no runtime tests are required.
+
+### Technical details
+
+Successful launch log: `/home/manuel/.cache/md-view/launch-1245874169.log`. Its WebKit signal-handler notice did not prevent the process/window from running. The design remains the document committed in `fed4b07`.
