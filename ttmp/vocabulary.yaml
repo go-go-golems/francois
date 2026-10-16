@@ -15,6 +15,10 @@ topics:
       description: Subscriptions, plans and entitlements
     - slug: frontend
       description: Portal, admin and public web pages
+    - slug: cli
+      description: Command-line clients and operator tooling
+    - slug: mcp
+      description: Model Context Protocol servers and agent tool surfaces
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
