@@ -23,3 +23,11 @@ Recorded owner decisions (subscriber tokens: yes; catalog push → catalog relea
 ## 2026-10-15
 
 MCP library decision changed to go-go-mcp v0.3.0 (embedded OIDC no longer linked; introspection available); §6.7-6.8, phases and tests rewritten for its API.
+
+## 2026-10-15
+
+Phase 1 implemented: scoped tokens (migration 008, guard scopes on every route), /api/me, /api/tokens with minting rules, admin token oversight, token IDs in the audit log, account-page token UI.
+
+## 2026-10-15
+
+Phases 2-6 implemented on PR #6: customer-management endpoints, pkg/catalog/client, francois catalog command tree, francois mcp (go-go-mcp v0.3.0), remote /mcp behind catalog serve --mcp.

@@ -72,6 +72,7 @@ type CatalogServeSettings struct {
 	LegalContact       string   `glazed:"legal-contact"`
 	TrustProxyHeaders  bool     `glazed:"trust-proxy-headers"`
 	FontDir            string   `glazed:"font-dir"`
+	MCP                bool     `glazed:"mcp"`
 	ReleaseDir         string   `glazed:"release-dir"`
 	Migrate            bool     `glazed:"migrate"`
 	OIDCIssuer         string   `glazed:"oidc-issuer"`
@@ -159,7 +160,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir}
+	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -459,7 +460,8 @@ func (c *CatalogSettings) RunIntoGlazeProcessor(ctx context.Context, p *values.V
 
 func registerCatalog(root *cobra.Command) error {
 	group := &cobra.Command{Use: "catalog", Short: "Hosted subscriber platform: portal, admin, instances and billing"}
-	users := &cobra.Command{Use: "users", Short: "Operator account management"}
+	db := &cobra.Command{Use: "db", Short: "Direct database operations for operators (bootstrap and break-glass; prefer the API commands)"}
+	users := &cobra.Command{Use: "users", Short: "Operator account management directly in the database"}
 	withDB := func(extra ...*fields.Definition) glazed.CommandDescriptionOption {
 		return glazed.WithFlags(append(dbFlags(), extra...)...)
 	}
@@ -472,6 +474,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
 			fields.New("legal-contact", fields.TypeString, fields.WithHelp("Contact address shown on /privacy and /terms")),
 			fields.New("trust-proxy-headers", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Take visitor addresses from X-Real-Ip/X-Forwarded-For (only behind a trusted ingress); used for demo rate limits")),
+			fields.New("mcp", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Serve MCP tools at /mcp for remote agents with a personal API token")),
 			fields.New("font-dir", fields.TypeString, fields.WithHelp("Private directory of licensed WOFF2 web fonts (ABC Areal); never commit these files")),
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
@@ -511,12 +514,19 @@ func registerCatalog(root *cobra.Command) error {
 		))}
 	list := &CatalogUsers{glazed.NewCommandDescription("list", glazed.WithShort("List accounts"), withDB(fields.New("search", fields.TypeString)))}
 	settingsCmd := &CatalogSettings{glazed.NewCommandDescription("settings", glazed.WithShort("Show or activate validated platform settings"), withDB(fields.New("file", fields.TypeString, fields.WithHelp("JSON settings document to validate and activate"))))}
-	for _, cmd := range []glazed.Command{serve, migrate, publish, settingsCmd, newCatalogPush()} {
+	for _, cmd := range []glazed.Command{serve, migrate} {
 		c, err := cli.BuildCobraCommandFromCommand(cmd)
 		if err != nil {
 			return err
 		}
 		group.AddCommand(c)
+	}
+	for _, cmd := range []glazed.Command{publish, settingsCmd} {
+		c, err := cli.BuildCobraCommandFromCommand(cmd)
+		if err != nil {
+			return err
+		}
+		db.AddCommand(c)
 	}
 	userFlags := withDB(fields.New("user-id", fields.TypeString), fields.New("issuer", fields.TypeString), fields.New("subject", fields.TypeString), fields.New("days", fields.TypeInteger, fields.WithDefault(0)), fields.New("reason", fields.TypeString), fields.New("plan", fields.TypeString, fields.WithHelp("grant-access: plan key (default: the highest plan)")))
 	actions := map[string]string{"promote": "Make an exact issuer/subject (or user) an administrator", "disable": "Disable hosted access and revoke runtime grants", "enable": "Re-enable an account", "revoke-sessions": "Revoke portal sessions and runtime grants", "grant-access": "Grant complimentary hosted access for --days"}
@@ -532,7 +542,11 @@ func registerCatalog(root *cobra.Command) error {
 		}
 		users.AddCommand(c)
 	}
-	group.AddCommand(users)
+	db.AddCommand(users)
+	group.AddCommand(db)
+	if err := registerAPI(group); err != nil {
+		return err
+	}
 	root.AddCommand(group)
 	return nil
 }

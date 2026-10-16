@@ -137,6 +137,23 @@ func (f *fakeGateway) CustomerSubscriptions(_ context.Context, c string) ([]bill
 	defer f.mu.Unlock()
 	return append([]billing.Subscription(nil), f.subs[c]...), nil
 }
+
+// SetCancelAtPeriodEnd flips the flag on the fake Stripe subscription, as
+// Stripe does; the projection only changes when the worker refreshes.
+func (f *fakeGateway) SetCancelAtPeriodEnd(_ context.Context, id string, cancel bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for c, subs := range f.subs {
+		for i := range subs {
+			if subs[i].ID == id {
+				f.subs[c][i].CancelAtPeriodEnd = cancel
+				return nil
+			}
+		}
+	}
+	return errors.New("no such subscription")
+}
+
 func (f *fakeGateway) ConstructEvent([]byte, string) (Event, error) {
 	return Event{}, errors.New("unused")
 }
@@ -415,5 +432,56 @@ func TestWorkerConvergesOnCurrentState(t *testing.T) {
 	d, _ = s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now())
 	if d.Allowed {
 		t.Fatalf("canceled subscription still grants access: %+v", d)
+	}
+}
+
+func TestSetCancelAtPeriodEnd(t *testing.T) {
+	s := testStore(t)
+	g := newFake()
+	svc := NewService(g, s, Config{Deployment: "test"})
+	ctx := context.Background()
+	maya := user(t, s, "maya")
+	if _, err := s.SaveCustomer(ctx, maya.ID, "cus_maya"); err != nil {
+		t.Fatal(err)
+	}
+	g.deploy["cus_maya"] = "test"
+	future := time.Now().Add(30 * 24 * time.Hour)
+	g.subs["cus_maya"] = []billing.Subscription{{ID: "sub_m", CustomerID: "cus_maya", PriceID: "price_ok", Status: "active", Quantity: 1, ItemCount: 1, AccessUntil: &future}}
+	drain := func() {
+		for {
+			worked, err := svc.processOne(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !worked {
+				return
+			}
+		}
+	}
+	if err := svc.ReconcileUser(ctx, maya.ID); err != nil {
+		t.Fatal(err)
+	}
+	drain()
+
+	for _, cancel := range []bool{true, false} {
+		if err := svc.SetCancelAtPeriodEnd(ctx, "sub_m", cancel); err != nil {
+			t.Fatal(err)
+		}
+		drain()
+		sub, err := s.SubscriptionByID(ctx, "sub_m")
+		if err != nil || sub.CancelAtPeriodEnd != cancel || sub.UserID != maya.ID {
+			t.Fatalf("cancel=%v: projection %+v %v", cancel, sub, err)
+		}
+		// Access continues until the period ends either way.
+		if d, _ := s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, maya, time.Now()); !d.Allowed {
+			t.Fatalf("cancel=%v removed access before the period end: %+v", cancel, d)
+		}
+	}
+	if err := svc.SetCancelAtPeriodEnd(ctx, "sub_missing", true); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unknown subscription: %v", err)
+	}
+	rows, err := s.AllSubscriptions(ctx, "active", 10)
+	if err != nil || len(rows) != 1 || rows[0].Email == "" {
+		t.Fatalf("all subscriptions %+v %v", rows, err)
 	}
 }

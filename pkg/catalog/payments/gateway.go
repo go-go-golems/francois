@@ -48,6 +48,9 @@ type Gateway interface {
 	ExpireCheckout(ctx context.Context, id string) error
 	CreatePortal(ctx context.Context, customerID, returnURL string) (string, error)
 	SubscriptionCustomer(ctx context.Context, subscriptionID string) (string, error)
+	// SetCancelAtPeriodEnd schedules (or withdraws) the end of a subscription
+	// at the end of its current period. It moves no money.
+	SetCancelAtPeriodEnd(ctx context.Context, subscriptionID string, cancel bool) error
 	CustomerSubscriptions(ctx context.Context, customerID string) ([]billing.Subscription, error)
 	ConstructEvent(payload []byte, signature string) (Event, error)
 }
@@ -123,6 +126,11 @@ func (g *stripeGateway) RetrieveCheckout(ctx context.Context, id string) (Checko
 
 func (g *stripeGateway) ExpireCheckout(ctx context.Context, id string) error {
 	_, err := g.client.V1CheckoutSessions.Expire(ctx, id, &stripe.CheckoutSessionExpireParams{})
+	return err
+}
+
+func (g *stripeGateway) SetCancelAtPeriodEnd(ctx context.Context, id string, cancel bool) error {
+	_, err := g.client.V1Subscriptions.Update(ctx, id, &stripe.SubscriptionUpdateParams{CancelAtPeriodEnd: stripe.Bool(cancel)})
 	return err
 }
 

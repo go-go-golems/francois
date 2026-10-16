@@ -342,6 +342,24 @@ func (s *Service) reconcile(ctx context.Context) {
 }
 
 // ReconcileUser is the operator/admin entry point; it uses the same queue.
+// SetCancelAtPeriodEnd asks Stripe to end (or keep) a customer's subscription
+// at the end of its period, then refreshes the projection through the normal
+// event path, so the local state always comes from Stripe.
+func (s *Service) SetCancelAtPeriodEnd(ctx context.Context, subscriptionID string, cancel bool) error {
+	sub, err := s.Store.SubscriptionByID(ctx, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if err = s.Gateway.SetCancelAtPeriodEnd(ctx, subscriptionID, cancel); err != nil {
+		return err
+	}
+	if err = s.Store.EnqueueRefresh(ctx, sub.CustomerID, "operator"); err != nil {
+		return err
+	}
+	s.Wake()
+	return nil
+}
+
 func (s *Service) ReconcileUser(ctx context.Context, user string) error {
 	customer, err := s.Store.CustomerFor(ctx, user)
 	if err != nil {

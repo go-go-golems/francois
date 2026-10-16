@@ -7,6 +7,11 @@ export type Decision = {
   status?: string;
   cancelScheduled: boolean;
 };
+// Personal API tokens. A scope selects an API surface; it never exceeds the
+// owner's role.
+export type TokenScope = "studio" | "account" | "admin:read" | "admin:write";
+export type Token = { id: string; name: string; scopes: TokenScope[]; createdAt: string; lastUsedAt?: string; expiresAt?: string; revokedAt?: string };
+
 export type SessionUser = {
   id: string;
   name: string;
@@ -271,7 +276,7 @@ const baseQuery = fetchBaseQuery({
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
-  tagTypes: ["Session", "Catalog", "Account", "Instances", "Instance", "AdminReleases", "AdminUsers", "AdminUser", "AdminInstances", "Settings", "Billing", "Usage", "Audit", "Overview"],
+  tagTypes: ["Session", "Catalog", "Account", "Instances", "Instance", "AdminReleases", "AdminUsers", "AdminUser", "AdminInstances", "Settings", "Billing", "Usage", "Audit", "Overview", "Tokens"],
   endpoints: (b) => ({
     session: b.query<Session, void>({
       query: () => "api/session",
@@ -364,8 +369,10 @@ export const api = createApi({
       query: () => "api/admin/settings",
       providesTags: ["Settings"],
     }),
-    saveSettings: b.mutation<SettingsRevision, SettingsDoc>({
-      query: (body) => ({ url: "api/admin/settings", method: "PATCH", body }),
+    // If-Match names the revision the edit started from; the server answers
+    // 412 settings_conflict when another revision was activated in between.
+    saveSettings: b.mutation<SettingsRevision, { doc: SettingsDoc; revision: number }>({
+      query: ({ doc, revision }) => ({ url: "api/admin/settings", method: "PATCH", body: doc, headers: { "If-Match": `"${revision}"` } }),
       invalidatesTags: ["Settings", "Account"],
     }),
     billing: b.query<any, string>({ query: (state) => `api/admin/billing?state=${state}`, providesTags: ["Billing"] }),
@@ -388,6 +395,15 @@ export const api = createApi({
     audit: b.query<AuditEntry[], string>({
       query: (subject) => `api/admin/audit?subject=${encodeURIComponent(subject)}`,
       providesTags: ["Audit"],
+    }),
+    tokens: b.query<Token[], void>({ query: () => "api/tokens", providesTags: ["Tokens"] }),
+    createToken: b.mutation<{ token: string; info: Token }, { name: string; days: number; scopes: TokenScope[] }>({
+      query: (body) => ({ url: "api/tokens", method: "POST", body }),
+      invalidatesTags: ["Tokens"],
+    }),
+    revokeToken: b.mutation<unknown, string>({
+      query: (id) => ({ url: `api/tokens/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Tokens"],
     }),
   }),
 });

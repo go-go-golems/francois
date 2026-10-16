@@ -195,5 +195,10 @@ func Register(root *cobra.Command) error {
 	}
 	group.AddCommand(command)
 	root.AddCommand(group)
+	mcp, err := mcpCommand()
+	if err != nil {
+		return err
+	}
+	root.AddCommand(mcp)
 	return registerCatalog(root)
 }

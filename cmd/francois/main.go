@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/go-go-golems/francois/cmd/francois/cmds"
+	"github.com/go-go-golems/francois/pkg/doc"
 	"github.com/go-go-golems/glazed/pkg/cmds/logging"
 	"github.com/go-go-golems/glazed/pkg/help"
 	help_cmd "github.com/go-go-golems/glazed/pkg/help/cmd"
@@ -26,7 +27,11 @@ func run(ctx context.Context) error {
 	if err := logging.AddLoggingSectionToRootCommand(root, "francois"); err != nil {
 		return errors.Wrap(err, "configure logging")
 	}
-	help_cmd.SetupCobraRootCommand(help.NewHelpSystem(), root)
+	hs := help.NewHelpSystem()
+	if err := doc.AddDocToHelpSystem(hs); err != nil {
+		return errors.Wrap(err, "load help")
+	}
+	help_cmd.SetupCobraRootCommand(hs, root)
 	if err := cmds.Register(root); err != nil {
 		return errors.Wrap(err, "register commands")
 	}

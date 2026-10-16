@@ -264,6 +264,11 @@ main { min-height: 50vh; }
 .inline-form { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .inline-form input { min-width: 180px; flex: 1; }
 .inline-form input.num, .model-opts input.num { width: 80px; min-width: 0; flex: 0 0 auto; }
+.token-form { display: grid; gap: 12px; margin: 0 0 16px; }
+.scope-list { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; }
+.scope-list legend { padding: 0; margin-bottom: 4px; }
+.scope-option { display: flex; align-items: baseline; gap: 8px; }
+.token-form .btn { justify-self: start; }
 .grid-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px 32px; }
 .model-table { display: flex; flex-direction: column; border-top: 1px solid var(--color-ink); }
 .model-line { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--color-line); flex-wrap: wrap; }

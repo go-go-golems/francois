@@ -43,7 +43,7 @@ admin=$(user admin@francois.test Ada Admin 'Password1!')
 alice=$(user alice@francois.test Alice Subscriber 'Password1!')
 bob=$(user bob@francois.test Bob Subscriber 'Password1!')
 
-francois catalog users promote --database-url "$DATABASE_URL" --issuer "$ISSUER" --subject "$admin" >/dev/null
+francois catalog db users promote --database-url "$DATABASE_URL" --issuer "$ISSUER" --subject "$admin" >/dev/null
 chmod 0644 /bootstrap/oidc-client-id
 cat <<MSG
 Francois catalog provisioning complete.

@@ -335,7 +335,7 @@ it above both limits.
 Run catalog commands inside the pod; they need the database URL file:
 
 ```bash
-fc() { kubectl -n francois exec deploy/francois -- francois catalog "$@" --database-url-file /run/secrets/francois/database-url; }
+fc() { kubectl -n francois exec deploy/francois -- francois catalog db "$@" --database-url-file /run/secrets/francois/database-url; }
 ```
 
 ### 5.1 Invite a user
@@ -376,22 +376,47 @@ fc users enable --user-id usr_…
 fc users revoke-sessions --user-id usr_…
 ```
 
-`promote` by issuer and subject creates the identity row if the user has not
-signed in yet, so the first login already has the admin role. Use the ZITADEL
+`fc` runs the `catalog db` commands, which write to the database directly
+(bootstrap and break-glass). `promote` by issuer and subject creates the
+identity row if the user has not signed in yet, so the first login already
+has the admin role. Use the ZITADEL
 user ID as the subject. Roles (subscriber, creator, administrator),
 complimentary access (optionally for a named plan; without one, the highest
 plan), credit adjustments and suspensions are also in the admin UI (`/admin`).
 Creators and administrators have the highest plan without paying.
+
+The same operations are available from a laptop through the API, with a
+token holding `admin:read`/`admin:write` (`francois catalog --help` lists
+every group):
+
+```bash
+export FRANCOIS_SERVER=https://slop.boutique FRANCOIS_TOKEN=…   # e.g. from Vault
+francois catalog whoami
+francois catalog users list --role subscriber --plan subscriber
+francois catalog users grant usr_… --days 30 --reason pilot --plan studio
+francois catalog users revoke-grant agr_… --yes
+francois catalog subscriptions list --status active
+francois catalog plans set studio --monthly-credits 1500 --yes
+francois catalog audit list --actor usr_… --limit 20
+```
+
+Commands that change or remove data ask for confirmation on a terminal and
+need `--yes` in scripts.
+
+`francois mcp` offers the same operations to a local agent such as Claude Code
+(`francois help catalog-mcp`). `catalog serve --mcp` also serves them at
+`/mcp` for remote agents with a personal token; production does not enable it
+yet.
 
 ### 5.3 Publish a release of an artifact
 
 Creators publish their own artifacts; administrators publish any. In the
 studio (`/studio`): artifact → Releases → upload HTML → check → draft →
 preview on an isolated origin → publish. From a laptop, with a personal API
-token created in Studio → Tokens:
+token with the `studio` scope, created on the account page (`/account` → API tokens):
 
 ```bash
-francois catalog push --server https://slop.boutique --token-file ~/.config/francois/token \
+francois catalog releases push --server https://slop.boutique --token-file ~/.config/francois/token \
   --artifact-id polis --version 1.2.0 --html dist/polis.html \
   [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish] \
   [--attach docs/manual.pdf --attach plates.zip]
@@ -400,8 +425,15 @@ francois catalog push --server https://slop.boutique --token-file ~/.config/fran
 `--attach` files are uploaded to the draft before it is published; a missing
 file stops the push before anything is created.
 
-Tokens work only on `/api/studio/*`; a token cannot reach accounts, billing or
-instances, and cannot create tokens. Revoke one in Studio → Tokens.
+A token reaches only the surfaces its scopes name: `studio` (`/api/studio/*`),
+`account` (the owner's account, billing links and instances; not instance
+launch), `admin:read` (admin GETs) and `admin:write` (all admin routes). Scopes
+never exceed the owner's role; admin-scoped tokens must expire within 90 days.
+No token can create tokens. Owners revoke tokens on the account page;
+administrators list a user's tokens with `GET /api/admin/users/{id}/tokens`,
+revoke one with `DELETE /api/admin/tokens/{id}`, or all of them with
+`POST /api/admin/users/{id}/revoke-sessions {"tokens": true}`. Audit entries
+made through a token carry its ID (`tokenId`).
 
 As an operator, from inside the pod, with files that exist in the image:
 

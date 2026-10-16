@@ -43,6 +43,40 @@ FROM billing_subscriptions WHERE user_id=$1 ORDER BY refreshed_at DESC`, user)
 	})
 }
 
+// SubscriptionRow is a subscription projection with its customer.
+type SubscriptionRow struct {
+	billing.Subscription
+	UserID string `json:"userId"`
+	Email  string `json:"email"`
+}
+
+const subscriptionRowColumns = `b.stripe_subscription_id,b.stripe_customer_id,b.price_id,b.status,b.quantity,b.item_count,b.access_until,b.trial_until,b.cancel_at_period_end,b.canceled_at,b.refreshed_at,b.user_id,u.email`
+
+func scanSubscriptionRow(r pgx.Row) (SubscriptionRow, error) {
+	var s SubscriptionRow
+	err := r.Scan(&s.ID, &s.CustomerID, &s.PriceID, &s.Status, &s.Quantity, &s.ItemCount, &s.AccessUntil, &s.TrialUntil, &s.CancelAtPeriodEnd, &s.CanceledAt, &s.RefreshedAt, &s.UserID, &s.Email)
+	return s, notFound(err)
+}
+
+// AllSubscriptions lists subscription projections across customers, newest
+// first; status "" matches every status.
+func (s *Store) AllSubscriptions(ctx context.Context, status string, limit int) ([]SubscriptionRow, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	rows, err := s.Pool.Query(ctx, `SELECT `+subscriptionRowColumns+` FROM billing_subscriptions b JOIN users u ON u.id=b.user_id
+WHERE $1='' OR b.status=$1 ORDER BY b.refreshed_at DESC LIMIT $2`, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (SubscriptionRow, error) { return scanSubscriptionRow(r) })
+}
+
+// SubscriptionByID returns one subscription projection.
+func (s *Store) SubscriptionByID(ctx context.Context, id string) (SubscriptionRow, error) {
+	return scanSubscriptionRow(s.Pool.QueryRow(ctx, `SELECT `+subscriptionRowColumns+` FROM billing_subscriptions b JOIN users u ON u.id=b.user_id WHERE b.stripe_subscription_id=$1`, id))
+}
+
 func (s *Store) Comps(ctx context.Context, user string) ([]billing.Comp, error) {
 	grants, err := s.AccessGrants(ctx, user)
 	if err != nil {
