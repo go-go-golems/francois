@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 )
@@ -29,12 +30,29 @@ type Allowance struct {
 	MaxToolRounds      int `json:"maxToolRounds"`
 }
 
+type Operations struct {
+	AcceptNewVisits bool   `json:"acceptNewVisits"`
+	SamplingEnabled bool   `json:"samplingEnabled"`
+	StorageMode     string `json:"storageMode"`
+	Notice          string `json:"notice"`
+}
+
+// Message returns the operator notice or the operation-specific default.
+func (o Operations) Message(fallback string) string {
+	if strings.TrimSpace(o.Notice) != "" {
+		return o.Notice
+	}
+	return fallback
+}
+
 type Limits struct {
-	DocumentsPerInstance  int   `json:"documentsPerInstance"`
-	AssetBytesPerInstance int64 `json:"assetBytesPerInstance"`
-	MaxHTMLBytes          int64 `json:"maxHtmlBytes"`
-	MaxMediaBytes         int64 `json:"maxMediaBytes"`
-	MaxAttachmentBytes    int64 `json:"maxAttachmentBytes"`
+	ViewsPerUser            int   `json:"viewsPerUser"`
+	StorageBytesPerInstance int64 `json:"storageBytesPerInstance"`
+	DocumentsPerInstance    int   `json:"documentsPerInstance"`
+	AssetBytesPerInstance   int64 `json:"assetBytesPerInstance"`
+	MaxHTMLBytes            int64 `json:"maxHtmlBytes"`
+	MaxMediaBytes           int64 `json:"maxMediaBytes"`
+	MaxAttachmentBytes      int64 `json:"maxAttachmentBytes"`
 }
 
 type Publishing struct {
@@ -74,6 +92,7 @@ type Demo struct {
 	Enabled           bool     `json:"enabled"`
 	TTLMinutes        int      `json:"ttlMinutes"`
 	MaxActive         int      `json:"maxActive"`
+	PerUserPerHour    int      `json:"perUserPerHour"`
 	PerAddressPerHour int      `json:"perAddressPerHour"`
 	Credits           int      `json:"credits"`
 	DailyBudget       int      `json:"dailyBudget"`
@@ -88,6 +107,7 @@ type Storefront struct {
 }
 
 type Document struct {
+	Operations Operations `json:"operations"`
 	Models     Models     `json:"models"`
 	Allowance  Allowance  `json:"allowance"`
 	Limits     Limits     `json:"limits"`
@@ -101,12 +121,13 @@ type Document struct {
 // revision. It allows no models: hosted sampling stays off until approved.
 func Defaults() Document {
 	return Document{
+		Operations: Operations{AcceptNewVisits: true, SamplingEnabled: true, StorageMode: "read-write"},
 		Models:     Models{Allowed: []Model{}, Tiers: map[string]string{}},
-		Allowance:  Allowance{PerUserConcurrency: 2, GlobalConcurrency: 8, MaxToolRounds: 5},
-		Limits:     Limits{DocumentsPerInstance: 5000, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20, MaxMediaBytes: 25 << 20, MaxAttachmentBytes: 100 << 20},
+		Allowance:  Allowance{PerUserConcurrency: 1, GlobalConcurrency: 6, MaxToolRounds: 5},
+		Limits:     Limits{ViewsPerUser: 3, StorageBytesPerInstance: 16 << 20, DocumentsPerInstance: 500, AssetBytesPerInstance: 256 << 20, MaxHTMLBytes: 16 << 20, MaxMediaBytes: 25 << 20, MaxAttachmentBytes: 100 << 20},
 		Publishing: Publishing{AllowPinnedAfterWithdraw: true},
 		Plans:      []Plan{FreePlan()},
-		Demo:       Demo{TTLMinutes: 30, MaxActive: 20, PerAddressPerHour: 3, Credits: 5, DailyBudget: 200, Models: []string{}},
+		Demo:       Demo{PerUserPerHour: 3, TTLMinutes: 20, MaxActive: 20, PerAddressPerHour: 3, Credits: 5, DailyBudget: 200, Models: []string{}},
 	}
 }
 
@@ -131,6 +152,12 @@ func Parse(raw []byte) (Document, error) {
 }
 
 func (d *Document) Validate() error {
+	if d.Operations.StorageMode != "read-write" && d.Operations.StorageMode != "read-only" && d.Operations.StorageMode != "off" {
+		return errors.New("storageMode must be read-write, read-only or off")
+	}
+	if utf8.RuneCountInString(d.Operations.Notice) > 500 {
+		return errors.New("notice must be at most 500 characters")
+	}
 	if d.Models.Tiers == nil {
 		d.Models.Tiers = map[string]string{}
 	}
@@ -167,13 +194,19 @@ func (d *Document) Validate() error {
 		}
 	}
 	a := d.Allowance
-	if a.PerUserConcurrency < 1 || a.PerUserConcurrency > 16 || a.GlobalConcurrency < 1 || a.GlobalConcurrency > 256 {
-		return errors.New("concurrency must be 1–16 per user and 1–256 globally")
+	if a.PerUserConcurrency < 1 || a.PerUserConcurrency > 1 || a.GlobalConcurrency < 1 || a.GlobalConcurrency > 6 {
+		return errors.New("concurrency must be 1 per user and 1–6 globally")
 	}
 	if a.MaxToolRounds < 1 || a.MaxToolRounds > 10 {
 		return errors.New("maxToolRounds must be 1–10")
 	}
 	l := d.Limits
+	if l.ViewsPerUser < 1 || l.ViewsPerUser > 20 {
+		return errors.New("viewsPerUser must be 1–20")
+	}
+	if l.StorageBytesPerInstance < 1 || l.StorageBytesPerInstance > 4<<30 {
+		return errors.New("storageBytesPerInstance must be 1 byte–4 GiB")
+	}
 	if l.DocumentsPerInstance < 1 || l.DocumentsPerInstance > 100_000 {
 		return errors.New("documentsPerInstance must be 1–100,000")
 	}
@@ -267,8 +300,8 @@ func (d *Document) validateDemo(approved map[string]bool) error {
 	if m.Models == nil {
 		m.Models = []string{}
 	}
-	if m.TTLMinutes < 5 || m.TTLMinutes > 24*60 || m.MaxActive < 0 || m.MaxActive > 1000 || m.PerAddressPerHour < 1 || m.PerAddressPerHour > 100 {
-		return errors.New("demo: ttlMinutes 5–1440, maxActive 0–1000, perAddressPerHour 1–100")
+	if m.TTLMinutes < 5 || m.TTLMinutes > 24*60 || m.MaxActive < 0 || m.MaxActive > 1000 || m.PerUserPerHour < 1 || m.PerUserPerHour > 100 || m.PerAddressPerHour < 1 || m.PerAddressPerHour > 100 {
+		return errors.New("demo: ttlMinutes 5–1440, maxActive 0–1000, perUserPerHour/perAddressPerHour 1–100")
 	}
 	if m.Credits < 0 || m.Credits > 10_000 || m.DailyBudget < 0 || m.DailyBudget > 1_000_000 {
 		return errors.New("demo: credits 0–10,000 and dailyBudget 0–1,000,000")

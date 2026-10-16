@@ -93,11 +93,16 @@ func (s *Store) WriteDocument(ctx context.Context, instance, user, path, op stri
 	if owner := PrivateOwner(path); owner != "" && owner != user {
 		return errors.New("Private document belongs to another person")
 	}
-	tx, err := s.Pool.Begin(ctx)
+	tx, limits, err := s.beginStorageWrite(ctx, instance)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	before, err := storageBytes(ctx, tx, instance)
+	if err != nil {
+		return err
+	}
+	maxDocs = min(maxDocs, limits.DocumentsPerInstance)
 	if op == "delete" {
 		if _, err = tx.Exec(ctx, `DELETE FROM instance_documents WHERE instance_id=$1 AND path=$2`, instance, path); err != nil {
 			return err
@@ -140,7 +145,7 @@ ON CONFLICT(instance_id,path) DO UPDATE SET body=EXCLUDED.body,size=EXCLUDED.siz
 		instance, path, collectionOf(path), raw, len(raw), user); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return commitStorageWrite(ctx, tx, instance, before, limits.StorageBytesPerInstance)
 }
 
 // AcquireLease takes or renews a cooperative lease within an instance.
@@ -155,10 +160,22 @@ func (s *Store) AcquireLease(ctx context.Context, instance, user, path, holder s
 	if err != nil {
 		return false, err
 	}
-	tag, err := s.Pool.Exec(ctx, `INSERT INTO instance_leases(instance_id,path,holder,expires_at,data) VALUES($1,$2,$3,$4,$5)
+	tx, limits, err := s.beginStorageWrite(ctx, instance)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	before, err := storageBytes(ctx, tx, instance)
+	if err != nil {
+		return false, err
+	}
+	tag, err := tx.Exec(ctx, `INSERT INTO instance_leases(instance_id,path,holder,expires_at,data) VALUES($1,$2,$3,$4,$5)
 ON CONFLICT(instance_id,path) DO UPDATE SET holder=EXCLUDED.holder,expires_at=EXCLUDED.expires_at,data=EXCLUDED.data
 WHERE instance_leases.expires_at<=now() OR instance_leases.holder=EXCLUDED.holder`, instance, path, holder, time.Now().Add(time.Duration(ttl)*time.Millisecond), raw)
 	if err != nil {
+		return false, err
+	}
+	if err = commitStorageWrite(ctx, tx, instance, before, limits.StorageBytesPerInstance); err != nil {
 		return false, err
 	}
 	return tag.RowsAffected() == 1, nil

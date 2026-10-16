@@ -11,9 +11,9 @@ import (
 func TestArealLayout(t *testing.T) {
 	e := setup(t)
 	pages := map[string][]string{
-		"/apps":                {`<h1>Applications.</h1>`, `<p class="sub">Each runs on its own origin`},
-		"/journal":             {`<h1>Journal.</h1>`},
-		"/pricing":             {`<h1>Plans.</h1>`},
+		"/apps":                {`aria-label="Applications and writing"`},
+		"/journal":             {`aria-label="Applications and writing"`},
+		"/pricing":             {`<h1>Support.</h1>`},
 		"/?login_error=denied": {`class="notice bad login-error"`, `Sign-in did not complete. Please try again.`},
 	}
 	for path, wants := range pages {

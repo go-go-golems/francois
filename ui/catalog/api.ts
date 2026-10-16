@@ -1,5 +1,16 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
+export type TrafficPoint = { day: string; key: string; other: boolean; views: number };
+export type ModelUsage = { key: string; label?: string; calls: number; failed: number; credits: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number };
+export type TrafficGroup = { key: string; views: number; visitors: number };
+export type Analytics = {
+ from: string; to: string; site: string; path: string; referrer: string | null;
+ traffic: { views: number; visitors: number; sessions: number; users: number; bounces: number };
+ groups: Record<string, TrafficGroup[]>;
+ series: Record<"pages" | "referrers", TrafficPoint[]>;
+ models: Record<string, ModelUsage[]>;
+};
+
 export type Decision = {
   allowed: boolean;
   reason: string;
@@ -212,6 +223,7 @@ export type AuditEntry = {
   createdAt: string;
 };
 export type SettingsDoc = {
+  operations: { acceptNewVisits: boolean; samplingEnabled: boolean; storageMode: "read-write" | "read-only" | "off"; notice: string };
   models: {
     allowed: { selector: string; label: string; thinking: string[]; credits: number }[];
     tiers: Record<string, string>;
@@ -222,6 +234,8 @@ export type SettingsDoc = {
     maxToolRounds: number;
   };
   limits: {
+    viewsPerUser: number;
+    storageBytesPerInstance: number;
     documentsPerInstance: number;
     assetBytesPerInstance: number;
     maxHtmlBytes: number;
@@ -234,6 +248,7 @@ export type SettingsDoc = {
     enabled: boolean;
     ttlMinutes: number;
     maxActive: number;
+    perUserPerHour: number;
     perAddressPerHour: number;
     credits: number;
     dailyBudget: number;
@@ -278,6 +293,7 @@ export const api = createApi({
   baseQuery,
   tagTypes: ["Session", "Catalog", "Account", "Instances", "Instance", "AdminReleases", "AdminUsers", "AdminUser", "AdminInstances", "Settings", "Billing", "Usage", "Audit", "Overview", "Tokens"],
   endpoints: (b) => ({
+    analytics: b.query<Analytics, string>({ query: (query) => `api/admin/analytics?${query}` }),
     session: b.query<Session, void>({
       query: () => "api/session",
       providesTags: ["Session"],

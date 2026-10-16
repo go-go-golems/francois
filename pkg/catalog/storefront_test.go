@@ -184,7 +184,7 @@ func TestStorefrontPages(t *testing.T) {
 	_ = st.SetArtifactCreators(ctx, "board", []string{c.ID})
 
 	// Home, catalog, tag filter.
-	if code, b, h := get(nil, "/"); code != 200 || !strings.Contains(b, "Board") || !strings.Contains(b, "Cleo Maker") || h.Get("Cache-Control") != "no-cache" {
+	if code, b, h := get(nil, "/"); code != 200 || !strings.Contains(b, "Board") || !strings.Contains(b, "Cleo Maker") || h.Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("home %d %s", code, b)
 	}
 	if code, b, _ := get(nil, "/apps?tag=tools"); code != 200 || !strings.Contains(b, `href="/apps/board"`) || !strings.Contains(b, `/media/`+cover.ID) {

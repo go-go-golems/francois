@@ -394,6 +394,7 @@ async function sample(r: Request) {
         waiting.delete(key);
       }
     }
+    emit({ type: "ended", callId: r.callId });
   }
 }
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });

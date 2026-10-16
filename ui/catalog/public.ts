@@ -1,8 +1,16 @@
+import { serviceNotice } from "./service-notice";
 // public.ts adds the session-dependent actions to server-rendered storefront
 // pages: sign out, run an artifact, try a demo. Pages are complete without
 // it; it only replaces placeholders. No framework, to stay small.
 
-type Plan = { key: string; name: string; rank: number; source: string; paid: boolean; instances: number };
+type Plan = {
+  key: string;
+  name: string;
+  rank: number;
+  source: string;
+  paid: boolean;
+  instances: number;
+};
 type Session = {
   authenticated: boolean;
   loginAvailable: boolean;
@@ -27,9 +35,16 @@ const getSession = () => (session ??= fetch("/api/session", { credentials: "same
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const s = await getSession();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
   if (s.csrfToken) headers["X-CSRF-Token"] = s.csrfToken;
-  const r = await fetch(path, { method: "POST", credentials: "same-origin", headers, body: JSON.stringify(body) });
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(body),
+  });
   const out = (await r.json().catch(() => ({}))) as T & Failure;
   if (!r.ok) throw new RequestError(out.error?.message || "Request failed", out.error?.code || "");
   return out;
@@ -46,7 +61,9 @@ const loginHref = () => "/auth/login?return=" + encodeURIComponent(location.path
 
 function fail(box: HTMLElement, message: string) {
   box.querySelector(".action-error")?.remove();
-  box.append(el("p", { class: "action-error notice bad", role: "alert" }, message));
+  const notice = serviceNotice(message);
+  notice.classList.add("action-error");
+  box.append(notice);
 }
 
 async function renderActions(box: HTMLElement) {
@@ -62,11 +79,13 @@ async function renderActions(box: HTMLElement) {
   // the demo when there is one; everything else is a text link.
   const hasDemo = demo === "true";
   const demoAction = (primary: boolean) => {
-    const btn = el("button", { class: primary ? "btn btn-ink" : "tlink", type: "button" }, "Try the demo");
+    const btn = el("button", { class: primary ? "btn btn-ink" : "tlink", type: "button" }, "Try");
     btn.addEventListener("click", async () => {
       btn.setAttribute("disabled", "");
       try {
-        const inst = await post<{ id: string }>("/api/demos", { artifactId: box.dataset.artifact });
+        const inst = await post<{ id: string }>("/api/demos", {
+          artifactId: box.dataset.artifact,
+        });
         location.assign("/instances/" + inst.id);
       } catch (e) {
         btn.removeAttribute("disabled");
@@ -76,11 +95,14 @@ async function renderActions(box: HTMLElement) {
     return btn;
   };
   if (release && canRun) {
-    const run = el("button", { class: "btn btn-ink", type: "button" }, "Run in a new instance");
+    const run = el("button", { class: "btn btn-ink", type: "button" }, "Open");
     run.addEventListener("click", async () => {
       run.setAttribute("disabled", "");
       try {
-        const inst = await post<{ id: string }>("/api/instances", { releaseId: release, title });
+        const inst = await post<{ id: string }>("/api/instances/open", {
+          releaseId: release,
+          title,
+        });
         location.assign("/instances/" + inst.id);
       } catch (e) {
         run.removeAttribute("disabled");
@@ -88,20 +110,14 @@ async function renderActions(box: HTMLElement) {
       }
     });
     box.append(run);
-    if (hasDemo) box.append(demoAction(false));
   } else {
     if (hasDemo) box.append(demoAction(true));
-    if (release) {
+    if (release && !hasDemo) {
       const cls = hasDemo ? "tlink" : "btn btn-ink";
       const name = box.dataset.plan;
-      box.append(
-        s.authenticated
-          ? el("a", { class: cls, href: "/pricing" }, name ? `Get ${name} to run` : "See plans")
-          : el("a", { class: cls, href: loginHref() }, "Sign in to run"),
-      );
+      box.append(el("a", { class: cls, href: loginHref() }, "Sign in"));
     }
   }
-  if (meta) box.append(meta);
 }
 
 // bindCheckout turns the pricing page's subscribe links into Checkout for
@@ -115,7 +131,10 @@ async function bindCheckout(box: HTMLElement) {
       e.preventDefault();
       a.setAttribute("aria-busy", "true");
       try {
-        const out = await post<{ url: string }>("/api/billing/checkout", { plan: box.dataset.plan, interval: a.dataset.interval });
+        const out = await post<{ url: string }>("/api/billing/checkout", {
+          plan: box.dataset.plan,
+          interval: a.dataset.interval,
+        });
         location.assign(out.url);
       } catch (err) {
         if (err instanceof RequestError && err.code === "subscription_open") {

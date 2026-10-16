@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 )
 
@@ -30,6 +31,16 @@ func (s *Store) CreateGuestSession(ctx context.Context, user string, ttl time.Du
 // ErrDemoCapacity reports that the maximum number of live demos is reached.
 var ErrDemoCapacity = errors.New("demo capacity reached")
 
+// LiveDemo returns a resumable tour without changing its expiry.
+func (s *Store) LiveDemo(ctx context.Context, owner, artifact string) (Instance, error) {
+	var id string
+	err := s.Pool.QueryRow(ctx, `SELECT i.id FROM instances i JOIN releases r ON r.id=i.release_id WHERE i.owner_user_id=$1 AND r.artifact_id=$2 AND i.kind='demo' AND i.state='active' AND i.expires_at>now() ORDER BY i.created_at,i.id LIMIT 1`, owner, artifact).Scan(&id)
+	if err != nil {
+		return Instance{}, notFound(err)
+	}
+	return s.MemberInstance(ctx, owner, id)
+}
+
 // CreateDemo creates a demo instance that expires at expires, unless limit
 // live demos already exist (admission is serialized so concurrent visitors
 // cannot exceed it).
@@ -40,6 +51,18 @@ func (s *Store) CreateDemo(ctx context.Context, owner, release, title string, ex
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('demos'))`); err != nil {
+		return Instance{}, err
+	}
+	// Repeat under the admission lock: simultaneous clicks resume one tour.
+	var existing string
+	err = tx.QueryRow(ctx, `SELECT i.id FROM instances i JOIN releases r ON r.id=i.release_id JOIN releases target ON target.id=$2 WHERE i.owner_user_id=$1 AND r.artifact_id=target.artifact_id AND i.kind='demo' AND i.state='active' AND i.expires_at>now() ORDER BY i.created_at,i.id LIMIT 1`, owner, release).Scan(&existing)
+	if err == nil {
+		if err = tx.Commit(ctx); err != nil {
+			return Instance{}, err
+		}
+		return s.MemberInstance(ctx, owner, existing)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return Instance{}, err
 	}
 	var live int

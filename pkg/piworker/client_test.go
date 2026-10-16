@@ -34,6 +34,9 @@ func runHelperWorker() {
 		switch kind {
 		case "init":
 			_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "ready", Models: []Model{{Provider: "test", ID: "protocol"}}})
+		case "cancel":
+			time.Sleep(80 * time.Millisecond)
+			_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "ended", CallID: callID})
 		case "sample":
 			var input string
 			_ = json.Unmarshal(frame["input"], &input)
@@ -44,6 +47,7 @@ func runHelperWorker() {
 			if input == "thinking" {
 				_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "thinking", CallID: callID, Text: "Inspecting the scene.", Delta: "Inspecting the scene."})
 				_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "result", CallID: callID, Result: &Result{Text: "done", Thinking: "Inspecting the scene."}})
+				_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "ended", CallID: callID})
 				continue
 			}
 			if input == "wait" {
@@ -61,6 +65,7 @@ func runHelperWorker() {
 				text = "tool accepted"
 			}
 			_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "result", CallID: callID, Result: &Result{Text: text, ModelTierApplied: "quick"}})
+			_ = json.NewEncoder(os.Stdout).Encode(Event{Type: "ended", CallID: callID})
 		}
 	}
 }
@@ -107,7 +112,11 @@ func TestClientToolsCancellationAndWorkerExit(t *testing.T) {
 		c := testClient(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 		defer cancel()
+		started := time.Now()
 		err := c.Sample(ctx, Request{CallID: "cancel", Input: json.RawMessage(`"wait"`)}, func(Event) {}, nil)
+		if time.Since(started) < 80*time.Millisecond {
+			t.Fatal("released before worker completion")
+		}
 		if err != context.DeadlineExceeded {
 			t.Fatalf("cancellation error: %v", err)
 		}

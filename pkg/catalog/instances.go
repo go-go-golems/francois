@@ -67,7 +67,18 @@ func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", "Title is too long")
 		return
 	}
-	inst, err := s.Store.CreateInstance(ctx, principal(ctx).User.ID, rel.ID, in.Title, "workspace", e.Plan.Instances)
+	var inst store.Instance
+	if r.URL.Path == "/api/instances/open" {
+		inst, err = s.Store.OpenWorkspace(ctx, principal(ctx).User.ID, rel.ID, in.Title, e.Plan.Instances, doc.Operations.AcceptNewVisits, doc.Publishing.AllowPinnedAfterWithdraw)
+	} else if !doc.Operations.AcceptNewVisits {
+		err = store.ErrActivityPaused
+	} else {
+		inst, err = s.Store.CreateInstance(ctx, principal(ctx).User.ID, rel.ID, in.Title, "workspace", e.Plan.Instances)
+	}
+	if errors.Is(err, store.ErrActivityPaused) {
+		httpx.Fail(w, 503, "visits_paused", doc.Operations.Message("New visits are temporarily paused."))
+		return
+	}
 	if errors.Is(err, store.ErrLimit) {
 		httpx.Fail(w, 409, "instance_limit", "You have reached your plan's instance limit")
 		return

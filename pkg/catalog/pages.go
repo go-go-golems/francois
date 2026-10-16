@@ -140,14 +140,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	d.Canonical = site.PortalOrigin() + r.URL.Path
 	d.LoginAvailable = site.OIDC.Configured()
 	d.LoginHref = "/auth/login?return=" + url.QueryEscape(r.URL.RequestURI())
-	nav := []navItem{{Href: "/apps", Label: "Catalog"}, {Href: "/journal", Label: "Journal"}}
-	if len(rev.Document.Prices()) > 0 {
-		nav = append(nav, navItem{Href: "/pricing", Label: "Pricing"})
-	}
+	nav := []navItem{{Href: "/", Label: "Feed"}}
 	// Demo guests browse like visitors: no account pages, and they may sign in.
 	if p != nil && p.User.Role != "guest" {
 		d.User = &p.User
-		nav = append(nav, navItem{Href: "/instances/", Label: "Instances"}, navItem{Href: "/account", Label: "Account"})
+		nav = append(nav, navItem{Href: "/account", Label: "Account"})
 		if p.User.Role == "creator" || p.User.Role == "admin" {
 			nav = append(nav, navItem{Href: "/studio", Label: "Studio"})
 		}
@@ -156,7 +153,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		}
 	}
 	for i := range nav {
-		nav[i].Current = strings.HasPrefix(r.URL.Path, strings.TrimSuffix(nav[i].Href, "/"))
+		nav[i].Current = r.URL.Path == nav[i].Href || (nav[i].Href != "/" && strings.HasPrefix(r.URL.Path, strings.TrimSuffix(nav[i].Href, "/")))
 	}
 	d.Nav = nav
 	if d.Description == "" {
@@ -261,87 +258,71 @@ func find(arts []store.Artifact, id string) *store.Artifact {
 
 func listed(a store.Artifact) bool { return a.Visibility == "listed" }
 
-func (s *Server) homePage(w http.ResponseWriter, r *http.Request) {
+// feedPage presents applications and writing in one chronological stream.
+func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	all, err := s.cards(ctx, listed)
+	cards, err := s.cards(ctx, listed)
 	if err != nil {
 		s.pageFailed(w, r, err)
 		return
 	}
-	featured := []card{}
-	for _, c := range all {
-		if c.Featured {
-			featured = append(featured, c)
-		}
-	}
-	if len(featured) == 0 && len(all) > 0 {
-		featured = all[:min(len(all), 6)]
-	}
-	creators, err := s.Store.Creators(ctx)
+	posts, err := s.Store.Posts(ctx, "published", "", 0)
 	if err != nil {
 		s.pageFailed(w, r, err)
 		return
 	}
-	posts, err := s.Store.Posts(ctx, "published", "", 3)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
+	type entry struct {
+		Cards []card
+		Posts []store.Post
+		Date  time.Time
+		Key   string
 	}
-	rev, err := s.Store.ActiveSettings(ctx)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
-	}
-	front := rev.Document.Storefront
-	// The front page leads with one statement; the brand is already in the
-	// header's crumb.
-	statement := firstNonEmpty(front.Tagline, front.Title, "Single-file HTML applications, hosted for you: a private origin, a real database, shared rooms and model calls — no setup, no keys.")
-	body := map[string]any{
-		"Statement":  statement,
-		"Intro":      s.markdown(r.Context(), front.Intro),
-		"Featured":   featured,
-		"Creators":   creators,
-		"Posts":      posts,
-		"LoginError": r.URL.Query().Get("login_error"),
-	}
-	s.render(w, r, http.StatusOK, "home", pageData{Body: body})
-}
-
-type tagCount struct {
-	Name    string
-	Count   int
-	Current bool
-}
-
-func (s *Server) catalogPage(w http.ResponseWriter, r *http.Request) {
-	all, err := s.cards(r.Context(), listed)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
-	}
+	entries := []entry{}
 	tag := r.URL.Query().Get("tag")
 	counts := map[string]int{}
-	list := []card{}
-	for _, c := range all {
+	for _, c := range cards {
 		for _, t := range c.Tags {
 			counts[t]++
 		}
-		if tag == "" || contains(c.Tags, tag) {
-			list = append(list, c)
+		if tag != "" && !contains(c.Tags, tag) {
+			continue
 		}
+		e := entry{Cards: []card{c}, Key: "app:" + c.ID}
+		if c.Published != nil {
+			e.Date = *c.Published
+		}
+		entries = append(entries, e)
+	}
+	for _, p := range posts {
+		for _, t := range p.Tags {
+			counts[t]++
+		}
+		if tag != "" && !contains(p.Tags, tag) {
+			continue
+		}
+		e := entry{Posts: []store.Post{p}, Key: "post:" + p.ID}
+		if p.PublishedAt != nil {
+			e.Date = *p.PublishedAt
+		}
+		entries = append(entries, e)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Date.Equal(entries[j].Date) {
+			return entries[i].Key < entries[j].Key
+		}
+		return entries[i].Date.After(entries[j].Date)
+	})
+	type tagCount struct {
+		Name    string
+		Count   int
+		Current bool
 	}
 	tags := []tagCount{}
 	for t, n := range counts {
-		tags = append(tags, tagCount{Name: t, Count: n, Current: t == tag})
+		tags = append(tags, tagCount{t, n, t == tag})
 	}
-	sort.Slice(tags, func(i, j int) bool {
-		if tags[i].Count != tags[j].Count {
-			return tags[i].Count > tags[j].Count
-		}
-		return tags[i].Name < tags[j].Name
-	})
-	s.render(w, r, http.StatusOK, "catalog", pageData{Title: "Applications", Crumb: "apps", Description: "All published applications.",
-		Body: map[string]any{"Cards": list, "Tags": tags, "Tag": tag}})
+	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
+	s.render(w, r, http.StatusOK, "home", pageData{Description: "Applications and writing.", Body: map[string]any{"Entries": entries, "Tags": tags, "Tag": tag, "LoginError": r.URL.Query().Get("login_error")}})
 }
 
 func contains(list []string, v string) bool {
@@ -529,17 +510,6 @@ func (s *Server) creatorPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "creator", d)
 }
 
-func (s *Server) journalPage(w http.ResponseWriter, r *http.Request) {
-	posts, err := s.Store.Posts(r.Context(), "published", "", 0)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
-	}
-	s.render(w, r, http.StatusOK, "journal", pageData{Title: "Journal", Crumb: "journal", Description: "Notes on how the applications are made.", Body: posts})
-}
-
-// canEditPost: administrators, the post's creator account, and the account
-// linked to its author profile.
 func (s *Server) canEditPost(ctx context.Context, u store.User, p store.Post) bool {
 	if u.Disabled {
 		return false
@@ -594,12 +564,17 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "post", d)
 }
 
+type rssGUID struct {
+	Value     string `xml:",chardata"`
+	Permalink bool   `xml:"isPermaLink,attr"`
+}
+
 type rssItem struct {
-	Title       string `xml:"title"`
-	Link        string `xml:"link"`
-	GUID        string `xml:"guid"`
-	PubDate     string `xml:"pubDate"`
-	Description string `xml:"description"`
+	Title       string  `xml:"title"`
+	Link        string  `xml:"link"`
+	GUID        rssGUID `xml:"guid"`
+	PubDate     string  `xml:"pubDate"`
+	Description string  `xml:"description"`
 }
 
 type rssDoc struct {
@@ -630,21 +605,13 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 	doc.Channel.Description = "Notes on how the applications are made."
 	for _, p := range posts {
 		link := origin + "/journal/" + p.Slug
-		item := rssItem{Title: p.Title, Link: link, GUID: link, Description: firstNonEmpty(p.Summary, content.Excerpt(p.Body, 300))}
+		item := rssItem{Title: p.Title, Link: link, GUID: rssGUID{Value: link, Permalink: true}, Description: firstNonEmpty(p.Summary, content.Excerpt(p.Body, 300))}
 		if p.PublishedAt != nil {
 			item.PubDate = p.PublishedAt.UTC().Format(time.RFC1123Z)
 		}
 		doc.Channel.Items = append(doc.Channel.Items, item)
 	}
-	out, err := xml.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	_, _ = w.Write([]byte(xml.Header))
-	_, _ = w.Write(out)
+	writeRSS(w, doc)
 }
 
 // media serves uploaded storefront media. A media ID always names the same

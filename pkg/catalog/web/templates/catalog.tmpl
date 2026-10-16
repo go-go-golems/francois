@@ -1,4 +1,6 @@
-{{define "content"}}<main>
+{{define "content"}}
+<main>
+<p><a class="u" href="/apps/feed.xml">Subscribe to releases via RSS</a></p>
 <section class="intro"><h1>Applications.</h1><p class="sub">Each runs on its own origin, with its own database, rooms and model calls.</p></section>
 <section class="controls">
 <div class="views"><span class="result-count">{{len .Body.Cards}} {{if eq (len .Body.Cards) 1}}application{{else}}applications{{end}}</span>{{if .Body.Tag}}<a class="u" href="/apps">Show all</a>{{end}}</div>

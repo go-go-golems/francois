@@ -72,9 +72,26 @@ func (rt *Runtime) createView(w http.ResponseWriter, r *http.Request, inst store
 		failErr(w, err)
 		return
 	}
+	rev, err := rt.Store.ActiveSettings(r.Context())
+	if err != nil {
+		failErr(w, err)
+		return
+	}
 	ctx, cancel := context.WithCancel(rt.ctx)
 	v := &View{ID: store.NewID("v_"), P: p, ctx: ctx, cancel: cancel, events: make(chan any, 128), calls: map[string]*call{}, presence: map[string]map[string]any{}, rooms: map[string]bool{"": true}}
 	rt.mu.Lock()
+	n := 0
+	for _, other := range rt.views {
+		if other.P.User.ID == p.User.ID {
+			n++
+		}
+	}
+	if n >= rev.Document.Limits.ViewsPerUser {
+		rt.mu.Unlock()
+		cancel()
+		httpx.Fail(w, 429, "view_limit", "Please close another application tab and try again.")
+		return
+	}
 	rt.views[v.ID] = v
 	rt.mu.Unlock()
 	rt.group.Go(func() error {

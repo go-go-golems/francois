@@ -741,3 +741,21 @@ The order follows the dependencies; each step names its check.
   garbage collector.
 - The PDS records in the `scapegoat.dev` zone are not imported into Terraform
   (HK3S-0031), so a full DNS apply would try to recreate them.
+
+
+## 13. Hosted service controls
+
+Admin → Settings → Service controls edits the existing versioned policy. Save & activate applies it to subsequent requests from both new and already-open tabs.
+
+- **Accept new visits:** turn off to stop new tours/workspaces. Existing eligible workspaces and live tours still reopen.
+- **Enable AI:** turn off to refuse new calls. Already-running calls finish under their existing timeout.
+- **Saved work:** Read and write is normal; Read only preserves reads but rejects all persistent mutations; Unavailable rejects persistent reads too, including signed asset URLs. Public pages remain available while the database is healthy.
+- **Notice:** optional plain text shown when a blocked action occurs. A rejected save stops later autosave writes in that tab and identifies unsaved changes; reload after service restoration to retry.
+
+These controls use `operations.acceptNewVisits`, `samplingEnabled`, `storageMode` and `notice` in the existing GET/PATCH `/api/admin/settings` document. PATCH requires the revision's `If-Match`, as before. Pause controls apply to everyone; account/instance suspension remains available for an individual caller.
+
+Model concurrency is bounded at six globally and one per person across tabs/artifacts. Configure free/paid/demo allowances privately in the existing plan/model settings. Tours default to 20 minutes, with user/network start limits; counters remain process-local. New resource defaults are three live views per user, 500 documents and 16 MiB of aggregate logical persistent payload per instance. Lowering a storage quota keeps existing data readable and allows cleanup/shrinking.
+
+Apply migration `011_operations.sql` before deploying this implementation. It transforms saved settings into the new strict shape and applies the stated default caps, preserving accounts, plans and saved work. Rolling back to an older image requires the matching pre-migration database backup because older code rejects the new settings fields.
+
+Normal Open resumes a saved workspace through `POST /api/instances/open`. The public stream subscribes through `/feed.xml`; usage remains in administrator analytics. See FRANCOIS-008's implementation receipt for the verified local rollout; it is not evidence of a production deployment.

@@ -187,7 +187,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 			}
 		}
 	}
-	srv.portal = srv.routes()
+	srv.portal = srv.trackTraffic(srv.routes())
 	return srv
 }
 
@@ -339,6 +339,7 @@ func (s *Server) Run(ctx context.Context, listen string) error {
 		g.Go(func() error { return s.Payments.Run(ctx) })
 	}
 	g.Go(func() error { return s.expireDemos(ctx) })
+	g.Go(func() error { return s.pruneTraffic(ctx) })
 	g.Go(func() error {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -32,11 +32,9 @@ type limiter struct {
 
 func newLimiter() *limiter { return &limiter{hits: map[string][]time.Time{}} }
 
-// allow records a hit for key and reports whether it is within limit hits
-// per window.
-func (l *limiter) allow(key string, limit int, window time.Duration, now time.Time) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// available prunes expired hits and checks a limit without spending a start.
+// The caller holds mu through lookup, creation and recording successful starts.
+func (l *limiter) available(key string, limit int, window time.Duration, now time.Time) bool {
 	cut := now.Add(-window)
 	kept := l.hits[key][:0]
 	for _, t := range l.hits[key] {
@@ -44,11 +42,7 @@ func (l *limiter) allow(key string, limit int, window time.Duration, now time.Ti
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= limit {
-		l.hits[key] = kept
-		return false
-	}
-	l.hits[key] = append(kept, now)
+	l.hits[key] = kept
 	// Bound memory: forget idle keys occasionally.
 	if len(l.hits) > 10000 {
 		for k, v := range l.hits {
@@ -57,7 +51,7 @@ func (l *limiter) allow(key string, limit int, window time.Duration, now time.Ti
 			}
 		}
 	}
-	return true
+	return len(kept) < limit
 }
 
 // clientAddress is the visitor's address: the reverse proxy's X-Real-Ip
@@ -111,12 +105,35 @@ func (s *Server) createDemo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 403, "demo_disabled", "There is no demo for this application")
 		return
 	}
+	// One process serves tours. Serialize resume/check/create so simultaneous
+	// Try requests spend one start, and failed creation spends none.
+	s.demoLimiter.mu.Lock()
+	defer s.demoLimiter.mu.Unlock()
 	p := principal(ctx)
 	if p != nil && p.User.Disabled {
 		httpx.Fail(w, 403, "account_disabled", "This account is disabled")
 		return
 	}
-	if !s.demoLimiter.allow(s.clientAddress(r), cfg.PerAddressPerHour, time.Hour, time.Now()) {
+	if p != nil {
+		inst, err := s.Store.LiveDemo(ctx, p.User.ID, a.ID)
+		if err == nil {
+			httpx.JSON(w, 201, map[string]any{"id": inst.ID, "expiresAt": inst.ExpiresAt})
+			return
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			httpx.Fail(w, 503, "unavailable", "Could not open the visit")
+			return
+		}
+	}
+	if !rev.Document.Operations.AcceptNewVisits {
+		httpx.Fail(w, 503, "visits_paused", rev.Document.Operations.Message("New visits are temporarily paused."))
+		return
+	}
+	if p != nil && !s.demoLimiter.available("user:"+p.User.ID, cfg.PerUserPerHour, time.Hour, time.Now()) {
+		httpx.Fail(w, 429, "rate_limited", "Please come back a little later.")
+		return
+	}
+	if !s.demoLimiter.available("address:"+s.clientAddress(r), cfg.PerAddressPerHour, time.Hour, time.Now()) {
 		httpx.Fail(w, 429, "rate_limited", "Too many demos from your network; try again later")
 		return
 	}
@@ -145,6 +162,13 @@ func (s *Server) createDemo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Could not start the demo")
 		return
 	}
+	now := time.Now()
+	if p != nil {
+		key := "user:" + p.User.ID
+		s.demoLimiter.hits[key] = append(s.demoLimiter.hits[key], now)
+	}
+	key := "address:" + s.clientAddress(r)
+	s.demoLimiter.hits[key] = append(s.demoLimiter.hits[key], now)
 	log.Info().Str("artifact", a.ID).Str("instance", inst.ID).Bool("guest", p == nil).Msg("Demo started")
 	httpx.JSON(w, 201, map[string]any{"id": inst.ID, "expiresAt": inst.ExpiresAt})
 }
