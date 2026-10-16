@@ -79,7 +79,7 @@ export function ApiTokens({ role }: { role: SessionUser["role"] }) {
           <pre className="code-inline">{`export FRANCOIS_TOKEN=…   # the token above
 curl -H "Authorization: Bearer $FRANCOIS_TOKEN" ${location.origin}/api/me`}</pre>
           {secret.scopes.includes("studio") && (
-            <pre className="code-inline">{`francois catalog push --server ${location.origin} \\\n  --artifact-id <id> --version 1.0.0 --html dist/app.html --publish`}</pre>
+            <pre className="code-inline">{`francois catalog releases push --server ${location.origin} \\\n  --artifact-id <id> --version 1.0.0 --html dist/app.html --publish`}</pre>
           )}
           <button type="button" className="tlink" onClick={() => setSecret(null)}>
             Done

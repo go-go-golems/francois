@@ -1235,7 +1235,7 @@ function Tokens() {
         <Link className="u" to="/account#api-tokens">
           account page
         </Link>
-        . Give a token the <span className="mono">studio</span> scope to use it with <span className="mono">francois catalog push</span>.
+        . Give a token the <span className="mono">studio</span> scope to use it with <span className="mono">francois catalog releases push</span>.
       </p>
     </section>
   );

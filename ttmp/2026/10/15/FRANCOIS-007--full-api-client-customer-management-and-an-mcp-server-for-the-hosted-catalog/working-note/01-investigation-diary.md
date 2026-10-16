@@ -703,3 +703,77 @@ Everything went in as one commit, as the owner asked for less granular steps.
 ### Technical details
 
 - Every route in guide §7 has a client method except `/api/billing/refresh` (a Checkout-return helper for the browser) and the public pages.
+
+## Step 11: Phase 4: the `francois catalog` command tree
+
+Every API operation now has a command under `francois catalog`, built on one generic Glazed command over the client. The direct-database commands moved to `catalog db`, `catalog push` moved to `catalog releases push`, and an embedded help topic (`francois help catalog-api`) explains tokens, scopes and the groups. Smoke-tested against the local stack. The test exposed two problems (a stale server image and a broken setup script), both fixed.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 9.
+
+**Assistant interpretation:** Phase 4 of the guide.
+
+**Inferred user intent:** Operate the shop from a shell with a scoped token.
+
+### What I did
+
+- `cmd/francois/cmds/api.go`:
+  - the generic `apiCommand` (Glazed `GlazeCommand`): reads the connection flags `--server`, `--token-file` and `--host`, with `$FRANCOIS_SERVER` and `$FRANCOIS_TOKEN` as fallbacks;
+  - a `run(ctx, client, in)` hook, with `emit` turning lists into one row per element, objects into one row, and no body into `ok: true`;
+  - the `in` accessors (`S`, `B`, `I`, `L`, plus tri-state `optS`, `optB`, `optI` for patch flags);
+  - a `def` table and the `single`/`group` builders; destructive commands get `--yes`, and `confirm` uses `term.IsTerminal`.
+- `cmd/francois/cmds/api_commands.go`: groups `whoami`, `artifacts` (list, show, create, update, page-set, page-publish, page-discard), `releases` (list, publish, withdraw, preview, delete, push), `attachments`, `media`, `posts`, `creators`, `users` (list, show, set-role, disable, enable, revoke-sessions, grant, revoke-grant, tokens, revoke-token), `subscriptions`, `instances`, `plans` (list, show, set: an `If-Match` read-modify-write through `EditPlan`), `settings` (show, history, apply), `billing`, `usage`, `audit` and `account`.
+- `catalog.go`: new `db` group with `publish`, `settings` and `users …`; `serve` and `migrate` stay; `registerAPI` added.
+- `pkg/doc` (embedded topics) loaded in `cmd/francois/main.go`; topic `01-catalog-api.md`.
+- Callers of the moved commands updated: `deploy/compose/bin/catalog-setup` (`catalog db users promote`), `README.md`, `doc/production.md` (the `fc` helper now runs `catalog db`, plus a new section of API examples), and the UI hints (`catalog releases push`).
+- `go.mod`: `golang.org/x/term` is now a direct dependency (`go mod tidy`).
+- Tests (`api_test.go`): the command tree (including that `catalog push` is gone); `whoami` and `users grant` against a fake API, checking the request body; refusal without `--yes`; an API error code reaching the user.
+
+### Why
+
+- One generic command keeps around 60 commands to a table of short definitions; the client already holds the logic.
+
+### What worked
+
+- Against the rebuilt local stack:
+  - `users list` with plan and source;
+  - `users grant` → `agr_…`;
+  - `users revoke-grant` without `--yes`: `revoke-grant changes or removes data; pass --yes to confirm`; with `--yes`: revoked;
+  - `audit list --action user.access_revoke` shows `tokenId tok_5bbf…` (the CLI's token);
+  - `plans set studio --daily-credits 120 --yes` → revision 5, and `plans show studio` → 120;
+  - `subscriptions list` shows bob's Stripe-sandbox subscription.
+- `make ci-check` → `0 issues.`, every package `ok`; `pnpm check`, `pnpm test` 5/0.
+
+### What didn't work
+
+- The first smoke run used `--output`/`--fields` (`unknown flag: --output`). This Glazed version names them `--format` and `--output-fields`.
+- The first smoke run gave an empty plan column, `not_found: Unknown API route` for `revoke-grant`, and ignored audit filters. Cause: the local stack still ran the phase 1 image, without the phase 2 routes.
+- Rebuilding the stack failed: `service "zitadel-setup" didn't complete successfully: exit 1`. The container log said `unknown flag: --database-url`, because the setup script still called `francois catalog users promote`, which had moved to `catalog db`. The script was updated, which also showed the docs needed updating.
+- The confirmation first used `os.Stdin.Stat()` and `ModeCharDevice`. `/dev/null` is a character device, so the command prompted and read EOF ("cancelled") instead of saying "pass --yes". It was replaced with `term.IsTerminal`.
+- `make ci-check` failed at `fmt-check` until `golangci-lint fmt` reflowed one-line closures in `api_commands.go`.
+
+### What I learned
+
+- Moving commands has callers outside Go: compose scripts, docs, UI hints, and the k3s repository README (`gitops/kustomize/francois/README.md:42`, which is not in this repository and still says `catalog users promote`).
+
+### What was tricky to build
+
+- Patch semantics on the command line: unset flags must mean "unchanged". String flags with tri-state parsing (`optB`, `optI`) avoid Glazed defaults that are indistinguishable from explicit values.
+
+### What warrants a second pair of eyes
+
+- `plans set` and `settings apply` are marked destructive (`--yes`) because they change what customers get.
+- The k3s README still documents `catalog users promote`; it needs a one-line change in that repository.
+
+### What should be done in the future
+
+- Phase 5: the MCP server.
+
+### Code review instructions
+
+- `cmd/francois/cmds/api.go`, then the tables in `api_commands.go`; `francois catalog --help`; `francois help catalog-api`.
+
+### Technical details
+
+- Output: `--format json|yaml|csv|table`, `--output-fields a,b`.

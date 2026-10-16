@@ -459,7 +459,8 @@ func (c *CatalogSettings) RunIntoGlazeProcessor(ctx context.Context, p *values.V
 
 func registerCatalog(root *cobra.Command) error {
 	group := &cobra.Command{Use: "catalog", Short: "Hosted subscriber platform: portal, admin, instances and billing"}
-	users := &cobra.Command{Use: "users", Short: "Operator account management"}
+	db := &cobra.Command{Use: "db", Short: "Direct database operations for operators (bootstrap and break-glass; prefer the API commands)"}
+	users := &cobra.Command{Use: "users", Short: "Operator account management directly in the database"}
 	withDB := func(extra ...*fields.Definition) glazed.CommandDescriptionOption {
 		return glazed.WithFlags(append(dbFlags(), extra...)...)
 	}
@@ -511,12 +512,19 @@ func registerCatalog(root *cobra.Command) error {
 		))}
 	list := &CatalogUsers{glazed.NewCommandDescription("list", glazed.WithShort("List accounts"), withDB(fields.New("search", fields.TypeString)))}
 	settingsCmd := &CatalogSettings{glazed.NewCommandDescription("settings", glazed.WithShort("Show or activate validated platform settings"), withDB(fields.New("file", fields.TypeString, fields.WithHelp("JSON settings document to validate and activate"))))}
-	for _, cmd := range []glazed.Command{serve, migrate, publish, settingsCmd, newCatalogPush()} {
+	for _, cmd := range []glazed.Command{serve, migrate} {
 		c, err := cli.BuildCobraCommandFromCommand(cmd)
 		if err != nil {
 			return err
 		}
 		group.AddCommand(c)
+	}
+	for _, cmd := range []glazed.Command{publish, settingsCmd} {
+		c, err := cli.BuildCobraCommandFromCommand(cmd)
+		if err != nil {
+			return err
+		}
+		db.AddCommand(c)
 	}
 	userFlags := withDB(fields.New("user-id", fields.TypeString), fields.New("issuer", fields.TypeString), fields.New("subject", fields.TypeString), fields.New("days", fields.TypeInteger, fields.WithDefault(0)), fields.New("reason", fields.TypeString), fields.New("plan", fields.TypeString, fields.WithHelp("grant-access: plan key (default: the highest plan)")))
 	actions := map[string]string{"promote": "Make an exact issuer/subject (or user) an administrator", "disable": "Disable hosted access and revoke runtime grants", "enable": "Re-enable an account", "revoke-sessions": "Revoke portal sessions and runtime grants", "grant-access": "Grant complimentary hosted access for --days"}
@@ -532,7 +540,11 @@ func registerCatalog(root *cobra.Command) error {
 		}
 		users.AddCommand(c)
 	}
-	group.AddCommand(users)
+	db.AddCommand(users)
+	group.AddCommand(db)
+	if err := registerAPI(group); err != nil {
+		return err
+	}
 	root.AddCommand(group)
 	return nil
 }

@@ -335,7 +335,7 @@ it above both limits.
 Run catalog commands inside the pod; they need the database URL file:
 
 ```bash
-fc() { kubectl -n francois exec deploy/francois -- francois catalog "$@" --database-url-file /run/secrets/francois/database-url; }
+fc() { kubectl -n francois exec deploy/francois -- francois catalog db "$@" --database-url-file /run/secrets/francois/database-url; }
 ```
 
 ### 5.1 Invite a user
@@ -376,12 +376,32 @@ fc users enable --user-id usr_…
 fc users revoke-sessions --user-id usr_…
 ```
 
-`promote` by issuer and subject creates the identity row if the user has not
-signed in yet, so the first login already has the admin role. Use the ZITADEL
+`fc` runs the `catalog db` commands, which write to the database directly
+(bootstrap and break-glass). `promote` by issuer and subject creates the
+identity row if the user has not signed in yet, so the first login already
+has the admin role. Use the ZITADEL
 user ID as the subject. Roles (subscriber, creator, administrator),
 complimentary access (optionally for a named plan; without one, the highest
 plan), credit adjustments and suspensions are also in the admin UI (`/admin`).
 Creators and administrators have the highest plan without paying.
+
+The same operations are available from a laptop through the API, with a
+token holding `admin:read`/`admin:write` (`francois catalog --help` lists
+every group):
+
+```bash
+export FRANCOIS_SERVER=https://slop.boutique FRANCOIS_TOKEN=…   # e.g. from Vault
+francois catalog whoami
+francois catalog users list --role subscriber --plan subscriber
+francois catalog users grant usr_… --days 30 --reason pilot --plan studio
+francois catalog users revoke-grant agr_… --yes
+francois catalog subscriptions list --status active
+francois catalog plans set studio --monthly-credits 1500 --yes
+francois catalog audit list --actor usr_… --limit 20
+```
+
+Commands that change or remove data ask for confirmation on a terminal and
+need `--yes` in scripts.
 
 ### 5.3 Publish a release of an artifact
 
@@ -391,7 +411,7 @@ preview on an isolated origin → publish. From a laptop, with a personal API
 token with the `studio` scope, created on the account page (`/account` → API tokens):
 
 ```bash
-francois catalog push --server https://slop.boutique --token-file ~/.config/francois/token \
+francois catalog releases push --server https://slop.boutique --token-file ~/.config/francois/token \
   --artifact-id polis --version 1.2.0 --html dist/polis.html \
   [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish] \
   [--attach docs/manual.pdf --attach plates.zip]
