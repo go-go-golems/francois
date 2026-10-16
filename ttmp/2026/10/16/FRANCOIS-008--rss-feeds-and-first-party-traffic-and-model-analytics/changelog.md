@@ -55,3 +55,7 @@ Implemented backend operation switches, six-call admission with worker terminati
 ## 2026-10-16
 
 Implemented the existing settings editor controls, shared pause/unsaved notices, automatic Open, minimal Account/launcher, and combined public HTML/RSS stream. Full Go/PostgreSQL suite, frontend checks/tests/build, Go build and lint pass.
+
+## 2026-10-16
+
+Deployed revision 42a1f3f locally with migration 011 and matching pre-migration backup. All 21 real-browser checks passed; all user/instance/release/model-call/document counts preserved. Completed tasks, recorded receipts/screenshots, and uploaded the current minimal hosting guide to reMarkable.

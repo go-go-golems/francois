@@ -38,7 +38,7 @@ The application is now running at [local Analytics](http://localhost:8090/admin/
 
 ## Feature entry points
 
-The follow-up [minimal public experience and operational capacity proposal](design-doc/03-minimal-public-experience-and-operational-capacity-controls.md) addresses Paper simplification comments, six model lanes, private fairness limits, service pauses and instance infrastructure costs. It is a proposed next phase; deployment receipts above describe the existing implementation.
+The [minimal hosting implementation guide](design-doc/03-minimal-public-experience-and-operational-capacity-controls.md) is now implemented in backend `ad5f791` and UI `42a1f3f`, including service controls, six-call admission, private limits, workspace/tour reuse, bounded storage, shared notices and a merged public stream. See the [implementation/local rollout receipt](reference/02-minimal-hosting-implementation-and-local-deployment-receipt.md) for validation and preserved-data evidence.
 
 - Release feed: `/apps/feed.xml`; existing journal feed: `/journal/feed.xml`.
 - Admin dashboard: `/admin/analytics`.

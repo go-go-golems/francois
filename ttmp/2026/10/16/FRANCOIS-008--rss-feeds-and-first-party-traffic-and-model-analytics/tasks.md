@@ -7,4 +7,4 @@
 - [x] Upload completed guide to reMarkable <!-- t:68cj -->
 - [x] Implement and validate Paper-designed graphs, traffic filters/stacks and date dialog <!-- t:nsd3 -->
 - [x] Deploy the completed analytics implementation to the existing local Compose stack and verify authenticated behavior <!-- t:a1wv -->
-- [ ] Implement the simplified design using existing settings, model admission, tour limits and workspace/storage handlers, with one shared notice <!-- t:byyf -->
+- [x] Implement the simplified design using existing settings, model admission, tour limits and workspace/storage handlers, with one shared notice <!-- t:byyf -->

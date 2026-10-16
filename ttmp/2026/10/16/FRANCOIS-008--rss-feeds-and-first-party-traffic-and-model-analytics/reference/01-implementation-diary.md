@@ -857,3 +857,74 @@ Start with `ui/catalog/admin.tsx`, `service-notice.ts`, `public.ts`, `account.ts
 ### Technical details
 
 Pause settings are saved through the existing versioned GET/PATCH administration API with If-Match. `/feed.xml` excludes hidden artifacts and draft posts/releases and uses stable GUIDs. No changes to provider credentials or live accounts/data were needed for tests.
+
+## Step 13: Deploy locally, verify the actual runtime and deliver the guide
+
+The completed application was rebuilt from `42a1f3f` using the existing Dockerfile's Node 24 build/runtime. After a private database backup, migration 011 applied and only the local application container was recreated. The real deployment passed 21 browser checks, including temporary service pauses and settings restoration, with no new provider call or application document.
+
+### Prompt Context
+
+**User prompt:** See Step 11; continuing the previously authorized local deployment and requested reMarkable delivery.
+
+**Assistant interpretation:** Complete actual local rollout and user-visible verification, then record/deliver the implementation evidence.
+
+**Inferred user intent:** Working code available locally, reviewable commits and a trustworthy implementation diary.
+
+**Commits (code):** `ad5f791` — Add simple operation controls and bounded hosted workspaces; `42a1f3f` — Keep public hosting minimal with shared service notices.
+
+### What I did
+
+- Notified the user before Compose read its existing environment file; no provider credentials or auth-file contents were printed.
+- Recorded baseline counts, made `/tmp/francois-008-pre-controls.dump` (custom-format PostgreSQL, mode 0600, 99,232 bytes), and tagged the previous image `francois-catalog:pre-controls-42a1f3f`.
+- Built in tmux, ran the image's catalog migration command, and recreated only the app without rebuilding identity/database services or removing volumes.
+- Verified health/readiness, image/revision and zero restarts, then used the preserved authenticated local browser session to exercise the real settings editor and isolated runtime.
+- Added `scripts/04-local-controls-browser-check.js`, a detailed implementation/local rollout receipt, and reviewed screenshots of the actual controls/home/staff Account.
+- Added focused integration coverage proving that changing IP addresses cannot bypass a signed-in user's tour-start limit and parallel inserts cannot overrun document count; both passed.
+- Updated the production runbook and ticket guides/index/task status. Task `byyf` is complete.
+- Used the remarkable-upload skill to upload the current guide plus rollout receipt under a new name, preserving earlier annotated uploads.
+- Closed the build tmux session and removed the disposable integration-test PostgreSQL container; the real local site remains running.
+
+### Why
+
+Browser verification catches the boundary between portal settings, existing grants, authored-app capability access, runtime error handling and save behavior. Keeping a matching pre-migration dump matters because old images reject the explicit new settings fields.
+
+### What worked
+
+- Image build completed under Node 24. Deployed image is `sha256:b1ee8e4a1040f2413f42379e51c957799fb229af77b12188f260e6ec61fb36ab`, revision `42a1f3f`.
+- Migration output: `011_operations.sql | applied`.
+- `/healthz` and `/readyz` returned HTTP 200; readiness reports models true. Container is running with zero restarts.
+- All 21 real-browser assertions passed: controls visible/saved through revision checks, six/one concurrency policy, minimal launcher, sampling refused before provider use, read-only writes refused, repeated autosaves stopped locally, explicit unsaved text, plain-text operator notice, healthy reads, no persisted rejected write, same-workspace resume while new activity is paused, minimal Account/navigation/home, valid combined RSS, restored controls and no browser page errors.
+- Independent final counts equal baseline: seven users, 13 instances, five releases, five model calls and seven documents. Browser checks changed only temporary settings revisions/audit history and ordinary traffic/grant records.
+- Final operations policy restored to acceptNewVisits true, samplingEnabled true, storageMode read-write and empty notice.
+- Additional targeted tour/document concurrency tests passed against disposable PostgreSQL. Earlier full suite/build/lint/frontend receipts remain applicable because subsequent source additions were tests only.
+- Exact delivery result: `OK: uploaded FRANCOIS-008 Minimal Hosting Implementation Guide.pdf -> /ai/2026/10/16/FRANCOIS-008`. This proves reMarkable cloud delivery, not physical-tablet synchronization.
+
+### What didn't work
+
+- The rollout command chained stop, required port cleanup and startup. After Compose stopped the app, `lsof-who -p 8090 -k` reported `no process listening/bound on port 8090` and exited nonzero, so startup had not run. Issued startup separately immediately; curl's first connection-refused attempt retried during normal startup and health/readiness then passed.
+- The browser check first used Locator.contentFrame as a Frame, producing `TypeError: frame.waitForFunction is not a function`. Switched to ElementHandle.contentFrame.
+- Its next attempt waited for `window.claude.db` and timed out after 30 seconds. The actual API is `claude.use("db")` and `claude.use("sample")`; corrected the check to use the existing capability contract. The check's finally block restored settings and closed its temporary tab on both failures. No application fix was needed, and model-call counts remained five.
+
+### What I learned
+
+The real browser verified the intended minimal flow without provider traffic. Operational controls are independent: pausing model access does not disable healthy reads, and pausing new activity does not prevent resuming saved work. The worker completion boundary and save acknowledgement remain the two important correctness boundaries.
+
+### What was tricky to build
+
+Existing browser tabs can keep valid grants across a settings change; policy enforcement therefore occurs at each affected operation and persistent mutation. The browser's second save attempt was rejected locally after the first 503, demonstrating that the common runtime prevents repeated autosaves while leaving reads available.
+
+### What warrants a second pair of eyes
+
+The remote provider's exact lane semantics are still its external contract; the implementation enforces six admitted application calls in this service and waits for worker completion. Backup plus matching image are needed for rollback across the strict settings migration. No production rollout was performed.
+
+### What should be done in the future
+
+Tune existing private allowance/start/resource values from normal local/operator observation. The requested implementation, local deployment, diary and guide delivery are complete.
+
+### Code review instructions
+
+Read the implementation/local rollout receipt and reproduction script, then the current design guide and code commits. Screenshots show real local data but contain no credentials/token secrets. The app is at http://localhost:8090/ and controls are at /admin/settings. The private database dump stays outside Git.
+
+### Technical details
+
+The combined live RSS contained eight items. Signed-in tour counters and network counters remain process-local. Storage quotas measure logical payload bytes, not physical PostgreSQL overhead. Existing instances/releases/account data and provider/font mounts were preserved.

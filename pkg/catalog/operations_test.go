@@ -291,3 +291,73 @@ func TestCombinedFeedAndMinimalPublicStream(t *testing.T) {
 		t.Fatal("hidden artifact leaked in combined feed")
 	}
 }
+
+func TestTourStartsFollowUserAcrossAddresses(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	e.srv.Config.TrustProxyHeaders = true
+	admin := e.user("tour-admin", "admin", false)
+	visitor := e.user("tour-user", "subscriber", false)
+	for _, id := range []string{"board", "second"} {
+		e.publishArtifact(admin, id, "")
+		if code, out := e.portal(&admin, "PATCH", "/api/studio/artifacts/"+id, map[string]bool{"demoEnabled": true}); code != 200 {
+			t.Fatalf("enable %d %v", code, out)
+		}
+	}
+	d := testDoc(100)
+	d.Demo.Enabled = true
+	d.Demo.PerUserPerHour = 1
+	d.Demo.PerAddressPerHour = 10
+	if _, err := e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	start := func(artifact, address string) (int, map[string]any) {
+		code, body, _ := e.do(&visitor, "portal.test", "POST", "/api/demos", strings.NewReader(`{"artifactId":"`+artifact+`"}`), map[string]string{"X-Real-Ip": address})
+		var out map[string]any
+		_ = json.Unmarshal(body, &out)
+		return code, out
+	}
+	code, first := start("board", "10.1.0.1")
+	if code != 201 {
+		t.Fatalf("start %d %v", code, first)
+	}
+	if code, out := start("second", "10.1.0.2"); code != 429 || errCode(out) != "rate_limited" {
+		t.Fatalf("changed address bypassed user cap %d %v", code, out)
+	}
+	if code, out := start("board", "10.1.0.3"); code != 201 || out["id"] != first["id"] || out["expiresAt"] != first["expiresAt"] {
+		t.Fatalf("resume spent a start or reset expiry %d %v", code, out)
+	}
+}
+
+func TestDocumentCountIsAtomic(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	owner := e.user("document-owner", "admin", false)
+	release := e.publishArtifact(owner, "board", "")
+	inst, err := e.store.CreateInstance(ctx, owner.user.ID, release, "Count", "workspace", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	results := make(chan error, 8)
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results <- e.store.WriteDocument(ctx, inst.ID, owner.user.ID, fmt.Sprintf("count/%d", i), "set", map[string]any{}, 1)
+		}()
+	}
+	wg.Wait()
+	close(results)
+	success := 0
+	for err := range results {
+		if err == nil {
+			success++
+		} else if !strings.Contains(err.Error(), "document limit") {
+			t.Fatal(err)
+		}
+	}
+	if success != 1 {
+		t.Fatalf("document admission count %d", success)
+	}
+}
