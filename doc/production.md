@@ -388,7 +388,7 @@ Creators and administrators have the highest plan without paying.
 Creators publish their own artifacts; administrators publish any. In the
 studio (`/studio`): artifact → Releases → upload HTML → check → draft →
 preview on an isolated origin → publish. From a laptop, with a personal API
-token created in Studio → Tokens:
+token with the `studio` scope, created on the account page (`/account` → API tokens):
 
 ```bash
 francois catalog push --server https://slop.boutique --token-file ~/.config/francois/token \
@@ -400,8 +400,15 @@ francois catalog push --server https://slop.boutique --token-file ~/.config/fran
 `--attach` files are uploaded to the draft before it is published; a missing
 file stops the push before anything is created.
 
-Tokens work only on `/api/studio/*`; a token cannot reach accounts, billing or
-instances, and cannot create tokens. Revoke one in Studio → Tokens.
+A token reaches only the surfaces its scopes name: `studio` (`/api/studio/*`),
+`account` (the owner's account, billing links and instances; not instance
+launch), `admin:read` (admin GETs) and `admin:write` (all admin routes). Scopes
+never exceed the owner's role; admin-scoped tokens must expire within 90 days.
+No token can create tokens. Owners revoke tokens on the account page;
+administrators list a user's tokens with `GET /api/admin/users/{id}/tokens`,
+revoke one with `DELETE /api/admin/tokens/{id}`, or all of them with
+`POST /api/admin/users/{id}/revoke-sessions {"tokens": true}`. Audit entries
+made through a token carry its ID (`tokenId`).
 
 As an operator, from inside the pod, with files that exist in the image:
 

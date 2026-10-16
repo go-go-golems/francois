@@ -220,8 +220,14 @@ publishing), demos, journal posts, creator profiles, a media library and
 personal API tokens. Videos (MP4, WebM) work as covers, gallery items and
 Markdown embeds (`![caption](/media/<id>)`), with a poster taken from one of
 their frames. A creator edits the artifacts credited to their profile.
-`francois catalog push` uploads releases with a token, without database
-access:
+Personal API tokens are created on the account page (`/account`) with
+scopes: `account` (the owner's account, billing links and instances),
+`studio` (content the owner may edit), and for administrators `admin:read`
+and `admin:write` (the admin API; these tokens expire within 90 days). A scope
+never exceeds the owner's role, `GET /api/me` reports a token's identity and
+scopes, and changes made through a token name it in the audit log.
+`francois catalog push` uploads releases with a `studio` token, without
+database access:
 
 ```sh
 francois catalog push --server https://catalog.example --token-file token \

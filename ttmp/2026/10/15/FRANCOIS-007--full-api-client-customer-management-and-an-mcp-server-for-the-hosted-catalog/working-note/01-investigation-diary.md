@@ -382,3 +382,176 @@ go-go-mcp PR #89 (GO-GO-MCP-EMBEDDABLE-AUTH) was merged and released as v0.3.0. 
 ### Technical details
 
 - go-go-mcp v0.3.0: tag on `ded30b2`, served by proxy.golang.org.
+
+## Step 7: Phase 1 backend: scoped tokens, `/api/me`, admin token oversight, token audit
+
+Phase 1 of the guide (§10) gives personal API tokens scopes, so an administrator can mint a token that reaches the admin API while existing publishing tokens keep exactly their current reach. This step implemented the server side: migration 008, scopes in the store, a scope on every route declaration, the new token and identity endpoints, administrator oversight, and token attribution in the audit log. The browser UI follows in the next step.
+
+The implementation matches the design with one change in where the token-management endpoints sit relative to the guard levels, described below. All new tests passed on the first run. A mutation check confirmed that the scope matrix fails when scopes are ignored.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, go ahead" (to: start phase 1, scoped tokens), and mid-turn: "commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+
+**Assistant interpretation:** Implement guide phase 1 on its own branch, commit at validated boundaries, and record each step here in investigation format.
+
+**Inferred user intent:** Scripts and agents can use admin and account APIs with narrowly scoped tokens; the work is reviewable step by step.
+
+**Commit (code):** 522f816 — "Scoped personal API tokens, /api/me, admin token oversight, token audit"
+
+### What I did
+
+- Branch `feat/francois-007-scoped-tokens` from `docs/francois-007-api-client-mcp` (PR #5), so the ticket can be updated with the code.
+- Surveyed: `s.guard(` call sites (30 in `routes.go`, plus the `a` and `c` wrappers in `admin.go` and `studio.go`); five `INSERT INTO admin_audit` statements (`store/users.go:131`, `store/settings.go:59`, `store/usage.go:230`, `store/releases.go:306,342`); `httpx.Read` rejects an empty body (needed for the optional `revoke-sessions` body).
+- `store/migrations/008_token_scopes.sql`: `api_tokens.scopes text[] NOT NULL DEFAULT '{studio}'`, then `DROP DEFAULT`; `admin_audit.token_id`; indexes `admin_audit_actor`, `admin_audit_subject`.
+- `store/tokens.go`:
+  - scope constants;
+  - `ScopesForRole`, `IsAdminScope`;
+  - `APIToken.Scopes`, `APIToken.Allows` (where `admin:write` implies `admin:read`);
+  - `CreateToken(..., scopes, expires)`, `RevokeTokenByID`, `RevokeUserTokens`.
+- `store/audit.go`: `WithAuditToken(ctx, id)` and `auditToken(ctx)`. All five audit inserts now write `token_id`; `AuditEntry.TokenID` and `AuditLog` select it.
+- `auth.go`:
+  - `type scope` with `noToken`, `anyToken`, `scopeStudio`, `scopeAccount` and `scopeAdmin`, plus `scope.required(method)`;
+  - `guard(level, sc, h)` rejects tokens on `noToken` routes (401 `token_not_allowed`), resolves the token, checks the scope (403 `token_scope`), and stores the token ID for auditing;
+  - role, disabled and CSRF checks are unchanged.
+- `routes.go`:
+  - public routes, logout and instance launch → `noToken` (launch codes are bound to the browser session);
+  - account, billing and instance routes → `scopeAccount`;
+  - `s.tokenRoutes(m)` added.
+- `admin.go` → `scopeAdmin`. New endpoints:
+  - `GET /api/admin/users/{id}/tokens`;
+  - `DELETE /api/admin/tokens/{id}` (audited against the owner);
+  - `revoke-sessions` accepts an optional `{"tokens": true}` and reports the count.
+- `studio.go` → `scopeStudio`; removed the three `/api/studio/tokens*` routes, their handlers and `sessionOnly`.
+- New `tokens.go`:
+  - `GET /api/me` (guard `session`, `anyToken`);
+  - `GET` and `DELETE /api/tokens` (guard `session`, `noToken`);
+  - `POST /api/tokens` (guard `enabled`, `noToken`) with the minting rules: scopes must be ones the role allows; duplicates collapse; admin-scoped tokens need 1–90 days; guests get 403 `tokens_unavailable`; creation is audited with scopes and expiry.
+- Tests:
+  - `tokens_test.go` moved to `/api/tokens` with scopes;
+  - new `token_scopes_test.go`: `TestTokenScopeMatrix` (18 calls covering three roles, six tokens and all surfaces, plus `/api/me`, a demoted admin, a disabled owner and an expired token), `TestTokenMintingRules`, `TestAuditRecordsToken` and `TestAdminTokenOversight`.
+
+### Why
+
+- Declaring the scope at registration makes each route's token reach readable in one place, and the compiler finds every call site when the signature changes. That is why no compatibility wrapper was kept (AGENT.md).
+- `POST /api/tokens` uses guard level `enabled` so a disabled account cannot mint. Listing and revoking stay at `session` so a disabled user can still revoke a token.
+
+### What worked
+
+- `TEST_DATABASE_URL=…5434… go test ./pkg/catalog/ -run 'TestTokenScopeMatrix|TestTokenMintingRules|TestAuditRecordsToken|TestAdminTokenOversight|TestTokensAndPush' -v` → all five `PASS`.
+- Mutation check: with `Allows` forced to return `true`, `TestTokenScopeMatrix` fails all seven `token_scope` cases (`…, want token_scope`); restored, it passes.
+- `make ci-check` with the Postgres URL: `0 issues.`, logcopter check clean, every test package `ok`.
+
+### What didn't work
+
+- The first build failed as expected at the old caller: `pkg/catalog/studio.go:1240:91: not enough arguments in call to s.Store.CreateToken`. The old handler was removed, and that left `"time"` unused in `studio.go` (`"time" imported and not used`); the import was removed.
+- `gosec` is not installed locally, so GoSec will first run in CI.
+
+### What I learned
+
+- `artifact.create` is audited with the artifact ID as subject, which made `TestAuditRecordsToken` a direct check of `token_id` on a real handler path.
+- A subscriber now gets 400 `invalid_scopes` for `studio` instead of the old 403 `creator_required`, because minting moved out of the creator-only studio namespace.
+
+### What was tricky to build
+
+- The order inside `guard`. The scope check must come before the role check so that a token lacking a scope gets `token_scope`, not a misleading `admin_required`. A token that has the scope but whose owner lost the role must still get `admin_required`. The matrix covers both: the creator token on admin routes gives `token_scope`; the demoted admin's write token gives `admin_required`.
+
+### What warrants a second pair of eyes
+
+- `scopeAccount` on `POST /api/billing/checkout` and `/portal`: a token can obtain a Stripe Checkout or customer-portal URL for its owner. Neither moves money by itself, but the portal URL is a bearer link to the owner's billing.
+- Read-only account routes (level `session`) remain readable with a disabled owner's token, matching the browser session's behaviour.
+
+### What should be done in the future
+
+- The account-page token UI (next step); README and `doc/production.md`.
+
+### Code review instructions
+
+- Start with `pkg/catalog/auth.go` (`scope`, `guard`), then `pkg/catalog/tokens.go`, `pkg/catalog/admin.go` (`adminRevoke`, `adminUserTokens`, `adminRevokeToken`), and `pkg/catalog/store/tokens.go`.
+- Validate with `TEST_DATABASE_URL='postgres://francois:francois@127.0.0.1:5434/francois_catalog?sslmode=disable' make ci-check`.
+
+### Technical details
+
+- Error codes added: 403 `token_scope`, 400 `invalid_scopes`, 403 `tokens_unavailable`. The message for 401 `token_not_allowed` is now "API tokens are not accepted here".
+- Minting matrix: subscriber `account`; creator `studio`, `account`; admin `studio`, `account`, `admin:read`, `admin:write`.
+
+## Step 8: Phase 1 UI, browser verification and documentation
+
+Token management moved from the studio to the account page, so that subscribers, who have no studio, can create `account` tokens. The form offers a checkbox for each scope the user's role allows, with a description of each. The step ended with a browser round trip on the local stack: create an `admin:read` token in the form, use it from curl, revoke it, and confirm it stops working.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 7.
+
+**Assistant interpretation:** Finish phase 1: UI, verification and docs, committed separately.
+
+**Inferred user intent:** Tokens usable by every role from the browser.
+
+**Commit (code):** c36f489 — "Token management on the account page, with scopes"
+
+### What I did
+
+- `ui/catalog/api.ts`: `TokenScope` and `Token` (with `scopes`) types; the `tokens`, `createToken` (`{name, days, scopes}`) and `revokeToken` endpoints on `api/tokens`; tag `Tokens`.
+- `ui/catalog/studio-api.ts`: removed the token type and endpoints.
+- New `ui/catalog/tokens.tsx`:
+  - `ApiTokens({role})`, with `scopesFor(role)` mirroring `store.ScopesForRole`;
+  - the day limit switches to 1–90 when an admin scope is checked;
+  - the secret is shown once with a curl example, plus a `catalog push` example for `studio` tokens;
+  - the list shows each token's scopes, use and expiry.
+- `ui/catalog/account.tsx`: an "API tokens" row with anchor `#api-tokens`. `ui/catalog/studio.tsx`: the Tokens section now links to `/account#api-tokens`.
+- `pkg/catalog/web/static/catalog.css`: `.token-form`, `.scope-list`, `.scope-option`. `pnpm build` regenerated `catalog.js`.
+- Rebuilt the local stack's francois service (`docker compose -f deploy/compose/compose.yaml up -d --build francois`); migration 008 applied (the `scopes` column exists on the 5435 database).
+- Browser (Playwright, signed in as Ada Admin):
+  - the panel listed all four scopes;
+  - filled name "browser check", 30 days, `admin:read`, and created the token;
+  - the secret had prefix `frt_` and length 47;
+  - the token list showed the new token and the pre-existing "local showcase seed" token as `studio`.
+- `README.md`, `doc/production.md`: tokens are created on the account page; scopes, oversight endpoints and audit attribution are described.
+
+### Why
+
+- Token management was under `/api/studio`, which only creators and admins can reach; subscriber tokens (owner decision) need a page every user has.
+
+### What worked
+
+- `pnpm -s check` passed; `pnpm -s test` → `ℹ pass 5`, `ℹ fail 0`.
+- With the browser-created token:
+
+  ```text
+  GET /api/me -> 200 {"creator":null,"token":{"id":"tok_88f9…","name":"browser check","scopes":["admin:read"],…
+  GET /api/admin/users -> 200 [...]
+  GET /api/studio/artifacts -> 403 {"error":{"code":"token_scope","message":"This token lacks the studio scope"}}
+  PATCH /api/admin/settings -> 403 {"error":{"code":"token_scope","message":"This token lacks the admin:write scope"}}
+  ```
+
+  After revoking it in the browser session (`DELETE /api/tokens/{id}` → 200): `GET /api/me` → 401 `token_invalid`.
+- The element screenshot (`.playwright-mcp/account-tokens.png`, git-ignored) shows the form, the scope list, the revoked token and the migrated token.
+
+### What didn't work
+
+- The first curl loop used `set -- $p` to split `"GET /api/me"`; zsh does not word-split unquoted parameters, so every call went out malformed (`400 Bad Request`). It was rewritten with explicit arguments.
+- The Playwright MCP refused to save a screenshot to the session scratchpad (`File access denied … is outside allowed roots`); it was saved under the git-ignored `.playwright-mcp/` instead.
+
+### What I learned
+
+- The migration's default worked on real data: the local stack's existing token became `studio` and kept working for its owner.
+
+### What was tricky to build
+
+- Keeping the scope list in the UI consistent with the server. The UI mirrors `ScopesForRole` only to offer choices; the server validates independently, so a stale UI could only offer fewer or invalid choices, never grant more.
+
+### What warrants a second pair of eyes
+
+- Showing admin scopes in a browser form makes it easy to create powerful tokens. The 90-day limit and the audit entries mitigate this; an extra confirmation step could be added.
+
+### What should be done in the future
+
+- Phase 2 (customer-management endpoints).
+
+### Code review instructions
+
+- `ui/catalog/tokens.tsx`; then try it on the local stack at `http://localhost:8090/account#api-tokens`.
+
+### Technical details
+
+- Local stack: `deploy/compose/compose.yaml`; francois on `:8090`, its Postgres on `127.0.0.1:5435`; tests use `127.0.0.1:5434`.
