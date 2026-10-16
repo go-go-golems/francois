@@ -31,3 +31,7 @@ Completed follow-up implementation: backend 2f53554 and frontend f072af7. Final 
 ## 2026-10-16
 
 Uploaded the completed combined implementation guide v2 to /ai/2026/10/16/FRANCOIS-008 with OK uploaded receipt; preserved the original document and stopped the temporary preview. All feature tasks complete, production rollout not performed.
+
+## 2026-10-16
+
+Deployed locally at http://localhost:8090/admin/analytics using application revision 1d8a137. Applied migrations 009/010; preserved users, instances, releases and all five model calls. Health/readiness and 18 real-service browser checks passed; private backup and previous image retained. Production unchanged.

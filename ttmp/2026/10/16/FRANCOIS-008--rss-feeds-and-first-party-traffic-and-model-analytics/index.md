@@ -32,6 +32,10 @@ Implemented release RSS and first-party portal document analytics with an admin 
 
 Initial implementation is committed as `0a66114`; the backend follow-up is `2f53554` and the frontend is `f072af7`. The expanded graph/filter/date/artifact work is now implemented and validated; see the diary and implementation guide for checkpoint evidence.
 
+## Local deployment
+
+The application is now running at [local Analytics](http://localhost:8090/admin/analytics). See the [local deployment receipt](various/validation/04-local-deployment.md) for the deployed image/revision, applied migrations, data preservation, recovery artifacts and real-service verification. Production remains unchanged.
+
 ## Feature entry points
 
 - Release feed: `/apps/feed.xml`; existing journal feed: `/journal/feed.xml`.

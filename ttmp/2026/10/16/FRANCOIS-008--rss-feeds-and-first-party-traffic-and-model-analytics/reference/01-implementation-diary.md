@@ -459,3 +459,78 @@ No new runtime or test dependency was added. Top-three-plus-Other stacks preserv
 - Temporary preview stopped through `lsof-who -p 18908 -k`; its tmux session ended with the process.
 - Final documentation hygiene: docmgr doctor passed and trailing evidence whitespace was removed.
 - All requested runtime features are implemented. Applying migrations and deploying production remain operator rollout actions, not work performed in this session.
+
+
+## Step 7: Deploy the completed feature to the existing local Compose stack
+
+The user explicitly requested local deployment after implementation and clarified the distinction from production. Inspection identified the existing francois-catalog Compose deployment at localhost:8090, running with Pi, persistent catalog/release/bootstrap volumes, and migrations 001–008. The configured local settings match the running container, so deployment can preserve the existing behavior and data.
+
+### Prompt Context
+
+**User prompt (verbatim):** "commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill) and deploy locally"
+
+**Assistant interpretation:** Rebuild and update the existing local deployment, apply migrations 009/010, verify the actual service, and commit deployment documentation or fixes at meaningful checkpoints.
+
+**Inferred user intent:** Make the implemented analytics available in the running local application rather than leaving it only in Git or a synthetic preview.
+
+**Application revision:** `1d8a137`, including backend `2f53554` and frontend `f072af7`.
+
+### What I did
+
+- Read the Compose configuration, Dockerfile and startup/setup scripts, then inspected local containers and the migration ledger.
+- Notified the user before Compose/runtime environment settings were read; printed only the nonsecret BACKEND/PUBLIC_URL/APP_DOMAIN/GRANT_TTL values and mount targets.
+- Confirmed that running and desired settings match: Pi backend, localhost:8090 portal, apps.localhost instances, 30-minute grants.
+- Prepared a private custom-format database backup at `/tmp/francois-008-local-predeploy.dump` and retained the old image as `francois-catalog:pre-analytics-1d8a137`.
+- Started a Compose image rebuild in tmux with explicit local image revision/version labels.
+
+### Why
+
+Using the existing deployment preserves local accounts, instances, releases, provider configuration and licensed-font mounts. Running only the migration command avoids re-running unrelated identity/user provisioning.
+
+### What worked
+
+Inspection and preflight succeeded. Migrations 009 and 010 were identified as pending. Build and deployment results are appended below when verified.
+
+### What didn't work
+
+No failure observed during preflight.
+
+### What I learned
+
+The prior image did not record its source revision (label `unknown`); the new build will carry the application revision for a reviewable deployment receipt.
+
+### What was tricky to build
+
+The service uses host networking and reads its local Compose .env plus startup environment. Narrow comparison confirms the intended configuration without exposing secrets or changing the running Pi backend.
+
+### What warrants a second pair of eyes
+
+Production is outside this deployment request. Validation should exercise actual local session/analytics behavior without issuing billable model calls.
+
+### What should be done in the future
+
+Finish migration/recreation, confirm health and authenticated analytics, and append exact receipts. Production rollout remains separate.
+
+### Code review instructions
+
+Review deploy/compose/compose.yaml, Dockerfile, catalog-serve and the deployment receipt before reproducing the local rollout. Keep the database backup private; it contains application data and is not a repository artifact.
+
+### Technical details
+
+Current image: `sha256:afdf1c8cfe901d9c69edd1ca218274eda7fc42480ec63ba489c3491156990f4e`. Local PostgreSQL container: francois-catalog-postgres-1, catalog database francois_catalog. Build runs in tmux session francois-008-local-build; transient build output is in /tmp, not Git.
+
+
+### Step 7 final rollout and validation receipt
+
+The local rollout completed successfully. Compose rebuilt the application image, applied the two pending migrations, and recreated only the Francois service. The existing authenticated browser session continued working after recreation, and the real deployment passed the targeted browser checks.
+
+- Image build succeeded; deployed revision label is `1d8a137`, image `sha256:9bba2f8f7ae5916c2b59ae74d803e346257442a81b8215fa142d6e7ec255702a`.
+- Migration command reported `009_analytics.sql | applied` and `010_model_call_artifacts.sql | applied`.
+- `/healthz` and `/readyz` both returned HTTP 200; readiness reports models available.
+- Preserved row counts: 7 users, 13 instances, 5 releases and 5 model calls. All five historical calls were attributed: Polis IDE 4, Capability playground 1.
+- Real local Chromium validation passed 18 checks: public pages, preserved admin session, authenticated report, exact direct/path filters, both full-stack reconciliations, anonymous denial, both RSS feeds, stack selectors, date preset/cancel, token/cost graphs, artifact totals and no page errors.
+- Validation created six ordinary document-view events and made zero model calls. It did not modify application content, accounts, subscriptions or model settings.
+- Container remains running with zero restarts; the completed tmux image-build session was closed. Compose continues managing the app at http://localhost:8090.
+- No deployment failure or code fix was needed. Backup file permissions/header and the retained previous image were checked before migration.
+- Reproduction script and exact deployment evidence are in `scripts/03-local-deployment-check.js` and `various/validation/04-local-deployment.md`.
+- Production was not accessed. This session deploys locally only.
