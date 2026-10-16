@@ -35,7 +35,7 @@ WhenToUse: ""
 
 Visitors open applications and read the site. Usage accounting stays in administration. When a limit or outage prevents something, show a short message where the action would happen. Keep sign out and subscription management accessible.
 
-Implement this in the existing Go application, PostgreSQL database, Pi worker and React UI. The changes below are proposed; the running local deployment has not been changed by this document.
+Implement this in the existing Go application, PostgreSQL database, Pi worker and React UI. The controls and public-flow changes below are now implemented. Backend checkpoint: `ad5f791`; the diary records frontend validation and the subsequent local rollout. Initial policy values are configurable operational choices, not measured capacity claims.
 
 The [Paper comments](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-3-0) call for removing most account/instance/pricing presentation, merging the catalog and journal feeds, and keeping a small warning treatment. Preserve that direction: an application has an Open/Try action, rather than a provisioning flow or usage dashboard.
 
@@ -104,7 +104,7 @@ Reuse existing expiry handling: it suspends the demo, revokes grants and closes 
 
 An instance is a PostgreSQL workspace identity: owner, release, hostname, members and stored data. It does not create a container or start a worker. All instances use the same Go service and shared Pi worker; application JavaScript runs in the browser.
 
-Change the normal Open action to find the person's existing workspace for that artifact and open it. If several already exist, use the oldest active one as the default. If none exists, create one under the existing access and instance-count checks. Perform lookup and creation under the existing per-owner transaction lock so simultaneous tabs do not create duplicates. Existing additional instances and their URLs remain intact; remove routine instance management from the default flow without merging or deleting data.
+The normal Open action uses `POST /api/instances/open` to find the person's existing workspace for that artifact and open it. If several already exist, use the oldest active one as the default. If none exists, create one under the existing access and instance-count checks. Perform lookup and creation under the existing per-owner transaction lock so simultaneous tabs do not create duplicates. Existing additional instances and their URLs remain intact; remove routine instance management from the default flow without merging or deleting data.
 
 | State | Infrastructure cost |
 | --- | --- |
@@ -163,3 +163,11 @@ flowchart LR
 Implement the settings and handler checks first, then tour/workspace opening and storage bounds, then the Paper-approved public simplification. Keep the existing admin analytics. The ticket diary preserves the earlier investigation and measurements; this document is the current implementation direction.
 
 Verify the behaviors that matter: a seventh call and a second call by the same person are refused; cancellation does not overrun upstream slots; already-open tabs obey pauses; read-only blocks every persistent mutation while reads work; refresh cannot extend a tour; simultaneous Open requests return one workspace; parallel writes respect quotas; reopening access preserves data; public pages contain no usage meters.
+
+## Implementation checkpoints
+
+The current implementation lives in the existing service and worker. Migration `011_operations.sql` explicitly adds the settings shape and applies the six-lane/default resource caps to stored revisions, following the existing strict settings migration convention. It does not delete saved work, change plans or remove model history.
+
+The combined public stream uses `/feed.xml` as its primary RSS subscription. Applications and journal entries share a chronological list. Account no longer exposes usage meters, the launcher retains only Close, and the Support destination contains subscription actions without resource comparisons. Authored application/journal content, entitled downloads and editor previews remain accessible.
+
+Paper notice designs: [Minimal site — service notices](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-D-0). The diary records code commits, tests, failures and final deployment evidence.

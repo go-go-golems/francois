@@ -28,12 +28,13 @@ func (s *Server) routes() http.Handler {
 		m.HandleFunc(p, spa)
 	}
 	// Server-rendered storefront.
-	m.HandleFunc("GET /{$}", s.guard(public, noToken, s.homePage))
-	m.HandleFunc("GET /apps", s.guard(public, noToken, s.catalogPage))
-	m.HandleFunc("GET /apps/{$}", s.guard(public, noToken, s.catalogPage))
+	m.HandleFunc("GET /{$}", s.guard(public, noToken, s.feedPage))
+	m.HandleFunc("GET /apps", s.guard(public, noToken, s.feedPage))
+	m.HandleFunc("GET /apps/{$}", s.guard(public, noToken, s.feedPage))
 	m.HandleFunc("GET /apps/{id}", s.guard(public, noToken, s.artifactPage))
 	m.HandleFunc("GET /creators/{slug}", s.guard(public, noToken, s.creatorPage))
-	m.HandleFunc("GET /journal", s.guard(public, noToken, s.journalPage))
+	m.HandleFunc("GET /journal", s.guard(public, noToken, s.feedPage))
+	m.HandleFunc("GET /feed.xml", s.combinedFeed)
 	m.HandleFunc("GET /journal/feed.xml", s.journalFeed)
 	m.HandleFunc("GET /apps/feed.xml", s.releaseFeed)
 	m.HandleFunc("GET /journal/{slug}", s.guard(public, noToken, s.postPage))

@@ -46,12 +46,11 @@ export function Header() {
   const [logout] = api.useLogoutMutation();
   const { path } = useRoute();
   const nav: [string, string][] = [
-    ["/apps", "Catalog"],
-    ["/journal", "Journal"],
+    ["/", "Feed"],
   ];
-  if (session?.billingEnabled) nav.push(["/pricing", "Pricing"]);
+
   const guest = session?.user?.role === "guest";
-  if (session?.authenticated && !guest) nav.push(["/instances/", "Instances"], ["/account", "Account"]);
+  if (session?.authenticated && !guest) nav.push(["/account", "Account"]);
   if (session?.user?.role === "creator" || session?.user?.role === "admin") nav.push(["/studio", "Studio"]);
   if (session?.user?.role === "admin") nav.push(["/admin", "Admin"]);
   const current = (to: string) => path.startsWith(to.replace(/\/$/, ""));

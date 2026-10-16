@@ -616,6 +616,69 @@ function Settings() {
         </Row>
       ) : (
         <>
+          <Row
+            label="Service controls"
+            sub="apply to everyone, including open applications"
+          >
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={doc.operations.acceptNewVisits}
+                onChange={(e) =>
+                  upd((d) => {
+                    d.operations.acceptNewVisits = e.target.checked;
+                  })
+                }
+              />
+              Accept new visits
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={doc.operations.samplingEnabled}
+                onChange={(e) =>
+                  upd((d) => {
+                    d.operations.samplingEnabled = e.target.checked;
+                  })
+                }
+              />
+              Enable AI
+            </label>
+            <p className="muted small">
+              Pausing AI stops new calls. Calls already running finish.
+            </p>
+            <label className="field">
+              <span>Saved work</span>
+              <select
+                aria-label="Storage mode"
+                value={doc.operations.storageMode}
+                onChange={(e) =>
+                  upd((d) => {
+                    d.operations.storageMode = e.target
+                      .value as SettingsDoc["operations"]["storageMode"];
+                  })
+                }
+              >
+                <option value="read-write">Read and write</option>
+                <option value="read-only">Read only</option>
+                <option value="off">Unavailable</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Notice (optional)</span>
+              <textarea
+                aria-label="Service notice"
+                maxLength={500}
+                rows={2}
+                value={doc.operations.notice}
+                onChange={(e) =>
+                  upd((d) => {
+                    d.operations.notice = e.target.value;
+                  })
+                }
+              />
+            </label>
+          </Row>
           <Row label="Approved models" sub="from the operator's Pi configuration">
             {data.providerModels.length === 0 && <p className="warn">The model worker reports no models.</p>}
             <div className="model-table">
@@ -695,6 +758,7 @@ function Settings() {
             <div className="grid-fields">
               <NumField label="Demo lifetime (minutes)" value={doc.demo.ttlMinutes} set={(v) => upd((d) => (d.demo.ttlMinutes = v))} />
               <NumField label="Live demos (all visitors)" value={doc.demo.maxActive} set={(v) => upd((d) => (d.demo.maxActive = v))} />
+              <NumField label="Demos per user per hour" value={doc.demo.perUserPerHour} set={v => upd(d => {d.demo.perUserPerHour = v})} />
               <NumField label="Demos per address per hour" value={doc.demo.perAddressPerHour} set={(v) => upd((d) => (d.demo.perAddressPerHour = v))} />
               <NumField label="Credits per demo" value={doc.demo.credits} set={(v) => upd((d) => (d.demo.credits = v))} />
               <NumField label="Daily credit budget, all demos" value={doc.demo.dailyBudget} set={(v) => upd((d) => (d.demo.dailyBudget = v))} />
@@ -726,6 +790,8 @@ function Settings() {
           </Row>
           <Row label="Limits" sub="hosted resources">
             <div className="grid-fields">
+              <NumField label="Views per user" value={doc.limits.viewsPerUser} set={v => upd(d => {d.limits.viewsPerUser = v})} />
+              <NumField label="Total saved MiB per instance" value={doc.limits.storageBytesPerInstance / (1 << 20)} set={v => upd(d => {d.limits.storageBytesPerInstance = Math.round(v * (1 << 20))})} />
               <NumField label="Documents per instance" value={doc.limits.documentsPerInstance} set={(v) => upd((d) => (d.limits.documentsPerInstance = v))} />
               <NumField label="Asset MiB per instance" value={Math.round(doc.limits.assetBytesPerInstance / (1 << 20))} set={(v) => upd((d) => (d.limits.assetBytesPerInstance = v * (1 << 20)))} />
               <NumField label="Max HTML KiB" value={Math.round(doc.limits.maxHtmlBytes / 1024)} set={(v) => upd((d) => (d.limits.maxHtmlBytes = v * 1024))} />

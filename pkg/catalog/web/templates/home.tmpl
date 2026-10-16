@@ -1,13 +1,8 @@
-{{define "content"}}<main>
-<section class="hero"><h1>{{period .Body.Statement}}</h1>
-{{if .Body.Intro}}<div class="md sub intro-md">{{.Body.Intro}}</div>{{end}}</section>
+{{define "content"}}<main aria-label="Applications and writing">
 {{if .Body.LoginError}}<p class="notice bad login-error"><span>Sign-in did not complete. Please try again.</span>{{if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}</p>{{end}}
-{{if .Body.Featured}}<section class="lib-head label"><h2>Featured</h2><a class="u" href="/apps">All applications</a></section>
-{{template "cards" .Body.Featured}}{{else}}<p class="empty">No applications are published yet.</p>{{end}}
-{{if .Body.Creators}}<section class="lib-head label"><h2>Made by</h2></section>
-<section class="creator-grid">
-{{range .Body.Creators}}<a class="creator-card" href="/creators/{{.Slug}}">{{if .Avatar}}<img src="/media/{{.Avatar}}" alt="" loading="lazy">{{else}}<span class="creator-mono" aria-hidden="true">{{monogram .Name}}</span>{{end}}<span class="creator-name">{{.Name}}</span></a>
-{{end}}</section>{{end}}
-{{if .Body.Posts}}<section class="lib-head label"><h2>Journal</h2><a class="u" href="/journal">All posts</a></section>
-{{template "posts" .Body.Posts}}{{end}}
+<section class="controls">
+<div class="views"><a class="u" href="/feed.xml">RSS</a>{{if .Body.Tag}}<a class="u" href="/">Show all</a>{{end}}</div>
+{{if .Body.Tags}}<div class="tags" role="group" aria-label="Filter by tag">{{range .Body.Tags}}<a class="tag" href="/?tag={{.Name}}"{{if .Current}} aria-pressed="true"{{end}}>{{.Name}} <span class="tag-count">{{.Count}}</span></a>{{end}}</div>{{end}}
+</section>
+{{range .Body.Entries}}{{if .Cards}}{{template "cards" .Cards}}{{else}}{{template "posts" .Posts}}{{end}}{{else}}<p class="empty">Nothing published yet.</p>{{end}}
 </main>{{end}}

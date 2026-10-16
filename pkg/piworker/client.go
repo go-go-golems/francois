@@ -151,7 +151,7 @@ func (c *Client) Sample(ctx context.Context, r Request, emit func(Event), execut
 		Type string `json:"type"`
 		Request
 	}{Type: "sample", Request: r}
-	wire.Request.CallID = wireID
+	wire.CallID = wireID
 	if err := c.send(wire); err != nil {
 		return err
 	}

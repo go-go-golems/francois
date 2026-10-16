@@ -790,3 +790,70 @@ Start with settings, migration 011, `store/storage.go`, `operations_test.go`, `h
 ### Technical details
 
 Paper page: https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-D-0. Global controls are `acceptNewVisits`, `samplingEnabled`, `storageMode` and optional notice. Sampling pause drains existing calls. Tour start counters remain process-local. The model-call ledger remains private and authoritative for call/token accounting.
+
+## Step 12: Wire controls and simplify the public experience
+
+The backend checkpoint is committed as `ad5f791`. This checkpoint wires the existing settings editor, shared notice treatment and automatic Open action, and removes the public usage/account management presentation. Applications and writing now share one chronological page stream and one primary RSS subscription.
+
+### Prompt Context
+
+**User prompt:** See Step 11.
+
+**Assistant interpretation:** Finish the approved minimal UI and operational controls without adding infrastructure.
+
+**Inferred user intent:** Ordinary visitors see applications and writing, while operators retain limits and incident controls.
+
+**Commit (backend):** `ad5f791` — Add simple operation controls and bounded hosted workspaces.
+
+### What I did
+
+- Added the three operation controls and notice field to the existing admin settings editor, plus view/aggregate-storage/user-tour limits in their existing settings sections.
+- Added a shared plain-text notice builder, reused for public action failures and hosted runtime notices. Paused storage rejects further autosave mutations locally after the first server rejection, rolls failed optimistic writes back through the existing database client, and clearly says changes cannot be saved.
+- Changed normal Open to the atomic `/api/instances/open` endpoint. Removed the new-instance wording, duplicate demo action and public plan upsell from the application action.
+- Reduced Account to subscription management/sign out, keeping operator API-token management available to staff. Removed the launcher's instance-management toolbar/panel while preserving saved instance URLs and a Close link.
+- Removed hero/Made by sections from the front page, merged application and journal lists by publication time, and added `/feed.xml` with published listed releases and published posts. Existing specialized RSS endpoints remain ordinary feeds.
+- Removed release-history/plan badges from application presentation while preserving authored content, entitled downloads, attachments and editor draft previews. Reduced the existing pricing destination to a small Support page without allowance/instance comparisons; removed it from normal navigation.
+- Exported the Paper notice typography/spacing and corrected text nodes to explicitly use ABC Areal, then reviewed the inline variants again. No clipped or misaligned content was found.
+- Rebuilt the repository's tracked embedded frontend bundles. Kept unrelated compact source formatting intact rather than including a broad reformat.
+
+### Why
+
+The site's routine flow should be Open/Try and read. Incident controls belong in the existing operator settings; a single short notice is enough for visitors. Pausing saving must be truthful even when an authored app keeps requesting autosaves.
+
+### What worked
+
+- `pnpm run check`, all eight existing frontend contract/chart tests and `pnpm run build` passed.
+- Combined feed integration tests passed: published post/release ordering, site-specific links, hidden/draft exclusion and merged HTML content on the public listing routes.
+- Public tests still verify entitled downloads, draft isolation and billing/access metadata while checking the reduced visible presentation.
+- Full `go test ./...` passed with real isolated PostgreSQL after correcting the timing-sensitive demo test. `go build ./...` passed. `golangci-lint run -v` reports zero issues.
+
+### What didn't work
+
+- The broad suite initially failed `TestPlans` at `plans_test.go:145: artifact plan badge`: the old assertion required the visible “Studio plan” badge deliberately removed by this design. It now checks retained access metadata and absence of that badge.
+- The full suite later exposed `demos_test.go:103: guest call 2: 429 ... code:rate_limited`. Sequential allowance assertions had assumed the preceding asynchronous call had already released its slot. Their helper now waits on that transient concurrency rejection; `TestDemos -count=3` passes and independent concurrency tests still assert the strict cap.
+- Lint found three `ST1013` numeric HTTP-status literals in the combined feed and one `QF1008` redundant embedded-field selector in the worker client. Replaced the literals with `http.StatusServiceUnavailable` and `wire.Request.CallID` with `wire.CallID`; lint then passed.
+- The local shell uses Node 20 while package metadata asks for Node 24. Checks/tests/build succeeded with an engine warning; the deployment Dockerfile builds and runs with Node 24 and will provide the production-shaped build verification.
+
+### What I learned
+
+Keeping explicit creation separate from the normal Open action preserves existing workspace data and management API semantics while simplifying the public flow. A shared RSS feed also removes the need to present two separate subscription choices on the minimal page.
+
+### What was tricky to build
+
+Authored HTML runs on an isolated origin, so runtime notices cannot assume portal CSS or navigate a portal-relative back link inside their iframe. The shared notice is styled from the exported design and the trusted launcher supplies Close outside the frame. Reads remain usable during read-only mode; future writes stop after a rejected save until the person reloads to retry.
+
+### What warrants a second pair of eyes
+
+Review the shared error/notice handling and preservation of access checks while reducing visible plan information. The storage byte cap counts logical payloads rather than PostgreSQL physical/index overhead.
+
+### What should be done in the future
+
+Deploy the completed code locally, apply migration 011 after a backup, verify the real settings UI and paused runtime behavior, and record the exact rollout/browser results. Production remains outside scope.
+
+### Code review instructions
+
+Start with `ui/catalog/admin.tsx`, `service-notice.ts`, `public.ts`, `account.tsx`, `instances.tsx`, `ui/src/runtime.ts`, `pkg/catalog/pages.go`, `feed.go` and `operations_test.go`. Generated embedded JavaScript is intentionally included because this repository tracks its browser assets.
+
+### Technical details
+
+Pause settings are saved through the existing versioned GET/PATCH administration API with If-Match. `/feed.xml` excludes hidden artifacts and draft posts/releases and uses stable GUIDs. No changes to provider credentials or live accounts/data were needed for tests.

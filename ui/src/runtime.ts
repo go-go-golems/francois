@@ -1,3 +1,4 @@
+import { serviceNotice, storageMutation } from "../catalog/service-notice";
 import { captureImages, prepareImages, imageLimits } from "./runtime-images";
 import { normalizeInput, parseJSON } from "./sample-contract";
 import { installDB } from "./runtime-db";
@@ -44,11 +45,54 @@ function scheduleRenewal(expiresAt: string) {
   setTimeout(() => void renew().catch(() => {}), Math.max(wait, 15000));
 }
 if (hosted) scheduleRenewal(boot.grantExpiresAt);
+let savingBlocked: Failure | undefined;
+function showServiceNotice(failure: Failure, fullPage = false) {
+  if (!hosted) return;
+  document.getElementById("francois-service-notice")?.remove();
+  const box = serviceNotice(failure.message, fullPage);
+  box.id = "francois-service-notice";
+  if (fullPage) box.querySelector("a")?.remove(); // The trusted launcher supplies Close outside the frame.
+  // Authored pages do not necessarily load portal CSS.
+  Object.assign(box.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    right: "0",
+    zIndex: "2147483647",
+    background: "#fff",
+    color: "#111",
+    fontFamily: '"ABC Areal",system-ui,sans-serif',
+    fontSize: "17px",
+    lineHeight: "22px",
+    padding: "16px 40px",
+    borderTop: "1px solid #eee",
+  });
+  if (fullPage)
+    Object.assign(box.style, {
+      bottom: "0",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      gap: "24px",
+    });
+  const paragraph = box.querySelector("p")!;
+  paragraph.style.margin = "0";
+  if (fullPage)
+    Object.assign(paragraph.style, {
+      fontSize: "clamp(28px,4vw,48px)",
+      lineHeight: "1.08",
+      fontWeight: "500",
+      letterSpacing: "-.02em",
+    });
+  document.body.append(box);
+}
 export async function request(
   path: string,
   options: RequestInit = {},
   retried = false,
 ): Promise<any> {
+  if (savingBlocked && path === "/api/assets" && options.method === "POST")
+    throw savingBlocked;
   const headers = new Headers(options.headers);
   if (hosted) headers.set("Authorization", "Bearer " + grant);
   const response = await fetch(path, { ...options, headers });
@@ -62,6 +106,25 @@ export async function request(
       failure = (await response.json()).error;
     } catch {
       failure = error("upstream_error", "Host request failed");
+    }
+    if (hosted && failure?.code) {
+      if (["storage_read_only", "storage_unavailable"].includes(failure.code)) {
+        savingBlocked = failure;
+        showServiceNotice({
+          ...failure,
+          message:
+            failure.message + " Changes cannot be saved. Reload to retry.",
+        });
+      } else if (
+        [
+          "sampling_paused",
+          "rate_limited",
+          "daily_limit",
+          "allowance_exhausted",
+          "demo_limit",
+        ].includes(failure.code)
+      )
+        showServiceNotice(failure);
     }
     throw failure;
   }
@@ -85,6 +148,7 @@ export const transport = {
     });
   },
   async rpc(method: string, args: unknown = {}) {
+    if (savingBlocked && storageMutation(method)) throw savingBlocked;
     return this.post("rpc", { method, args });
   },
   view: () => view,
@@ -136,6 +200,20 @@ async function connect() {
         }
       }
     } catch (e) {
+      const failure = e as Failure;
+      if (
+        hosted &&
+        [
+          "view_limit",
+          "demo_expired",
+          "instance_suspended",
+          "grant_invalid",
+        ].includes(failure?.code)
+      ) {
+        closed = true;
+        showServiceNotice(failure, true);
+        return;
+      }
       if (!closed) console.warn("Francois connection interrupted");
     }
     up = false;
@@ -633,7 +711,11 @@ const localUser = Object.freeze({
   email: async () => null,
   avatarUrl: async () => localProfile(boot.owner).avatarUrl,
   me: async () =>
-    Object.freeze({ ...localProfile(boot.owner), isOwner: true, canEdit: true }),
+    Object.freeze({
+      ...localProfile(boot.owner),
+      isOwner: true,
+      canEdit: true,
+    }),
   isOwner: async () => true,
   canEdit: async () => true,
   can: async (name: string) =>

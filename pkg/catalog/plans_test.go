@@ -141,8 +141,8 @@ func TestPlans(t *testing.T) {
 	if _, b, _ := e.do(nil, "portal.test", "GET", "/api/plans", nil, nil); strings.Contains(string(b), "price_") || !strings.Contains(string(b), `"supporter"`) {
 		t.Fatalf("public plans %s", b)
 	}
-	if _, b, _ := e.do(&sup, "portal.test", "GET", "/apps/premium", nil, nil); !strings.Contains(string(b), `data-rank="20"`) || !strings.Contains(string(b), "Studio plan") {
-		t.Fatalf("artifact plan badge %s", b)
+	if _, b, _ := e.do(&sup, "portal.test", "GET", "/apps/premium", nil, nil); !strings.Contains(string(b), `data-rank="20"`) || !strings.Contains(string(b), `data-plan="Studio"`) || strings.Contains(string(b), "Studio plan") {
+		t.Fatalf("artifact access metadata/minimal copy %s", b)
 	}
 
 	// Account shows the plan and its allowance.

@@ -223,6 +223,7 @@ export type AuditEntry = {
   createdAt: string;
 };
 export type SettingsDoc = {
+  operations: { acceptNewVisits: boolean; samplingEnabled: boolean; storageMode: "read-write" | "read-only" | "off"; notice: string };
   models: {
     allowed: { selector: string; label: string; thinking: string[]; credits: number }[];
     tiers: Record<string, string>;
@@ -233,6 +234,8 @@ export type SettingsDoc = {
     maxToolRounds: number;
   };
   limits: {
+    viewsPerUser: number;
+    storageBytesPerInstance: number;
     documentsPerInstance: number;
     assetBytesPerInstance: number;
     maxHtmlBytes: number;
@@ -245,6 +248,7 @@ export type SettingsDoc = {
     enabled: boolean;
     ttlMinutes: number;
     maxActive: number;
+    perUserPerHour: number;
     perAddressPerHour: number;
     credits: number;
     dailyBudget: number;

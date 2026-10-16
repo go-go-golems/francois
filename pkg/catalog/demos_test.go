@@ -42,8 +42,16 @@ func (e *env) demoFrom(addr, artifact string) (tactor, int, map[string]any) {
 }
 
 func (e *env) call(g grant, v *view, id string) (int, map[string]any) {
-	return e.app(g, "POST", "/api/views/"+v.id+"/calls", map[string]any{"callId": id, "input": "hi", "options": map[string]string{"modelTier": "default"}},
-		map[string]string{"X-Francois-View": v.id})
+	// Sequential allowance checks wait for the preceding asynchronous call's
+	// concurrency slot; concurrency behavior itself is tested independently.
+	deadline := time.Now().Add(time.Second)
+	for {
+		code, out := e.app(g, "POST", "/api/views/"+v.id+"/calls", map[string]any{"callId": id, "input": "hi", "options": map[string]string{"modelTier": "default"}}, map[string]string{"X-Francois-View": v.id})
+		if code != 429 || errCode(out) != "rate_limited" || time.Now().After(deadline) {
+			return code, out
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func TestDemos(t *testing.T) {

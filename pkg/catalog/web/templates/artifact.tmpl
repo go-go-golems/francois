@@ -5,7 +5,7 @@
 {{if .Card.Creators}}<p class="byline">by {{range $i, $c := .Card.Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
 <div class="lead-actions" data-actions data-artifact="{{.Card.ID}}" data-release="{{.Card.ReleaseID}}" data-title="{{.Card.Title}}"{{if .Demo}} data-demo="true"{{end}}{{if .Plan}} data-plan="{{.Plan}}"{{end}} data-rank="{{.Rank}}">
 <a class="btn btn-ink" href="/auth/login?return=/apps/{{.Card.ID}}">Sign in to run</a>
-<span class="muted">v{{.Card.Version}} · {{join .Card.Capabilities " · "}}{{if .Plan}} · {{.Plan}} plan{{end}}</span>
+
 </div>
 </section>
 {{if .Card.Cover}}<figure class="cover">{{template "hero" .Card.Cover}}</figure>{{end}}
@@ -13,18 +13,18 @@
 {{if .Gallery}}<section class="gallery" aria-label="Gallery">
 {{range .Gallery}}<figure>{{template "media" .}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>
 {{end}}</section>{{end}}
-<section class="lib-head label"><h2>Versions</h2></section>
+
 <section class="lines">
-{{range .Releases}}<div class="line release">
-<div><strong>v{{.Version}}</strong><span class="muted">{{date .PublishedAt}}</span></div>
+{{range .Releases}}{{if or .Downloads .Attached}}<div class="line release">
+
 <div class="release-body">
-<p class="changelog">{{if .Changelog}}{{.Changelog}}{{else}}No release notes.{{end}}</p>
+
 {{if .Downloads}}<p class="ri-actions">{{range .Downloads}}<a class="tlink quiet" href="{{.Href}}">{{.Label}}</a>{{end}}</p>{{end}}
 {{if .Attached}}<ul class="attachments" aria-label="Attachments">
 {{range .Attached}}<li>{{if .Href}}<a class="tlink" href="{{.Href}}" download="{{.Name}}">{{.Title}}</a>{{else}}<span>{{.Title}}</span>{{end}} <span class="muted">{{if ne .Title .Name}}{{.Name}} · {{end}}{{size .Size}}</span></li>
 {{end}}</ul>{{if .Locked}}<p class="muted small">{{if $.Body.Plan}}Attachments are included with the {{$.Body.Plan}} plan.{{else}}Sign in with a plan to download the attachments.{{end}}</p>{{end}}{{end}}
 </div>
 </div>
-{{end}}</section>
+{{end}}{{end}}</section>
 </main>{{end}}{{end}}
 

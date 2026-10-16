@@ -51,3 +51,7 @@ Rewrote the capacity design as direct changes to existing settings and handlers;
 ## 2026-10-16
 
 Implemented backend operation switches, six-call admission with worker termination acknowledgement, atomic workspace/tour reuse, live-view caps and transactional aggregate storage limits; targeted integration checks pass.
+
+## 2026-10-16
+
+Implemented the existing settings editor controls, shared pause/unsaved notices, automatic Open, minimal Account/launcher, and combined public HTML/RSS stream. Full Go/PostgreSQL suite, frontend checks/tests/build, Go build and lint pass.

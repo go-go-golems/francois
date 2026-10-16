@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"strings"
 	"sync"
@@ -244,5 +245,49 @@ func TestOpenWorkspaceAndTourResumeUnderConcurrency(t *testing.T) {
 	_ = json.Unmarshal(raw, &expiry)
 	if expiry == "" {
 		t.Fatal("tour expiry missing")
+	}
+}
+
+func TestCombinedFeedAndMinimalPublicStream(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	admin := e.user("writer", "admin", false)
+	release := e.publishArtifact(admin, "board", "")
+	p, err := e.store.CreatePost(ctx, store.Post{Slug: "hello", Title: "A new note", Summary: "A short note", Body: "Private draft body", CreatedBy: admin.user.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, before, _ := e.do(nil, "portal.test", "GET", "/feed.xml", nil, nil)
+	if strings.Contains(string(before), p.Title) {
+		t.Fatal("draft post leaked")
+	}
+	if _, err = e.store.SetPostState(ctx, p.ID, "published"); err != nil {
+		t.Fatal(err)
+	}
+	code, body, h := e.do(nil, "boutique.test", "GET", "/feed.xml", nil, nil)
+	var feed rssDoc
+	if err = xml.Unmarshal(body, &feed); err != nil || code != 200 || len(feed.Channel.Items) != 2 {
+		t.Fatalf("combined %d %s %v", code, body, err)
+	}
+	if !strings.Contains(h.Get("Content-Type"), "application/rss+xml") || feed.Channel.Items[0].Link != "http://boutique.test/journal/hello" {
+		t.Fatalf("feed order/origin %v", feed)
+	}
+	for _, path := range []string{"/", "/apps", "/journal"} {
+		code, page, _ := e.do(&admin, "portal.test", "GET", path, nil, nil)
+		if code != 200 || !strings.Contains(string(page), "A new note") || !strings.Contains(string(page), "/apps/board") {
+			t.Fatalf("merged page %s %d %s", path, code, page)
+		}
+		for _, removed := range []string{`class="hero"`, `>Made by<`, `>Instances</a>`, `>Pricing</a>`} {
+			if strings.Contains(string(page), removed) {
+				t.Errorf("%s exposes %s", path, removed)
+			}
+		}
+	}
+	if _, err = e.store.Pool.Exec(ctx, `UPDATE catalog_artifacts SET visibility='hidden' WHERE id=(SELECT artifact_id FROM releases WHERE id=$1)`, release); err != nil {
+		t.Fatal(err)
+	}
+	_, body, _ = e.do(nil, "portal.test", "GET", "/feed.xml", nil, nil)
+	if strings.Contains(string(body), "/apps/board") {
+		t.Fatal("hidden artifact leaked in combined feed")
 	}
 }
