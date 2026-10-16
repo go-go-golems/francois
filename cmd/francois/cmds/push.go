@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-go-golems/francois/pkg/catalog/studioclient"
+	"github.com/go-go-golems/francois/pkg/catalog/client"
 	glazed "github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/fields"
 	"github.com/go-go-golems/glazed/pkg/cmds/schema"
@@ -87,34 +87,28 @@ func (c *CatalogPush) RunIntoGlazeProcessor(ctx context.Context, p *values.Value
 			return err
 		}
 	}
-	// Fail before creating a draft when an attachment is missing.
-	for _, a := range s.Attach {
-		if fi, err := os.Stat(a); err != nil || fi.IsDir() {
-			return errors.Errorf("attachment %s is not a readable file", a)
-		}
-	}
-	rel := studioclient.Release{ArtifactID: s.ArtifactID, Version: s.Version, Title: s.Title, Description: s.Description, Tags: s.Tags,
-		Changelog: s.Changelog, HTML: html, Manifest: manifest, FreeSample: s.Free, Attachments: s.Attach}
-	client := studioclient.New(s.Server, token)
-	report := func(checks []studioclient.Check) {
+	rel := client.ReleaseUpload{ArtifactID: s.ArtifactID, Version: s.Version, Title: s.Title, Description: s.Description, Tags: s.Tags,
+		Changelog: s.Changelog, HTML: html, Manifest: manifest, FreeSample: s.Free}
+	studio := client.New(s.Server, token).Studio
+	report := func(checks []client.Check) {
 		for _, ch := range checks {
 			log.Info().Str("level", ch.Level).Str("code", ch.Code).Msg(ch.Message)
 		}
 	}
 	if s.Check {
-		checks, err := client.Check(ctx, rel)
-		report(checks)
+		res, err := studio.CheckRelease(ctx, rel)
+		report(res.Checks)
 		return err
 	}
-	res, err := client.Push(ctx, rel, s.Publish)
-	report(res.Checks)
-	var apiErr *studioclient.Error
+	res, err := studio.Push(ctx, rel, s.Attach, s.Publish)
+	report(res.Release.Checks)
+	var apiErr *client.Error
 	if errors.As(err, &apiErr) {
 		report(apiErr.Checks)
 	}
 	if err != nil {
 		return err
 	}
-	return out.AddRow(ctx, types.NewRow(types.MRP("release_id", res.ReleaseID), types.MRP("artifact", s.ArtifactID), types.MRP("version", s.Version), types.MRP("state", res.State),
+	return out.AddRow(ctx, types.NewRow(types.MRP("release_id", res.Release.ID), types.MRP("artifact", s.ArtifactID), types.MRP("version", s.Version), types.MRP("state", res.Release.State),
 		types.MRP("attachments", len(res.Attachments))))
 }

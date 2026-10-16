@@ -635,3 +635,71 @@ Everything went in as one commit, as the owner asked for less granular steps.
 ### Technical details
 
 - New codes: 428 `revision_required`, 412 `settings_conflict`, 502 `billing_unavailable`.
+
+## Step 10: Phase 3: the typed Go client
+
+`pkg/catalog/client` replaces `pkg/catalog/studioclient`. It covers the identity, studio, admin and account APIs (§7 of the guide), using one transport with retries, streamed multipart uploads, streamed downloads and an in-process handler transport for the remote MCP phase. A contract test calls the methods against the real server with strict decoding.
+
+### Prompt Context
+
+**User prompt (verbatim):** see Step 9.
+
+**Assistant interpretation:** Phase 3 of the guide.
+
+**Inferred user intent:** One client that the CLI and the MCP server share.
+
+### What I did
+
+- `client.go`:
+  - `New(server, token, opts...)` with the options `WithHTTPClient`, `WithHost`, `WithRetries` (default 3), `WithHandler` (in-process `http.Handler` transport) and `WithStrictDecoding`;
+  - `send` retries GET/HEAD on connection errors and 502/503/504 with 250/500/1000 ms backoff, and never retries mutations;
+  - `do` decodes JSON up to 8 MiB; `upload` streams multipart through `io.Pipe`; `download` streams to an `io.Writer`;
+  - each call logs method, path, status and duration at debug level through the package's logcopter logger, never headers or bodies.
+- `errors.go`: `Error{Status, Code, Message, Checks}`, `IsCode`, and decoding of the envelope (or `http_<status>` for other bodies).
+- `types.go`:
+  - wire types mirroring the server JSON (`Me`, `Token`, `Artifact`, `ArtifactRow`, `ArtifactDetail`, `Release`, `CheckResult`, `Media`, `Post`, `Creator`, `Instance`, `AccessGrant`, `AuditEntry`, `UserRow`, `Customer`, `SubscriptionRow`, `Settings`, `SettingsRevision`, …);
+  - reuses `settings.Document` and `billing.Decision`/`billing.Subscription`;
+  - nested values the client passes through (overview, usage, allowance) stay `json.RawMessage`.
+- `studio.go` (all studio routes and `Push`: draft → attachments → publish, naming the draft on partial failure), `admin.go` (all admin routes; `SaveSettings(doc, base)` sends `If-Match`; `EditSettings`/`EditPlan` re-read and retry up to three times on `settings_conflict`), `account.go` (account, checkout/portal links, instances, members, upgrade).
+- `cmd/francois/cmds/push.go` ported; `pkg/catalog/studioclient` removed (`git rm`).
+- Tests:
+  - `pkg/catalog/client/client_test.go`: a GET succeeds after two 503s (three attempts); a POST gets one attempt and returns `http_503`; error envelope decoding;
+  - `pkg/catalog/client_contract_test.go` (`TestClientContract`): about 70 calls across every surface with a strict client, including the expected error codes (`version_exists`, `token_scope`, `settings_conflict`, `billing_unavailable`, `token_invalid`);
+  - `TestTokensAndPush` now uses the new client.
+
+### Why
+
+- A single client means authorization lives only in the server; the CLI and MCP tools are thin.
+
+### What worked
+
+- The contract test passed on the first run. A mutation check showed strict decoding is effective: with `Release.DownloadAccess` removed, the test fails with `client_contract_test.go:64: create release: json: unknown field "downloadAccess"`.
+- `make ci-check`: `0 issues.`, every package `ok` (including the new `pkg/catalog/client`).
+
+### What didn't work
+
+- `make ci-check` stopped once at `fmt-check` on `pkg/catalog/client/types.go` (struct field alignment); `gofmt -w` fixed it.
+
+### What I learned
+
+- The server's map-built responses (`publicRelease`, `instanceJSON`, studio list rows) were stable enough that hand-written types matched them exactly. Strict decoding is what keeps that true.
+
+### What was tricky to build
+
+- `Instance` is used for list rows, detail responses (`membersList`, `usage`, `release`, `upgrades`, `launchBlocked`) and admin detail (`activeViews`, `recentFailures`, `audit`). One struct with optional fields keeps strict decoding valid for all of them.
+
+### What warrants a second pair of eyes
+
+- `WithHandler` uses `httptest.NewRecorder` in production code (remote MCP). It buffers whole responses, which is fine for JSON but not for large downloads.
+
+### What should be done in the future
+
+- Phase 4: commands.
+
+### Code review instructions
+
+- `pkg/catalog/client/client.go` (`send`), then `types.go`; run `go test ./pkg/catalog/client/` and `TestClientContract`.
+
+### Technical details
+
+- Every route in guide §7 has a client method except `/api/billing/refresh` (a Checkout-return helper for the browser) and the public pages.

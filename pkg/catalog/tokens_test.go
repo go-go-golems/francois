@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-go-golems/francois/pkg/catalog/studioclient"
+	"github.com/go-go-golems/francois/pkg/catalog/client"
 )
 
 func TestTokensAndPush(t *testing.T) {
@@ -58,29 +58,28 @@ func TestTokensAndPush(t *testing.T) {
 	}
 
 	// Push a new artifact and publish it.
-	client := studioclient.New(e.ts.URL, secret)
-	client.Host = "portal.test"
+	studio := client.New(e.ts.URL, secret, client.WithHost("portal.test"), client.WithStrictDecoding()).Studio
 	dir := t.TempDir()
 	manual, notes := filepath.Join(dir, "Manual.pdf"), filepath.Join(dir, "notes.txt")
 	_ = os.WriteFile(manual, []byte("%PDF-1.4 manual"), 0o600)
 	_ = os.WriteFile(notes, []byte("release notes"), 0o600)
-	res, err := client.Push(ctx, studioclient.Release{ArtifactID: "loom", Title: "Loom", Version: "1.0.0", HTML: []byte(testHTML), Manifest: []byte(`{"db":{}}`),
-		Attachments: []string{manual, notes}}, true)
-	if err != nil || res.State != "published" || res.ReleaseID == "" || len(res.Attachments) != 2 || res.Attachments[0].Name != "Manual.pdf" {
+	res, err := studio.Push(ctx, client.ReleaseUpload{ArtifactID: "loom", Title: "Loom", Version: "1.0.0", HTML: []byte(testHTML), Manifest: []byte(`{"db":{}}`)},
+		[]string{manual, notes}, true)
+	if err != nil || res.Release.State != "published" || res.Release.ID == "" || len(res.Attachments) != 2 || res.Attachments[0].Name != "Manual.pdf" {
 		t.Fatalf("push %+v %v", res, err)
 	}
-	if rel, _ := e.store.Release(ctx, res.ReleaseID); len(rel.Attachments) != 2 || rel.Attachments[1].Size != int64(len("release notes")) {
+	if rel, _ := e.store.Release(ctx, res.Release.ID); len(rel.Attachments) != 2 || rel.Attachments[1].Size != int64(len("release notes")) {
 		t.Fatalf("pushed attachments %+v", rel.Attachments)
 	}
 	if ok, _ := e.store.IsArtifactCreator(ctx, "loom", cleo.user.ID); !ok {
 		t.Fatal("pushed artifact not credited to the token owner")
 	}
-	checks, err := client.Check(ctx, studioclient.Release{ArtifactID: "loom", Version: "1.0.1", HTML: []byte("not html")})
-	if err != nil || len(checks) == 0 {
-		t.Fatalf("check %v %v", checks, err)
+	checked, err := studio.CheckRelease(ctx, client.ReleaseUpload{ArtifactID: "loom", Version: "1.0.1", HTML: []byte("not html")})
+	if err != nil || len(checked.Checks) == 0 {
+		t.Fatalf("check %v %v", checked, err)
 	}
-	_, err = client.Push(ctx, studioclient.Release{ArtifactID: "loom", Version: "1.0.0", HTML: []byte(testHTML)}, false)
-	var apiErr *studioclient.Error
+	_, err = studio.Push(ctx, client.ReleaseUpload{ArtifactID: "loom", Version: "1.0.0", HTML: []byte(testHTML)}, nil, false)
+	var apiErr *client.Error
 	if !errors.As(err, &apiErr) || apiErr.Code != "version_exists" {
 		t.Fatalf("duplicate version %v", err)
 	}
@@ -88,7 +87,7 @@ func TestTokensAndPush(t *testing.T) {
 	if _, err = e.store.Pool.Exec(ctx, `INSERT INTO catalog_artifacts(id,title) VALUES('other','Other')`); err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Push(ctx, studioclient.Release{ArtifactID: "other", Version: "1.0.0", HTML: []byte(testHTML)}, false)
+	_, err = studio.Push(ctx, client.ReleaseUpload{ArtifactID: "other", Version: "1.0.0", HTML: []byte(testHTML)}, nil, false)
 	if !errors.As(err, &apiErr) || apiErr.Code != "not_editor" {
 		t.Fatalf("push to someone else's artifact %v", err)
 	}
