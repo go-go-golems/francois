@@ -23,158 +23,143 @@ RelatedFiles:
     - Path: repo://worker/src/main.ts
       Note: Per-round output cap and tool-round behavior
 ExternalSources: []
-Summary: 'Proposed direction: minimal public UI, private fairness controls for six model lanes, reversible service pauses, and implicit saved workspaces. No runtime policy changes in this document.'
+Summary: "Use existing settings, call counters, demo limits and storage methods to keep the public site minimal and operations controllable. Proposed implementation."
 LastUpdated: 2026-10-16T12:41:52.034773574-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
 
-# Minimal public experience and operational capacity controls
+# Minimal site: limits, pause switches and saved work
 
-## Status and revised direction
+## What we are changing
 
-This is a proposal based on the user's clarification after local deployment, not an implementation receipt. The deployed RSS and administrator analytics remain as described in the earlier guide. This document revises the proposed public experience: ordinary visitors should see applications, writing and a direct way to open an application, with occasional short service notices. Usage accounting and resource policy remain private operational functions.
+Visitors open applications and read the site. Usage accounting stays in administration. When a limit or outage prevents something, show a short message where the action would happen. Keep sign out and subscription management accessible.
 
-The user reports free model hosting with effectively unlimited tokens and six execution lanes. Treat six as the physical concurrency budget, not the number of people allowed to have a workspace or a browser tab open. Token counts remain useful for debugging context growth and expensive applications; occupied lane time, latency, rejection rates, and active users become more useful capacity indicators than monetary cost.
+Implement this in the existing Go application, PostgreSQL database, Pi worker and React UI. The changes below are proposed; the running local deployment has not been changed by this document.
 
-## Paper evidence
+The [Paper comments](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-3-0) call for removing most account/instance/pricing presentation, merging the catalog and journal feeds, and keeping a small warning treatment. Preserve that direction: an application has an Open/Try action, rather than a provisioning flow or usage dashboard.
 
-Read 20 open threads in [the unified Paper file](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-3-0). Every listed thread had one message and its preview was complete. Relevant feedback includes removing Hero, Made by, artifact Intro/Versions, the pricing Plans section, creator Profile, most Account content, Instances, Instance bar and Instance settings; merging Catalog and Journal feeds; retaining subscription management/sign out; considering public support; and using a warning resembling the existing Demo slots full page. The Demo ended design is also marked for removal.
+## 1. Three controls in the existing settings
 
-These comments establish the simplification direction. They do not specify the final merged feed contents or the exact copy for an expired tour. No Paper nodes were changed and no thread was resolved in this investigation. The proposed service notice replaces the elaborate expiration/plan screens with a small common treatment.
+Add this object to `settings.Document` and expose it in the existing administrator settings editor:
 
-## What an instance costs today
+```json
+{
+  "operations": {
+    "acceptNewVisits": true,
+    "samplingEnabled": true,
+    "storageMode": "read-write",
+    "notice": ""
+  }
+}
+```
 
-An instance is a PostgreSQL identity and data namespace: owner, members, pinned release, hostname, state and optional demo expiry. `store.CreateInstance` inserts the instance and its owner membership. `Runtime.Handler` routes requests for that instance through the shared HTTP service. The Pi worker is a shared Node process started by `piworker.Start`; it is not started per instance. Application JavaScript executes in the visitor's browser.
+`storageMode` accepts `read-write`, `read-only`, or `off`. `notice` is optional plain text, at most 500 characters, for the current incident; use the default message for the blocked operation when it is empty. Render it as text.
 
-| Resource | When it exists | Main infrastructure burden |
+| Setting | Behavior when restricted | Check it in |
 | --- | --- | --- |
-| Saved instance | Until deleted | Metadata/index rows and retained content; no model lane or dedicated process |
-| Release | Shared by instances pinned to it | Authored HTML/media retained by release, rather than copied for each instance |
-| Live view/tab | While connected | HTTP/SSE connection, goroutine, event channel, presence and authorization checks |
-| Model call | During sampling | Shared worker request and upstream generation; consumes concurrency admission |
-| Stored documents/assets/comments | Until deleted | PostgreSQL storage, query work, WAL/backups and data transfer |
+| `acceptNewVisits = false` | Refuse creation of new tours/workspaces. Existing eligible workspaces still open. | `createDemo`, `createInstance`, automatic workspace creation |
+| `samplingEnabled = false` | Refuse new model calls. Already-running calls finish under the existing timeout. | `Runtime.sample`, before model admission/reservation |
+| `storageMode = read-only` | Allow reads; refuse all persistent changes. | RPC mutations and asset upload/delete |
+| `storageMode = off` | Refuse persistent reads and writes, including previously signed asset URLs. | Storage RPC methods, uploads and blob reads |
 
-`createView` allocates a 128-event channel; SSE sends a keepalive every 15 seconds and checks authorization every 30 seconds. An idle view therefore costs more than a saved instance but does not itself hold an LLM slot. There is no explicit view-count limit in the inspected creation path. Presence broadcasting scans views repeatedly, which can become costly in a crowded shared room. Keep shared multi-user rooms outside the simple default flow.
+These controls apply to all users. Account-specific abuse continues to use existing account/instance suspension. The public catalog and writing remain available when hosted capabilities are paused. This assumes the database is running; the storage switch is an application control, not a way to serve database-backed pages through a database failure.
 
-`sample` currently holds its admission slot for the entire application call, including tool waits between provider rounds. It has a five-minute timeout; each browser-tool wait can last up to 150 seconds. This is a conservative lane proxy, not a precise measurement of provider occupancy. The worker already caps output at `min(model.maxTokens, 8192)` per round and the server controls tool rounds. Input/context size and duration still matter even when token billing is irrelevant.
+Read current settings at the operation, so an already-open tab cannot bypass a pause. Display the notice on its next affected request; extra polling is unnecessary. A model-only pause leaves saved-data access alone. A read-only pause also blocks document/asset deletion, comments and leases; ordinary quota exhaustion should still permit deletion to free space.
 
-### Observed local baseline
+Reuse `GET /api/admin/settings` and `PATCH /api/admin/settings`, including the existing `If-Match` revision check and audit trail. Supply explicit initial values when updating the active settings. Keep the checks as small functions in the existing handlers.
 
-A single read-only local snapshot on 2026-10-16 showed 13 instances, seven documents containing 606 logical bytes, zero assets, and a 10,401,459-byte PostgreSQL database. `docker stats --no-stream` reported the app container at 85.15 MiB/0.00% CPU and PostgreSQL at 89.58 MiB/0.29% CPU. These are whole-container, lightly loaded observations, not per-instance memory or a load test; they exclude other stack services and upstream hosting. They support distinguishing saved identities from active work, but do not establish a supported user count.
+## 2. Six model calls, one per person
 
-### Storage gaps
+Set the existing `Allowance.GlobalConcurrency` to 6 and `PerUserConcurrency` to 1. Reuse `Runtime.admit` and `release`. The per-user key already spans instances and browser tabs. When admission fails, return the existing HTTP 429 response with a short busy message. The person can retry.
 
-Defaults allow 5,000 documents at up to 256 KiB each, about 1.22 GiB of logical document bodies per instance, plus 256 MiB of assets. PostgreSQL overhead and backups add to this. These are code defaults, not a claim about the active saved configuration. Asset inserts enforce a byte/count quota under an advisory transaction lock. Document insertion checks document count without an equivalent instance-wide lock, so simultaneous new paths can race. Comment creation/replies do not enforce an aggregate instance byte quota in the inspected store path.
+Keep the existing five-minute call timeout, server-controlled tool-round limit and per-round output cap of 8,192 tokens. Admission remains held for the full application call, including tool waits. This is deliberately conservative for the six available lanes.
 
-Add total bytes and operation rate limits across persistent capabilities, rather than relying on document count. Account-wide limits prevent creating extra workspaces to multiply allowance. Read/query limits also matter: `QueryDocuments` can decode up to 5,000 documents before applying shared filter/order/limit semantics. Large collections can consume substantial memory even without a model request.
+Keep the existing credit reservation and daily/monthly limits as private call allowances. Set model credit weights to 1 if the intended policy is simply a number of calls; for example, a daily allowance of 50 then means 50 started calls. Configure smaller allowances for free accounts and tours using the existing plan/demo settings. Preserve current accounting semantics: started calls count even if cancelled, while calls that never start release their reservation. Visitors see a neutral limit message, never a credit balance or upgrade prompt.
 
-## Minimal user experience
+Continue recording tokens, model, artifact, timestamps and failures in `model_calls`. Existing start/settle timestamps provide call duration for operator inspection. This is enough to tune limits from actual use.
 
-Expose “Open” or “Try” from the application. For a signed-in person, resolve their saved workspace automatically. Preserve instances internally for ownership, private state, release pinning and origin isolation; remove their routine provisioning/management burden from the public flow. A stable per-instance origin remains useful even if its identifier is never presented as a product concept.
+Cancellation deserves one focused correctness check: `piworker.Client.Sample` currently sends cancel and returns before an acknowledgement. Confirm the worker terminates the generation before treating that slot as reusable. Also verify that the provider's six lanes refer to concurrent generations and that other callers are not consuming the same pool. These checks establish whether the configured six-call limit matches the upstream limit.
 
-Start with one default workspace per owner and artifact. Resolve/create it transactionally with a dedicated identity or unique constraint; “list then create” is insufficient under two simultaneous tabs. This is a new default-workspace rule: existing additional workspaces must not be silently merged or deleted. Their eventual reachability and treatment need a separate explicit migration decision before a UI removal strands data. Collaboration and multiple named workspaces can remain future requirements if there is a real application need.
+```text
+sample(request):
+    authenticate and validate request
+    if sampling is paused: return service notice
+    if existing per-user/global admission fails: return busy
+    reserve existing call allowance
+    if reservation fails: release admission; return limit message
+    run with existing timeout and tool/output bounds
+    settle usage and release admission exactly once
+```
 
-Anonymous visitors receive an expiring private tour workspace. Reopening an existing tour resumes it and must not reset its clock or start allowance. Signed-in free users can keep saved state while their model access observes rolling fairness limits; do not equate saved-data lifetime with an LLM session. A tab/session refresh, grant renewal or repeated “Open” must not grant a fresh usage allowance.
+## 3. Short tours and limited starts
 
-Render one notice component in the existing typography, with plain text and at most a retry/back link:
+Reuse `Demo.TTLMinutes`, `MaxActive`, `PerAddressPerHour`, `Credits` and `DailyBudget`. Start with a 20-minute tour and the existing three starts per address per hour; leave other limits configurable in the current settings. These are initial policy choices, not measured capacity claims. Demo instance count is independent of model-call concurrency: an idle tour consumes no model lane.
 
-- Busy: “All spots are busy. Please try again shortly.”
-- Cooling down: “You've had a turn. Please come back a little later.” Include a reliable return time when known.
-- LLM paused: “AI is temporarily paused. You can still open your saved work.”
-- Storage read-only: “Saving is temporarily paused. Your existing work is still available.”
-- Tour ended: “This visit has ended. You can return later.”
+When Open/Try finds a live tour for that person and application, resume it without extending `expires_at` or consuming another start. Refreshing the page or renewing a grant must not create a fresh tour allowance. For signed-in callers, add `Demo.PerUserPerHour`, initially 3, and apply the existing limiter with a user-ID key as well as the network key. Anonymous callers retain the network limit. Keep the limiter process-local as it is today; its counters reset on application restart.
 
-Use inline notices when the application can still function. Use the small warning page only when entry itself is blocked. A storage pause must disable autosave and communicate unsaved edits; never acknowledge a write that was not persisted. Existing healthy reads/exports can remain available. A complete storage outage must use wording that does not promise access to data.
+Reuse existing expiry handling: it suspends the demo, revokes grants and closes its views. Existing cleanup deletes expired demo data after seven days while model-call history remains. Signed-in saved workspaces are separate from tours and keep their data when a daily model allowance runs out.
 
-## Admission and fairness for six lanes
+## 4. Keep instances internal; open saved work directly
 
-Start with a single authoritative model gateway, global concurrency six, and one active call per principal across all their tabs/artifacts. The code default is currently global eight and per-user two; do not assume it matches the active saved settings. If this site shares provider lanes with other software, its cap must fit the remaining budget or every caller must pass through the same gateway. Paying users and administrators should still respect the physical cap.
+An instance is a PostgreSQL workspace identity: owner, release, hostname, members and stored data. It does not create a container or start a worker. All instances use the same Go service and shared Pi worker; application JavaScript runs in the browser.
 
-Begin with immediate rejection and a retry hint when all slots are busy; no unbounded queue or automatic repeated resubmission. If observation later shows unacceptable contention, a short, bounded, cancellable fair queue is a separate addition. Avoid putting an idle 20-minute visit into a model lane. If paid prioritization is desired, cap the free cohort below six under contention or schedule fairly; do not permanently idle capacity before there is evidence it helps.
+Change the normal Open action to find the person's existing workspace for that artifact and open it. If several already exist, use the oldest active one as the default. If none exists, create one under the existing access and instance-count checks. Perform lookup and creation under the existing per-owner transaction lock so simultaneous tabs do not create duplicates. Existing additional instances and their URLs remain intact; remove routine instance management from the default flow without merging or deleting data.
 
-For a small single-service deployment, the existing mutex/counters are sufficient for in-process concurrency admission. They are not provider-wide or replica-wide semaphores. Cancellation currently sends a worker cancellation frame and returns, so rigorous physical-slot reuse requires confirming worker/upstream termination, not merely decrementing the local counter. Retain conservative slot holding and validate cancellation before claiming a hard six-generation guarantee. Multiple gateway replicas would need shared leases and crash recovery. Do not add that complexity while deploying just one gateway.
+| State | Infrastructure cost |
+| --- | --- |
+| Saved instance | Small metadata plus whatever data it retains |
+| Connected tab | HTTP/SSE connection, event buffer and authorization checks |
+| Running model call | One admitted slot, shared worker work and upstream generation |
+| Stored content | Database space, query work and backup growth |
 
-Use a small set of server-owned policies for each audience:
+The local investigation found 13 instances, seven documents totaling 606 logical bytes and no assets. This is a small development dataset, not a capacity estimate. The practical controls are model-call limits, storage bounds and a small per-user live-view cap; add `Limits.ViewsPerUser`, initially 3, checked under the existing runtime mutex in `createView`.
 
-| Control | Tentative starting point | Scope |
-| --- | --- | --- |
-| Anonymous tour lifetime | 15–20 minutes | Fixed expiry, no refresh extension |
-| Tour starts | Small rolling hourly/daily allowance | Visitor identity and coarse network abuse limit |
-| Active model requests | One per user/visitor | Shared across tabs, workspaces and artifacts |
-| Sustained model access | Rolling start-rate and occupied-seconds budget | Especially anonymous/free; configurable for all users |
-| Saved storage | Small total-byte cap plus document/asset count and size limits | Per instance and owning account |
-| Live views and RPC/write rates | Small finite bounds | Per principal and instance, plus global emergency cap |
+## 5. Bound storage with the existing store methods
 
-These are starting hypotheses, not capacity measurements or deployed settings. Rate and lane-seconds values should be set from representative application timings. Six continuously occupied lanes yield 360 lane-seconds per minute: with a 30-second mean admitted-call duration that implies about 12 calls/minute; with a 120-second mean, about three. These are theoretical throughput examples with no utilization headroom, not user-count promises.
+Add `Limits.StorageBytesPerInstance`, initially 16 MiB, and lower the existing document-count default to 500. Apply the byte cap to document bodies, asset bytes, comment text/anchors and lease payloads. Keep existing per-document/per-upload request bounds. Existing instance-count limits bound how many such allowances an account can create.
 
-Count starts as well as completions to limit repeated cancel/retry abuse. Reserve duration allowance for running requests so concurrent calls cannot all spend the same remaining budget; reconcile on settlement, and define how upstream failures affect the fairness ledger separately from provider-start accounting. Existing credit reservations/usage history provide a useful pattern, but fixed per-call credits do not measure lane occupancy.
+At each persistent write, take the same instance advisory transaction lock, calculate the resulting logical byte total, and reject growth over the cap. For updates, subtract the old value before adding its replacement. Allow deletions and size-reducing updates when already over quota. Check the document-count limit under this same lock to fix concurrent inserts exceeding it. All mutation methods must participate, including comments and leases.
 
-Keep tour start counters in PostgreSQL for limits that should survive restarts. Use authenticated user identity when available and a server-issued visitor identifier otherwise; clearing cookies cannot be fully prevented, so add a coarse network limit with care for shared networks. Existing per-address demo limiting is process-local and has no principal-wide session-start budget. Do not use traffic analytics identifiers as authorization credentials.
+Do this in the current store methods. The dataset is bounded and small enough to calculate its usage inside the write transaction. Existing data above a new limit remains readable. Switching storage modes must never delete data.
 
-## Reversible operations controls
+## 6. One notice treatment
 
-Extend the existing versioned settings with three explicit service controls and one shared notice payload. Each control can target everyone or just anonymous/free callers. Keep resolution in one policy helper so portal launch, runtime RPC and asset routes agree.
+Use the site's existing type and spacing, with one short paragraph and at most a retry/back action. Show it inline if the application remains usable, or as a small warning page when entry is blocked. Design these variants in Paper before implementing the UI.
 
-| Control | Modes | Expected effect |
-| --- | --- | --- |
-| New activity | open / paused | Stop creating tours and saved workspaces; existing eligible work can remain available |
-| Model access | open / paused | Reject new model requests; choose ordinary drain or an explicit emergency cancellation action |
-| Storage | read-write / read-only / unavailable | Normal writes; reads only; or refuse persistent capability access during an incident |
+| Reason | Message |
+| --- | --- |
+| Busy | “All spots are busy. Please try again shortly.” |
+| Daily allowance reached | “You've reached today's limit. Please come back tomorrow.” |
+| Tour expired | “This visit has ended. You can return later.” |
+| AI paused | “AI is temporarily paused.” |
+| Saving paused | “Saving is temporarily paused. Your existing work is still available.” |
+| Storage off | “Saved work is temporarily unavailable.” |
 
-“Read-only” means all persistent mutations, including comments, leases and asset/document deletion, are refused. Ordinary quota exhaustion is different: permit authorized deletion there so a user can free space. An unavailable storage backend may prevent launching authenticated apps too; keep the public failure page independent of that backend wherever practical. Operations metadata belongs in the existing administrator settings/audit flow, not a public service-control dashboard.
-
-A graceful LLM pause stops new calls and lets admitted calls finish. An emergency action also cancels active calls and waits for worker completion before considering slots reusable. Existing `RevokeInstance` closes views and their calls and is useful for suspension, but is broader than a model-only pause; add a narrowly scoped call cancellation operation to keep healthy saved-data views usable. Affected connected tabs receive the notice, and every sensitive request checks policy, so old grants or already-open tabs cannot bypass a pause.
-
-Return stable codes (`capacity_busy`, `fair_use_cooldown`, `tour_expired`, `sampling_paused`, `storage_read_only`, `storage_unavailable`) with message and optional `retryAt`. Use HTTP 429 for client fairness/capacity rejection and 503 for temporary service pauses; include `Retry-After` when a retry interval is meaningful. Avoid upgrade prompts. RFC 9110 describes `Retry-After` for temporary unavailability: [HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after).
+Reuse the existing JSON error envelope. Add specific paused-storage/AI codes where needed; use HTTP 503 for those temporary pauses and retain existing limit codes. Render the operator notice when supplied. Stop autosave after a saving-pause response and show that edits are unsaved. Do not report success or promise persistence for rejected writes.
 
 ```mermaid
 flowchart LR
-  Open[Open application] --> Resolve[Resume or create private workspace]
-  Resolve --> App[Browser app]
-  App --> Gate[Identity, expiry and operation policy]
-  Gate --> Data[Bounded PostgreSQL reads and writes]
-  Gate --> Fair[Principal rate and duration allowance]
-  Fair --> Slots[Shared gateway: at most six admitted calls]
-  Slots --> Worker[Pi worker and provider]
-  Gate --> Notice[Small notice when blocked]
-  Fair --> Notice
-  Slots --> Notice
+  Open[Open application] --> Workspace[Resume or create workspace]
+  Workspace --> App[Browser app]
+  App --> Model[Existing model handler: enabled, allowance, six calls]
+  App --> Storage[Existing storage handlers: mode and quota]
+  Model --> Notice[Shared notice when blocked]
+  Storage --> Notice
 ```
 
-```text
-openApplication(principal, artifact):
-    if a resumable eligible workspace exists: return it
-    check new-activity policy and creation/start limits
-    transactionally resolve-or-create the default workspace or bounded tour
+## Files and implementation order
 
-sample(principal, workspace, request):
-    verify membership, workspace expiry, sampling policy and request bounds
-    check principal's rolling start/duration allowance
-    acquire global and per-principal admission, or return busy
-    reserve usage/fairness allowance; release slot if reservation fails
-    run within server timeout and tool/output limits
-    on actual termination: reconcile usage and duration; release admission once
+| Files | Change |
+| --- | --- |
+| `pkg/catalog/settings/settings.go`, `pkg/catalog/admin.go`, `ui/catalog/admin.tsx` | Three controls, notice text, view/storage/start limits in the existing settings flow |
+| `pkg/catalog/hosted/sample.go`, `pkg/piworker/client.go`, `worker/src/main.ts` | Existing concurrency/allowance path and cancellation completion check |
+| `pkg/catalog/demos.go`, `pkg/catalog/store/demos.go` | Resume live tours; reuse TTL/start limiting and cleanup |
+| `pkg/catalog/instances.go`, `pkg/catalog/store/instances.go` | Atomic open-or-create using existing ownership, release and origin boundaries |
+| `pkg/catalog/hosted/views.go`, `rpc.go`, `routes.go` | View cap, operation checks and notice responses; blob reads check storage mode too |
+| `pkg/catalog/store/documents.go`, `assets.go` | Transactional byte/count checks covering documents, assets, comments and leases |
+| Existing launch/runtime UI and public templates | Automatic Open flow, small notice and approved Paper removals |
 
-storageOperation(principal, workspace, operation):
-    verify membership and declared capability
-    check operation-specific storage policy
-    transactionally check byte/count deltas and apply mutation
-```
+Implement the settings and handler checks first, then tour/workspace opening and storage bounds, then the Paper-approved public simplification. Keep the existing admin analytics. The ticket diary preserves the earlier investigation and measurements; this document is the current implementation direction.
 
-Serialize quota-check-plus-write with a consistent instance/account locking order. PostgreSQL transaction advisory locks suit application-defined resource boundaries, but require all mutation paths to participate: [PostgreSQL explicit locking](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS). Do not hold a transaction lock across a five-minute model call.
-
-## Existing foundations and implementation sequence
-
-Existing foundations are substantial: fixed demo TTL, global demo admission cap, per-address start limiting, per-tour credits, shared daily demo credits, transactional model reservations, global/per-user call counters, active-view revocation and versioned settings. Demo expiry suspends instances, revokes grants and closes their views; instance data is removed after seven days while model calls remain for usage history. Guest-account/session cleanup needs explicit review; instance deletion does not itself guarantee removal of those other rows.
-
-1. Add operational controls, common response codes and the small warning treatment in Paper, then implement gate checks in `createDemo`, `createInstance`, `sample`, RPC mutations, upload and signed-blob access. Distinguish reads from mutations; do not implement a read-only pause as broad entitlement denial.
-2. Configure six-lane admission and one call per principal, validate cancellation semantics, and record occupancy/duration/rejection reasons privately. The existing token/artifact report remains useful; add these operational metrics rather than exposing customer-facing meters.
-3. Add fixed tour admission counts, bounded views/request rates, and transactional total storage quotas including comments/leases. Keep credential refresh separate from tour start. Test cross-tab, cross-artifact and restart behavior.
-4. Add transactional default-workspace resolution, decide treatment of existing extra workspaces, then implement the approved public simplification. Keep sign out and subscription management reachable.
-
-Meaningful checks include: seventh concurrent call refused; a second tab cannot exceed one principal's cap; cancel then immediate retry cannot exceed upstream capacity; paused mode affects already-open tabs; model-only pause keeps healthy reads working; read-only rejects every persistent mutation; refresh cannot reset a tour; parallel creation resolves one default; parallel writes cannot overrun aggregate storage; reopening a paused service preserves data; no usage meter is added to public screens.
-
-## Decisions still needed
-
-The six-lane provider contract needs clarification: is a lane one generation/stream, a whole agent conversation, or a logged-in upstream session, and is the pool exclusively this site's? The proposal assumes concurrent generation and deliberately holds admission through the full application call. Free saved-data retention, exact tour/rate/duration policy, paid-user differentiation, and treatment of existing extra workspaces remain design choices. Measure representative applications before setting final limits. No policy settings, deployment or public designs were changed by this analysis.
+Verify the behaviors that matter: a seventh call and a second call by the same person are refused; cancellation does not overrun upstream slots; already-open tabs obey pauses; read-only blocks every persistent mutation while reads work; refresh cannot extend a tour; simultaneous Open requests return one workspace; parallel writes respect quotas; reopening access preserves data; public pages contain no usage meters.

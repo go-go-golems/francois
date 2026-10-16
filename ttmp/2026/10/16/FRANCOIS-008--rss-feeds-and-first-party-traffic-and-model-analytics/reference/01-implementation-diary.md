@@ -606,3 +606,62 @@ Read the new proposal first, then its related source files and `pkg/catalog/host
 ### Technical details
 
 The default 5,000 documents times 256 KiB permit approximately 1.22 GiB of logical document bodies, plus 256 MiB of assets and database overhead. Existing SSE keepalive/rechecks are 15/30 seconds, model-call timeout is five minutes, browser-tool timeout is 150 seconds and per-round output cap is 8,192 tokens. Proposed independent controls target new activity, sampling and storage. Private capacity metrics should add occupied seconds, active calls, latency and rejection reasons to existing token/artifact accounting.
+
+## Step 9: Rewrite the proposal as direct changes to the current application
+
+The user rejected the unnecessary architectural possibilities introduced in Step 8 and the subsequent explanation. I rewrote the current design around the existing settings, handlers, counters, demo limiter and usage ledger. The document now gives a concrete settings object, the places to enforce it, and a short implementation sequence; it removes the speculative mechanisms instead of describing them as future additions.
+
+### Prompt Context
+
+**User prompt (verbatim):** "what was the service / queue / scheduling syste abouted? yeah this should be fucking straightforward bro. rewrite"
+
+**Assistant interpretation:** Rewrite the design immediately, eliminating unnecessary architecture while retaining a technically useful implementation guide.
+
+**Inferred user intent:** Straightforward changes to the application that already exists, with private limits and small notices.
+
+**Prior commit:** `a6265e0` — Document minimal site capacity and service control design.
+
+### What I did
+
+- Rewrote `design-doc/03-minimal-public-experience-and-operational-capacity-controls.md` in place and preserved the source investigation in the earlier diary entry.
+- Defined three operations settings plus plain notice text, using the existing admin settings GET/PATCH API and revision handling.
+- Reused existing global/per-user call admission, daily/monthly call allowances, tour TTL/start limits and cleanup. Removed duration-budget reservations, distributed coordination, optional queues, priority scheduling, per-audience control rules and new model-only cancellation orchestration.
+- Specified atomic resume/open using the existing per-owner lock; retained existing additional workspace identities and URLs.
+- Kept storage checks local to the existing transaction methods, with a shared instance lock and logical-byte cap. Added initial view/tour/storage values as proposed policy, not claims about deployed settings.
+- Updated task `byyf` through docmgr to reflect the simplified implementation, and recorded the rewrite in the changelog.
+
+### Why
+
+The current application already contains the mechanisms needed for a small hosted site. Explaining hypothetical scale-out designs distracted from the requested implementation and made the proposal appear much larger than necessary.
+
+### What worked
+
+The rewritten document maps each requirement to existing files and behaviors. It includes settings JSON, model-call pseudocode, notice copy, a small diagram and acceptance checks without requiring another runtime component. Runtime configuration, source and the local deployment remain unchanged.
+
+### What didn't work
+
+The earlier design included speculative architecture beyond the user's scope; the following chat answer repeated those concepts and caused confusion. This rewrite removes them. No tool failure occurred during the rewrite.
+
+### What I learned
+
+Technical detail should explain direct edits and their correctness, rather than enumerate possible future systems. Existing private credit allowances are sufficient as call-count safeguards; a new lane-time budget is unnecessary for this version.
+
+### What was tricky to build
+
+No runtime code was built. Simplification still needs correct boundaries: an AI pause permits running calls to finish; a storage pause applies to every persistent capability; quota reductions preserve readable existing data; and simultaneous Open requests must reuse the same workspace.
+
+### What warrants a second pair of eyes
+
+Check cancellation termination before slot reuse and complete coverage of storage mutations/signed asset reads. Initial 20-minute tours, three starts/hour, three views, 500 documents and 16 MiB per-instance storage are proposed configurable starting values.
+
+### What should be done in the future
+
+Implement the simplified design through the existing handlers and settings. Create the shared warning variants in Paper before UI implementation. Task `byyf` remains open; this turn is the requested documentation rewrite.
+
+### Code review instructions
+
+Read the rewritten design and task text. Verify that requirements are explained through existing mechanisms and that the old speculative options do not remain in the current design. Run `docmgr doctor --ticket FRANCOIS-008 --stale-after 30` and `git diff --check`; runtime tests are unnecessary for this documentation-only change.
+
+### Technical details
+
+The proposed operations object contains `acceptNewVisits`, `samplingEnabled`, `storageMode` and `notice`. Model concurrency uses existing `Allowance` fields; limits use existing plan/demo allowances plus `Demo.PerUserPerHour`, `Limits.ViewsPerUser` and `Limits.StorageBytesPerInstance`. Existing model-call timestamps support private duration inspection without a new accounting subsystem.

@@ -43,3 +43,7 @@ Recorded revised minimal public experience and proposed six-lane fairness, rever
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-008--rss-feeds-and-first-party-traffic-and-model-analytics/design-doc/03-minimal-public-experience-and-operational-capacity-controls.md — Evidence-backed next-phase proposal
+
+## 2026-10-16
+
+Rewrote the capacity design as direct changes to existing settings and handlers; removed speculative queue/scheduling/distributed coordination and duration-budget designs. Reuse existing allowance and demo mechanisms.
