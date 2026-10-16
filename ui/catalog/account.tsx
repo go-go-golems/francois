@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, errorMessage } from "./api";
 import { navigate, show } from "./store";
+import { ApiTokens } from "./tokens";
 import { date, dateUTC, datetime, Empty, Line, Link, loginHref, reasonLabel, Row } from "./ui";
 
 export function Account() {
@@ -168,6 +169,11 @@ export function Account() {
           <span className="muted">— private by default; share them with other subscribers explicitly.</span>
         </p>
       </Row>
+      {session.user && (
+        <Row label="API tokens" sub="for scripts and agents">
+          <ApiTokens role={session.user.role} />
+        </Row>
+      )}
       {a.checkouts.length > 0 && (
         <Row label="Checkout attempts">
           <div className="v-list">
