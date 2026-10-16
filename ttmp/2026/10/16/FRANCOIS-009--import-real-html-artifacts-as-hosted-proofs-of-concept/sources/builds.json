@@ -1,0 +1,53 @@
+[
+  {
+    "artifact": "lattice-rift",
+    "bytes": 113625,
+    "sha256": "51d7fbe7464e3a76b9ec770cf22faa61ad2af9c18b6faa296fe481d7f772a36f",
+    "manifest": {}
+  },
+  {
+    "artifact": "lattice-phantasmagoria",
+    "bytes": 152468,
+    "sha256": "383f8c70392a5b0171ce49cc9ec7e98ea9d8bb1e0a5cc0441c96eb236862827e",
+    "manifest": {}
+  },
+  {
+    "artifact": "tabula-workbench",
+    "bytes": 1067766,
+    "sha256": "e0f1462afb22e99e637a3c0d83e4f56ccf62ae2412bbd641b93f0500b396fcbe",
+    "manifest": {
+      "sample": {},
+      "downloads": true
+    }
+  },
+  {
+    "artifact": "lattice-deck",
+    "bytes": 425957,
+    "sha256": "f23be2e95222a17ea0a37820284aea3353c3ea6141b9acdae9ad0ec6ff278985",
+    "manifest": {
+      "sample": {},
+      "db": {},
+      "user": {
+        "scopes": [
+          "profile"
+        ]
+      },
+      "room": {}
+    }
+  },
+  {
+    "artifact": "rag-workbench",
+    "bytes": 502408,
+    "sha256": "29b5942a43c86bb1b33a436b66aa134dd28c41a99625307a37add6e64e23ae67",
+    "manifest": {
+      "sample": {},
+      "db": {},
+      "user": {
+        "scopes": [
+          "profile"
+        ]
+      },
+      "downloads": true
+    }
+  }
+]

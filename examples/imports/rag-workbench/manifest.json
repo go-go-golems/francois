@@ -1,0 +1,10 @@
+{
+  "sample": {},
+  "db": {},
+  "user": {
+    "scopes": [
+      "profile"
+    ]
+  },
+  "downloads": true
+}

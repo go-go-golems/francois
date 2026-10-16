@@ -1,0 +1,215 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Lattice Phantasmagoria</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Jacquard+24&family=Silkscreen:wght@400;700&family=VT323&display=swap">
+<style>
+/* Layout: the handheld is the page. Its notes sit in a narrow column beside it, and under it on phones. One dark look, chosen on purpose: the screens are the only light. */
+:root {
+  --bg: #0E0C12; --shell: #221E29; --shell-2: #2D2836; --edge: #3B3446; --glass: #060509;
+  --ink: #EDE6D8; --dim: #A69DB1; --faint: #5E566A; --pink: #FF4FA3;
+  --f-display: "Jacquard 24", Georgia, serif; --f-body: "Courier Prime", "Courier New", monospace; --f-label: "Silkscreen", "Courier New", monospace;
+  --s: clamp(300px, calc((100vh - 150px) / 1.78), 600px);
+  --side: calc(var(--s) * .34);
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { margin: 0; font: 16px/1.5 var(--f-body); }
+.wrap { box-sizing: border-box; max-width: 1280px; margin: 0 auto; padding-block: 18px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: auto minmax(0, 380px); gap: 44px; justify-content: center; align-items: start; }
+
+/* ---------- the handheld ---------- */
+.device { width: calc(var(--s) + 2 * var(--side)); user-select: none; -webkit-user-select: none; }
+.lid, .base { background: linear-gradient(180deg, var(--shell-2), var(--shell)); border: 1px solid var(--edge); }
+.lid { border-radius: 22px 22px 10px 10px; padding: calc(var(--s) * .07) var(--side) calc(var(--s) * .055); position: relative; }
+.lid::before, .lid::after { content: ""; position: absolute; top: 50%; width: calc(var(--side) * .32); height: calc(var(--s) * .2); transform: translateY(-50%);
+  background: radial-gradient(circle, var(--glass) 1.2px, transparent 1.6px) 0 0 / 9px 9px; opacity: .9; }
+.lid::before { left: calc(var(--side) * .34); } .lid::after { right: calc(var(--side) * .34); }
+.hinge { height: calc(var(--s) * .065); margin: 0 calc(var(--side) * .35); border-radius: 0 0 10px 10px; position: relative;
+  background: linear-gradient(180deg, #17141C, var(--shell-2) 45%, #17141C); }
+.led { position: absolute; right: 12%; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+.base { border-radius: 10px 10px 26px 26px; position: relative; display: grid; grid-template-columns: var(--side) var(--s) var(--side);
+  grid-template-areas: "dpad scr face" "dpad scr sys"; padding: calc(var(--s) * .075) 0 calc(var(--s) * .08); }
+.screen { position: relative; width: var(--s); aspect-ratio: 4 / 3; background: #000; border-radius: 3px; overflow: hidden;
+  box-shadow: 0 0 0 calc(var(--s) * .02) var(--glass), 0 0 0 calc(var(--s) * .02 + 1px) var(--edge); }
+.screen canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+.screen.bot { grid-area: scr; }
+.screen.grid::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .16;
+  background-image: linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px);
+  background-size: calc(100% / var(--cw, 256)) calc(100% / var(--ch, 192)); }
+
+.ctl { font: 700 11px/1 var(--f-label); color: var(--dim); background: radial-gradient(circle at 35% 30%, #3A3444, #18151D 70%); border: 1px solid #0B0A0E;
+  box-shadow: 0 2px 0 #08070A, inset 0 1px 0 rgba(255, 255, 255, .08); cursor: pointer; touch-action: none; padding: 0; }
+.ctl:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.ctl.on, .ctl:active { background: radial-gradient(circle at 50% 50%, #4A3150, #1E1424 70%); color: var(--ink); box-shadow: 0 0 0 1px var(--pink), 0 0 14px rgba(255, 79, 163, .45); transform: translateY(1px); }
+.dpad { grid-area: dpad; align-self: center; justify-self: center; display: grid; grid-template-columns: repeat(3, 1fr); width: min(132px, calc(var(--side) * .74)); aspect-ratio: 1; }
+.dpad .ctl { border-radius: 4px; }
+.dpad .c { background: #18151D; border-radius: 2px; }
+.dpad [data-b="UP"] { grid-column: 2; } .dpad [data-b="LEFT"] { grid-column: 1; grid-row: 2; } .dpad [data-b="RIGHT"] { grid-column: 3; grid-row: 2; } .dpad [data-b="DOWN"] { grid-column: 2; grid-row: 3; }
+.face { grid-area: face; align-self: end; justify-self: center; display: grid; grid-template-columns: repeat(3, 1fr); width: min(132px, calc(var(--side) * .76)); aspect-ratio: 1; gap: 2px; }
+.face .ctl { border-radius: 50%; font-size: 12px; }
+.face [data-b="X"] { grid-column: 2; } .face [data-b="Y"] { grid-column: 1; grid-row: 2; } .face [data-b="A"] { grid-column: 3; grid-row: 2; } .face [data-b="B"] { grid-column: 2; grid-row: 3; }
+.sys { grid-area: sys; align-self: start; justify-self: center; display: flex; gap: 8px; margin-top: 14px; }
+.sys .ctl { border-radius: 99px; padding: 6px 9px; font-size: 9px; letter-spacing: .08em; }
+.shoulder { position: absolute; top: -14px; width: calc(var(--side) * .62); height: 22px; border-radius: 12px 12px 4px 4px; font-size: 10px; }
+.shoulder.l { left: 10px; } .shoulder.r { right: 10px; }
+
+/* ---------- notes ---------- */
+.notes { min-width: 0; display: grid; gap: 22px; padding-top: 6px; }
+.kicker { margin: 0; font: 400 11px/1.4 var(--f-label); letter-spacing: .14em; color: var(--dim); }
+h1 { margin: 2px 0 0; font: 400 clamp(40px, 5vw, 58px)/.95 var(--f-display); text-wrap: balance; }
+.now h2 { margin: 0; font: 400 clamp(34px, 4vw, 46px)/1 var(--f-display); color: var(--pink); text-wrap: balance; }
+.meta { margin: 8px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; font-size: 14px; }
+.meta dt { font: 400 10px/1.9 var(--f-label); letter-spacing: .1em; color: var(--dim); }
+.meta dd { margin: 0; }
+.hints { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; }
+.hints li { padding-left: 16px; position: relative; }
+.hints li::before { content: ""; position: absolute; left: 0; top: .62em; width: 7px; height: 7px; background: var(--pink); }
+h3 { margin: 0 0 8px; font: 400 11px/1.4 var(--f-label); letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.verbs dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 14px; font-size: 14px; }
+.verbs dt { font: 700 11px/1.75 var(--f-label); color: var(--ink); }
+.verbs dd { margin: 0; color: var(--dim); }
+.keys { font-size: 13px; color: var(--dim); }
+.keys kbd { font: 700 11px/1 var(--f-label); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; background: var(--shell); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 400 10px/1 var(--f-label); letter-spacing: .08em; color: var(--ink); background: transparent; border: 1px solid var(--edge); border-radius: 99px; padding: 7px 10px; cursor: pointer; }
+.chip:hover { border-color: var(--dim); }
+.chip[aria-current="true"] { border-color: var(--pink); color: var(--pink); }
+.chip:focus-visible, .opt:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { font: 400 10px/1 var(--f-label); letter-spacing: .08em; color: var(--dim); background: var(--shell); border: 1px solid var(--edge); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+.opt[aria-pressed="true"] { color: var(--ink); border-color: var(--dim); }
+.note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--dim); max-width: 62ch; }
+.err { margin: 0; padding: 12px 14px; border: 1px solid var(--pink); color: var(--ink); font-size: 14px; }
+
+@media (max-width: 1080px) { .wrap { grid-template-columns: minmax(0, 1fr); justify-items: center; } .notes { max-width: 640px; width: 100%; } }
+@media (max-width: 760px) {
+  :root { --s: calc(100vw - 32px - 28px); --side: 14px; }
+  .lid { padding: 16px 14px 12px; } .lid::before, .lid::after { display: none; }
+  .hinge { margin: 0 24px; }
+  .base { grid-template-columns: 1fr 1fr; grid-template-areas: "scr scr" "dpad face" "sys sys"; padding: 16px 14px 18px; row-gap: 18px; }
+  .screen.bot { justify-self: center; }
+  .dpad, .face { width: 128px; }
+  .face { align-self: center; }
+  .sys { margin-top: 0; }
+  .shoulder { width: 84px; }
+}
+@media (prefers-reduced-motion: reduce) { .ctl.on, .ctl:active { transform: none; } }
+</style>
+
+<div class="wrap">
+  <div class="device" id="device" role="application" aria-label="Lattice handheld. The bottom screen is the touch screen. Keys: arrows, X, Z, S, A, Q, W, Enter, Shift.">
+    <div class="lid"><div class="screen top" id="topWrap"><canvas id="scrTop" width="1024" height="768" aria-label="Top screen"></canvas></div></div>
+    <div class="hinge" aria-hidden="true"><span class="led"></span></div>
+    <div class="base">
+      <button type="button" class="ctl shoulder l" data-b="L" id="btnL">L</button>
+      <button type="button" class="ctl shoulder r" data-b="R" id="btnR">R</button>
+      <div class="dpad" aria-label="Direction pad">
+        <button type="button" class="ctl" data-b="UP" id="btnUp" aria-label="Up">&#9650;</button>
+        <button type="button" class="ctl" data-b="LEFT" id="btnLeft" aria-label="Left">&#9664;</button>
+        <span class="c" style="grid-column:2;grid-row:2"></span>
+        <button type="button" class="ctl" data-b="RIGHT" id="btnRight" aria-label="Right">&#9654;</button>
+        <button type="button" class="ctl" data-b="DOWN" id="btnDown" aria-label="Down">&#9660;</button>
+      </div>
+      <div class="screen bot" id="botWrap"><canvas id="scrBot" width="1024" height="768" aria-label="Bottom screen, touch it"></canvas></div>
+      <div class="face" aria-label="Face buttons">
+        <button type="button" class="ctl" data-b="X" id="btnX">X</button>
+        <button type="button" class="ctl" data-b="Y" id="btnY">Y</button>
+        <button type="button" class="ctl" data-b="A" id="btnA">A</button>
+        <button type="button" class="ctl" data-b="B" id="btnB">B</button>
+      </div>
+      <div class="sys">
+        <button type="button" class="ctl" data-b="SELECT" id="btnSelect">SELECT</button>
+        <button type="button" class="ctl" data-b="START" id="btnStart">START</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="notes">
+    <div>
+      <p class="kicker">LATTICE &middot; FIRMWARE 1992.3</p>
+      <h1>Lattice Phantasmagoria</h1>
+    </div>
+    <p class="err" id="err" hidden></p>
+    <section class="now" aria-live="polite">
+      <h2 id="scName">Boot</h2>
+      <dl class="meta">
+        <dt>ELEMENT</dt><dd id="scEl">Boot screen</dd>
+        <dt>AFTER</dt><dd><i id="scBook">The Electric Ant</i></dd>
+      </dl>
+      <ul class="hints" id="scHint"></ul>
+    </section>
+    <section class="verbs">
+      <h3>Breaking it, anywhere</h3>
+      <dl>
+        <dt>ANY KEY</dt><dd>melts whatever it touched. Mash to melt more.</dd>
+        <dt>L / R</dt><dd>tear the console open along the hinge. Both tear wider.</dd>
+        <dt>HOLD X</dt><dd>everything turns into microglobular molecules.</dd>
+        <dt>STYLUS</dt><dd>drag on the bottom screen to draw strands of hyperreality. They climb onto the top screen.</dd>
+        <dt>HOLD Y</dt><dd>sprays Ubik. It puts reality back, for a while.</dd>
+        <dt>START</dt><dd>pauses any cartridge. SELECT goes back to the menu.</dd>
+      </dl>
+    </section>
+    <p class="keys">Keyboard: <kbd>&larr;&uarr;&rarr;&darr;</kbd> pad, <kbd>X</kbd> A, <kbd>Z</kbd> B, <kbd>S</kbd> X, <kbd>A</kbd> Y, <kbd>Q</kbd> L, <kbd>W</kbd> R, <kbd>Enter</kbd> START, <kbd>Shift</kbd> SELECT. A gamepad works too.</p>
+    <section>
+      <h3>Go to</h3>
+      <div class="chips" id="chips"></div>
+    </section>
+    <section>
+      <h3>Display</h3>
+      <div class="opts">
+        <button type="button" class="opt" id="res256" aria-pressed="true">DS 256&times;192</button>
+        <button type="button" class="opt" id="res512" aria-pressed="false">LATTICE 512&times;384</button>
+        <button type="button" class="opt" id="motion" aria-pressed="true">MOTION ON</button>
+      </div>
+    </section>
+    <p class="note">Every console element here still does its job: A confirms, B backs out, the health bar drains and the inventory holds your things. Each screen's UI is drawn plainly, the way Lattice draws its widgets. The shaders receive only that picture and the game state, then take it apart. Each screen renders at 256&times;192, as it would on the device, and is scaled up without smoothing. None of this has run on the RG DS Plus yet.</p>
+  </aside>
+</div>
+
+<script src="dshost.js"></script>
+<script src="phant-a.js"></script>
+<script src="phant-b.js"></script>
+<script src="phant-c.js"></script>
+<script src="phant.js"></script>
+<script>
+(function () {
+  const PH = window.PHANT, $ = id => document.getElementById(id);
+  const err = (e) => { const b = $('err'); b.hidden = false; b.textContent = 'The screens could not start: ' + (e && e.message ? e.message.split('\n').slice(0, 3).join(' ') : e) + ' The notes still describe what each part does.'; };
+  PH.onError = err;
+  const chips = $('chips');
+  const JUMPS = [['boot', 'BOOT'], ['home', 'MENU'], ...PH.CARTS.map(c => [c.id, c.name]), ['over', 'GAME OVER']];
+  for (const [id, label] of JUMPS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.id = id; b.id = 'go-' + id; b.textContent = label; b.addEventListener('click', () => { PH.jump(id); }); chips.appendChild(b); }
+  PH.onScene = (sc) => {
+    $('scName').textContent = sc.name.charAt(0) + sc.name.slice(1).toLowerCase();
+    $('scEl').textContent = sc.element; $('scBook').textContent = sc.book;
+    $('scHint').innerHTML = ''; for (const t of sc.hint || []) { const li = document.createElement('li'); li.textContent = t; $('scHint').appendChild(li); }
+    for (const c of chips.children) c.setAttribute('aria-current', c.dataset.id === sc.id ? 'true' : 'false');
+  };
+  const buttons = [...document.querySelectorAll('[data-b]')];
+  for (const el of buttons) {
+    const b = el.dataset.b; let held = false;
+    const down = (e) => { e.preventDefault(); held = true; el.setPointerCapture && el.setPointerCapture(e.pointerId); PH.press(b, true); };
+    const up = () => { if (held) { held = false; PH.press(b, false); } };
+    el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    el.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); e.stopPropagation(); PH.press(b, true); } });
+    el.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.stopPropagation(); PH.press(b, false); } });
+  }
+  let lastMask = -1;
+  PH.onFrame = () => { const m = PH.run.heldMask; if (m === lastMask) return; lastMask = m; for (const el of buttons) el.classList.toggle('on', !!(m & (1 << DS.BUTTONS.indexOf(el.dataset.b)))); };
+  const wraps = [$('topWrap'), $('botWrap')]; let res = [256, 192];
+  const grid = () => { const w = wraps[0].getBoundingClientRect().width; for (const s of wraps) { s.style.setProperty('--cw', res[0]); s.style.setProperty('--ch', res[1]); s.classList.toggle('grid', w / res[0] >= 3); } };
+  addEventListener('resize', grid);
+  const setRes = (w, h) => { res = [w, h]; PH.setRes(w, h); $('res256').setAttribute('aria-pressed', w === 256); $('res512').setAttribute('aria-pressed', w === 512); grid(); };
+  $('res256').addEventListener('click', () => setRes(256, 192)); $('res512').addEventListener('click', () => setRes(512, 384));
+  let motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const setMotion = (on) => { motion = on; PH.setMotion(on); $('motion').setAttribute('aria-pressed', on); $('motion').textContent = on ? 'MOTION ON' : 'MOTION OFF'; };
+  $('motion').addEventListener('click', () => setMotion(!motion));
+  const r = PH.start({ screens: [$('scrTop'), $('scrBot')], card: $('device') });
+  if (r) { if (!motion) setMotion(false); grid(); }
+})();
+</script>
+
+</body></html>
