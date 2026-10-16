@@ -1286,3 +1286,62 @@ Source PR: https://github.com/go-go-golems/francois/pull/7. Main image workflow:
 ### Step 18 post-publication dependency-alert note
 
 The deployment receipt and ticket closure were committed/pushed as `94d256f`. GitHub's push response then reported 11 dependency alerts newly visible after repository alerts were enabled. REST inspection identifies the two high alerts as undici advisories #9 (WebSocket subprotocol DoS) and #5 (BalancedPool TLS option propagation), patched in 8.10.2. The deployed release did not change the lockfile or dependency manifests; package.json only changes the test command. Recorded these as separate unresolved dependency/exposure follow-ups in the production receipt without claiming they were fixed or silently modifying the verified image. The deployment remains sha-fda5382, one ready replica. The requested review fixes, merge and rollout remain complete.
+
+
+## Step 19: Complete the explicitly authorized local backup and clarify public launch requirements
+
+The user explicitly authorized the previously rejected local database transfer, explaining that it is dev data. I created a new private backup of the current production deployment and verified the archive without printing its contents. The subsequent public-deployment question was handled as informational steering; no demo, signup or billing policy was changed.
+
+### Prompt Context
+
+**User prompts (verbatim):** "go ahead, it's just dev data"; "what is necessary for a public deploy? (k3s etc...)"
+
+**Assistant interpretation:** The first message explicitly authorizes the local database backup transfer. The second asks what infrastructure and access configuration are needed for a public launch.
+
+**Inferred user intent:** Permit the backup and understand what remains between the deployed service and publicly usable applications.
+
+### What I did
+
+- Stated before running the backup that it would capture current post-deployment state and use the pod's configured database role without printing credentials.
+- Ran pg_dump in the existing PostgreSQL pod with custom format, streamed into an exclusively created mode-0600 file in /tmp, checked the PGDMP header and ran pg_restore --list with output suppressed.
+- Verified the deployment still has one replica, Recreate strategy and sha-fda5382. Read the runbook and nonsecret current demo/operations metadata.
+- Confirmed current demos are globally disabled, there is one listed artifact and zero listed demo-enabled artifacts. Visits/sampling remain enabled and storage read-write. The runbook records invite-only identity and Stripe sandbox configuration; those external policies were not changed or independently reconfigured.
+
+### Why
+
+The user's explicit transfer authorization changes the earlier approval basis. This backup must be labeled post-deployment: migrations have already applied, so it cannot replace the pre-migration in-cluster backup for rollback. Public hosting and public application access are separate configuration questions.
+
+### What worked
+
+- Backup: /tmp/francois-008-production-postdeploy-20261016T230304Z.dump, 89,540 bytes, mode 0600.
+- SHA256: f34d75457131bc0e064c3f16ca1aa1a5cb2d8a42f4b5a50f35d73b050b195bc4.
+- Custom-format header and pg_restore --list validation passed. No database contents or credential values were printed, and the dump is not committed.
+- Current hosting/access checks returned the expected image and concrete disabled-demo policy without mutating service settings.
+
+### What didn't work
+
+No failure or automatic-review rejection occurred for the newly authorized backup. The earlier rejection remains historical evidence in Step 16; this is a separate, explicitly authorized post-deployment transfer.
+
+### What I learned
+
+The deployed public domains are healthy, but anonymous tours are still switched off. A public launch needs an explicit access policy, not another hosting service.
+
+### What was tricky to build
+
+Preserve the distinction between the pre-migration backup at its established destination and this local post-migration archive. The local copy contains current schema/settings and is useful for current-state recovery, not old-image rollback by itself.
+
+### What warrants a second pair of eyes
+
+Before open public access, decide tour/sign-in/free-plan policy, address the documented dependency alerts, and verify representative application/model behavior. No access policy change was requested in this question.
+
+### What should be done in the future
+
+No additional backup work remains. Public-launch configuration is an informational follow-up until the user authorizes changing it.
+
+### Code review instructions
+
+This is documentation-only. The dump is private under /tmp and excluded from Git. The runbook and production rollout receipt describe hosting; the current SQL checks only inspected policy/count metadata.
+
+### Technical details
+
+The existing in-cluster backup Job remains the pre-migration recovery point. The local file is a PostgreSQL custom-format archive generated after deployment. The Go/Node service remains a single shared process deployment with process-local six-call admission.

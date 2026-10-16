@@ -98,3 +98,10 @@ The detailed investigation and release chronology are in [the diary](01-implemen
 The documentation push reported 11 open Dependabot advisories (two high, six moderate, three low). The two high alerts concern undici in pnpm-lock.yaml: [unrequested WebSocket subprotocol denial of service](https://github.com/go-go-golems/francois/security/dependabot/9) and [BalancedPool TLS option propagation](https://github.com/go-go-golems/francois/security/dependabot/5); both report a fix in 8.10.2. They require separate dependency/exposure triage and were not fixed in this release.
 
 Comparison of source base 64c7ece and deployed fda5382 confirms pnpm-lock.yaml, go.mod, go.sum and worker/package.json are unchanged. The package.json change only updates the frontend test command. These are pre-existing locked dependencies surfaced by enabling alerts, distinct from a newly introduced dependency change or a failing release check. The verified production image remains sha-fda5382 with one ready replica after the documentation push.
+
+
+## Subsequent authorized local backup
+
+After the deployment, the user explicitly authorized a local database copy ("go ahead, it's just dev data"). A current-state archive was created at `/tmp/francois-008-production-postdeploy-20261016T230304Z.dump`: 89,540 bytes, mode 0600, SHA256 `f34d75457131bc0e064c3f16ca1aa1a5cb2d8a42f4b5a50f35d73b050b195bc4`. Its PGDMP header and `pg_restore --list` validation passed without printing data contents. The dump is not in Git.
+
+This is a post-migration backup. The earlier in-cluster backup remains the pre-migration recovery point. Current follow-up inspection also confirms demos are disabled globally and no listed artifact is demo-enabled; public network availability does not currently imply anonymous tour access.
