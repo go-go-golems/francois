@@ -928,3 +928,148 @@ Read the implementation/local rollout receipt and reproduction script, then the 
 ### Technical details
 
 The combined live RSS contained eight items. Signed-in tour counters and network counters remain process-local. Storage quotas measure logical payload bytes, not physical PostgreSQL overhead. Existing instances/releases/account data and provider/font mounts were preserved.
+
+## Step 14: Publish the pull request and wait for code review
+
+The user requested a PR and review wait. The prior working branch belonged to the already-merged FRANCOIS-007 PR, so I refreshed origin/main and published the completed FRANCOIS-008 commits under their own branch. GitHub automatically started Codex review when the ready PR opened.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok,  let's open a PR and wait for code reviews"
+
+**Assistant interpretation:** Publish the completed work, provide review context and monitor the repository's code reviews/CI.
+
+**Inferred user intent:** Get an external review of the implementation before deciding the next action.
+
+**Implementation head under review:** `aa9ca58b90969803d28588538947d328902a01d4`.
+
+### What I did
+
+- Checked working-tree cleanliness, remotes, branch and existing PR status; FRANCOIS-007 PR #6 was already merged.
+- Ran `git fetch origin`, which refreshed main to `64c7ece`. Confirmed the remaining diff contains the FRANCOIS-008 work rather than the already-merged scoped-token feature.
+- Created and pushed `feat/francois-008-minimal-hosting` without rewriting the existing commits.
+- Wrote the exact PR body to `/tmp/francois-008-pr-body.md`, then used `gh pr create --base main --head feat/francois-008-minimal-hosting --body-file ...` with the title “FRANCOIS-008: analytics, RSS and minimal hosting controls.”
+- Included final behavior, validation, migration/rollback requirements, local-only deployment and guide/diary starting points in the PR description.
+- Checked the new PR's review and CI state. Monitoring results are appended below.
+
+### Why
+
+A branch named for the current ticket and an accurate base keep reviewers focused on the new changes. Existing implementation/validation evidence should accompany the review rather than requiring the reviewer to reconstruct this conversation.
+
+### What worked
+
+- PR opened: https://github.com/go-go-golems/francois/pull/7.
+- GitHub's Codex review summary reports code review running on `aa9ca58`, automatically triggered by PR creation.
+- Initial CI includes Analyze, Dependency Review, TruffleHog, frontend check, Go test/lint, release build and vulnerability/security scans.
+
+### What didn't work
+
+No publication failure observed. The first comparison used a stale local origin/main; refreshing it before publication correctly excluded the already-merged FRANCOIS-007 scope.
+
+### What I learned
+
+This repository automatically runs Codex review when a ready PR opens; no manual reviewer ping or comment was necessary.
+
+### What was tricky to build
+
+No code was built in this step. Preserve the reviewed source head while the review runs; collect the publication/review diary locally and commit the receipt afterward.
+
+### What warrants a second pair of eyes
+
+The PR description calls out migrations 009–011 and strict-settings rollback. Await the actual external findings rather than treating passing local checks as approval.
+
+### What should be done in the future
+
+Wait for review completion, inspect any inline findings and CI failures, and record their exact status. Do not merge without a user instruction.
+
+### Code review instructions
+
+Review PR #7; start with the current minimal-hosting design and implementation receipt in this ticket. Source and validation commits are preserved individually for review.
+
+### Technical details
+
+Base: main at `64c7ece`; head branch: `feat/francois-008-minimal-hosting`; original source head: `aa9ca58`. The existing local app remains on revision `42a1f3f` and is independent of this GitHub publication.
+
+### Step 14 final review and CI receipt
+
+- Codex review completed on `aa9ca58` at `2026-10-16T17:45:22Z` with two P2 findings. PR remains open and unmerged.
+- Workspace selection can repeatedly return a workspace pinned to a withdrawn release that current policy forbids running: https://github.com/go-go-golems/francois/pull/7#discussion_r4297572224.
+- Concurrent signed-in Try requests consume multiple start-limit hits before the locked store coalesces them into one tour: https://github.com/go-go-golems/francois/pull/7#discussion_r4297572241.
+- Source inspection confirms the two boundaries: `OpenWorkspace` lacks pinned-release usability filtering, and the tour handler consumes limiter hits before `CreateDemo`'s atomic reuse decision. Findings remain unresolved; the subsequent user request is the vault report, not a claim that review fixes have landed.
+- Frontend, Go tests, lint, vulnerability checks, GoSec, CodeQL and image publication succeeded. The GitOps PR step was skipped; no production deployment was performed.
+- Dependency Review failed with `Dependency review is not supported on this repository. Please ensure that Dependency graph is enabled` (run `38941532816`). This is a repository capability/configuration failure, not a reported vulnerable dependency.
+- TruffleHog failed with `Found unverified URI result with HTML encoding` and exit code 183 (run `38941532847`). Its summary reports zero verified secrets and one unverified secret. The available log did not identify its exact source. It remains an unresolved scan finding; zero verified secrets does not mean the check passed.
+- The scanner's echoed shell contains a generic BASE/HEAD-equal error branch, but the actual scan used distinct revisions. That echoed diagnostic is not the cause of this failure.
+- No runtime source, provider configuration or deployed policy was changed while waiting for review.
+
+## Step 15: Write and publish the Obsidian technical project report
+
+The user requested a detailed technical blog post in the go-go-parc vault, using the textbook skill and no analogies. I wrote a new dated report from the ticket's complete diary, current design, source code, tests, deployment receipts and completed external review. The report and five copied figures were committed and pushed to the vault's main branch without changing earlier Francois notes.
+
+### Prompt Context
+
+**User prompt (verbatim):**
+
+> write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).
+> Commit and push the bsidian vault when done (go-go-parc vault).
+
+**Assistant interpretation:** Produce a substantial prose-first technical report with definitions, a concrete application trace, code/SQL, diagrams, implementation evidence and limits; save it in the current vault and commit/push only its note and assets.
+
+**Inferred user intent:** A durable technical explanation of the completed work and its actual review/deployment state, suitable for future readers learning the system.
+
+**Commit (vault):** `afc8140c310f1f96e71e0b0eeaf82329b9db0af0` — Document Francois private analytics and minimal hosting in technical deep dive.
+
+### What I did
+
+- Applied `pr-deep-dive-report`, `textbook-authoring` and `obsidian-vault-writing`; used the explicit go-go-parc destination over the older report skill's vault path.
+- Read all FRANCOIS-008 diary entries in bounded chunks, the current architecture/implementation guides and deployment receipt, and actual analytics, storage, admission, worker, workspace/tour and browser-runtime code.
+- Read the existing Francois storefront report and vault exemplars for continuity. Checked applicable ancestor instructions and confirmed go-go-parc was clean on main and synchronized with origin after fetching.
+- Traced one illustrative Polis request through document-load measurement, Open, launch, model admission/accounting, and an existing-view read-only rejection. Defined artifact/release/instance/view/grant/call before relying on them.
+- Wrote a 6,634-word, 489-line report with three Mermaid diagrams, real Go/TypeScript/SQL excerpts, an API example, source maps, test evidence, local rollout/rollback semantics and concrete follow-up work.
+- Viewed all five source screenshots before copying them to the note's dated `_assets/` folder. Captions explicitly distinguish synthetic analytics fixtures, older navigation in those captures and the actual local deployment.
+- Inspected completed Codex review and CI logs, confirmed the two findings against source, and represented them as unresolved rather than claiming full approval or green CI.
+- Created only `Projects/2026/10/16/PROJ - Francois - Private Analytics and Minimal Hosting - A Technical Deep Dive.md` and five `francois-008-*.png` figures in the vault. Preserved previous historical notes and unrelated assets.
+- Validated YAML, balanced code fences, all pinned GitHub source paths with `git cat-file -e`, reference-link definitions, both vault wikilinks and every relative image target. Checked for prohibited analogy/filler phrases.
+- Staged exactly the six intended files, reviewed the staged stat/numstat and whitespace, committed, then pushed with `git push origin main`.
+- Recorded review/CI follow-ups as docmgr tasks `t41l`, `c74u` and `nr27`, updated the ticket changelog and ran doctor successfully. These are new review tasks; completed implementation checkpoints remain historical facts.
+
+### Why
+
+The system's important decisions concern different data and execution lifetimes. A report organized around those boundaries teaches the implementation more effectively than a file inventory or chronological changelog. A pinned source revision and explicit review snapshot keep the report truthful as subsequent fixes arrive.
+
+### What worked
+
+- Vault report created at `/home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/10/16/PROJ - Francois - Private Analytics and Minimal Hosting - A Technical Deep Dive.md`.
+- All source/link/figure/metadata checks passed. The note exactly matches the inspected draft.
+- Vault commit contains one new note and five PNGs, with no workspace state or historical edits.
+- Push receipt: `090ac0f..afc8140 main -> main`; final vault status is clean and synchronized with `origin/main`.
+- Earlier runtime validation remains accurately cited; no unnecessary application test rerun was performed for this report-only milestone.
+- `docmgr doctor --ticket FRANCOIS-008 --stale-after 30` and `git diff --check` passed before the ticket documentation commit.
+
+### What didn't work
+
+No vault write, validation, commit or push failure occurred. Some batched reading output was truncated; narrower follow-up reads recovered the relevant source and diary sections before writing. The two failing CI jobs and two unresolved code-review findings are recorded in Step 14 and the report rather than characterized as publication failures.
+
+### What I learned
+
+The external review identifies limits of the existing tests: atomic tour reuse can pass while start accounting is wrong, and active-workspace reuse can pass while release usability is wrong. These are separate predicates and require separate regression cases. The current report keeps both limits visible.
+
+### What was tricky to build
+
+Historical analytics screenshots show older navigation and synthetic totals. Copying them without captions would imply the current deployed interface or real usage. The report labels that evidence explicitly and pairs it with actual local controls/home captures. Provider lane semantics likewise remain external; the article states the process-local admission and worker-completion guarantee precisely.
+
+### What warrants a second pair of eyes
+
+Review the two PR findings, the unidentified unverified URI scan result and the repository's Dependency Review configuration before merging. The report documents existing behavior and proposed corrections without claiming they have been implemented.
+
+### What should be done in the future
+
+Address the two P2 findings and CI follow-ups in a subsequent implementation checkpoint. The requested vault report is complete and pushed; production rollout and PR merge have not been performed.
+
+### Code review instructions
+
+Read vault commit `afc8140`, especially Sections 9–12 for lifetime/transaction behavior and Section 16 for external findings. The note links source at `aa9ca58`; its five relative figures resolve within the same dated vault directory. Verify continuation work against current source rather than treating this historical snapshot as a later fix receipt.
+
+### Technical details
+
+Vault remote: `ssh://git@github.com/go-go-golems/go-go-parc`; branch main. Report source snapshot: `aa9ca58`; local app remains `42a1f3f`. The new report has no database dumps, credentials, raw scanner payloads or cross-repository image dependencies. No messages were sent to reviewers or other users.

@@ -59,3 +59,7 @@ Implemented the existing settings editor controls, shared pause/unsaved notices,
 ## 2026-10-16
 
 Deployed revision 42a1f3f locally with migration 011 and matching pre-migration backup. All 21 real-browser checks passed; all user/instance/release/model-call/document counts preserved. Completed tasks, recorded receipts/screenshots, and uploaded the current minimal hosting guide to reMarkable.
+
+## 2026-10-16
+
+Opened PR #7 and waited for completed Codex review: two unresolved P2 findings in workspace release selection and concurrent tour-start accounting; two CI checks need follow-up. Published the 6,634-word textbook-style technical report with diagrams and five figures to go-go-parc/main, vault commit afc8140. No merge or production rollout.
