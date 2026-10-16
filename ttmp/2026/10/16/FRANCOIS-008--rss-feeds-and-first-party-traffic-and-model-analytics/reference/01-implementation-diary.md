@@ -1204,3 +1204,80 @@ Review the small storage.go change and `TestExpiredLeasesReleaseStorageQuota`, t
 ### Technical details
 
 The cleanup SQL is `DELETE FROM instance_leases WHERE instance_id=$1 AND expires_at<=now()` within `beginStorageWrite`. No schema migration, additional goroutine or new service is needed for this fix.
+
+
+## Step 18: Merge the reviewed tree and roll out through production GitOps
+
+PR #7 was squash-merged as `fda53827a21abb0039c6c40cff6c4c72e072343d` at `2026-10-16T22:14:49Z`, after the final image build and functional/security checks passed. The PR's remaining historical scanner result was the verified dummy test fixture; scanning the merged final tree passed. Production image publication and the GitOps rollout are monitored below rather than assumed complete from the source merge.
+
+### Prompt Context
+
+**User prompt:** See Step 16; explicit authorization includes merge and production deployment.
+
+**Assistant interpretation:** Complete the source merge, immutable image publication, image-pin GitOps merge, controller reconciliation and live service verification.
+
+**Inferred user intent:** Make the reviewed implementation available on the production domains with a concrete deployment receipt.
+
+**Commits (review fixes):** `4ac3e59`, `0d33a57`; source merge `fda5382`.
+
+### What I did
+
+- Confirmed all three review threads resolved, final tree identical across `0d33a57` and merge `fda5382`, full PostgreSQL suite/build passing and final catalog lint clean.
+- Final full suite after lease cleanup passed (`pkg/catalog 6.871s`). The direct fixture filesystem scan passed with zero findings; only the exact synthetic test line is ignored.
+- Merged with `gh pr merge 7 --squash --match-head-commit 0d33a577f5e71c59d5a0386a77307982f8071681 --body-file ...`, then fast-forwarded local main.
+- Verified main Secret Scanning run `38974582260` succeeded; tests/lint/frontend/CodeQL also passed. Followed main publish-image run `38974582680` for the production artifact.
+- Read deployment-repository AGENTS.md and canonical architecture, image-update, runtime-secret and sync-wave sections. The intended rollout changes only the existing Francois image pin, preserving its single-replica/Recreate, PVC, secret and identity configuration.
+- Added a reproducible read-only production smoke script covering both portal domains, public routes/static assets, health/readiness/models, all three RSS feeds/site links/GUID semantics, and anonymous analytics denial. Its user agent is excluded by the analytics bot classifier.
+- Marked the CI follow-up task complete after Dependency Review and the main secret scan passed. Removed the disposable local test PostgreSQL container.
+
+### Why
+
+Image publication, desired-state merge and live workload readiness are separate facts. Waiting for the expected image before checking rollout prevents a stale healthy deployment from being mistaken for the new release.
+
+### What worked
+
+Source merge and final-tree secret scan succeeded. The backup is in the established production storage destination, and baseline aggregate counts/migrations are recorded in Step 17. Final live rollout results are appended below.
+
+### What didn't work
+
+A sandbox read failed with `bwrap: Can't bind mount /oldroot/ on /newroot/: ... /newroot/mnt/pico: No such device`. Scoped authorized execution completed the read; this did not require application or deployment changes. The local default branch was stale, so its fast-forward output included earlier already-merged work; the explicit reviewed-tree comparison confirms no unexpected source difference.
+
+### What I learned
+
+Squashing a verified final tree avoids carrying the synthetic historical scanner fixture into the main push's scanned change, while retaining review/source history on the PR. The merged commit's scanner result independently confirms the narrow ignore behaves correctly.
+
+### What was tricky to build
+
+The backup export rejection required using the existing in-cluster workflow rather than moving production data locally. Review also continued asynchronously: the third quota finding arrived after the first two had been fixed, and was addressed before merge.
+
+### What warrants a second pair of eyes
+
+Verify that the production manifest references `ghcr.io/go-go-golems/francois:sha-fda5382`, migrations 009–011 are applied, operation settings are enabled/read-write, and both domains serve the new feed with working readiness. Use the appended live receipt rather than the initial merge status.
+
+### What should be done in the future
+
+Finish image/GitOps rollout and append the exact production evidence. Tune private allowances from real usage while keeping public usage presentation minimal.
+
+### Code review instructions
+
+Start at PR #7's three resolved threads, the review-fix tests and the production smoke script. The production runbook now explains unusable-pin recovery, successful-only tour charging and expired lease cleanup. No credentials or database dump are committed.
+
+### Technical details
+
+Source PR: https://github.com/go-go-golems/francois/pull/7. Main image workflow: https://github.com/go-go-golems/francois/actions/runs/38974582680. Main secret scan: https://github.com/go-go-golems/francois/actions/runs/38974582260. Rollback across settings migration 011 still requires matching old settings/database state and image.
+
+
+### Step 18 final production verification receipt
+
+- Main image workflow `38974582680` completed successfully, including GitOps PR creation. Main tests/lint/frontend/CodeQL/security scans passed; the synthetic-fixture historical failure is absent from the merged scan.
+- Reviewed GitOps PR #358: exactly one deployment image line changed, from sha-64c7ece to sha-fda5382. The validate check passed before merge.
+- GitOps PR merged as `3c71ab40ead780b334ecd23ad1235374941c9f06` at 2026-10-16T22:20:05Z. Refreshed Argo, observed the expected deployment image, then verified rollout status.
+- The generated PR's generic rollback wording needed correction. `gh pr edit` failed because the installed CLI queried deprecated classic Projects fields; REST PATCH corrected the body and returned rollbackNoteCorrected true. No source/manifest rollback was attempted.
+- Argo CD reports the GitOps merge, Synced, Healthy and Succeeded. Pod francois-78fbcf8976-s6992 is Ready with zero restarts and image sha-fda5382, digest sha256:275821a9cd83a15e1af1a29045cfafc554951114a2f97e0b19dac7680efb0c3b.
+- All 22 production smoke checks passed across the two domains: public/static pages, health/readiness/models, three RSS feeds/site-correct links/GUIDs, and anonymous analytics denial. The script performs no provider call or application write.
+- Migrations 009–011 are applied. Settings verify enabled visits/sampling, read-write storage, empty notice, six global/one per-user call, three views, 16 MiB and 500 documents per instance.
+- Before/after counts match: 3 users, 4 instances, 1 release, 1 model call, 0 documents. The one historical model call has artifact attribution after migration.
+- Added reference/03-production-rollout-receipt.md and scripts/05-production-smoke.py, updated the runbook and marked the last review/CI task done. Closing the ticket after documentation validation; production rollout is complete.
+- No local database dump transfer took place. The previously rejected export was replaced by the successful established in-cluster backup Job.
+
+- Final docmgr doctor and whitespace checks passed; ticket status is complete. The completed close-operation recovery journal (state committed) is retained privately in /tmp rather than adding generated projection snapshots to Git. Pending journals were not removed.

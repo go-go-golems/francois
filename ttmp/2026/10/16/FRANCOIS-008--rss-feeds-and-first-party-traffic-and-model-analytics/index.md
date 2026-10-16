@@ -1,7 +1,7 @@
 ---
 Title: RSS feeds and first-party traffic and model analytics
 Ticket: FRANCOIS-008
-Status: active
+Status: complete
 Topics:
     - backend
 DocType: index
@@ -10,7 +10,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-16T11:26:00.385927044-04:00
+LastUpdated: 2026-10-16T18:22:24.67028727-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -46,3 +46,8 @@ The [minimal hosting implementation guide](design-doc/03-minimal-public-experien
 - Migration: `009_analytics.sql`; apply through the normal catalog migration command before rollout.
 
 The first implementation counts successful portal HTML document loads. SPA-only navigation, time-on-page, geolocation, and conversion funnels are documented extensions. Traffic can be filtered by site; model usage remains catalog-wide because its ledger has no site attribution.
+
+
+## Production completion
+
+PR [#7](https://github.com/go-go-golems/francois/pull/7) and GitOps PR [#358](https://github.com/wesen/2026-03-27--hetzner-k3s/pull/358) are merged. Production runs `ghcr.io/go-go-golems/francois:sha-fda5382` with migrations 009–011 and all three reviewed fixes. See the [production rollout receipt](reference/03-production-rollout-receipt.md), [smoke script](scripts/05-production-smoke.py) and diary Steps 16–18 for validation, backup/rollback requirements and exact evidence.

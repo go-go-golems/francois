@@ -71,3 +71,7 @@ Addressed both PR #7 P2 findings: recover unusable release pins without changing
 ## 2026-10-16
 
 Addressed new P2 expired-lease quota finding by purging expired leases in the existing locked write transaction. Targeted PostgreSQL storage regressions and lint pass. Existing in-cluster production backup completed with upload receipt; deployment has not yet changed.
+
+## 2026-10-16
+
+Completed all review fixes, merged source PR #7 as fda5382 and GitOps PR #358 as 3c71ab4, and verified production rollout on both domains: 22 smoke checks, migrations 009–011, expected policy, healthy image and preserved aggregate data. Backup stayed in the established in-cluster workflow.
