@@ -243,6 +243,16 @@ and limits, demo limits, storefront wording) and the audit log. Plans decide
 which artifacts an account may run (by rank), how many instances and members,
 and how many model credits.
 
+RSS subscriptions are available for journal posts at `/journal/feed.xml` and
+application releases at `/apps/feed.xml`. The admin Analytics page
+(`/admin/analytics`, JSON at `/api/admin/analytics`) reports portal document
+views, visitors, sessions, signed-in users, referrers, campaigns and browser/device
+categories, alongside catalog-wide model tokens, cache usage, credits and reported
+provider cost. Traffic records expire after 90 days and honor DNT/GPC. SPA-only
+navigation is not counted. Apply migration `009_analytics.sql` through the normal
+catalog migration command before rolling out this version. The architecture,
+metric definitions and rollout guide are in docmgr ticket **FRANCOIS-008**.
+
 The production deployment (yolo k3s, `francois.yolo.scapegoat.dev` and
 `slop.boutique`) is described in [doc/production.md](doc/production.md).
 

@@ -44,6 +44,7 @@ func (s *Server) adminRoutes(m *http.ServeMux) {
 	m.HandleFunc("POST /api/admin/billing/reconcile", a(s.adminReconcile))
 	m.HandleFunc("POST /api/admin/billing/events/{id}/retry", a(s.adminRetryEvent))
 	m.HandleFunc("GET /api/admin/usage", a(s.adminUsage))
+	m.HandleFunc("GET /api/admin/analytics", a(s.adminAnalytics))
 	m.HandleFunc("POST /api/admin/usage/adjustments", a(s.adminAdjust))
 	m.HandleFunc("GET /api/admin/audit", a(s.adminAudit))
 }

@@ -1,5 +1,12 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
+export type Analytics = {
+  from: string; to: string; site: string;
+  traffic: { views: number; visitors: number; sessions: number; users: number; bounces: number };
+  groups: Record<string, { key: string; views: number; visitors: number }[]>;
+  models: Record<string, { key: string; calls: number; failed: number; credits: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number }[]>;
+};
+
 export type Decision = {
   allowed: boolean;
   reason: string;
@@ -278,6 +285,7 @@ export const api = createApi({
   baseQuery,
   tagTypes: ["Session", "Catalog", "Account", "Instances", "Instance", "AdminReleases", "AdminUsers", "AdminUser", "AdminInstances", "Settings", "Billing", "Usage", "Audit", "Overview", "Tokens"],
   endpoints: (b) => ({
+    analytics: b.query<Analytics, string>({ query: (query) => `api/admin/analytics?${query}` }),
     session: b.query<Session, void>({
       query: () => "api/session",
       providesTags: ["Session"],

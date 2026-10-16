@@ -594,12 +594,17 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "post", d)
 }
 
+type rssGUID struct {
+	Value     string `xml:",chardata"`
+	Permalink bool   `xml:"isPermaLink,attr"`
+}
+
 type rssItem struct {
-	Title       string `xml:"title"`
-	Link        string `xml:"link"`
-	GUID        string `xml:"guid"`
-	PubDate     string `xml:"pubDate"`
-	Description string `xml:"description"`
+	Title       string  `xml:"title"`
+	Link        string  `xml:"link"`
+	GUID        rssGUID `xml:"guid"`
+	PubDate     string  `xml:"pubDate"`
+	Description string  `xml:"description"`
 }
 
 type rssDoc struct {
@@ -630,21 +635,13 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 	doc.Channel.Description = "Notes on how the applications are made."
 	for _, p := range posts {
 		link := origin + "/journal/" + p.Slug
-		item := rssItem{Title: p.Title, Link: link, GUID: link, Description: firstNonEmpty(p.Summary, content.Excerpt(p.Body, 300))}
+		item := rssItem{Title: p.Title, Link: link, GUID: rssGUID{Value: link, Permalink: true}, Description: firstNonEmpty(p.Summary, content.Excerpt(p.Body, 300))}
 		if p.PublishedAt != nil {
 			item.PubDate = p.PublishedAt.UTC().Format(time.RFC1123Z)
 		}
 		doc.Channel.Items = append(doc.Channel.Items, item)
 	}
-	out, err := xml.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	_, _ = w.Write([]byte(xml.Header))
-	_, _ = w.Write(out)
+	writeRSS(w, doc)
 }
 
 // media serves uploaded storefront media. A media ID always names the same

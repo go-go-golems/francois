@@ -35,6 +35,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /creators/{slug}", s.guard(public, noToken, s.creatorPage))
 	m.HandleFunc("GET /journal", s.guard(public, noToken, s.journalPage))
 	m.HandleFunc("GET /journal/feed.xml", s.journalFeed)
+	m.HandleFunc("GET /apps/feed.xml", s.releaseFeed)
 	m.HandleFunc("GET /journal/{slug}", s.guard(public, noToken, s.postPage))
 	m.HandleFunc("GET /media/{id}", s.media)
 	m.HandleFunc("GET /pricing", s.guard(public, noToken, s.pricingPage))
@@ -109,7 +110,7 @@ func (s *Server) routes() http.Handler {
 
 // legalUpdated is the date shown on /privacy and /terms; change it with
 // their text in web/legal.tmpl.
-const legalUpdated = "13 October 2026"
+const legalUpdated = "16 October 2026"
 
 // legalPage serves the privacy policy or terms as plain HTML, named after
 // the site the request arrived on, so identity-provider consent screens and
