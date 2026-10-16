@@ -908,3 +908,72 @@ With `catalog serve --mcp`, every portal serves the same tools at `/mcp` (stream
 ### Technical details
 
 - Claude Code (remote): `claude mcp add --transport http francois https://slop.boutique/mcp --header "Authorization: Bearer frt_…"`.
+
+## Step 14: Code review fixes (PRs #5 and #6)
+
+Codex left three findings on PR #6 (code) and three on PR #5 (the guide), all P2.
+- The three code findings were real bugs. Each now has a test that fails without its fix.
+- Two of the guide findings (revision 0, closing retried responses) were already handled correctly in the implementation (Steps 9 and 10), but the guide's pseudocode still said otherwise.
+- The third guide finding (own-token CLI commands that could never work) had already been left out of the implementation; the guide now says why.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Address code review issues"
+
+**Assistant interpretation:** Fix the review findings on the open PRs, test them, and answer the threads.
+
+**Inferred user intent:** Merge-ready PRs.
+
+**Commit (code):** 316c830 — "Review fixes: filters before limits, explicit empty patch values, relative allow dirs"; guide: b5202e8 on PR #5, merged into PR #6 as b5195ba.
+
+### What I did
+
+- **Filters before limit** (`admin.go`, comment 4290123901):
+  - new `store.UserPage(UserFilter{Search, Role, Limit, Offset})`; the role filter is in SQL, ordered `created_at DESC, id`;
+  - the handler reads pages of 200 and applies the plan filter, which needs entitlement resolution, until it has `limit` matches or the candidates run out;
+  - `TestUserFiltersBeforeLimit`: an older creator and an older pro subscriber are found with `limit=1` behind three newer users.
+- **Explicit empty values in patch DTOs** (`client/types.go`, comment 4290123907):
+  - the server already tells absent (`nil`) from empty (`[]`, `""`); the client's `omitempty` on plain strings and slices threw the empty values away;
+  - `ArtifactPatch.Tags` and `.Creators` are now `*[]string`; `PostInput` and `CreatorInput` fields are pointers; added the helpers `client.String`, `Strings` and `Int`;
+  - CLI: `--clear-tags` on `artifacts update`, and `--clear` on posts (summary, cover, tags) and creators (bio, avatar, links, user-id);
+  - MCP update tools accept `[]` to clear;
+  - the contract test now clears an artifact's tags and a post's summary, and checks that omitted fields stay unchanged.
+- **Relative `--allow-dir`** (`mcpserver/files.go`, comment 4290123909): `filepath.Abs` before `EvalSymlinks`. New `TestLocalPathAllowDirs` covers `uploads`, `./uploads/` and an absolute directory; escapes through `..` and through a symlink; the working-directory default; and refusal in remote mode.
+- **Guide** (PR #5 comments 4289580426, 4289580439, 4289580448): revision 0 is compared like any other revision, and only the break-glass store path writes unconditionally; the `catalog tokens list|revoke` line was removed, with a note that `/api/tokens` is session-only; the retry pseudocode closes the response before retrying.
+
+### Why
+
+- Each finding described a failure a user would hit: missing customers in filtered lists, fields that could not be cleared, and `--allow-dir .` rejecting every upload.
+
+### What worked
+
+- Mutation check: with the `Abs` step removed, `TestLocalPathAllowDirs` fails with `allow [uploads]: "" uploads/app.html is outside the allowed directories (uploads)`, which is exactly the reported bug.
+- `TestUserFiltersBeforeLimit`, `TestCustomerManagement`, `TestClientContract` and `TestMCPTools` pass; `make ci-check` → `0 issues.` and OK.
+
+### What didn't work
+
+- N/A.
+
+### What I learned
+
+- In the implementation, `client.send` already drained and closed retried responses, and `SaveSettingsIf` already used a negative base for unconditional writes. Only the guide's pseudocode was stale; the reviewer read the guide.
+
+### What was tricky to build
+
+- The plan filter cannot move into SQL, because the plan comes from roles, subscriptions and grants resolved per user. Paging with a stable order (`created_at DESC, id`) keeps results correct without loading every user at once.
+
+### What warrants a second pair of eyes
+
+- A plan filter matching very few customers reads candidates in pages of 200 until it runs out; fine for this shop's size, not for millions of users.
+
+### What should be done in the future
+
+- N/A.
+
+### Code review instructions
+
+- `pkg/catalog/admin.go` (`adminUsers`), `pkg/catalog/client/types.go` (patch inputs), `pkg/catalog/mcpserver/files.go`.
+
+### Technical details
+
+- Review threads: PR #6 r4290123901, r4290123907, r4290123909; PR #5 r4289580426, r4289580439, r4289580448.
