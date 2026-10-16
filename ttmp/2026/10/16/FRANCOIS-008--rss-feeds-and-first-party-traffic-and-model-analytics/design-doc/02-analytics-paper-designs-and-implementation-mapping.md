@@ -34,7 +34,7 @@ The new Analytics group is separated by dividers in the existing unified design 
 - [Analytics — Traffic](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-A-0): traffic overview plus the date-range dialog state.
 - [Analytics — Model usage](https://app.paper.design/file/01M506DAH3CXP5QS28T2VQ4W3N/p-B-0): token/cost graphs and detailed usage table.
 
-The user required Paper-first design. These artboards were created and reviewed before the follow-up graph/filter implementation. Their data is explicitly labeled SAMPLE DATA. The existing application commit `0a66114` has basic analytics tables; the new graphs/filters/dialog are the next implementation milestone.
+The user required Paper-first design. These artboards were created and reviewed before the follow-up graph/filter implementation. Their data is explicitly labeled SAMPLE DATA. The baseline commit `0a66114` added basic analytics. The backend follow-up is implemented in `2f53554`; the completed frontend now includes these graphs, filters, date dialog and per-artifact reporting.
 
 ## Visual system
 
@@ -71,7 +71,7 @@ Reuse the catalog's underlined choices, admin selection-button language, and Stu
 
 `pkg/catalog/store/analytics.go` owns filtered aggregates and complete daily stacks; `pkg/catalog/analytics.go` validates query fields and dates; `ui/catalog/api.ts` defines the report contract. The UI should keep chart preparation separate from rendering and reuse the existing RTK Query transport and styling variables.
 
-The first guide remains the system-orientation source. This document owns the additional Paper-first interaction/graph decisions and should be updated with implementation/validation evidence when that milestone completes.
+The first guide remains the system-orientation source. This document owns the additional Paper-first interaction/graph decisions and is supplemented by the implementation and validation receipt below.
 
 ## Review evidence
 
@@ -293,6 +293,25 @@ Required regression cases:
 - Artifact/model/user/instance aggregations use the same charged-state predicate and keep cache counts distinct.
 - Anonymous/subscriber callers remain denied; filtering does not expand API-token scope or alter billing state.
 
-## Completion boundary
+## Implementation status and validation
 
-At the design checkpoint these sections are the implementation plan, not a claim that the follow-up runtime code is already present. The existing RSS/basic analytics feature is committed as `0a66114`. The diary and changelog will name the later implementation commit and validation evidence once the graph/filter/date/artifact work is complete. The Paper references and clean source exports are the visual source of truth for that work.
+The full follow-up is implemented. The initial feature is `0a66114`, Paper/design checkpoint is `6909bee`, and filtered-series/artifact backend is `2f53554`. The detailed diary records the frontend checkpoint.
+
+| Responsibility | Implementation |
+| --- | --- |
+| Exact population, consistent snapshot, daily stacks, artifact groups | `pkg/catalog/store/analytics.go` |
+| HTTP filter validation and admin guard | `pkg/catalog/analytics.go`, existing admin route |
+| Historical artifact backfill | `pkg/catalog/store/migrations/010_model_call_artifacts.sql` |
+| Trusted artifact snapshot | `pkg/catalog/store/usage.go`, `pkg/catalog/hosted/sample.go` |
+| UTC presets, inclusive conversion, zero fill, series preparation | `ui/catalog/analytics-data.ts` |
+| Responsive SVG marks and exact daily tables | `ui/catalog/analytics-charts.tsx` |
+| Shared preset/custom native date dialog | `ui/catalog/date-range-dialog.tsx` |
+| Traffic/model views, applied filters, tables | `ui/catalog/analytics.tsx` |
+| Layout and palette | scoped analytics rules in `pkg/catalog/web/static/catalog.css` |
+| Browser delivery | rebuilt `pkg/catalog/web/static/catalog.js` |
+
+Eight frontend contracts pass, including UTC/DST/leap/year boundaries, invalid ranges, gaps, direct-versus-Other series, and zero/single-day SVG rendering. PostgreSQL integration tests exercise over 100 categories, reconciliation, combined/direct filters, exclusive boundaries, migration replay, deletion survival and real hosted admission. The full Go suite/build and repository lint pass. Chromium checks cover 18 interactions/responsive properties with zero page errors; see [browser evidence](../various/validation/02-browser-validation.md).
+
+The user observed that an outlined top segment appeared wider than lower segments. Paper and the application now remove lower side strokes and inset the Other outline so visible left/right edges are identical; browser regression checks verify those edges. Token summary figures use compact notation to preserve the type layout; exact values remain in tables and titles.
+
+No chart/calendar package or compatibility adapter was introduced. The reusable date component owns draft edits, the page owns the applied range, and RTK Query currentData prevents stale report data from appearing beneath new filter labels. The production rollout is not performed: apply migration 009 if pending and migration 010 through the normal catalog migration command, then deploy the new binary and embedded frontend together. Historical unknown artifact IDs cannot be recovered after the underlying instance was deleted.

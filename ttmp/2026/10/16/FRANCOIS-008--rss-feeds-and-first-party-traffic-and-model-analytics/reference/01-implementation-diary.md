@@ -367,3 +367,76 @@ Start with store/analytics.go, migration 010, store/usage.go, hosted/sample.go, 
 ### Technical details
 
 The report is bounded to 90 days, four daily categorical series per dimension, and the existing five-second request budget. No new dependency, provider request or environment-variable reader was added. Test execution uses the existing harness and an explicit local database URL, following the session's prior notification.
+
+
+## Step 6: Deliver Paper-designed graphs, filters, dates and artifact tables
+
+Implemented the complete frontend using the existing RTK Query transport and monochrome styling tokens. Traffic and Model usage now have distinct views, daily SVG plots, a shared date-range dialog, and exact tables. The backend milestone is `2f53554`; this step completes its operator-facing surface.
+
+### Prompt Context
+
+See Step 5 for the implementation request.
+
+**Additional user prompt (verbatim):** "why is the top box in boxcharts wider thatn th ebottom?"
+
+**Assistant interpretation:** Correct the visual width mismatch in the stacked bars while completing the already-authorized implementation.
+
+**Inferred user intent:** Keep Paper and the working application visually aligned, with equal visible edges across stack segments.
+
+### What I did
+
+- Extracted the analytics screen from admin.tsx into analytics.tsx; added pure UTC/chart preparation, SVG chart rendering and shared native date-dialog modules.
+- Wired page/referrer filters to the guarded server report, with exact row shortcuts, Apply/Clear controls and distinct direct/all-referrer states.
+- Added local Total/Page/Referrer stack switches, input/output token bars, cost line, exact daily data tables, empty states and single-day points.
+- Added the per-artifact usage table with current title labels and explicit Unknown artifact history, plus model/user/instance/day grouping controls.
+- Rebuilt the embedded frontend. Added focused date/chart tests and a test runner that explicitly executes both existing and new suites.
+- Added an actual hosted-call artifact-snapshot assertion to the existing runtime integration test.
+- Ran Chromium checks against built assets, including date drafts, invalid ranges, Apply, Cancel/Escape focus return, referrer query encoding, local stack switches, model graphs, unknown artifacts, equal stack edges and mobile overflow.
+- Fixed the outlined Other segment in Paper and React, then refreshed the Paper source snapshot and screenshot-reviewed the results.
+
+### Why
+
+Native SVG and native date controls meet the design without a chart/calendar dependency. Keeping draft and applied filters/ranges distinct prevents partial requests. Exact daily tables make values available without relying on color or hover interaction.
+
+### What worked
+
+- Catalog backend checkpoint: PostgreSQL suite passed and catalog lint returned zero issues before commit `2f53554`.
+- Final `go test ./...` with explicit local PostgreSQL passed (`pkg/catalog 4.317s`).
+- Final `golangci-lint run ./...`: `0 issues.`
+- TypeScript check, eight frontend tests, and embedded build passed, including direct execution with Node v24.18.0.
+- Chromium: 18 interaction/layout checks passed with no page errors. See various/validation/02-browser-validation.md for the exact receipt and screenshots.
+- Paper screenshot review confirms matching visible stack edges, preserved totals, adequate contrast and no clipping.
+
+### What didn't work
+
+- Python's default interpreter lacked Playwright (`ModuleNotFoundError: No module named 'playwright'`). Used the available Playwright MCP tools instead, without installing a dependency.
+- React static rendering warned that SVG title children were arrays. Converted them to single template strings and reran tests without warnings.
+- A generic Node --test invocation reported only file-level results in this environment; replaced it with tests/run.ts so all eight named contracts are visibly executed.
+- Restarting the preview with send-keys failed with `can't find pane: francois-008-preview` because stopping its only process ended the session. Recreated the tmux session.
+- Formatting the browser-tool function added a trailing semicolon, producing `SyntaxError: Unexpected token ';'` in that tool's expression wrapper. Removed it and preserved the expression format; all checks then passed.
+- The user's width observation exposed a stroke issue: white side strokes reduced visible dark widths while the Other outline extended outward. Removed side strokes and inset the Other outline; a browser assertion now compares actual visible boundaries.
+- Initial visual review found long token summaries crowded on narrower screens. Changed summary tokens to compact notation while retaining exact table/tooltip values.
+
+### What I learned
+
+Geometric SVG widths alone do not prove equal visible widths when strokes differ. The regression check includes half-stroke extents. Native dialog behavior also provided focus restoration and Escape handling without a modal framework.
+
+### What was tricky to build
+
+Direct referrers and the remainder both have empty raw keys but different identities. The preparation code keys on (other,key), and the UI sends explicit empty referrer only for Direct. RTK Query currentData avoids displaying old rows under newly applied filter labels.
+
+### What warrants a second pair of eyes
+
+Browser tests use synthetic API data; real SQL, migrations, and runtime accounting are covered separately by PostgreSQL integration tests. Production deployment and licensed-font rendering were not exercised in this session.
+
+### What should be done in the future
+
+Deploy through the existing migration/rollout procedure, applying both pending migrations before starting the new binary. Historical calls whose instances were already deleted remain unavoidably unknown.
+
+### Code review instructions
+
+Start with analytics-data.ts and tests/analytics.test.ts, then analytics-charts.tsx, date-range-dialog.tsx, analytics.tsx, and the scoped catalog.css additions. Use the ticket's preview and browser-check scripts for reproduction. Review the updated Paper traffic export for the stroke correction.
+
+### Technical details
+
+No new runtime or test dependency was added. Top-three-plus-Other stacks preserve every filtered view. All calendar arithmetic is UTC, the date UI includes the selected end day, and transport remains half-open. Model reporting stays catalog-wide under traffic filters. Changes are not deployed.

@@ -399,3 +399,54 @@ select.btn { appearance: none; cursor: pointer; }
 .foot-credit { margin: 0; }
 .foot-credit a { text-decoration: underline 1px var(--color-faint); text-underline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Analytics: Paper's Areal typography, monochrome marks and unboxed surfaces. */
+.analytics h2 { margin: 0; font-size: 24px; line-height: 30px; font-weight: 500; color: var(--color-ink); }
+.analytics p { margin: 0; }
+.analytics-toolbar, .analytics-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.analytics-toolbar { border-top: 1px solid var(--color-ink); border-bottom: 1px solid var(--color-line); padding: 16px 0; }
+.analytics-date-trigger { white-space: nowrap; }
+.analytics-filters { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+.analytics-filters .field { flex: 1; min-width: 160px; }
+.analytics-active-filters { flex-basis: 100%; }
+.analytics-summary { display: flex; gap: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--color-line); }
+.analytics-summary > div { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+.analytics-summary > div > :first-child { font: 400 40px/48px var(--font-mono); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.analytics-chart { display: flex; flex-direction: column; gap: 20px; min-width: 0; padding: 4px 0 20px; border-bottom: 1px solid var(--color-line); }
+.analytics-chart svg { display: block; overflow: visible; }
+.analytics-chart svg text { font: 14px var(--font-mono); fill: var(--color-muted); }
+.analytics-rule { stroke: var(--color-line); }
+.analytics-legend { display: flex; gap: 24px; flex-wrap: wrap; font-size: 14px; line-height: 20px; }
+.analytics-legend > span { display: inline-flex; gap: 8px; align-items: center; overflow-wrap: anywhere; }
+.analytics-legend i { display: inline-block; flex-shrink: 0; width: 12px; height: 12px; }
+.analytics-model-charts { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 56px; }
+.analytics-breakdowns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; }
+.analytics-table { overflow-x: auto; margin-top: 20px; }
+.analytics-table table { border-collapse: collapse; width: 100%; font-size: 15px; line-height: 22px; }
+.analytics-table th, .analytics-table td { padding: 14px 16px; border-bottom: 1px solid var(--color-line); text-align: right; font-family: var(--font-mono); font-weight: 400; white-space: nowrap; }
+.analytics-table th:first-child { text-align: left; font-family: var(--font-sans); padding-left: 0; }
+.analytics-table :is(th, td):last-child { padding-right: 0; }
+.analytics-table thead th { border-top: 1px solid var(--color-ink); color: var(--color-muted); font: 400 14px/20px var(--font-sans); }
+.analytics-note { border-top: 1px solid var(--color-line); padding-top: 20px; }
+.analytics-date-dialog { width: min(840px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 32px; border: 1px solid var(--color-ink); background: var(--color-wall); color: var(--color-ink); }
+.analytics-date-dialog::backdrop { background: #11111114; }
+.analytics-date-dialog form { display: flex; flex-direction: column; gap: 28px; }
+.analytics-date-dialog p { margin: 0; }
+.analytics-dialog-head, .analytics-dialog-actions { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; }
+.analytics-dialog-head h2 { margin: 0; font-size: 32px; line-height: 36px; font-weight: 500; letter-spacing: -.02em; }
+.analytics-date-fields { display: flex; gap: 24px; }
+.analytics-date-fields .field { flex: 1; color: var(--color-muted); font-size: 15px; }
+.analytics-date-fields input { width: 100%; border: 1px solid var(--color-faint); padding: 16px; font-size: 22px; line-height: 28px; color: var(--color-ink); }
+.analytics-dialog-actions { border-top: 1px solid var(--color-line); padding-top: 20px; align-items: center; }
+@media (max-width: 1000px) {
+  .analytics-model-charts, .analytics-breakdowns { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .analytics-summary { flex-wrap: wrap; }
+  .analytics-summary > div { flex: 1 1 28%; }
+}
+@media (max-width: 520px) {
+  .analytics-summary > div { flex-basis: 42%; }
+  .analytics-summary > div > :first-child { font-size: 32px; line-height: 40px; }
+  .analytics-date-dialog { padding: 24px; }
+  .analytics-date-fields, .analytics-dialog-actions { flex-direction: column; align-items: stretch; }
+  .analytics-filters .field { min-width: 100%; }
+}

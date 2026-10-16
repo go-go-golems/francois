@@ -1,3 +1,4 @@
+import { AnalyticsPage } from "./analytics";
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, Check, errorMessage, Plan, Release, SettingsDoc } from "./api";
@@ -45,7 +46,7 @@ export function Admin() {
       {section === "instances" && (id ? <InstanceDetail id={id} /> : <AdminInstances />)}
       {section === "billing" && <Billing />}
       {section === "usage" && <Usage />}
-      {section === "analytics" && <Analytics />}
+      {section === "analytics" && <AnalyticsPage />}
       {section === "settings" && <Settings />}
       {section === "audit" && <Audit />}
     </main>
@@ -925,134 +926,6 @@ function Audit() {
         </div>
       </div>
       <AuditList entries={data} />
-    </section>
-  );
-}
-
-function Analytics() {
-  const [from, setFrom] = useState(() =>
-    new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10),
-  );
-  const [to, setTo] = useState(() =>
-    new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-  );
-  const [site, setSite] = useState("");
-  const { data, error, isFetching } = api.useAnalyticsQuery(
-    new URLSearchParams({ from, to, site }).toString(),
-  );
-  return (
-    <section className="stats">
-      <h1>Analytics</h1>
-      <div className="controls">
-        <label>
-          From (UTC){" "}
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </label>
-        <label>
-          To (exclusive){" "}
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
-        <label>
-          Portal origin{" "}
-          <input
-            placeholder="All sites"
-            value={site}
-            onChange={(e) => setSite(e.target.value)}
-          />
-        </label>
-      </div>
-      {error && <p role="alert">{errorMessage(error)}</p>}
-      {isFetching && <p>Loading…</p>}
-      {data && (
-        <>
-          <Tiles
-            items={[
-              [data.traffic.views, "page views"],
-              [data.traffic.visitors, "visitors"],
-              [data.traffic.sessions, "sessions"],
-              [data.traffic.users, "signed-in users"],
-              [
-                data.traffic.sessions
-                  ? `${((100 * data.traffic.bounces) / data.traffic.sessions).toFixed(1)}%`
-                  : "—",
-                "single-page sessions",
-              ],
-            ]}
-          />
-          <p className="muted">
-            Successful portal document loads; known bots and privacy opt-outs
-            excluded. Visits end after 30 minutes of inactivity. Single-page
-            sessions are measured within the selected range. Model usage below
-            covers every site, including demos. Tables show up to 100 groups.
-          </p>
-          {Object.entries(data.groups).map(([name, rows]) => (
-            <section key={name}>
-              <h2>{name}</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Views</th>
-                    <th>Visitors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.key}>
-                      <td>{row.key || "Direct / unspecified"}</td>
-                      <td>{row.views}</td>
-                      <td>{row.visitors}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
-          {Object.entries(data.models).map(([name, rows]) => (
-            <section key={name}>
-              <h2>Model usage by {name}</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Calls</th>
-                    <th>Failed</th>
-                    <th>Credits</th>
-                    <th>Input</th>
-                    <th>Output</th>
-                    <th>Cache read</th>
-                    <th>Cache write</th>
-                    <th>Provider cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.key}>
-                      <td>{row.key}</td>
-                      <td>{row.calls}</td>
-                      <td>{row.failed}</td>
-                      <td>{row.credits}</td>
-                      <td>{row.inputTokens}</td>
-                      <td>{row.outputTokens}</td>
-                      <td>{row.cacheReadTokens}</td>
-                      <td>{row.cacheWriteTokens}</td>
-                      <td>{row.cost.toFixed(4)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
-        </>
-      )}
     </section>
   );
 }

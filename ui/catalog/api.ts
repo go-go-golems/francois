@@ -1,10 +1,14 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
+export type TrafficPoint = { day: string; key: string; other: boolean; views: number };
+export type ModelUsage = { key: string; label?: string; calls: number; failed: number; credits: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number };
+export type TrafficGroup = { key: string; views: number; visitors: number };
 export type Analytics = {
-  from: string; to: string; site: string;
-  traffic: { views: number; visitors: number; sessions: number; users: number; bounces: number };
-  groups: Record<string, { key: string; views: number; visitors: number }[]>;
-  models: Record<string, { key: string; calls: number; failed: number; credits: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number }[]>;
+ from: string; to: string; site: string; path: string; referrer: string | null;
+ traffic: { views: number; visitors: number; sessions: number; users: number; bounces: number };
+ groups: Record<string, TrafficGroup[]>;
+ series: Record<"pages" | "referrers", TrafficPoint[]>;
+ models: Record<string, ModelUsage[]>;
 };
 
 export type Decision = {

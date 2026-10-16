@@ -555,6 +555,10 @@ func TestHostedPlatform(t *testing.T) {
 			if calls[0].OutputTokens == 0 || calls[0].Credits != 1 {
 				t.Fatalf("usage not recorded: %+v", calls[0])
 			}
+			var artifact string
+			if err := e.store.Pool.QueryRow(context.Background(), `SELECT artifact_id FROM model_calls WHERE id=$1`, calls[0].ID).Scan(&artifact); err != nil || artifact != "board" {
+				t.Fatalf("runtime artifact attribution: %q %v", artifact, err)
+			}
 			break
 		}
 		if time.Now().After(deadline) {
