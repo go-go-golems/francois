@@ -1,7 +1,9 @@
 package catalog
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -17,12 +19,14 @@ import (
 )
 
 func (s *Server) adminRoutes(m *http.ServeMux) {
-	a := func(h http.HandlerFunc) http.HandlerFunc { return s.guard(admin, h) }
+	a := func(h http.HandlerFunc) http.HandlerFunc { return s.guard(admin, scopeAdmin, h) }
 	m.HandleFunc("GET /api/admin/overview", a(s.adminOverview))
 	m.HandleFunc("GET /api/admin/users", a(s.adminUsers))
 	m.HandleFunc("GET /api/admin/users/{id}", a(s.adminUser))
 	m.HandleFunc("PATCH /api/admin/users/{id}", a(s.adminPatchUser))
 	m.HandleFunc("POST /api/admin/users/{id}/revoke-sessions", a(s.adminRevoke))
+	m.HandleFunc("GET /api/admin/users/{id}/tokens", a(s.adminUserTokens))
+	m.HandleFunc("DELETE /api/admin/tokens/{id}", a(s.adminRevokeToken))
 	m.HandleFunc("POST /api/admin/users/{id}/access-grants", a(s.adminGrant))
 	m.HandleFunc("DELETE /api/admin/users/{id}/access-grants", a(s.adminRevokeGrants))
 	m.HandleFunc("GET /api/admin/instances", a(s.adminInstances))
@@ -195,16 +199,70 @@ func (s *Server) adminPatchUser(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, map[string]bool{"ok": true})
 }
 
+// adminRevoke ends a user's sessions, runtime grants and live views, and with
+// {"tokens": true} also revokes their personal API tokens. The body is optional.
 func (s *Server) adminRevoke(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	var in struct {
+		Tokens bool `json:"tokens"`
+	}
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1024))
+	if err == nil && len(bytes.TrimSpace(raw)) > 0 {
+		err = json.Unmarshal(raw, &in)
+	}
+	if err != nil {
+		httpx.Fail(w, 400, "invalid_request", "Expected an optional JSON body {\"tokens\": bool}")
+		return
+	}
 	n, err := s.Store.RevokeUserSessions(r.Context(), id)
 	if err != nil {
 		unavailable(w, err)
 		return
 	}
+	var tokens int64
+	if in.Tokens {
+		if tokens, err = s.Store.RevokeUserTokens(r.Context(), id); err != nil {
+			unavailable(w, err)
+			return
+		}
+	}
 	views := s.Runtime.RevokeUser(id)
-	_ = s.Store.Audit(r.Context(), actor(r), "user.revoke_sessions", id, map[string]any{"sessions": n, "views": views})
-	httpx.OK(w, map[string]any{"sessions": n, "views": views})
+	_ = s.Store.Audit(r.Context(), actor(r), "user.revoke_sessions", id, map[string]any{"sessions": n, "views": views, "tokens": tokens})
+	httpx.OK(w, map[string]any{"sessions": n, "views": views, "tokens": tokens})
+}
+
+// adminUserTokens lists a user's personal API tokens (metadata only).
+func (s *Server) adminUserTokens(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := s.Store.User(r.Context(), id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Fail(w, 404, "not_found", "User not found")
+			return
+		}
+		unavailable(w, err)
+		return
+	}
+	list, err := s.Store.Tokens(r.Context(), id)
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	httpx.OK(w, list)
+}
+
+// adminRevokeToken revokes any user's token, for example one that leaked.
+func (s *Server) adminRevokeToken(w http.ResponseWriter, r *http.Request) {
+	t, err := s.Store.RevokeTokenByID(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		httpx.Fail(w, 404, "not_found", "No live token with this ID")
+		return
+	}
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	_ = s.Store.Audit(r.Context(), actor(r), "token.revoke", t.UserID, map[string]any{"token": t.ID, "name": t.Name, "scopes": t.Scopes})
+	httpx.OK(w, map[string]bool{"revoked": true})
 }
 
 func (s *Server) adminGrant(w http.ResponseWriter, r *http.Request) {

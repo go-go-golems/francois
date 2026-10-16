@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/content"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
@@ -32,7 +31,7 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 var planKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 func (s *Server) studioRoutes(m *http.ServeMux) {
-	c := func(h http.HandlerFunc) http.HandlerFunc { return s.guard(creator, h) }
+	c := func(h http.HandlerFunc) http.HandlerFunc { return s.guard(creator, scopeStudio, h) }
 	m.HandleFunc("GET /api/studio/me", c(s.studioMe))
 	m.HandleFunc("GET /api/studio/artifacts", c(s.studioArtifacts))
 	m.HandleFunc("POST /api/studio/artifacts", c(s.studioCreateArtifact))
@@ -69,9 +68,6 @@ func (s *Server) studioRoutes(m *http.ServeMux) {
 	m.HandleFunc("DELETE /api/studio/creators/{id}", c(s.studioDeleteCreator))
 	m.HandleFunc("POST /api/studio/markdown", c(s.studioMarkdown))
 	m.HandleFunc("GET /api/studio/plans", c(s.studioPlans))
-	m.HandleFunc("GET /api/studio/tokens", c(s.studioTokens))
-	m.HandleFunc("POST /api/studio/tokens", c(s.studioCreateToken))
-	m.HandleFunc("DELETE /api/studio/tokens/{id}", c(s.studioRevokeToken))
 }
 
 func me(r *http.Request) store.User { return principal(r.Context()).User }
@@ -1196,64 +1192,4 @@ func (s *Server) studioPlans(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{"key": p.Key, "name": p.Name, "rank": p.Rank, "public": p.Public})
 	}
 	httpx.OK(w, out)
-}
-
-// Personal API tokens are managed from a browser session only: a token
-// cannot mint or revoke tokens.
-func (s *Server) sessionOnly(w http.ResponseWriter, r *http.Request) bool {
-	if principal(r.Context()).Token != nil {
-		httpx.Fail(w, 403, "session_required", "Manage tokens from the studio in a browser")
-		return false
-	}
-	return true
-}
-
-func (s *Server) studioTokens(w http.ResponseWriter, r *http.Request) {
-	if !s.sessionOnly(w, r) {
-		return
-	}
-	list, err := s.Store.Tokens(r.Context(), actor(r))
-	if err != nil {
-		unavailable(w, err)
-		return
-	}
-	httpx.OK(w, list)
-}
-
-func (s *Server) studioCreateToken(w http.ResponseWriter, r *http.Request) {
-	if !s.sessionOnly(w, r) {
-		return
-	}
-	var in struct {
-		Name string `json:"name"`
-		Days int    `json:"days"`
-	}
-	if err := httpx.Read(w, r, &in, 1024); err != nil || strings.TrimSpace(in.Name) == "" || len(in.Name) > 80 || in.Days < 0 || in.Days > 366 {
-		httpx.Fail(w, 400, "invalid_request", "A name (≤80) and a lifetime of 0–366 days (0 = no expiry) are required")
-		return
-	}
-	var expires *time.Time
-	if in.Days > 0 {
-		t := time.Now().Add(time.Duration(in.Days) * 24 * time.Hour)
-		expires = &t
-	}
-	secret, t, err := s.Store.CreateToken(r.Context(), actor(r), strings.TrimSpace(in.Name), expires)
-	if err != nil {
-		unavailable(w, err)
-		return
-	}
-	_ = s.Store.Audit(r.Context(), actor(r), "token.create", t.ID, map[string]any{"name": t.Name})
-	httpx.JSON(w, 201, map[string]any{"token": secret, "info": t})
-}
-
-func (s *Server) studioRevokeToken(w http.ResponseWriter, r *http.Request) {
-	if !s.sessionOnly(w, r) {
-		return
-	}
-	if err := s.Store.RevokeToken(r.Context(), actor(r), r.PathValue("id")); err != nil {
-		httpx.Fail(w, 404, "not_found", "Token not found")
-		return
-	}
-	_ = s.Store.Audit(r.Context(), actor(r), "token.revoke", r.PathValue("id"), nil)
-	httpx.OK(w, map[string]bool{"revoked": true})
 }

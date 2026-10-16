@@ -128,13 +128,14 @@ func (s *Store) Audit(ctx context.Context, actor, action, subject string, summar
 	if actor != "" {
 		a = actor
 	}
-	_, err = s.Pool.Exec(ctx, `INSERT INTO admin_audit(actor_id,action,subject,summary) VALUES($1,$2,$3,$4)`, a, action, subject, raw)
+	_, err = s.Pool.Exec(ctx, `INSERT INTO admin_audit(actor_id,token_id,action,subject,summary) VALUES($1,$2,$3,$4,$5)`, a, auditToken(ctx), action, subject, raw)
 	return err
 }
 
 type AuditEntry struct {
 	ID        int64           `json:"id"`
 	ActorID   *string         `json:"actorId"`
+	TokenID   *string         `json:"tokenId,omitempty"`
 	Action    string          `json:"action"`
 	Subject   string          `json:"subject"`
 	Summary   json.RawMessage `json:"summary"`
@@ -145,13 +146,13 @@ func (s *Store) AuditLog(ctx context.Context, subject string, limit int) ([]Audi
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT id,actor_id,action,subject,summary,created_at FROM admin_audit WHERE $1='' OR subject=$1 ORDER BY id DESC LIMIT $2`, subject, limit)
+	rows, err := s.Pool.Query(ctx, `SELECT id,actor_id,token_id,action,subject,summary,created_at FROM admin_audit WHERE $1='' OR subject=$1 ORDER BY id DESC LIMIT $2`, subject, limit)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (AuditEntry, error) {
 		var e AuditEntry
-		err := r.Scan(&e.ID, &e.ActorID, &e.Action, &e.Subject, &e.Summary, &e.CreatedAt)
+		err := r.Scan(&e.ID, &e.ActorID, &e.TokenID, &e.Action, &e.Subject, &e.Summary, &e.CreatedAt)
 		return e, err
 	})
 }

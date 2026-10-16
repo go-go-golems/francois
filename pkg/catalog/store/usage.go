@@ -227,7 +227,7 @@ ON CONFLICT(user_id,period) DO UPDATE SET adjustments=model_allowance_periods.ad
 	if _, err = tx.Exec(ctx, `INSERT INTO allowance_adjustments(id,user_id,period,credits,reason,actor_id) VALUES($1,$2,$3,$4,$5,$6)`, NewID("adj_"), user, period, credits, reason, actor); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,action,subject,summary) VALUES($1,'usage.adjust',$2,jsonb_build_object('credits',$3::int,'period',$4::text,'reason',$5::text))`, actor, user, credits, period, reason); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,token_id,action,subject,summary) VALUES($1,$6,'usage.adjust',$2,jsonb_build_object('credits',$3::int,'period',$4::text,'reason',$5::text))`, actor, user, credits, period, reason, auditToken(ctx)); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

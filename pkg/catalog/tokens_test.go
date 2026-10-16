@@ -21,11 +21,11 @@ func TestTokensAndPush(t *testing.T) {
 	if code, out := e.portal(&admin, "POST", "/api/studio/creators", map[string]any{"slug": "cleo", "name": "Cleo", "userId": cleo.user.ID}); code != 201 {
 		t.Fatalf("profile %d %v", code, out)
 	}
-	code, out := e.portal(&sam, "POST", "/api/studio/tokens", map[string]any{"name": "laptop"})
-	if code != 403 || errCode(out) != "creator_required" {
-		t.Fatalf("subscriber token %d %v", code, out)
+	code, out := e.portal(&sam, "POST", "/api/tokens", map[string]any{"name": "laptop", "scopes": []string{"studio"}})
+	if code != 400 || errCode(out) != "invalid_scopes" {
+		t.Fatalf("subscriber studio token %d %v", code, out)
 	}
-	code, out = e.portal(&cleo, "POST", "/api/studio/tokens", map[string]any{"name": "laptop", "days": 30})
+	code, out = e.portal(&cleo, "POST", "/api/tokens", map[string]any{"name": "laptop", "days": 30, "scopes": []string{"studio"}})
 	if code != 201 {
 		t.Fatalf("create token %d %v", code, out)
 	}
@@ -43,17 +43,17 @@ func TestTokensAndPush(t *testing.T) {
 		return code, string(b)
 	}
 
-	// The token works on studio routes only, without Origin or CSRF, and
-	// cannot manage tokens.
+	// A studio token works on studio routes, without Origin or CSRF; other
+	// surfaces need other scopes, and no token can manage tokens.
 	if code, b := bearer("GET", "/api/studio/artifacts", ""); code != 200 {
 		t.Fatalf("token on studio %d %s", code, b)
 	}
 	for _, path := range []string{"/api/account", "/api/instances", "/api/admin/users"} {
-		if code, b := bearer("GET", path, ""); code != 401 || !strings.Contains(b, "token_not_allowed") {
+		if code, b := bearer("GET", path, ""); code != 403 || !strings.Contains(b, "token_scope") {
 			t.Fatalf("token on %s: %d %s", path, code, b)
 		}
 	}
-	if code, b := bearer("POST", "/api/studio/tokens", `{"name":"more"}`); code != 403 || !strings.Contains(b, "session_required") {
+	if code, b := bearer("POST", "/api/tokens", `{"name":"more","scopes":["studio"]}`); code != 401 || !strings.Contains(b, "token_not_allowed") {
 		t.Fatalf("token minting tokens %d %s", code, b)
 	}
 
@@ -94,17 +94,17 @@ func TestTokensAndPush(t *testing.T) {
 	}
 
 	// Listing shows use; revoking ends the token.
-	_, list, _ := e.do(&cleo, "portal.test", "GET", "/api/studio/tokens", nil, nil)
-	if !strings.Contains(string(list), `"lastUsedAt"`) || strings.Contains(string(list), secret) {
+	_, list, _ := e.do(&cleo, "portal.test", "GET", "/api/tokens", nil, nil)
+	if !strings.Contains(string(list), `"lastUsedAt"`) || !strings.Contains(string(list), `"scopes":["studio"]`) || strings.Contains(string(list), secret) {
 		t.Fatalf("token list %s", list)
 	}
-	if code, out := e.portal(&cleo, "DELETE", "/api/studio/tokens/"+tokenID, nil); code != 200 {
+	if code, out := e.portal(&cleo, "DELETE", "/api/tokens/"+tokenID, nil); code != 200 {
 		t.Fatalf("revoke %d %v", code, out)
 	}
 	if code, b := bearer("GET", "/api/studio/artifacts", ""); code != 401 || !strings.Contains(b, "token_invalid") {
 		t.Fatalf("revoked token %d %s", code, b)
 	}
-	if code, _ := e.portal(&admin, "DELETE", "/api/studio/tokens/"+tokenID, nil); code != 404 {
+	if code, _ := e.portal(&admin, "DELETE", "/api/tokens/"+tokenID, nil); code != 404 {
 		t.Fatal("revoked someone else's token")
 	}
 }

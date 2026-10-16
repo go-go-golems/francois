@@ -14,7 +14,7 @@ import (
 )
 
 // Principal is the authenticated portal caller: a browser session, or a
-// personal API token (Token set, no session) on studio routes.
+// personal API token (Token set, no session) on routes whose scope it carries.
 type Principal struct {
 	Session store.Session
 	User    store.User
@@ -73,9 +73,33 @@ const (
 	admin
 )
 
+// scope is the token scope a route accepts. Every route declares one next to
+// its level, so which surfaces a token reaches is visible where the route is
+// registered.
+type scope string
+
+const (
+	noToken      scope = ""        // personal API tokens are rejected
+	anyToken     scope = "*"       // any valid token (GET /api/me)
+	scopeStudio  scope = "studio"  // store.ScopeStudio
+	scopeAccount scope = "account" // store.ScopeAccount
+	scopeAdmin   scope = "admin"   // admin:read for GET and HEAD, admin:write otherwise
+)
+
+// required is the token scope a request needs on a route declaring sc.
+func (sc scope) required(method string) string {
+	if sc != scopeAdmin {
+		return string(sc)
+	}
+	if method == http.MethodGet || method == http.MethodHead {
+		return store.ScopeAdminRead
+	}
+	return store.ScopeAdminWrite
+}
+
 // guard enforces authentication, account state, role and CSRF + Origin for
 // mutations. Hiding UI elements is never the authorization.
-func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
+func (s *Server) guard(level int, sc scope, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p, err := s.resolve(r)
 		if err != nil {
@@ -83,19 +107,26 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 			httpx.Fail(w, 503, "unavailable", "Session store unavailable")
 			return
 		}
-		// Personal API tokens authenticate studio routes only, so a leaked
-		// publishing token cannot reach accounts, billing or instances.
+		ctx := r.Context()
+		// A personal API token reaches only routes whose scope it carries. The
+		// scope is a ceiling: role, account state and object checks below and
+		// in the handler still apply.
 		if bearer := r.Header.Get("Authorization"); p == nil && strings.HasPrefix(bearer, "Bearer "+store.TokenPrefix) {
-			if !strings.HasPrefix(r.URL.Path, "/api/studio/") {
-				httpx.Fail(w, 401, "token_not_allowed", "API tokens are accepted only by the studio API")
+			if sc == noToken {
+				httpx.Fail(w, 401, "token_not_allowed", "API tokens are not accepted here")
 				return
 			}
-			t, u, err := s.Store.ResolveToken(r.Context(), strings.TrimPrefix(bearer, "Bearer "))
+			t, u, err := s.Store.ResolveToken(ctx, strings.TrimPrefix(bearer, "Bearer "))
 			if err != nil {
 				httpx.Fail(w, 401, "token_invalid", "The API token is invalid, expired or revoked")
 				return
 			}
+			if need := sc.required(r.Method); sc != anyToken && !t.Allows(need) {
+				httpx.Fail(w, 403, "token_scope", "This token lacks the "+need+" scope")
+				return
+			}
 			p = &Principal{User: u, Token: &t}
+			ctx = store.WithAuditToken(ctx, t.ID)
 		}
 		if level >= session && p == nil {
 			httpx.Fail(w, 401, "login_required", "Sign in first")
@@ -126,7 +157,7 @@ func (s *Server) guard(level int, h http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		h(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+		h(w, r.WithContext(context.WithValue(ctx, principalKey{}, p)))
 	}
 }
 

@@ -56,7 +56,7 @@ func (s *Store) SaveSettings(ctx context.Context, actor string, d settings.Docum
 		return r, err
 	}
 	summary, _ := json.Marshal(map[string]any{"revision": r.Revision})
-	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,action,subject,summary) VALUES($1,'settings.activate','settings',$2)`, a, summary); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,token_id,action,subject,summary) VALUES($1,$3,'settings.activate','settings',$2)`, a, summary, auditToken(ctx)); err != nil {
 		return r, err
 	}
 	return r, tx.Commit(ctx)

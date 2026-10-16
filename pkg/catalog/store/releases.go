@@ -303,7 +303,7 @@ func (s *Store) PublishRelease(ctx context.Context, id, actor string) (Release, 
 	if _, err = tx.Exec(ctx, `UPDATE catalog_artifacts SET updated_at=now() WHERE id=(SELECT artifact_id FROM releases WHERE id=$1)`, id); err != nil {
 		return Release{}, err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,action,subject,summary) VALUES($1,'release.publish',$2,'{}')`, actor, id); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,token_id,action,subject,summary) VALUES($1,$3,'release.publish',$2,'{}')`, actor, id, auditToken(ctx)); err != nil {
 		return Release{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -339,7 +339,7 @@ func (s *Store) WithdrawRelease(ctx context.Context, id, actor string, suspendPi
 		}
 	}
 	summary, _ := json.Marshal(map[string]any{"suspendPinned": suspendPinned, "suspendedInstances": suspended})
-	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,action,subject,summary) VALUES($1,'release.withdraw',$2,$3)`, actor, id, summary); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO admin_audit(actor_id,token_id,action,subject,summary) VALUES($1,$4,'release.withdraw',$2,$3)`, actor, id, summary, auditToken(ctx)); err != nil {
 		return 0, err
 	}
 	return suspended, tx.Commit(ctx)
