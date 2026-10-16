@@ -304,3 +304,66 @@ Investigation found a material retention boundary: `DeleteInstance` physically d
 A docmgr check initially rejected the new validation Markdown with `frontmatter delimiters '---' not found`. Added full ticket/reference frontmatter to the evidence document and retained the diagnostic here. Existing validation logs were consolidated into that Markdown receipt to keep incidental .log files out of Git.
 
 The Paper artifact-table screenshot passed spacing/type/contrast/alignment checks, and its sample totals reconcile with the model summary. No graph/filter/date/artifact runtime changes have yet been made at this design checkpoint.
+
+
+## Step 5: Implement and validate filtered reports and artifact accounting
+
+Implemented the backend portion of the Paper-first design. Traffic filters now define one SQL population for totals, browsing tables and complete daily stacks, all read in one repeatable-read transaction. Model calls snapshot artifact identity at admission, preserving usage when an instance disappears.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Ok, implement, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+
+**Assistant interpretation:** Finish the runtime implementation of graphs, filters/stacks, the date dialog, and artifact breakdown; commit validated milestones and maintain this investigation diary.
+
+**Inferred user intent:** Deliver the working feature rather than stopping at the design handoff.
+
+**Prior design commit:** `6909bee` — Document analytics design, Paper graphs, filters and artifact attribution.
+
+### What I did
+
+- Added migration 010 with artifact-ID snapshots and evidence-based historical backfill.
+- Extended ReserveRequest and the hosted runtime to copy the authorized instance's artifact ID into each model-call row.
+- Replaced the positional site argument with TrafficFilter; exact path/referrer filters and nil-versus-empty semantics apply consistently.
+- Added bounded top-three-plus-Other daily series, artifact usage groups, and one-to-one artifact display-name lookup.
+- Used a read-only repeatable-read transaction to make chart/table totals consistent within a report.
+- Added PostgreSQL tests for more than 100 categories, daily reconciliation, combined filters, direct referrers, range boundaries, actual migration replay, and attribution after deletion.
+
+### Why
+
+A chart constructed from truncated browsing tables loses categories. Joining calls to live instances loses historical spend after deletion. The implementation addresses both at their authoritative database boundaries.
+
+### What worked
+
+- Focused PostgreSQL feature tests passed (`ok .../pkg/catalog 0.335s`).
+- `go test ./pkg/catalog/...` with the explicitly supplied local TEST_DATABASE_URL passed.
+- `golangci-lint run ./pkg/catalog/...` returned `0 issues.`
+- Existing model reservation/settlement behavior remains covered by the catalog suite.
+
+### What didn't work
+
+No validation failures at this milestone. During local review, corrected the model aggregation GROUP BY position after adding a label field, before executing tests.
+
+### What I learned
+
+An empty referrer is a real category. Both SQL and chart identities need an explicit remainder marker rather than reusing an empty key for Other.
+
+### What was tricky to build
+
+Backfill cannot recover already-deleted instance relationships. The migration leaves those records unknown instead of fabricating attribution; new snapshots remain intact after deletion. Artifact titles are resolved after aggregation to avoid multiplying call counts through unrelated joins.
+
+### What warrants a second pair of eyes
+
+Review transaction scope, all predicate call sites, and how old unknown attribution is represented. Model usage intentionally remains catalog-wide under traffic filters.
+
+### What should be done in the future
+
+Complete the frontend graph/date/filter milestone and validate the browser interactions before marking the follow-up task complete.
+
+### Code review instructions
+
+Start with store/analytics.go, migration 010, store/usage.go, hosted/sample.go, and analytics_reporting_test.go. Re-run the catalog suite against isolated PostgreSQL test databases.
+
+### Technical details
+
+The report is bounded to 90 days, four daily categorical series per dimension, and the existing five-second request budget. No new dependency, provider request or environment-variable reader was added. Test execution uses the existing harness and an explicit local database URL, following the session's prior notification.

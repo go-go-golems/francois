@@ -100,7 +100,7 @@ func TestTrafficAnalytics(t *testing.T) {
 	if err = e.store.SettleCall(ctx, resv, true, "", store.CallUsage{Input: 10, Output: 5, CacheRead: 3, CacheWrite: 2, Cost: 0.01, ModelUsed: "fake/actual"}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := e.store.Analytics(ctx, from, to, "http://portal.test")
+	a, err := e.store.Analytics(ctx, from, to, store.TrafficFilter{Site: "http://portal.test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestTrafficAnalytics(t *testing.T) {
 	if a.Groups["referrers"][0].Key != "search.example" || a.Models["models"][0].CacheRead != 3 || a.Models["models"][0].Credits != 2 {
 		t.Fatalf("%+v", a)
 	}
-	all, err := e.store.Analytics(ctx, from, to, "")
+	all, err := e.store.Analytics(ctx, from, to, store.TrafficFilter{})
 	if err != nil || all.Traffic.Views != 3 || all.Traffic.Bounces != 1 {
 		t.Fatalf("%+v %v", all, err)
 	}

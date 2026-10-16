@@ -35,9 +35,9 @@ type Reservation struct {
 }
 
 type ReserveRequest struct {
-	UserID, InstanceID, CallID, Model string
-	Credits, Included, Daily          int
-	SettingsRevision                  int64
+	UserID, InstanceID, ArtifactID, CallID, Model string
+	Credits, Included, Daily                      int
+	SettingsRevision                              int64
 	// Period overrides the monthly ledger key; demos use "demo:<instance>"
 	// so their budget never touches the visitor's monthly allowance.
 	Period string
@@ -97,8 +97,8 @@ RETURNING included,adjustments,reserved,used`, r.UserID, period, r.Included).Sca
 		return Reservation{}, err
 	}
 	res := Reservation{ID: NewID("mc_"), CallID: r.CallID, UserID: r.UserID, Credits: r.Credits, Period: period}
-	if _, err = tx.Exec(ctx, `INSERT INTO model_calls(id,call_id,user_id,instance_id,period,settings_revision,model,credits,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'reserved')`,
-		res.ID, r.CallID, r.UserID, r.InstanceID, period, r.SettingsRevision, r.Model, r.Credits); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO model_calls(id,call_id,user_id,instance_id,period,settings_revision,model,credits,state,artifact_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'reserved',$9)`,
+		res.ID, r.CallID, r.UserID, r.InstanceID, period, r.SettingsRevision, r.Model, r.Credits, r.ArtifactID); err != nil {
 		return Reservation{}, err
 	}
 	return res, tx.Commit(ctx)

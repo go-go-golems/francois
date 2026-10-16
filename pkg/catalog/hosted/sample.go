@@ -138,7 +138,7 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		httpx.Fail(w, 429, "rate_limited", "Too many model calls are running; try again shortly")
 		return
 	}
-	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, CallID: req.CallID, Model: selector,
+	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, ArtifactID: inst.ArtifactID, CallID: req.CallID, Model: selector,
 		Credits: model.Credits, Included: budget.Monthly, Daily: budget.Daily, SettingsRevision: rev.Revision, Period: budget.Period,
 		Shared: budget.Shared, SharedLimit: budget.SharedLimit})
 	if err != nil {

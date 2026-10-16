@@ -150,9 +150,19 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_range", "Range must be positive and at most 90 days; to is exclusive")
 		return
 	}
+	q := r.URL.Query()
+	f := store.TrafficFilter{Site: q.Get("site"), Path: q.Get("path")}
+	if q.Has("referrer") {
+		ref := q.Get("referrer")
+		f.Referrer = &ref
+	}
+	if len([]rune(f.Site)) > 200 || len([]rune(f.Path)) > 200 || f.Path != "" && (!strings.HasPrefix(f.Path, "/") || strings.ContainsAny(f.Path, "?#")) || f.Referrer != nil && (len([]rune(*f.Referrer)) > 200 || strings.ContainsAny(*f.Referrer, "/?#@ ")) {
+		httpx.Fail(w, 400, "invalid_filter", "Use a path without query/fragment and a referring hostname; filters are limited to 200 characters")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	a, err := s.Store.Analytics(ctx, from, to, r.URL.Query().Get("site"))
+	a, err := s.Store.Analytics(ctx, from, to, f)
 	if err != nil {
 		unavailable(w, err)
 		return
