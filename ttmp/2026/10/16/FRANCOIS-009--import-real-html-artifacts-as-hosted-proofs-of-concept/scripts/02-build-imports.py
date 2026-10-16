@@ -27,6 +27,9 @@ for slug, manifest in MANIFESTS.items():
     app = ROOT / slug
     source = app / 'source'
     html = (source / 'index.html').read_text()
+    if slug == 'lattice-rift':
+        # Leave room for the host viewer's Close link at the upper right.
+        html = replace_once(html, '</style>\n\n<canvas', '</style>\n<style>.bar { padding-right: max(96px, env(safe-area-inset-right, 0px)); }</style>\n\n<canvas')
     if slug == 'lattice-deck':
         # Room presence is fire-and-forget in the supported runtime.
         html, count = re.subn(r'((?:this\.lobby|this\.room)\.presence\([^;\n]+?\))\.catch', r'Promise.resolve(\1).catch', html)
