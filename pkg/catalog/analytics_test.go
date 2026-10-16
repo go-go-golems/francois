@@ -24,7 +24,8 @@ func TestTrafficPolicy(t *testing.T) {
 			t.Errorf("excludes %s", p)
 		}
 	}
-	if got := trafficReferrer("https://name:secret@SEARCH.example/path?token=secret#frag"); got != "search.example" {
+	// Deliberate dummy userinfo tests that only the hostname is retained.
+	if got := trafficReferrer("https://name:secret@SEARCH.example/path?token=secret#frag"); got != "search.example" { // trufflehog:ignore
 		t.Fatal(got)
 	}
 	if trafficReferrer("javascript:secret") != "" {

@@ -63,3 +63,7 @@ Deployed revision 42a1f3f locally with migration 011 and matching pre-migration 
 ## 2026-10-16
 
 Opened PR #7 and waited for completed Codex review: two unresolved P2 findings in workspace release selection and concurrent tour-start accounting; two CI checks need follow-up. Published the 6,634-word textbook-style technical report with diagrams and five figures to go-go-parc/main, vault commit afc8140. No merge or production rollout.
+
+## 2026-10-16
+
+Addressed both PR #7 P2 findings: recover unusable release pins without changing workspace identity/data, and charge tour starts only after successful serialized creation. PostgreSQL regressions/full Go suite and lint pass. Identified the secret-scan finding as a dummy referrer fixture; narrow inline ignore added. Existing production backup Job completed before rollout.

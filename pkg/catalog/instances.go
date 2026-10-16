@@ -69,7 +69,7 @@ func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	var inst store.Instance
 	if r.URL.Path == "/api/instances/open" {
-		inst, err = s.Store.OpenWorkspace(ctx, principal(ctx).User.ID, rel.ID, in.Title, e.Plan.Instances, doc.Operations.AcceptNewVisits)
+		inst, err = s.Store.OpenWorkspace(ctx, principal(ctx).User.ID, rel.ID, in.Title, e.Plan.Instances, doc.Operations.AcceptNewVisits, doc.Publishing.AllowPinnedAfterWithdraw)
 	} else if !doc.Operations.AcceptNewVisits {
 		err = store.ErrActivityPaused
 	} else {

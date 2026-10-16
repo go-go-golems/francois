@@ -78,7 +78,7 @@ func (s *Store) CreateInstance(ctx context.Context, owner, release, title, kind 
 
 // OpenWorkspace resumes the oldest active workspace of this artifact, or
 // creates one while holding the same per-owner lock as explicit creation.
-func (s *Store) OpenWorkspace(ctx context.Context, owner, release, title string, limit int, allowNew bool) (Instance, error) {
+func (s *Store) OpenWorkspace(ctx context.Context, owner, release, title string, limit int, allowNew, allowPinnedAfterWithdraw bool) (Instance, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return Instance{}, err
@@ -87,10 +87,17 @@ func (s *Store) OpenWorkspace(ctx context.Context, owner, release, title string,
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('instances:'||$1))`, owner); err != nil {
 		return Instance{}, err
 	}
-	var id string
-	err = tx.QueryRow(ctx, `SELECT i.id FROM instances i JOIN releases r ON r.id=i.release_id JOIN releases target ON target.id=$2 WHERE i.owner_user_id=$1 AND i.kind='workspace' AND i.state='active' AND r.artifact_id=target.artifact_id ORDER BY i.created_at,i.id LIMIT 1`, owner, release).Scan(&id)
+	var id, state string
+	err = tx.QueryRow(ctx, `SELECT i.id,r.state FROM instances i JOIN releases r ON r.id=i.release_id JOIN releases target ON target.id=$2 WHERE i.owner_user_id=$1 AND i.kind='workspace' AND i.state='active' AND r.artifact_id=target.artifact_id ORDER BY i.created_at,i.id LIMIT 1`, owner, release).Scan(&id, &state)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return Instance{}, err
+	}
+	if err == nil && state != "published" && (state != "withdrawn" || !allowPinnedAfterWithdraw) {
+		// Keep the saved data and URL when the old pin can no longer run.
+		// The handler has already authorized the requested published release.
+		if _, err = tx.Exec(ctx, `UPDATE instances SET release_id=$2,updated_at=now() WHERE id=$1`, id, release); err != nil {
+			return Instance{}, err
+		}
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		if !allowNew {

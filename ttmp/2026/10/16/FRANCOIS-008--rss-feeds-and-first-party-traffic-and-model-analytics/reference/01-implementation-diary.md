@@ -1073,3 +1073,70 @@ Read vault commit `afc8140`, especially Sections 9–12 for lifetime/transaction
 ### Technical details
 
 Vault remote: `ssh://git@github.com/go-go-golems/go-go-parc`; branch main. Report source snapshot: `aa9ca58`; local app remains `42a1f3f`. The new report has no database dumps, credentials, raw scanner payloads or cross-repository image dependencies. No messages were sent to reviewers or other users.
+
+
+## Step 16: Address review findings and prepare the production release
+
+The user authorized fixing the next review issue, merging and production deployment. Both outstanding P2 findings affect the normal Open/Try flow, so I fixed them before preparing the release. Production remains unchanged at this checkpoint; the established in-cluster backup completed before migration.
+
+### Prompt Context
+
+**User prompt (verbatim):** "address next code review issue, then merge, and deploy to prod."
+
+**Assistant interpretation:** Correct the outstanding reviewed behavior, validate it, merge PR #7 and deploy through the existing production GitOps workflow.
+
+**Inferred user intent:** Finish the review-to-production lifecycle, preserving saved work and keeping implementation straightforward.
+
+### What I did
+
+- Read the production runbook, image/GitOps workflow, settings authorization and the exact workspace/tour selection paths. Confirmed production currently uses `ghcr.io/go-go-golems/francois:sha-64c7ece`, one ready replica.
+- Changed `OpenWorkspace` to preserve the workspace's identity/data and re-pin it to the requested published release only when its old pin cannot run under publishing policy. Allowed withdrawn pins remain unchanged. Recovery works at the instance-count cap and while new creation is paused.
+- Serialized tour resume/check/create using the existing process-local limiter mutex. Limit checks no longer spend hits; successful creation records user/network starts afterward. Repeated requests resume without spending starts, and failed capacity admission spends none.
+- Added `TestOpenWorkspaceRecoversWithdrawnPin`, `TestConcurrentTourRequestsSpendOneStart` and `TestFailedTourCreationDoesNotSpendStart`. The tests cover preserved data, permitted old pins, restrictive policy, real launch, concurrent requests and remaining start allowance.
+- Reproduced the secret scan privately with the same scanner image. Its sole URI finding is the deliberate referrer fixture at analytics_test.go:27, not a production credential. Added an explanatory comment and a narrow `trufflehog:ignore` on that line, as supported by the upstream scanner documentation. Historical commits still contain the old fixture until scanned as the merged change; no broad detector/path exclusion was added.
+- Enabled the repository's dependency vulnerability alerts; the dependency-graph SBOM API then became available. This addresses the missing repository capability without disabling the review job.
+- Started disposable PostgreSQL 17 on loopback port 15438. Notified the user before using the existing TEST_DATABASE_URL harness, then ran the focused regressions and full suite.
+- Used the existing production PostgreSQL backup CronJob through manual Job `postgres-backup-francois-008-20261016`, keeping data in the established cluster/object-storage backup destination. The job completed successfully before rollout.
+
+### Why
+
+A new workspace is unnecessary when only the old release pin is unusable: reusing its identity preserves data and works even when the account has no room for another instance. Tour start charging must follow successful creation; holding the existing mutex across resume/check/create makes that decision consistent in the documented single-process deployment.
+
+### What worked
+
+- Four focused existing/new workspace/tour checks passed against PostgreSQL (`pkg/catalog 0.938s`).
+- The full `go test ./... -count=1` passed with the explicit isolated test URL after the known unrelated upload-race failure described below (`pkg/catalog 9.995s`).
+- `golangci-lint run -v` passed with zero issues after the local expression correction.
+- The final focused run including failed-creation accounting passed (`pkg/catalog 0.773s`). Later edits were tests and the fixture comment only.
+- Production cluster access and existing backup workflow work. Manual backup Job reports Complete; final merge/build/rollout receipts follow in the next step.
+
+### What didn't work
+
+- First full suite failed the already-recorded `TestConcurrentNewArtifactUpload`: `studio_test.go:226: race-4 upload 1: 409 ... code:version_exists`. This predates the review fixes; the next complete run passed. No unrelated upload code/assertion was altered.
+- Lint first reported `QF1001: could apply De Morgan's law` for the release usability predicate; rewrote it directly and lint passed.
+- `gh pr view --json baseRefOid` is unsupported by the installed gh version; used REST `.base.sha` instead. zsh rejected an unquoted jsonpath-style custom-columns argument containing `[0]`; quoted it and verified the deployment.
+- Automatic approval review rejected exporting the full production database to local `/tmp`, because it may contain sensitive user data and the deployment request does not specifically authorize that transfer/destination. Did not retry or bypass the export. Used the existing in-cluster backup CronJob as the safer alternative, which completed without transferring the dump locally.
+
+### What I learned
+
+The review exposed separate correctness properties: successful workspace selection must also yield a usable release, and atomic tour identity does not imply atomic start accounting. A narrow synthetic-fixture scanner exception is appropriate; hiding an entire test file or disabling URI scanning would be excessive.
+
+### What was tricky to build
+
+Tour requests must be serialized before their live lookup, not just inside store creation, so concurrent handlers cannot all spend a start before finding the same committed tour. Persistent workspace recovery stays under the existing per-owner transaction lock and keeps document rows/hostname unchanged.
+
+### What warrants a second pair of eyes
+
+Review automatic re-pinning only for unusable releases and preservation of allowed pinned releases. The tour mutex is process-local, matching the existing limiter and single-replica deployment. The legacy upload race remains a separate intermittent test failure.
+
+### What should be done in the future
+
+Push fixes, inspect the refreshed CI, merge PR #7, wait for its image/GitOps PR, validate and merge that deployment change, then verify production image, migrations, health, feeds and aggregate preservation. Do not treat workflow image publication alone as a successful rollout.
+
+### Code review instructions
+
+Start with store/instances.go, instances.go, demos.go and the three regression cases in operations_test.go. The scanner raw result stays private under /tmp; source verification identifies only the dummy test referrer. Read Step 17 for actual release results.
+
+### Technical details
+
+Test database credentials are disposable local fixtures. Production backup uses the pre-existing CronJob's own secret mounts/environment internally. No secret values, production dump or raw scanner results are included in Git. The vault report remains the historical snapshot published before these review fixes.

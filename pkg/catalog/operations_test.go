@@ -192,7 +192,7 @@ func TestOpenWorkspaceAndTourResumeUnderConcurrency(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			i, err := e.store.OpenWorkspace(ctx, admin.user.ID, release, "Board", 10, true)
+			i, err := e.store.OpenWorkspace(ctx, admin.user.ID, release, "Board", 10, true, true)
 			if err != nil {
 				ids <- "error:" + err.Error()
 				return
@@ -359,5 +359,161 @@ func TestDocumentCountIsAtomic(t *testing.T) {
 	}
 	if success != 1 {
 		t.Fatalf("document admission count %d", success)
+	}
+}
+
+// A forbidden withdrawn pin must recover without losing data or needing a
+// second workspace, including while creation is paused and at the count cap.
+func TestOpenWorkspaceRecoversWithdrawnPin(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	admin := e.user("pin-owner", "admin", false)
+	old := e.publishArtifact(admin, "board", "")
+	code, original := e.portal(&admin, "POST", "/api/instances", map[string]string{"releaseId": old})
+	if code != 201 {
+		t.Fatalf("create %d %v", code, original)
+	}
+	id := original["id"].(string)
+	if err := e.store.WriteDocument(ctx, id, admin.user.ID, "notes/keep", "set", map[string]any{"text": "saved"}, 500); err != nil {
+		t.Fatal(err)
+	}
+	code, next := e.multipartTo(admin, "/api/studio/releases", map[string]string{"artifactId": "board", "title": "Board", "version": "2.0.0", "manifestJson": `{"db":{}}`}, "html", "a.html", []byte(testHTML))
+	if code != 201 {
+		t.Fatalf("upload %d %v", code, next)
+	}
+	current := next["id"].(string)
+	if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+current+"/publish", nil); code != 200 {
+		t.Fatalf("publish %d %v", code, out)
+	}
+	if _, err := e.store.Pool.Exec(ctx, `UPDATE releases SET state='withdrawn' WHERE id=$1`, old); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := e.store.OpenWorkspace(ctx, admin.user.ID, current, "Board", 1, false, true)
+	if err != nil || kept.ID != id || kept.ReleaseID != old {
+		t.Fatalf("permitted pin changed: %+v %v", kept, err)
+	}
+	d := testDoc(100)
+	d.Publishing.AllowPinnedAfterWithdraw = false
+	d.Operations.AcceptNewVisits = false
+	if _, err = e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := e.store.OpenWorkspace(ctx, admin.user.ID, current, "Board", 1, false, false)
+	if err != nil || recovered.ID != id || recovered.ReleaseID != current {
+		t.Fatalf("withdrawn recovery: %+v %v", recovered, err)
+	}
+	if code, out := e.portal(&admin, "POST", "/api/instances/open", map[string]string{"releaseId": current}); code != 201 || out["id"] != id {
+		t.Fatalf("open %d %v", code, out)
+	}
+	if _, code, out := e.launch(admin, original); code != 200 {
+		t.Fatalf("recovered launch %d %v", code, out)
+	}
+	var body string
+	if err = e.store.Pool.QueryRow(ctx, `SELECT body->>'text' FROM instance_documents WHERE instance_id=$1 AND path='notes/keep'`, id).Scan(&body); err != nil || body != "saved" {
+		t.Fatalf("saved document lost: %q %v", body, err)
+	}
+	var count int
+	if err = e.store.Pool.QueryRow(ctx, `SELECT count(*) FROM instances WHERE owner_user_id=$1 AND kind='workspace'`, admin.user.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("workspace count %d %v", count, err)
+	}
+}
+
+func TestConcurrentTourRequestsSpendOneStart(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	admin := e.user("tour-admin", "admin", false)
+	visitor := e.user("tour-visitor", "subscriber", false)
+	for _, id := range []string{"board", "second", "third"} {
+		e.publishArtifact(admin, id, "")
+		if code, out := e.portal(&admin, "PATCH", "/api/studio/artifacts/"+id, map[string]bool{"demoEnabled": true}); code != 200 {
+			t.Fatalf("enable %d %v", code, out)
+		}
+	}
+	d := testDoc(100)
+	d.Demo.Enabled = true
+	d.Demo.PerUserPerHour = 2
+	d.Demo.PerAddressPerHour = 2
+	if _, err := e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	// Hold creation until the concurrent requests are in flight, so an initial
+	// lookup cannot happen to observe an already-committed tour by timing alone.
+	tx, err := e.store.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('demos'))`); err != nil {
+		t.Fatal(err)
+	}
+	type result struct {
+		code int
+		out  map[string]any
+	}
+	results := make(chan result, 6)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for range 6 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			code, out := e.portal(&visitor, "POST", "/api/demos", map[string]string{"artifactId": "board"})
+			results <- result{code, out}
+		}()
+	}
+	close(start)
+	time.Sleep(100 * time.Millisecond)
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	wg.Wait()
+	close(results)
+	var id any
+	for r := range results {
+		if r.code != 201 {
+			t.Fatalf("concurrent resume %d %v", r.code, r.out)
+		}
+		if id == nil {
+			id = r.out["id"]
+		}
+		if r.out["id"] != id {
+			t.Fatalf("duplicate tour %v %v", id, r.out)
+		}
+	}
+	if code, out := e.portal(&visitor, "POST", "/api/demos", map[string]string{"artifactId": "second"}); code != 201 {
+		t.Fatalf("second actual tour blocked: %d %v", code, out)
+	}
+	if code, out := e.portal(&visitor, "POST", "/api/demos", map[string]string{"artifactId": "third"}); code != 429 || errCode(out) != "rate_limited" {
+		t.Fatalf("third tour exceeded cap: %d %v", code, out)
+	}
+}
+
+func TestFailedTourCreationDoesNotSpendStart(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	admin := e.user("tour-admin", "admin", false)
+	visitor := e.user("tour-visitor", "subscriber", false)
+	e.publishArtifact(admin, "board", "")
+	if code, out := e.portal(&admin, "PATCH", "/api/studio/artifacts/board", map[string]bool{"demoEnabled": true}); code != 200 {
+		t.Fatalf("enable %d %v", code, out)
+	}
+	d := testDoc(100)
+	d.Demo.Enabled = true
+	d.Demo.PerUserPerHour = 1
+	d.Demo.PerAddressPerHour = 1
+	d.Demo.MaxActive = 0
+	if _, err := e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	if code, out := e.portal(&visitor, "POST", "/api/demos", map[string]string{"artifactId": "board"}); code != 429 || errCode(out) != "demo_limit" {
+		t.Fatalf("capacity rejection %d %v", code, out)
+	}
+	d.Demo.MaxActive = 20
+	if _, err := e.store.SaveSettings(ctx, "", d); err != nil {
+		t.Fatal(err)
+	}
+	if code, out := e.portal(&visitor, "POST", "/api/demos", map[string]string{"artifactId": "board"}); code != 201 {
+		t.Fatalf("failed creation spent start: %d %v", code, out)
 	}
 }
