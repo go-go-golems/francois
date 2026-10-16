@@ -435,7 +435,7 @@ All are guard `admin`, scope `scopeAdmin`, and audited.
 - **Options considered:** per-section endpoints (`PATCH /api/admin/plans/{key}`, …); a JSON Patch endpoint; `If-Match` on the whole document.
 - **Decision:** `ETag` / `If-Match` with the revision number, required on every PATCH, including from the browser UI.
 - **Rationale:** It closes the race for every client with one mechanism, keeps validation in one place (`settings.Document.Validate`), and keeps the settings document as the single source of plan truth. Per-section endpoints would multiply validation paths.
-- **Consequences:** The admin settings page must send `If-Match` and show a "settings changed, reload" message on 412. `SaveSettings` callers (`catalog db settings`) pass the revision they read, or `0` for "whatever is current" from the break-glass CLI only.
+- **Consequences:** The admin settings page must send `If-Match` and show a "settings changed, reload" message on 412. API callers always pass the revision they read; revision 0 (only defaults so far) is compared like any other, so two editors starting from the defaults cannot overwrite each other. The unconditional write is a separate store path (`SaveSettings`, a negative base internally) used only by the break-glass `catalog db settings` command, never by the HTTP API.
 - **Status:** proposed
 
 ### 6.5 The Go client: `pkg/catalog/client`
@@ -547,7 +547,6 @@ francois catalog creators    list | create | update ID | delete ID
 francois catalog users       list [--q …] [--role …] [--plan …] | show ID | set-role ID ROLE | disable ID | enable ID
                              revoke-sessions ID [--tokens] | grant ID --days N --reason … [--plan K] | revoke-grant GRANT_ID
                              tokens ID
-francois catalog tokens      list | revoke ID            (own tokens; creation stays in the browser)
 francois catalog subscriptions list [--status …] [--plan …] | cancel ID | resume ID
 francois catalog instances   list [--q …] | show ID | suspend ID | resume ID | delete ID
 francois catalog plans       list | show KEY | set KEY [--monthly-credits N] [--instances N] [--price-month price_…] …
@@ -563,7 +562,7 @@ francois catalog db          users list | users promote | users disable | users 
                              users grant-access | settings --file F | publish …
 ```
 
-Destructive commands (`disable`, `revoke-*`, `withdraw`, `delete`, `cancel`) ask for confirmation on a terminal and accept `--yes` for scripts.
+Destructive commands (`disable`, `revoke-*`, `withdraw`, `delete`, `cancel`) ask for confirmation on a terminal and accept `--yes` for scripts. There is no command for managing one's own tokens: `/api/tokens` stays session-only, so a token can never mint or revoke tokens. Owners manage tokens on the account page; administrators use `users tokens ID` and `users revoke-token ID`, which call the admin API.
 
 ### 6.7 The MCP server: `francois mcp`
 
@@ -872,6 +871,9 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		if c.host != "" { req.Host = c.host }
 		resp, err := c.http.Do(req)
 		if retryable(method, resp, err) && attempt < c.retries {
+			if resp != nil {
+				drainAndClose(resp.Body) // release the connection before retrying
+			}
 			sleep(ctx, backoff(attempt)) // 250ms, 500ms, 1s
 			continue
 		}
@@ -925,7 +927,9 @@ func (s *Server) adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 // store: inside the transaction
 //   SELECT pg_advisory_xact_lock(hashtext('platform_settings'))
 //   SELECT COALESCE(max(revision), 0) FROM platform_settings  → current
-//   if base != 0 && base != current { return ErrConflict }   (base 0 only from `catalog db settings`)
+//   if base >= 0 && base != current { return ErrConflict }
+//   (revision 0 is checked like any other; only the break-glass store path
+//   SaveSettings passes a negative base, and the HTTP API never does)
 //   INSERT … RETURNING revision; audit
 ```
 
