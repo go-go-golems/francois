@@ -38,6 +38,8 @@ The application is now running at [local Analytics](http://localhost:8090/admin/
 
 ## Feature entry points
 
+The follow-up [minimal public experience and operational capacity proposal](design-doc/03-minimal-public-experience-and-operational-capacity-controls.md) addresses Paper simplification comments, six model lanes, private fairness limits, service pauses and instance infrastructure costs. It is a proposed next phase; deployment receipts above describe the existing implementation.
+
 - Release feed: `/apps/feed.xml`; existing journal feed: `/journal/feed.xml`.
 - Admin dashboard: `/admin/analytics`.
 - Admin JSON report: `/api/admin/analytics`.

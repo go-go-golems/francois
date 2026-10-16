@@ -7,3 +7,4 @@
 - [x] Upload completed guide to reMarkable <!-- t:68cj -->
 - [x] Implement and validate Paper-designed graphs, traffic filters/stacks and date dialog <!-- t:nsd3 -->
 - [x] Deploy the completed analytics implementation to the existing local Compose stack and verify authenticated behavior <!-- t:a1wv -->
+- [ ] Implement the proposed minimal public flow, six-lane fairness and reversible LLM/storage controls after resolving provider lane semantics and retention policy <!-- t:byyf -->

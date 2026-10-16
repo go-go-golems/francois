@@ -31,6 +31,8 @@ WhenToUse: ""
 
 This guide describes the initial implementation checkpoint (`0a66114`). The follow-up [Paper designs and implementation guide](02-analytics-paper-designs-and-implementation-mapping.md) supersedes its table-only presentation with graphs, exact traffic filters, page/referrer stacks, a reusable date dialog, and durable model usage by artifact. It specifies the additional schema, APIs, algorithms, and acceptance tests.
 
+The subsequent [minimal public experience and capacity proposal](03-minimal-public-experience-and-operational-capacity-controls.md) records the user's revised direction: keep usage reporting private, hide routine instance management, and protect six model lanes with fairness controls and reversible service pauses. Those additional policy/UI changes are proposed and have not been implemented.
+
 ## 1. What you are building on
 
 Francois turns saved HTML applications into applications people can discover, subscribe to, and run. An **artifact** is a catalog entry such as POLIS or Board. A **release** is one immutable version of that artifact's HTML and capability manifest. An **instance** is a runnable workspace pinned to a release, with its own documents, uploaded assets, members, and model allowance checks. Publishing a new release does not silently upgrade existing instances.

@@ -35,3 +35,11 @@ Uploaded the completed combined implementation guide v2 to /ai/2026/10/16/FRANCO
 ## 2026-10-16
 
 Deployed locally at http://localhost:8090/admin/analytics using application revision 1d8a137. Applied migrations 009/010; preserved users, instances, releases and all five model calls. Health/readiness and 18 real-service browser checks passed; private backup and previous image retained. Production unchanged.
+
+## 2026-10-16
+
+Recorded revised minimal public experience and proposed six-lane fairness, reversible service controls, implicit workspaces and measured local instance footprint; runtime and Paper designs unchanged.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-008--rss-feeds-and-first-party-traffic-and-model-analytics/design-doc/03-minimal-public-experience-and-operational-capacity-controls.md — Evidence-backed next-phase proposal

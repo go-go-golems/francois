@@ -534,3 +534,75 @@ The local rollout completed successfully. Compose rebuilt the application image,
 - No deployment failure or code fix was needed. Backup file permissions/header and the retained previous image were checked before migration.
 - Reproduction script and exact deployment evidence are in `scripts/03-local-deployment-check.js` and `various/validation/04-local-deployment.md`.
 - Production was not accessed. This session deploys locally only.
+
+## Step 8: Investigate minimal public UI and six-lane operating policy
+
+The user clarified that the site should feel intentionally minimal even though operators need usage tracking, fairness limits and the ability to pause capabilities. I read the Paper feedback and traced instance creation, live views, sampling, persistence and demo lifecycle to separate saved-workspace cost from active execution. The result is an evidence-backed next-phase design, with runtime changes explicitly left unimplemented in this advisory turn.
+
+### Prompt Context
+
+**User prompt (verbatim):**
+
+> Ok, so the idea for the site is that it is intentionally minimal, and I put a bunch of comments on the paper design of what could go.
+>
+> But the main idea is that we have a free LLM hosting with infinity tokens, but restricted lane count (6 lanes), and we don't want to turn this site into a "product" where people really see usage or so. So instead, we want to still limit and track and maybe rate limit for all users, especially for free ones (maybe limited tour length, limited sessions per blabla), and also be able to take storage + llm usage functionality down / disable it, when we realize we are growing too fast or there are issues, and in this case we need to show a little warning message or page. Also, under these circumstances, how would you address "instances", and how much burden do they put on the infrastructure?
+
+**Assistant interpretation:** Investigate the existing implementation and recommend simple private controls, restrained notices and an instance model appropriate for a six-lane shared service.
+
+**Inferred user intent:** Preserve the site as a small collection of applications and writing while retaining operational control over growth, misuse and incidents.
+
+**Prior commit:** `d9fadae` — Document verified local analytics deployment. No runtime implementation changes in this step.
+
+### What I did
+
+- Applied the diary and docmgr skills, read the current ticket checkpoint and inspected relevant code rather than assuming instances were containers.
+- Loaded the Paper guide, inspected the unified file, and read all 20 open one-message comment previews. They include removal of most account/instance/pricing UI, merged feeds and a small warning-page reference. No design nodes or comment statuses changed.
+- Traced `CreateInstance`, `Runtime.Handler`, `createView`, `sample`, `piworker.Start`, document/asset writes and demo creation/expiry. Checked worker output limits and model ledger retention.
+- Inspected local aggregate resource/storage usage without reading environment values or user document contents.
+- Added `design-doc/03-minimal-public-experience-and-operational-capacity-controls.md`, related seven primary source files through docmgr, and linked it from the ticket and original guide.
+- Consulted the PostgreSQL explicit-locking documentation and RFC 9110 Retry-After semantics for proposed concurrency/error handling.
+
+### Why
+
+Saved workspace count, live browser views and occupied model lanes have different costs. Protecting the six lanes requires request admission and fair duration limits; counting instances or exposing credits to visitors does not establish that protection. Reversible capability controls allow a small site to stay readable during model or storage incidents.
+
+### What worked
+
+- Confirmed instance creation inserts shared PostgreSQL metadata and membership, with no per-instance worker/container. The Node worker is shared and application JavaScript runs in browsers.
+- Confirmed existing demo TTL/capacity/network limits, transactional credit reservations, model counters, timeout/tool/output bounds, grants, revocation and retention provide reusable foundations.
+- Measured local aggregate state: 13 instances, seven documents/606 logical bytes, zero assets, database size 10,401,459 bytes. One docker-stats snapshot reported app 85.15 MiB/0.00% CPU and PostgreSQL 89.58 MiB/0.29% CPU. This is an idle whole-container observation, not a load test or per-instance estimate.
+- Identified gaps: global concurrency is process-local; connected view count is unbounded in the inspected path; document count checks can race; aggregate document/comment/lease bytes need limits; existing demo start limiting is process-local; model slots are held across tool waits; local cancellation release does not prove upstream completion.
+
+### What didn't work
+
+- The first `rg` invocation included unmatched `pkg/model*` and `pkg/runtime*` globs; zsh returned `zsh:1: no matches found: pkg/model*`. Replaced guessed directory globs with inspected concrete paths.
+- Paper `list_comment_threads` with `previewLength: 1500` returned `maximum: 1000` / `Invalid input`. Retried with 1000 and received all 20 complete messages.
+- Reads of guessed files `pkg/piworker/pi.go` and `pkg/catalog/launch.go` did not locate source; the latter reported `rg: pkg/catalog/launch.go: No such file or directory (os error 2)`. Used `rg --files pkg/piworker` and actual `server.go`/`client.go` paths to continue.
+- Initial `docker stats --no-stream` failed at the sandbox boundary: `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock` / `connect: operation not permitted`. The same narrowly scoped aggregate read succeeded with approved escalation. No automatic-review rejection occurred.
+
+### What I learned
+
+The user values private operational accounting and a nearly invisible public service layer. Token volume is no longer the primary scarce-resource proxy. Existing model-call admission occupies a slot during the entire agent call; provider lane semantics and cancellation acknowledgement must be understood before promising a hard physical six-generation cap. A saved instance alone consumes neither a provider lane nor its own process.
+
+### What was tricky to build
+
+No runtime code was built. The design boundary is separating identity/persistence lifetime from access lifetime: an expiring model visit must not erase signed-in saved work, and refreshing a grant must not reset fairness allowances. Similarly, read-only storage must cover comments/assets/leases as well as documents while allowing healthy reads; a model pause should not unnecessarily close those views.
+
+### What warrants a second pair of eyes
+
+- Establish whether provider lanes represent generation, conversation or upstream sessions and whether this site owns all six.
+- Review cancellation/termination before slot reuse, consistent quota locking, and guest-account/session cleanup.
+- Decide existing extra-workspace reachability before hiding management UI. Do not silently merge or discard stored work.
+- Choose initial retention and rolling duration/rate limits using representative applications; local idle measurements do not establish capacity.
+
+### What should be done in the future
+
+Implement the proposed controls in small phases: policy gates and shared notice; six-lane/fairness accounting; storage/view/start limits; implicit default workspaces and approved public UI reduction. Task `byyf` tracks the proposed implementation and remains open. No policy values or services were changed by this analysis.
+
+### Code review instructions
+
+Read the new proposal first, then its related source files and `pkg/catalog/hosted/rpc.go`, `pkg/catalog/store/assets.go`, `pkg/catalog/entitlement.go`, and `pkg/piworker/client.go`. Distinguish observed behavior, code defaults and tentative policy values. Documentation checks are appropriate for this checkpoint; no runtime test suite is required because runtime source/configuration are unchanged.
+
+### Technical details
+
+The default 5,000 documents times 256 KiB permit approximately 1.22 GiB of logical document bodies, plus 256 MiB of assets and database overhead. Existing SSE keepalive/rechecks are 15/30 seconds, model-call timeout is five minutes, browser-tool timeout is 150 seconds and per-round output cap is 8,192 tokens. Proposed independent controls target new activity, sampling and storage. Private capacity metrics should add occupied seconds, active calls, latency and rejection reasons to existing token/artifact accounting.
