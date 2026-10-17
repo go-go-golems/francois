@@ -1,0 +1,23 @@
+?   	github.com/go-go-golems/francois	[no test files]
+?   	github.com/go-go-golems/francois/cmd/francois	[no test files]
+ok  	github.com/go-go-golems/francois/cmd/francois/cmds	0.077s
+?   	github.com/go-go-golems/francois/pkg	[no test files]
+ok  	github.com/go-go-golems/francois/pkg/catalog	10.798s
+ok  	github.com/go-go-golems/francois/pkg/catalog/billing	0.006s
+ok  	github.com/go-go-golems/francois/pkg/catalog/client	0.756s
+ok  	github.com/go-go-golems/francois/pkg/catalog/content	0.006s
+ok  	github.com/go-go-golems/francois/pkg/catalog/hosted	0.030s
+?   	github.com/go-go-golems/francois/pkg/catalog/httpx	[no test files]
+ok  	github.com/go-go-golems/francois/pkg/catalog/identity	0.012s
+ok  	github.com/go-go-golems/francois/pkg/catalog/mcpserver	0.006s
+ok  	github.com/go-go-golems/francois/pkg/catalog/payments	0.577s
+ok  	github.com/go-go-golems/francois/pkg/catalog/releases	0.075s
+ok  	github.com/go-go-golems/francois/pkg/catalog/settings	0.005s
+?   	github.com/go-go-golems/francois/pkg/catalog/store	[no test files]
+ok  	github.com/go-go-golems/francois/pkg/catalog/web	0.047s
+?   	github.com/go-go-golems/francois/pkg/doc	[no test files]
+ok  	github.com/go-go-golems/francois/pkg/host	0.091s
+ok  	github.com/go-go-golems/francois/pkg/piworker	0.118s
+ok  	github.com/go-go-golems/francois/pkg/store	0.030s
+?   	github.com/go-go-golems/francois/pkg/web	[no test files]
+?   	github.com/go-go-golems/francois/ttmp/2026/10/14/FRANCOIS-004--showcase-storefront-creators-artifact-pages-demos-subscription-plans-and-an-artifact-editor/scripts/03-parse-settings	[no test files]

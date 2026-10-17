@@ -263,7 +263,7 @@ func TestEmailSignupRejectsDisabledAmbiguousAndProviderCollisions(t *testing.T) 
 					}
 				}
 				if mode == "ambiguous local" {
-					_, err = e.store.UpsertIdentity(ctx, store.Identity{Issuer: u.Issuer, Subject: "another", Email: u.Email, EmailVerified: true})
+					_, err = e.store.Pool.Exec(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified) VALUES($1,$2,'another',$3,true)`, store.NewID("usr_"), u.Issuer, u.Email)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -358,5 +358,41 @@ func TestEmailRegistrationConcurrentClaimAndCompletion(t *testing.T) {
 	}
 	if won != 1 {
 		t.Fatalf("completion winners %d", won)
+	}
+}
+
+func TestEmailSignupAndOIDCRejectTheSecondIdentityInEitherOrder(t *testing.T) {
+	for _, signupFirst := range []bool{true, false} {
+		t.Run(map[bool]string{true: "signup first", false: "OIDC first"}[signupFirst], func(t *testing.T) {
+			e, _ := setupSignup(t)
+			ctx := context.Background()
+			f := store.EmailSignin{Issuer: e.srv.Config.EmailLogin.Issuer(), Subject: "email-signup", Email: "new@example.test", ExpiresAt: time.Now().Add(time.Minute)}
+			id := store.Identity{Issuer: f.Issuer, Subject: "social-login", Email: "NEW@example.test", EmailVerified: true}
+			signup := func() error { _, err := e.store.CompleteEmailRegistration(ctx, f); return err }
+			oidc := func() error { _, err := e.store.UpsertIdentity(ctx, id); return err }
+			first, second := signup, oidc
+			if !signupFirst {
+				first, second = oidc, signup
+			}
+			if err := first(); err != nil {
+				t.Fatal(err)
+			}
+			if err := second(); err != store.ErrNotFound {
+				t.Fatalf("second identity was not rejected: %v", err)
+			}
+			users, err := e.store.UsersByEmail(ctx, f.Email)
+			if err != nil || len(users) != 1 {
+				t.Fatalf("local users %d: %v", len(users), err)
+			}
+			// The winning identity can refresh its profile without losing its role.
+			winner := users[0]
+			if err = e.store.SetUserRole(ctx, winner.ID, "creator"); err != nil {
+				t.Fatal(err)
+			}
+			refreshed, err := e.store.UpsertIdentity(ctx, store.Identity{Issuer: winner.Issuer, Subject: winner.Subject, Email: winner.Email, EmailVerified: true, Name: "Updated"})
+			if err != nil || refreshed.Role != "creator" || refreshed.DisplayName != "Updated" {
+				t.Fatalf("same-identity refresh %+v %v", refreshed, err)
+			}
+		})
 	}
 }

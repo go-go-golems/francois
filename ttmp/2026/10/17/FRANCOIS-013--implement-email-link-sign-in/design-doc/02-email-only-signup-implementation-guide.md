@@ -106,7 +106,7 @@ transaction:
 commit, clear browser-binding cookie, set portal-session cookie, redirect safely
 ```
 
-The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
+The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. After taking that lock, OIDC also rejects insertion of a new issuer/subject identity if the address is now owned locally; this protects either transaction order. Existing issuer/subject records may still refresh their mutable profile. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
 
 ```mermaid
 sequenceDiagram

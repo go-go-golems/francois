@@ -47,6 +47,18 @@ func (s *Store) UpsertIdentity(ctx context.Context, id Identity) (User, error) {
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1),0))`, id.Email); err != nil {
 		return User{}, err
 	}
+	// A signup may have committed while this OIDC callback waited for the
+	// email lock. Do not insert a second identity for its address. Existing
+	// issuer/subject accounts can still refresh their own mutable profile.
+	var collision bool
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))
+AND NOT EXISTS(SELECT 1 FROM users WHERE issuer=$2 AND subject=$3)`, id.Email, id.Issuer, id.Subject).Scan(&collision)
+	if err != nil {
+		return User{}, err
+	}
+	if collision {
+		return User{}, ErrNotFound
+	}
 	u, err := scanUser(tx.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
 VALUES($1,$2,$3,$4,$5,$6,now())
 ON CONFLICT(issuer,subject) DO UPDATE SET email=EXCLUDED.email,email_verified=EXCLUDED.email_verified,display_name=EXCLUDED.display_name,last_login_at=now()

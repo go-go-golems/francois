@@ -933,3 +933,51 @@ Read design-doc/02-email-only-signup-implementation-guide.md, then the provider/
 
 ### Technical details
 The only provider-route repair was `/v2/users/_search` to `/v2/users`, matching the pinned ListUsers annotation. Session/proof APIs and existing sign-in role guards were unchanged by the repair. Test email addresses use the isolated slop.test domain and Mailpit sink. No production mailbox was contacted.
+
+
+## Step 16: Prepare production release and fix the OIDC-first/second race
+
+Published the implementation branch and opened source PR #13 for the requested deployment. While CI qualified the source, automated Codex review identified a real P2 issue: if email signup committed first, a waiting OIDC callback acquired the advisory lock and unconditionally inserted a different issuer/subject with the same email. The lock serialized the transactions but only registration checked the collision. Repaired the OIDC insertion decision before merging or changing production.
+
+### Prompt Context
+**User prompt (verbatim):** "deploy to production"
+**User prompt (verbatim):** "when done, r write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).
+ Commit and push the bsidian vault when done (go-go-parc vault)."
+**Assistant interpretation:** Release the signup feature through the existing source/image/GitOps pipeline, verify production, then write and commit/push a detailed technical vault report.
+**Inferred user intent:** Make email registration available publicly and preserve a durable account of its architecture, implementation and actual rollout.
+
+### What I did
+- Pushed feat/email-only-signup and opened https://github.com/go-go-golems/francois/pull/13.
+- Read platform deployment instructions and inspected the live image, existing signup/email flags, credential delivery and startup migration contract. Confirmed migration 013 was not yet applied.
+- Read the actual automated review, including its inline comment on store/users.go. Added a post-lock check rejecting a new OIDC identity when another local user now owns the normalized address; existing issuer/subject profile refresh is preserved.
+- Added deterministic regression cases for both transaction orders and role-preserving refresh of the winning identity. Existing deliberate ambiguity fixtures now bypass provisioning explicitly through SQL.
+- Drafted a textbook-style project report and updated its concurrency explanation rather than preserving the original incomplete lock claim.
+
+### Why
+A shared lock enforces order, not the business decision. Both insertion paths need the relevant post-lock collision check. The central OIDC method changed, so a new full database-backed suite at this repair boundary is justified despite avoiding repeated intermediate checks.
+
+### What worked
+Source CI for the initial revision passed test, lint, dependency, secret, security and CodeQL checks while its image qualification was still running. The production read-only query confirmed migration 013 count zero and the previous image sha-5721ee8 remained live.
+
+### What didn't work
+`gh pr checks 13 --json name,state,link` failed with `unknown flag: --json` on the installed gh version. Used `gh pr view --json statusCheckRollup` and plain `gh pr checks` instead. Automated review exposed the incomplete duplicate-account protection before release; the report now describes both checks.
+
+### What I learned
+A mock-free provider journey does not cover a concurrent OIDC/local transaction ordering. Explicit two-order regression cases complement the existing eight-way claim/completion test.
+
+### What was tricky to build
+The OIDC callback must still refresh an existing issuer/subject identity, including role preservation, while refusing a new identity whose email was claimed by signup during its wait. The query distinguishes identity existence from email existence under the same normalized-email lock.
+
+### What warrants a second pair of eyes
+Review the new OIDC collision predicate and its existing-identity exception. Confirm review completion and all release checks before merge.
+
+### What should be done in the future
+Finish the repair qualification, publish the revision, merge source, await its immutable image, validate/merge its GitOps pin and verify the actual running image/migration/public sign-in page. Finish the vault report using observed production results and push the vault.
+
+### Code review instructions
+Start with store/users.go and TestEmailSignupAndOIDCRejectTheSecondIdentityInEitherOrder. The review comment is on PR #13; no production mail was requested or human factor changed during release preparation.
+
+### Technical details
+The runtime already supplies --migrate and --signup-allowed. Production rollout requires only an image pin; migration 013 adds a table and does not rewrite existing data. The source report remains a draft until the rollout result is known.
+
+Repair qualification: the full database-backed suite passed, including both transaction orders; lint reported zero issues and logcopter-check passed. No additional provider/browser rerun was needed for this SQL-only repair.
