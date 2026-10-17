@@ -20,6 +20,12 @@ type EmailLogin struct {
 	client                      *http.Client
 }
 
+type responseError int
+
+func (e responseError) Error() string {
+	return errors.Errorf("identity service returned HTTP %d", e).Error()
+}
+
 func NewEmailLogin(issuer, organization, token string) (*EmailLogin, error) {
 	u, err := url.Parse(issuer)
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
@@ -63,7 +69,7 @@ func (e *EmailLogin) call(ctx context.Context, method, path string, body, out an
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return errors.Errorf("identity service returned HTTP %d", res.StatusCode)
+		return responseError(res.StatusCode)
 	}
 	data, err = io.ReadAll(io.LimitReader(res.Body, 256*1024+1))
 	if err != nil || len(data) > 256*1024 {

@@ -39,10 +39,37 @@ type Identity struct {
 // UpsertIdentity provisions or refreshes a local user keyed by issuer and
 // subject. Role and disabled flags are never changed by a login.
 func (s *Store) UpsertIdentity(ctx context.Context, id Identity) (User, error) {
-	return scanUser(s.Pool.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	// Missing email is not an address: guests and OIDC identities may all
+	// have an empty placeholder. Coordinate ownership only for actual email.
+	if id.Email != "" {
+		if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1),0))`, id.Email); err != nil {
+			return User{}, err
+		}
+		// A signup may have committed while this OIDC callback waited for the
+		// email lock. Neither a new identity nor an existing identity's profile
+		// refresh may claim an address belonging to a different issuer/subject.
+		var collision bool
+		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1) AND (issuer<>$2 OR subject<>$3))`, id.Email, id.Issuer, id.Subject).Scan(&collision)
+		if err != nil {
+			return User{}, err
+		}
+		if collision {
+			return User{}, ErrNotFound
+		}
+	}
+	u, err := scanUser(tx.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
 VALUES($1,$2,$3,$4,$5,$6,now())
 ON CONFLICT(issuer,subject) DO UPDATE SET email=EXCLUDED.email,email_verified=EXCLUDED.email_verified,display_name=EXCLUDED.display_name,last_login_at=now()
 RETURNING `+userColumns, NewID("usr_"), id.Issuer, id.Subject, id.Email, id.EmailVerified, id.Name))
+	if err != nil {
+		return User{}, err
+	}
+	return u, tx.Commit(ctx)
 }
 
 func (s *Store) User(ctx context.Context, id string) (User, error) {

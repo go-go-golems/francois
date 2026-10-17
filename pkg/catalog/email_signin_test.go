@@ -324,7 +324,9 @@ func TestEmailSignupEligibilityAndLimits(t *testing.T) {
 		if mode == "ambiguous" {
 			email = u.Email
 			_ = e.store.SetUserRole(ctx, u.ID, "subscriber")
-			_, err := e.store.UpsertIdentity(ctx, store.Identity{Issuer: u.Issuer, Subject: "another", Email: u.Email, EmailVerified: true})
+			// Model a pre-existing ambiguous record, bypassing provisioning's
+			// new-identity collision guard deliberately for this fixture.
+			_, err := e.store.Pool.Exec(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified) VALUES($1,$2,'another',$3,true)`, store.NewID("usr_"), u.Issuer, u.Email)
 			if err != nil {
 				t.Fatal(err)
 			}

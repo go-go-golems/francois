@@ -1,0 +1,18 @@
+GOWORK=off golangci-lint run -v
+level=info msg="golangci-lint has version 2.4.0 built with go1.26.1 from (unknown, modified: ?, mod sum: \"h1:qz6O6vr7kVzXJqyvHjHSz5fA3D+PM8v96QU5gxZCNWM=\") on (unknown)"
+level=info msg="[config_reader] Config search paths: [./ /home/manuel/code/wesen/go-go-golems/francois /home/manuel/code/wesen/go-go-golems /home/manuel/code/wesen /home/manuel/code /home/manuel /home /]"
+level=info msg="[config_reader] Used config file .golangci.yml"
+level=info msg="[config_reader] Module name \"github.com/go-go-golems/francois\""
+level=info msg="maxprocs: Leaving GOMAXPROCS=8: CPU quota undefined"
+level=info msg="[goenv] Read go env for 5.486253ms: map[string]string{\"GOCACHE\":\"/home/manuel/.cache/go-build\", \"GOROOT\":\"/home/manuel/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.9.linux-amd64\"}"
+level=info msg="[lintersdb] Active 9 linters: [errcheck exhaustive gofmt govet ineffassign nonamedreturns predeclared staticcheck unused]"
+level=info msg="[loader] Go packages loading at mode 8767 (name|deps|exports_file|types_sizes|compiled_files|files|imports) took 4.678679531s"
+level=info msg="[runner/filename_unadjuster] Pre-built 0 adjustments in 29.708539ms"
+level=info msg="[linters_context/goanalysis] analyzers took 20.664835833s with top 10 stages: buildir: 3.851028405s, S1038: 716.211309ms, unused: 631.070573ms, QF1004: 559.516534ms, gofmt: 554.009386ms, exhaustive: 308.237617ms, QF1010: 299.30938ms, SA4030: 285.218277ms, QF1012: 275.727341ms, SA1004: 247.009673ms"
+level=info msg="[runner] processing took 3.436µs with stages: max_from_linter: 564ns, max_same_issues: 454ns, exclusion_rules: 446ns, exclusion_paths: 276ns, nolint_filter: 245ns, path_relativity: 166ns, source_code: 163ns, path_absoluter: 161ns, filename_unadjuster: 153ns, severity-rules: 135ns, path_prettifier: 128ns, sort_results: 128ns, diff: 125ns, invalid_issue: 43ns, max_per_file_from_linter: 43ns, path_shortener: 42ns, cgo: 41ns, generated_file_filter: 41ns, fixer: 41ns, uniq_by_line: 41ns"
+level=info msg="[runner] linters took 2.263718592s with stages: goanalysis_metalinter: 2.263678139s"
+0 issues.
+level=info msg="File cache stats: 0 entries of total size 0B"
+level=info msg="Memory: 71 samples, avg is 130.1MB, max is 496.2MB"
+level=info msg="Execution took 6.978086618s"
+GOWORK=off go tool logcopter-gen -area-prefix go-go-golems.francois -strip-prefix github.com/go-go-golems/francois -check ./pkg/...

@@ -1,0 +1,29 @@
+GOWORK=off golangci-lint run -v
+level=info msg="golangci-lint has version 2.4.0 built with go1.26.1 from (unknown, modified: ?, mod sum: \"h1:qz6O6vr7kVzXJqyvHjHSz5fA3D+PM8v96QU5gxZCNWM=\") on (unknown)"
+level=info msg="[config_reader] Config search paths: [./ /home/manuel/code/wesen/go-go-golems/francois /home/manuel/code/wesen/go-go-golems /home/manuel/code/wesen /home/manuel/code /home/manuel /home /]"
+level=info msg="[config_reader] Used config file .golangci.yml"
+level=info msg="[config_reader] Module name \"github.com/go-go-golems/francois\""
+level=info msg="maxprocs: Leaving GOMAXPROCS=8: CPU quota undefined"
+level=info msg="[goenv] Read go env for 7.24957ms: map[string]string{\"GOCACHE\":\"/home/manuel/.cache/go-build\", \"GOROOT\":\"/home/manuel/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.9.linux-amd64\"}"
+level=info msg="[lintersdb] Active 9 linters: [errcheck exhaustive gofmt govet ineffassign nonamedreturns predeclared staticcheck unused]"
+level=info msg="[loader] Go packages loading at mode 8767 (compiled_files|name|types_sizes|deps|exports_file|files|imports) took 350.686441ms"
+level=info msg="[runner/filename_unadjuster] Pre-built 0 adjustments in 19.125678ms"
+level=info msg="[linters_context/goanalysis] analyzers took 10.520626396s with top 10 stages: buildir: 2.621879301s, S1038: 480.360715ms, gofmt: 346.295655ms, QF1004: 344.134925ms, unused: 335.177868ms, QF1005: 215.666797ms, QF1010: 208.680407ms, QF1008: 192.478841ms, SA4030: 186.958061ms, SA1012: 166.110674ms"
+level=info msg="[runner] Processors filtering stat (in/out): invalid_issue: 3/3, nolint_filter: 3/3, fixer: 3/3, source_code: 3/3, sort_results: 3/3, exclusion_paths: 3/3, generated_file_filter: 3/3, max_per_file_from_linter: 3/3, max_same_issues: 3/3, severity-rules: 3/3, cgo: 3/3, path_relativity: 3/3, exclusion_rules: 3/3, diff: 3/3, path_shortener: 3/3, path_prettifier: 3/3, filename_unadjuster: 3/3, uniq_by_line: 3/3, max_from_linter: 3/3, path_absoluter: 3/3"
+level=info msg="[runner] processing took 827.045µs with stages: nolint_filter: 743.619µs, source_code: 36.777µs, generated_file_filter: 23.847µs, path_relativity: 4.857µs, max_same_issues: 3.74µs, sort_results: 2.605µs, uniq_by_line: 2.183µs, path_shortener: 1.88µs, invalid_issue: 1.17µs, max_from_linter: 1.157µs, max_per_file_from_linter: 881ns, cgo: 827ns, path_prettifier: 543ns, filename_unadjuster: 533ns, path_absoluter: 501ns, fixer: 483ns, exclusion_paths: 443ns, exclusion_rules: 390ns, diff: 366ns, severity-rules: 243ns"
+level=info msg="[runner] linters took 1.394594286s with stages: goanalysis_metalinter: 1.393662904s"
+pkg/catalog/email_signup_test.go:33:33: ST1013: should use constant http.StatusUnauthorized instead of numeric literal 401 (staticcheck)
+		http.Error(w, "unauthorized", 401)
+		                              ^
+pkg/catalog/email_signup_test.go:66:30: ST1013: should use constant http.StatusConflict instead of numeric literal 409 (staticcheck)
+			http.Error(w, "conflict", 409)
+			                          ^
+pkg/catalog/email_signup_test.go:111:31: ST1013: should use constant http.StatusPreconditionFailed instead of numeric literal 412 (staticcheck)
+			http.Error(w, "not ready", 412)
+			                           ^
+3 issues:
+* staticcheck: 3
+level=info msg="File cache stats: 1 entries of total size 11.4KiB"
+level=info msg="Memory: 19 samples, avg is 278.6MB, max is 487.6MB"
+level=info msg="Execution took 1.772362312s"
+make: *** [Makefile:23: lint] Error 1

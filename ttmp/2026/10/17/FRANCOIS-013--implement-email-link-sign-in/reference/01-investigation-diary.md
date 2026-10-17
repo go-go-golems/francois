@@ -752,3 +752,321 @@ Review social-production-rollout.json and social-production-browser.json for exa
 ### Technical details
 
 Source PR #12; Terraform PR #36 (e41283c2); k3s PR #366 (ed322cfb). Google IDP 395005753389219858; GitHub IDP 395005753372442642. These IDs are public configuration, not credentials. All authorization query values, cookies, codes and PATs are excluded from the saved browser/rollout receipts.
+
+
+## Step 12: Design email-only registration before implementation
+
+The requested email address had no local account, so the existing form acknowledged the request without sending mail. The user now explicitly requests email-only signup. Added a separate design document for the new-account path, reusing the existing form and confirmation endpoint while keeping unverified identities outside the local users table.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, add a new desiegn doc for that and implement it, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Implement passwordless registration for new email addresses, with a new ticket design and detailed implementation history.
+**Inferred user intent:** A visitor can create an ordinary account by confirming an emailed link without Google/GitHub or a password.
+
+### What I did
+- Read the current provider, store, handlers, tests and pinned v4.16.1 registration/email proto contracts.
+- Added design-doc/02-email-only-signup-implementation-guide.md through docmgr.
+- Chose one durable registration reservation/current-flow table, first-use email verification, subsequent email OTP and transactional local provisioning.
+
+### Why
+Email OTP requires a verified address. An unverified account cannot safely be passed directly into the existing session challenge. Persisting the reserved provider subject before calling the provider makes retries recoverable without adopting identities by email.
+
+### What worked
+The existing CSRF/browser binding, confirmation GET/POST separation, rate limits, safe return paths and no-store rendering can be reused.
+
+### What didn't work
+`cat pkg/catalog/templates/signin.tmpl` failed with `No such file or directory`; the actual template is pkg/catalog/web/templates/signin.tmpl. An attempted remote fetch of user_human_email_v2.go returned a cache miss; the existing local pinned source contains user_v2_email.go instead.
+
+### What I learned
+The provider API limits email to 200 characters. Signup must also distinguish blocked local records from a genuinely absent local account.
+
+### What was tricky to build
+The first verification can succeed before local provisioning completes. The design keeps the reserved identity and permits a fresh OTP proof on retry rather than inventing a verified-email flag or merging by email.
+
+### What warrants a second pair of eyes
+Review concurrency between social provisioning and signup completion, the signup flag at confirmation, and retry handling after provider-side success.
+
+### What should be done in the future
+Implement the design, validate against the isolated provider/mail sink, then qualify the code with database-backed tests and lint.
+
+### Code review instructions
+Start with the new design document and existing email_signin.go, identity/email.go and store/email_signins.go. No production behavior changes at this checkpoint.
+
+### Technical details
+The new table stores digests and provider identifiers only; mailbox codes and service credentials are never persisted. Existing human factor enrollment is outside the new-identity scope.
+
+
+## Step 13: Implement the registration path and prepare one validation gate
+
+Implemented email-only signup in the existing form and request/confirmation routes. A single new table reserves the provider subject and holds its current browser-bound attempt. The provider creates an unverified human, and a successful confirmation verifies the address, enrolls email OTP and creates a local ordinary user plus session transactionally. No production changes or mail requests were made.
+
+The user clarified the validation cadence while this work was underway. The remaining work is implemented first, followed by one combined qualification gate rather than repeatedly testing every edit. This checkpoint records implementation, not a claim of complete validation.
+
+### Prompt Context
+See Step 12 for the implementation request.
+**User prompt (verbatim):** "no need to overtest at every step. Implement the design doc, and then test"
+**Assistant interpretation:** Finish the feature before running its combined final validation.
+**Inferred user intent:** Keep the work focused on shipping rather than repeated intermediate checks.
+**Commit (design):** 2464600 — docs: design email-only registration and verification flow.
+
+### What I did
+- Added identity/email_signup.go for reserved-subject creation, collision checks, resend, verification and idempotent OTP enrollment.
+- Added migration 013 and store/email_registrations.go for stable reservations, hashed flow replacement, one-time claims and atomic local user/session creation.
+- Branched email_signin.go only for a genuinely absent local address when SignupAllowed is true. Disabled, unverified, ambiguous and guest local records cannot fall through into signup.
+- Shared a short normalized-email transaction lock with ordinary OIDC provisioning. Registration rejects any local account that appeared while confirmation was pending; it never updates or promotes an existing account.
+- Updated the form guidance and 200-character input limit, production operator docs and both design guides.
+- Added database-backed regression cases and a real local browser/mail-sink journey, ready for the combined gate.
+
+### Why
+The durable reservation is necessary to recover provider-side success without creating a second identity or assuming mailbox ownership. Reusing the current confirmation page preserves scanner safety and the existing CSRF/browser-cookie contract. Rejecting all newly present local accounts is simpler than preserving roles across two concurrent provisioning paths; the next request can use normal sign-in.
+
+### What worked
+An early existing-authentication check passed after allowing the required loopback network access: `go test ./pkg/catalog/identity` and the database-backed `go test ./pkg/catalog -run 'TestEmail|TestSharedSocial' -count=1`. These checks preceded the new signup tests and do not qualify the completed feature.
+
+### What didn't work
+The first sandboxed `go test ./pkg/catalog/identity` failed before executing assertions: `httptest: failed to listen on a port: listen tcp6 [::1]:0: socket: operation not permitted`. The same existing tests passed with the permitted network-enabled execution. While preparing the local-preview script, a mechanical filename replacement also changed the CLI flag to `--signup-database-url-file`; corrected it back to `--database-url-file` before the final validation run.
+
+### What I learned
+A pending registration must remain recoverable after the provider has verified the address but OTP enrollment or local commit fails. An empty provider-session ID identifies initial email verification; a nonempty ID selects the existing fresh-OTP session proof, so no separate purpose column is necessary.
+
+### What was tricky to build
+Local account creation must remain atomic with session creation and reject concurrent social provisioning. The email advisory lock is held only for local SQL operations, never provider/network I/O. Confirmation rechecks expiry after acquiring that lock. Pending links are replaced/claimed atomically and stale provider sessions are cleaned up outside transactions.
+
+### What warrants a second pair of eyes
+Review the provider-state checks, collision rejection, superseded-flow attachment condition, signup-disable behavior and retry following provider verification. The new tests are authored but not yet qualified at this checkpoint.
+
+### What should be done in the future
+Run the full Go/database/build/lint gate and real pinned-provider first-signup/second-login journey, repair material failures and record the result.
+
+### Code review instructions
+Start with email_signup.go, identity/email_signup.go and store/email_registrations.go; then read the small existing-handler/provisioning changes and migration 013. Use scripts 12 and 13 for the isolated provider integration.
+
+### Technical details
+New registrations reuse the existing process/global/client/recipient limits and five-minute browser-bound links. No password, bearer credential, plaintext flow secret or mailbox code is stored in PostgreSQL or ticket evidence. Existing unrelated human OTP factors and subscriptions are unchanged.
+
+
+## Step 14: Combined qualification exposed a real-provider route mismatch
+
+The full PostgreSQL-backed Go suite and build passed for implementation checkpoint 19dc040. The real-provider browser journey then failed to receive the first message, and the preview logged a status-only upstream HTTP 405. Compared the exact pinned REST annotation: ListUsers uses POST /v2/users, while the implementation and fake had incorrectly assumed /v2/users/_search. Corrected both and the design reference. This is why the actual pinned-provider journey is part of the feature's final qualification.
+
+### Prompt Context
+See Steps 12 and 13 for the implementation and validation-cadence requests.
+**Commit (code):** 19dc040 — feat: register new users through verified email links.
+
+### What I did
+- Ran `TEST_DATABASE_URL='postgres://emailtest:emailtest@127.0.0.1:5437/postgres?sslmode=disable' go test ./... -count=1`; all packages passed, including the new signup regression cases.
+- Ran `go build ./...` successfully, followed by `make lint logcopter-check`; lint identified three numeric HTTP status literals in the new fake.
+- Ran script 13 against the real isolated stack. It reported `Local email-signup verification failed at first email (Error); no code, token or link printed.` The server's diagnostic was `identity service returned HTTP 405`.
+- Corrected the collision-search REST route from the pinned proto and replaced the flagged test literals with net/http constants. No production operations were performed.
+
+### Why
+A mock can reproduce a mistaken contract. The pinned provider checks both its real routing and dedicated service-user permissions, while the browser/mail-sink journey checks that the confirmation link is usable.
+
+### What worked
+The full database-backed suite passed. The build passed. The error was safely bounded to HTTP status without leaking provider bodies, codes, links or credentials.
+
+### What didn't work
+`make lint logcopter-check` stopped at lint with ST1013 for HTTP 401, 409 and 412 literals. The first real signup attempt failed before email delivery because POST /v2/users/_search is not the pinned REST route. Both issues are repaired pending focused revalidation; logcopter-check had not yet run because make stopped at lint.
+
+### What I learned
+The older management API's _search naming must not be inferred for the v2 user service. Its REST annotation is authoritative.
+
+### What was tricky to build
+The generic acknowledgement intentionally hides provider details, so the mail-sink assertion and safe server diagnostic must be read together to identify delivery failures without weakening enumeration protection.
+
+### What warrants a second pair of eyes
+Confirm the remaining provider calls against their pinned annotations and retain the integration test as a boundary check.
+
+### What should be done in the future
+Rerun the failed integration and lint/logger gate, plus the narrowly affected signup tests; the already successful full suite/build need repetition only if subsequent functional repairs justify it.
+
+### Code review instructions
+See sources/zitadel-email-login/v4.16.1/proto/zitadel/user/v2/user_service.proto, ListUsers annotation, and identity/email_signup.go.
+
+### Technical details
+Full suite output is recorded separately from browser receipts; no raw notification content is checked into the ticket.
+
+
+## Step 15: Qualify first signup and repeat login against the actual provider
+
+The repaired implementation passed the final affected checks and the complete isolated browser journey against ZITADEL v4.16.1 and Mailpit. An actual first-use verification email was delivered, repeated confirmation GETs created no local account, the confirmation POST created exactly one ordinary account/session, replay failed, and a second actual email OTP signed into that same account. Desktop/mobile screenshots and a code-free receipt are saved in sources/implementation.
+
+This completes local implementation and qualification. Production remains on its prior release; neither real-user mail nor production configuration was changed during this work.
+
+### Prompt Context
+See Steps 12 and 13 for the exact implementation and test-cadence requests.
+
+### What I did
+- Reran the failed real-provider browser integration using script 13; all five recorded assertions passed.
+- Reran `make lint logcopter-check`: zero lint issues and logger-generation check passed.
+- Reran only the affected database-backed signup cases with `go test ./pkg/catalog -run 'TestEmailSignup|TestEmailRegistration' -count=1`: passed in 2.044 seconds.
+- Preserved the earlier full-suite success plus initial/final lint output, sanitized browser receipt and four desktop/mobile screenshots.
+- Updated docmgr task/changelog, related the new implementation files to the signup design and validated ticket metadata.
+
+### Why
+The full suite/build already passed before the provider-route and test-status corrections. Focused revalidation resolves those failures without repeating unrelated tests. Real mail-sink and browser checks establish behavior that mocks alone cannot demonstrate.
+
+### What worked
+- Full PostgreSQL-backed `go test ./... -count=1`: all packages passed at implementation checkpoint 19dc040; final affected signup tests passed after the route correction.
+- `go build ./...`: passed. The restarted local preview also compiled and ran the final route correction.
+- `make lint logcopter-check`: passed after the three status-constant fixes.
+- Real provider: first verification message delivered; no local user before proof; read-only/no-store confirmation GET; exactly one ordinary account/session after POST; replay rejected; subsequent real OTP mail signed into the same account.
+- Regression coverage includes wrong browser/code, replacement, interrupted enrollment recovery, signup disablement, disabled/unverified/ambiguous local accounts, provider-email collisions, changed provider identity, expiry, local collision and eight-way claim/completion races.
+
+### What didn't work
+The initial route/lint failures and their exact repairs are preserved in Step 14. No additional failure occurred during the final rerun.
+
+### What I learned
+The same dedicated IAM_LOGIN_CLIENT credential scope supports the required pinned-provider registration, verification and factor-enrollment operations in the isolated environment. A new account without a password becomes usable through email verification and the subsequent OTP path.
+
+### What was tricky to build
+Successful provider verification and local transaction commit are separate boundaries. Recovery preserves the reserved subject and requires a fresh OTP proof, while refusing to adopt a different provider or local identity by email.
+
+### What warrants a second pair of eyes
+Review the cross-provider/local collision boundary and five-minute one-shot flow. The provider test proves isolated delivery only, not acceptance or inbox placement by an external production mailbox.
+
+### What should be done in the future
+Merge/release and deploy separately when requested, including migration 013 and the existing signup flag. No additional worker, service or authentication page is needed.
+
+### Code review instructions
+Read design-doc/02-email-only-signup-implementation-guide.md, then the provider/store additions and small handler changes. sources/implementation/email-signup-browser.json describes the real journey without mailbox codes, tokens or links. The local preview remains available on http://localhost:18795/signin in tmux francois-email-signup-013.
+
+### Technical details
+The only provider-route repair was `/v2/users/_search` to `/v2/users`, matching the pinned ListUsers annotation. Session/proof APIs and existing sign-in role guards were unchanged by the repair. Test email addresses use the isolated slop.test domain and Mailpit sink. No production mailbox was contacted.
+
+
+## Step 16: Prepare production release and fix the OIDC-first/second race
+
+Published the implementation branch and opened source PR #13 for the requested deployment. While CI qualified the source, automated Codex review identified a real P2 issue: if email signup committed first, a waiting OIDC callback acquired the advisory lock and unconditionally inserted a different issuer/subject with the same email. The lock serialized the transactions but only registration checked the collision. Repaired the OIDC insertion decision before merging or changing production.
+
+### Prompt Context
+**User prompt (verbatim):** "deploy to production"
+**User prompt (verbatim):** "when done, r write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).
+ Commit and push the bsidian vault when done (go-go-parc vault)."
+**Assistant interpretation:** Release the signup feature through the existing source/image/GitOps pipeline, verify production, then write and commit/push a detailed technical vault report.
+**Inferred user intent:** Make email registration available publicly and preserve a durable account of its architecture, implementation and actual rollout.
+
+### What I did
+- Pushed feat/email-only-signup and opened https://github.com/go-go-golems/francois/pull/13.
+- Read platform deployment instructions and inspected the live image, existing signup/email flags, credential delivery and startup migration contract. Confirmed migration 013 was not yet applied.
+- Read the actual automated review, including its inline comment on store/users.go. Added a post-lock check rejecting a new OIDC identity when another local user now owns the normalized address; existing issuer/subject profile refresh is preserved.
+- Added deterministic regression cases for both transaction orders and role-preserving refresh of the winning identity. Existing deliberate ambiguity fixtures now bypass provisioning explicitly through SQL.
+- Drafted a textbook-style project report and updated its concurrency explanation rather than preserving the original incomplete lock claim.
+
+### Why
+A shared lock enforces order, not the business decision. Both insertion paths need the relevant post-lock collision check. The central OIDC method changed, so a new full database-backed suite at this repair boundary is justified despite avoiding repeated intermediate checks.
+
+### What worked
+Source CI for the initial revision passed test, lint, dependency, secret, security and CodeQL checks while its image qualification was still running. The production read-only query confirmed migration 013 count zero and the previous image sha-5721ee8 remained live.
+
+### What didn't work
+`gh pr checks 13 --json name,state,link` failed with `unknown flag: --json` on the installed gh version. Used `gh pr view --json statusCheckRollup` and plain `gh pr checks` instead. Automated review exposed the incomplete duplicate-account protection before release; the report now describes both checks.
+
+### What I learned
+A mock-free provider journey does not cover a concurrent OIDC/local transaction ordering. Explicit two-order regression cases complement the existing eight-way claim/completion test.
+
+### What was tricky to build
+The OIDC callback must still refresh an existing issuer/subject identity, including role preservation, while refusing a new identity whose email was claimed by signup during its wait. The query distinguishes identity existence from email existence under the same normalized-email lock.
+
+### What warrants a second pair of eyes
+Review the new OIDC collision predicate and its existing-identity exception. Confirm review completion and all release checks before merge.
+
+### What should be done in the future
+Finish the repair qualification, publish the revision, merge source, await its immutable image, validate/merge its GitOps pin and verify the actual running image/migration/public sign-in page. Finish the vault report using observed production results and push the vault.
+
+### Code review instructions
+Start with store/users.go and TestEmailSignupAndOIDCRejectTheSecondIdentityInEitherOrder. The review comment is on PR #13; no production mail was requested or human factor changed during release preparation.
+
+### Technical details
+The runtime already supplies --migrate and --signup-allowed. Production rollout requires only an image pin; migration 013 adds a table and does not rewrite existing data. The source report remains a draft until the rollout result is known.
+
+Repair qualification: the full database-backed suite passed, including both transaction orders; lint reported zero issues and logcopter-check passed. No additional provider/browser rerun was needed for this SQL-only repair.
+
+
+## Step 17: Close refresh and concurrent-provider-creation edge cases
+
+Renewed review of 8d84420 completed with two additional P2 findings. The OIDC exception for an existing identity was too broad: a provider email change could still assign another account's address. A separate race could leave both overlapping first-signup requests with unusable links when the superseded request won provider creation. Repaired both decisions before merging or deploying.
+
+### Prompt Context
+See Step 16 for the production deployment and vault-report requests.
+**Commit (previous repair):** 8d84420 — fix: reject OIDC identities that lose the signup email race.
+
+### What I did
+- Replaced the OIDC collision predicate with an exact different-issuer/subject owner check on the requested normalized address. It now applies equally to new identities and existing profile refreshes.
+- On provider creation HTTP 409, re-read only the already reserved subject and reuse the ordinary identity/state/address checks before resending the current link. Also handle a collision search that sees our reserved subject created since the first GET.
+- Added a refresh-collision regression and provider tests for both successful recovery variants plus wrong organization, changed email, wrong subject, inactive identity and unrelated search collision.
+- Updated the design and project-report explanations to describe the actual final collision and recovery decisions.
+
+### Why
+An existing identity is not permission to take another local account's email. Concurrent creation must not leave only an obsolete link when the current request can safely recover its own reserved identity. Neither repair adopts a subject discovered by email or bypasses the required mailbox proof.
+
+### What worked
+The previous complete suite/lint gate established the initial repair. The renewed review then identified distinct missing cases rather than a failure of the earlier two-order tests.
+
+### What didn't work
+The initial OIDC repair's existing-identity exception still allowed colliding refreshes. The original provider create-conflict behavior required a manual retry even though a validated re-read could issue the current link. Both review findings are addressed in this checkpoint, pending its combined affected-code qualification.
+
+### What I learned
+Identity existence and address ownership must be checked independently. A scoped provider-email search may observe the reserved identity created between reads; this is recoverable only because the subject was persisted before provider I/O.
+
+### What was tricky to build
+Creation recovery must re-read and validate the reserved subject, not trust the identity returned by email search. A 409 caused by another username/account cannot be converted into adoption of that identity. The retry remains bounded by the existing request deadline and adds no worker or retry loop.
+
+### What warrants a second pair of eyes
+Review the post-lock different-owner predicate and both paths leading to provider re-read. Verify that all mismatching identity cases send no replacement message.
+
+### What should be done in the future
+Run one combined qualification gate for these repairs, push the final source revision, complete review/CI and resume the already authorized rollout.
+
+### Code review instructions
+Read store/users.go, TestOIDCRefreshCannotTakeAnotherAccountsEmail, identity/email_signup.go and TestRegistrationRecoversOnlyItsReservedIdentityAfterConcurrentCreation.
+
+### Technical details
+Provider creation recovery recognizes only HTTP 409 and an email-search result equal to the reserved subject; other errors and unrelated results remain failures. After a successful re-read, the same validated unverified resend or verified OTP path handles the current attempt.
+
+Final repair qualification: the complete PostgreSQL-backed Go suite passed, including the new refresh and concurrent-provider-creation cases; lint reported zero issues and logcopter-check passed. Receipts are retained as email-signup-final-review-{tests,lint}.txt.
+
+
+## Step 18: Preserve missing-email OIDC and assess the legacy-data comment
+
+The next review completed with a valid missing-email case and a legacy-duplicate compatibility suggestion. Empty email claims are valid for native OIDC identities, and demo guests use the same empty schema placeholder. Restricted email coordination to actual nonempty addresses and added coverage for two missing-email identities, their profile refreshes and an existing guest.
+
+The legacy-data suggestion does not require an exception in this deployment: a read-only production query counted zero duplicate nonempty human-email groups. The repository explicitly says not to add backward-compatibility branches unless requested. Kept the strict different-owner rule for actual addresses and documented this decision rather than adding an unused legacy-account path.
+
+### Prompt Context
+See Step 16. This remains the authorized production rollout and report, not a request to design compatibility behavior for nonexistent production records.
+
+### What I did
+- Wrapped the normalized-email lock and ownership query in a nonempty-email condition; issuer/subject upsert remains unchanged for identities without email.
+- Added TestOIDCWithoutEmailDoesNotCollideWithGuests covering creation and refresh while guest placeholders exist.
+- Assessed the legacy-duplicate finding against the production aggregate (zero groups) and the explicit no-compatibility instruction. No personal addresses or credentials were printed.
+- Updated the report with the missing-email distinction and the data-based reason for declining a legacy exception.
+
+### Why
+An empty optional claim does not identify a mailbox and must not participate in address ownership. Preserving nonexistent legacy collisions would add conditional behavior without a current operational need.
+
+### What worked
+The stricter real-address check and concurrent creation recovery already passed the full suite and lint at f8e97b3. Production preflight confirmed no duplicate human emails before rollout.
+
+### What didn't work
+The prior collision predicate interpreted empty guest placeholders as owned addresses, blocking otherwise valid no-email OIDC identities. The reviewer also proposed a compatibility exception that is inapplicable to current production data; it was deliberately not implemented. A redundant attempt to fetch a single review comment through a nonmatching REST path returned HTTP 404; the full comments endpoint supplied the finding successfully.
+
+### What I learned
+Optional OIDC email and a verified mailbox proof have different contracts. Account identity remains issuer/subject even when no email is provided.
+
+### What was tricky to build
+The email collision protection must not become a requirement that every OIDC provider return an email claim. Scope the extra coordination to its actual resource: a nonempty address.
+
+### What warrants a second pair of eyes
+The new guard should cover both the lock and collision query; real-address ownership remains strict. Deliberate ambiguous fixtures still exercise fail-closed email sign-in.
+
+### What should be done in the future
+Complete affected authentication tests/lint, resolve the assessed comments and proceed with source/image/GitOps release checks. No additional compatibility layer is planned.
+
+### Code review instructions
+Read UpsertIdentity and TestOIDCWithoutEmailDoesNotCollideWithGuests, along with the current report's concurrency section.
+
+### Technical details
+The preflight count excludes guests and empty strings, groups by lower(email) and returned zero duplicate groups. Missing-email identities are still ineligible for the email-link path, which requires an actual verified address and matching provider identity.
+
+Qualification: affected database-backed TestOIDC/TestEmail cases passed in 4.705 seconds; lint reported zero issues and logcopter-check passed. The full remote release suite will qualify the final source revision before merge.
