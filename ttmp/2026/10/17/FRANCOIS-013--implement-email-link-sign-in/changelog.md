@@ -23,3 +23,7 @@ Implemented ZITADEL-backed magic links, Final forms, transactional flow/session 
 ## 2026-10-17
 
 Implemented and qualified ZITADEL email-only sign-in with real isolated v4.16.1 SMTP, Chromium desktop/mobile flow, concurrency security tests and full checks; default disabled in production.
+
+## 2026-10-17
+
+Read-only remote verification found active SES SMTP and existing Vault credentials; documented actual sender/ownership without exposing secrets or sending mail.

@@ -364,3 +364,64 @@ Read the implementation commit and subsequent browser fix, then sources/implemen
 - Isolated provider/mail/DB stack: tmux francois-email-013-infra.
 - Supported browser exception: Origin null AND Sec-Fetch-Site same-origin AND Sec-Fetch-Mode navigate, plus valid independent CSRF/binding.
 - Test browser screenshots contain page content only; no address bar or live link/code/token captures.
+
+## Step 6: Verify the existing remote SES configuration
+
+The user asked where remote mail delivery is configured in the K3s or shared Terraform repositories. Read-only inspection of both checkouts, Vault metadata and the live ZITADEL email-provider API confirmed that SMTP already exists. The earlier conversation had not checked that remote state; no new mail service needs to be provisioned for the feature.
+
+ZITADEL has one active SMTP provider using Amazon SES at email-smtp.us-east-1.amazonaws.com:587, TLS enabled, with sender no-reply@mail.scapegoat.dev and display name The Scapegoat. The Vault SMTP record exists. This is configuration evidence, not a claim that a real external email was delivered; no test mail or configuration mutation was performed.
+
+### Prompt Context
+
+**User prompt (verbatim):** "how is it setup remotely in ~/code/wesen/2026-03-27--hetzner-k3s or maybe ~/code/wesen/terraform"
+**Assistant interpretation:** Identify existing remote SMTP ownership, runtime configuration and secret location without exposing credentials.
+**Inferred user intent:** Reuse the actual production mail infrastructure for the newly implemented email-login flow.
+**Current implementation:** 2f2fe66 and 0b1c302; feature remains disabled in production.
+
+### What I did
+
+- Read the K3s AGENTS.md and inspected its ZITADEL Helm Application and VaultStaticSecret templates.
+- Read shared Terraform's SES production module, variables, README and SMTP playbook; SMTP credentials are explicitly not managed in Terraform state.
+- Used the existing admin credential in memory to call the read-only email-provider search API. Printed and saved only provider state, host, sender, TLS and description; no credentials or full raw response.
+- Listed Vault child paths and inspected only key names and nonsecret fields at kv/apps/zitadel/prod/smtp. SMTP username/password were not printed or persisted.
+- Inspected live namespace CronJob/VSO metadata. Found the branding reconciler and database/bootstrap secret mappings, but no SMTP reconciler in this namespace or the inspected repository files.
+- Saved the redacted result in sources/implementation/remote-smtp-check.json and corrected the production runbook's current-state description.
+
+### Why
+
+A local Mailpit test proves the implementation, while production SMTP ownership is a different question. The live provider endpoint establishes what ZITADEL actually uses; local Terraform and GitOps files explain infrastructure ownership without assuming that every live provider setting is declared in those checkouts.
+
+### What worked
+
+The live API returned one EMAIL_PROVIDER_ACTIVE SMTP configuration, described as Vault-managed SES for The Scapegoat. Vault lists runtime, smtp and terraform records for ZITADEL. The shared SES documentation identifies the existing mail.scapegoat.dev sender domain and us-east-1 region.
+
+### What didn't work
+
+The recorded production-document path terraform/zitadel/francois/envs/prod/main.tf is absent from the current local Terraform checkout. An initial SES README probe also guessed a nonexistent per-environment README; the actual SES README is at ses/README.md. Neither missing path prevented verification through the authoritative live provider API and the existing SES tree.
+
+### What I learned
+
+Remote SMTP is already configured, separately from the new Francois login credential and supporter OTP enrollment. The inspected GitOps secret template only injects ZITADEL database and bootstrap-password fields; it does not prove automatic SMTP rotation/reconciliation. The existing branding job is not an SMTP sync job.
+
+### What was tricky to build
+
+No code was built or deployed. The main investigation boundary was reading live configuration while preventing secret values from entering command output or saved evidence. Filtering happened in the process before output, rather than printing a raw Vault/API payload and redacting afterward.
+
+### What warrants a second pair of eyes
+
+Production enablement still requires the dedicated IAM_LOGIN_CLIENT credential and controlled supporter factor enrollment. Existing mail has Scapegoat branding; changing a shared instance-wide sender could affect other applications and was not done here.
+
+### What should be done in the future
+
+Use the already active provider during an explicitly authorized production login rollout. An external delivery test was not part of this read-only inquiry.
+
+### Code review instructions
+
+Review remote-smtp-check.json and the production runbook paragraph. Check the referenced SES README and K3s runtime-secret template; no application or remote infrastructure change is included.
+
+### Technical details
+
+- Live read endpoint: POST /admin/v1/email/_search with an empty search body; this is a read operation.
+- SMTP credential record: kv/apps/zitadel/prod/smtp.
+- Sender identity: mail.scapegoat.dev; SMTP region: us-east-1; port 587 with TLS enabled.
+- Existing login feature default remains off; no external message was sent.

@@ -1,0 +1,37 @@
+{
+  "observedDate": "2026-10-17",
+  "readOnly": true,
+  "testEmailSent": false,
+  "zitadelIssuer": "https://zitadel.yolo.scapegoat.dev",
+  "provider": {
+    "id": "383508819222724847",
+    "state": "EMAIL_PROVIDER_ACTIVE",
+    "description": "Vault-managed SES for The Scapegoat",
+    "smtpHost": "email-smtp.us-east-1.amazonaws.com:587",
+    "senderAddress": "no-reply@mail.scapegoat.dev",
+    "senderName": "The Scapegoat",
+    "tls": true
+  },
+  "vaultPath": "kv/apps/zitadel/prod/smtp",
+  "vaultFieldNames": [
+    "configuration_set",
+    "from_address",
+    "from_name",
+    "host",
+    "password",
+    "port",
+    "reply_to",
+    "ssl",
+    "starttls",
+    "username"
+  ],
+  "credentialsSaved": false,
+  "liveZitadelCronJobs": [
+    "zitadel-branding-reconciler"
+  ],
+  "smtpReconcilerFoundInInspectedReposOrZitadelNamespace": false,
+  "infrastructure": {
+    "ses": "/home/manuel/code/wesen/terraform/ses/domains/mail-scapegoat-dev/envs/prod",
+    "zitadelHelm": "/home/manuel/code/wesen/2026-03-27--hetzner-k3s/gitops/applications/zitadel.yaml"
+  }
+}
