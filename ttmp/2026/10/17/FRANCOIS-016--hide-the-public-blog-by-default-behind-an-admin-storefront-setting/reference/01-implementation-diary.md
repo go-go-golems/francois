@@ -146,3 +146,31 @@ Review the blog feature commit separately from this three-file upload fix. Repro
 - Existing error/retry contract reused: releases.ErrArtifactTaken; no fallback adapter.
 - Default public setting: storefront.journalEnabled=false.
 - No remote infrastructure or production settings were changed.
+
+## Step 3: Open the integration PR and reconcile squash-merged main
+
+Opened PR #10 for the completed branch and requested Codex review. GitHub initially reported merge conflicts because main contains older squash-merged versions of work retained in this branch's ancestry. Merging main and retaining the newer branch versions in the five conflicting files produced no runtime diff from the already validated HEAD.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, PR, wait for code review,"
+
+**Assistant interpretation:** Publish the branch, request review and monitor it without merging or deploying.
+
+**Inferred user intent:** Review the completed integration before production changes.
+
+### Evidence and commits
+
+- PR: https://github.com/go-go-golems/francois/pull/10
+- Codex request: https://github.com/go-go-golems/francois/pull/10#issuecomment-6241390753
+- `git merge origin/main` initially conflicted in pages.go, storefront_test.go, catalog.js, layout.tmpl and instances.tsx. Inspected combined diffs; main's conflicting alternatives were older download labels, launch handling and unconditional public script inclusion.
+- Retained the newer feature branch implementations; `git diff HEAD --stat` was empty after resolution. Main's nonconflicting changes were already present.
+- Node 24/Corepack `pnpm check` and `git diff --check` passed after resolution. The prior full validation remains applicable because the runtime tree is identical.
+
+### Noteworthy decisions or failures
+
+Kept the branch's completed features together as requested. The PR description explicitly distinguishes implemented changes from the two design-only tickets. Used a merge commit to reconcile ancestry rather than rewriting published history.
+
+### Remaining requirements and next action
+
+Wait for GitHub checks and Codex review. No merge or deployment is authorized by this request.
