@@ -133,6 +133,11 @@ func (s *Server) instance(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Instance unavailable")
 		return
 	}
+	artifact, err := s.Store.Artifact(ctx, rel.ArtifactID)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Instance unavailable")
+		return
+	}
 	upgrades := []map[string]any{}
 	if inst.Role == "owner" {
 		rels, _ := s.Store.Releases(ctx, rel.ArtifactID, "published")
@@ -143,6 +148,7 @@ func (s *Server) instance(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := s.instanceJSON(r, inst)
+	out["artifactTitle"] = artifact.Title
 	out["membersList"] = members
 	out["release"] = publicRelease(rel)
 	out["upgrades"] = upgrades
