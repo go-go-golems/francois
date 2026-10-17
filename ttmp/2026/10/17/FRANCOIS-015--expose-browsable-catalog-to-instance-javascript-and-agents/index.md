@@ -30,3 +30,5 @@ The guide specifies three read operations, current implementation anatomy, publi
 The guide was uploaded successfully to `/ai/2026/10/17/FRANCOIS-015/FRANCOIS 015 Recursive Catalog Intern Guide.pdf`; see [the receipt](sources/remarkable-upload.txt). Cloud delivery is confirmed; physical device synchronization was not checked.
 
 The illustrated delivery is `/ai/2026/10/17/FRANCOIS-015/FRANCOIS 015 Recursive Catalog Intern Guide Illustrated.pdf`; see [its successful receipt](sources/remarkable-upload-illustrated.txt). It includes both rendered diagrams. The later local guide adds the FRANCOIS-014 original-source clarification; that small cross-ticket note was not re-uploaded, following the instruction to stop further upload churn.
+
+Implementation must also honor [FRANCOIS-016's public blog setting](../FRANCOIS-016--hide-the-public-blog-by-default-behind-an-admin-storefront-setting/index.md): when storefront.journalEnabled is false, catalog list/read tools must not expose posts through an alternate browsing surface. This requirement follows the guide's existing public-visibility parity rule; the historical reMarkable delivery predates this setting.

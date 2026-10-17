@@ -8,6 +8,7 @@ import (
 // TestFinalLayout checks the public shell and the separate archive/journal routes.
 func TestFinalLayout(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	pages := map[string][]string{
 		"/apps":                {`aria-label="Experiments"`},
 		"/journal":             {`aria-label="Journal"`},

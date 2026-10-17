@@ -99,11 +99,12 @@ type Demo struct {
 	Models            []string `json:"models"`
 }
 
-// Storefront is the public wording of the front page.
+// Storefront controls public presentation; the journal is opt-in.
 type Storefront struct {
-	Title   string `json:"title"`
-	Tagline string `json:"tagline"`
-	Intro   string `json:"intro"` // Markdown
+	JournalEnabled bool   `json:"journalEnabled"`
+	Title          string `json:"title"`
+	Tagline        string `json:"tagline"`
+	Intro          string `json:"intro"` // Markdown
 }
 
 type Document struct {

@@ -765,7 +765,11 @@ function Settings() {
             </div>
             <ModelPicker label="Demo models (none = all approved)" approved={[...approved]} value={doc.demo.models} set={(m) => upd((d) => (d.demo.models = m))} />
           </Row>
-          <Row label="Storefront" sub="front page wording">
+          <Row label="Storefront" sub="public presentation">
+            <label className="check">
+              <input type="checkbox" checked={doc.storefront.journalEnabled} onChange={(e) => upd((d) => (d.storefront.journalEnabled = e.target.checked))} /> Show the blog publicly
+            </label>
+            <p className="muted small">Off by default. Hides the journal pages, links and blog entries in RSS. Posts remain available in Studio.</p>
             <div className="grid-fields">
               <label className="field">
                 <span>Title</span>

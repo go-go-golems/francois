@@ -11,6 +11,7 @@ import (
 
 func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	ctx := context.Background()
 	admin := e.user("editor", "admin", false)
 	publish := func(id, title, version string) store.Release {

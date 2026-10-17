@@ -199,6 +199,7 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 // TestStorefrontPages covers the server-rendered public pages and media.
 func TestStorefrontPages(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	ctx := context.Background()
 	st := e.store
 	admin := e.user("ada", "admin", false)

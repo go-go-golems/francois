@@ -108,7 +108,7 @@ export function Footer() {
       <div>
         <span>For humans</span>
         <a href="/feed.xml">RSS</a>
-        <a href="/journal">Journal</a>
+        {session?.journalEnabled && <a href="/journal">Journal</a>}
         <a href="/pricing">Support the lab</a>
         {signedIn && <Link to="/account">Account</Link>}
         {staff && <Link to="/studio">Studio</Link>}

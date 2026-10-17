@@ -112,6 +112,8 @@ type pageData struct {
 	Brand, Title, Description, Image, Canonical, Crumb string
 	Nav                                                []navItem
 	User                                               *store.User
+	JournalEnabled                                     bool
+	JournalPreview                                     bool
 	Sensitive                                          bool
 	LoginAvailable                                     bool
 	LoginHref                                          string
@@ -153,6 +155,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		s.pageFailed(w, r, err)
 		return
 	}
+	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
 	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + r.URL.Path
@@ -187,6 +190,10 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	// The header is personalised by the session cookie.
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Vary", "Cookie")
+	if d.Draft || d.JournalPreview {
+		w.Header().Set("Cache-Control", "private, no-store")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	}
 	if d.Sensitive {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -302,6 +309,15 @@ func listed(a store.Artifact) bool { return a.Visibility == "listed" }
 func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.URL.Path == "/journal" {
+		rev, err := s.Store.ActiveSettings(ctx)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		if !rev.Document.Storefront.JournalEnabled {
+			s.notFound(w, r)
+			return
+		}
 		posts, err := s.Store.Posts(ctx, "published", "", 0)
 		if err != nil {
 			s.pageFailed(w, r, err)
@@ -546,10 +562,18 @@ func (s *Server) creatorPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
-	posts, err := s.Store.Posts(ctx, "published", c.ID, 0)
+	rev, err := s.Store.ActiveSettings(ctx)
 	if err != nil {
 		s.pageFailed(w, r, err)
 		return
+	}
+	var posts []store.Post
+	if rev.Document.Storefront.JournalEnabled {
+		posts, err = s.Store.Posts(ctx, "published", c.ID, 0)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
 	}
 	d := pageData{Title: c.Name, Crumb: "creators/" + c.Slug, Description: content.Excerpt(c.Bio, 200),
 		Body: map[string]any{"Creator": c, "Bio": s.markdown(ctx, c.Bio), "Cards": cards, "Posts": posts}}
@@ -587,7 +611,17 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
 	pr := principal(ctx)
+	hidden := !rev.Document.Storefront.JournalEnabled
+	if hidden && (pr == nil || !s.canEditPost(ctx, pr.User, post)) {
+		s.notFound(w, r)
+		return
+	}
 	draft := post.State != "published"
 	if draft && (pr == nil || !s.canEditPost(ctx, pr.User, post)) {
 		s.notFound(w, r)
@@ -601,7 +635,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	body["Author"] = author
-	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, Body: body}
+	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, Body: body}
 	if post.Cover != "" {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
@@ -638,6 +672,16 @@ type rssDoc struct {
 }
 
 func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !rev.Document.Storefront.JournalEnabled {
+		s.notFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
 	posts, err := s.Store.Posts(r.Context(), "published", "", 50)
 	if err != nil {
 		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
@@ -645,10 +689,7 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	origin := s.site(r).PortalOrigin()
 	doc := rssDoc{Version: "2.0"}
-	brand := s.site(r).PublicURL.Hostname()
-	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {
-		brand = s.brand(r, rev.Document)
-	}
+	brand := s.brand(r, rev.Document)
 	doc.Channel.Title = brand + " journal"
 	doc.Channel.Link = origin + "/journal"
 	doc.Channel.Description = "Notes on how the applications are made."

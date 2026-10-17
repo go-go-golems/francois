@@ -784,3 +784,9 @@ Each link permits one verification attempt. After a failed or timed-out attempt,
 Email sessions use the existing local idle/absolute expiry and have no OIDC ID token. Logout stays local. Temporary provider proof sessions are deleted after redemption and expire automatically if cleanup fails. Changing a user's role revokes all portal sessions and runtime grants, and invalidates pending email attempts; promotion cannot turn an email session into an admin session.
 
 For a reproducible isolated test, use FRANCOIS-013's `scripts/03-local-stack.yaml` and `04-provision-local.py`. They are fixed to localhost ports 18083 (ZITADEL v4.16.1), 18025 (mail sink) and 5437 (PostgreSQL); they do not configure production. The bootstrap and dedicated test PATs remain under `/tmp/francois-013-private`. The opt-in Go test `TestEmailSigninRealZitadel` accepts `-email-login-fixture=/tmp/francois-013-private/fixture.json`; provide TEST_DATABASE_URL pointing to the isolated database. Test credentials, codes, live links and cookies must never be copied into ticket screenshots/logs.
+
+## Public blog visibility
+
+The public site is artifact-only by default. In **Admin → Settings → Storefront**, enable **Show the blog publicly** to expose journal pages, creator-page posts and blog entries in RSS. The setting is `storefront.journalEnabled` in the existing versioned settings document; missing/false means hidden, including previously saved documents. No migration is needed.
+
+While hidden, `/journal`, public post URLs and `/journal/feed.xml` return 404 to visitors. `/feed.xml` continues serving artifact releases. Authorized editors can still manage posts in Studio and open individual previews with private/no-store caching and noindex; publishing a post does not override the global setting. Turning the blog off does not delete or unpublish any content. This controls public presentation rather than making previously published media URLs secret.

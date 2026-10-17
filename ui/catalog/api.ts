@@ -34,6 +34,7 @@ export type SessionUser = {
 export type Session = {
   authenticated: boolean;
   loginAvailable: boolean;
+ journalEnabled: boolean;
   signupAvailable: boolean;
   billingEnabled: boolean;
   appDomain: string;
@@ -255,7 +256,7 @@ export type SettingsDoc = {
     dailyBudget: number;
     models: string[];
   };
-  storefront: { title: string; tagline: string; intro: string };
+  storefront: { title: string; tagline: string; intro: string; journalEnabled: boolean };
 };
 export type SettingsRevision = {
   revision: number;
@@ -390,7 +391,7 @@ export const api = createApi({
     // 412 settings_conflict when another revision was activated in between.
     saveSettings: b.mutation<SettingsRevision, { doc: SettingsDoc; revision: number }>({
       query: ({ doc, revision }) => ({ url: "api/admin/settings", method: "PATCH", body: doc, headers: { "If-Match": `"${revision}"` } }),
-      invalidatesTags: ["Settings", "Account"],
+      invalidatesTags: ["Settings", "Account", "Session"],
     }),
     billing: b.query<any, string>({ query: (state) => `api/admin/billing?state=${state}`, providesTags: ["Billing"] }),
     reconcile: b.mutation<unknown, string>({

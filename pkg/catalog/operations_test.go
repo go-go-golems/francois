@@ -250,6 +250,7 @@ func TestOpenWorkspaceAndTourResumeUnderConcurrency(t *testing.T) {
 
 func TestCombinedFeedAndSeparatePublicPages(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	ctx := t.Context()
 	admin := e.user("writer", "admin", false)
 	release := e.publishArtifact(admin, "board", "")
