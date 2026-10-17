@@ -1,0 +1,60 @@
+Validating Kustomize packages under /tmp/francois-email-k3s/gitops/kustomize
+
+OK    agentlogic
+OK    argocd-public
+OK    artifacts
+OK    atproto-glossary-appview
+OK    atproto-glossary-go
+OK    atproto-glossary-node
+OK    atproto-hypercard
+OK    bluesky-pds
+OK    cam
+OK    cam-ide
+OK    codebase-browser
+OK    coinvault
+OK    datadrop
+OK    dmeta-examples
+OK    docs-yolo
+OK    draft-review
+OK    foocamp-browse
+OK    francois
+OK    go-go-course-workshops
+OK    go-go-host
+OK    go-go-os-examples
+OK    goja-auth-host-demo
+OK    goja-kanban
+OK    hair-booking
+OK    hello-world-workshops
+OK    herold
+OK    hyperslop-systems
+OK    keycloak
+OK    maillist
+OK    monitoring-extras
+OK    mysql
+OK    obsidian-vault-publish
+OK    pbui-demo
+OK    platform-cert-issuer
+OK    postgres
+OK    pyxis
+OK    rag-evaluation-page-storybook
+OK    rag-evaluation-storybook
+OK    redis
+OK    retro-obsidian-publish
+OK    static-sites-host
+OK    tiny-message-desk
+OK    todo-demo
+OK    todo-tenant/base
+OK    todo-tenant/overlays/prod/alpha
+OK    todo-tenant/overlays/prod/beta
+OK    traefik-observability
+OK    turboproof
+OK    vault-backup
+OK    vault-kubernetes-auth
+OK    vault-secrets-operator-smoke
+OK    wesen-os
+OK    xmpp
+OK    zitadel
+
+Packages checked: 54
+Violations:       0
+RESULT: PASS — all rendered packages satisfy the GitOps invariants.

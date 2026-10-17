@@ -1,0 +1,83 @@
+{
+  "at": "2026-10-17T23:28:12.448415+00:00",
+  "image": "ghcr.io/go-go-golems/francois:sha-5068ad1",
+  "replicas": {
+    "ready": 1,
+    "updated": 1
+  },
+  "argo": {
+    "sync": "Synced",
+    "health": "Healthy",
+    "phase": "Succeeded",
+    "revision": "18cdb9dee94d3c2c49ab5adba2f7f5b82138077c"
+  },
+  "migration": "013_email_registrations.sql|2026-10-17 23:27:52.788413+00",
+  "sites": [
+    {
+      "origin": "https://slop.boutique",
+      "checks": [
+        {
+          "path": "/healthz",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/apps",
+          "status": 200
+        },
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200
+        },
+        {
+          "path": "/feed.xml",
+          "status": 200
+        }
+      ],
+      "signinNoStore": true,
+      "signinNoReferrer": true,
+      "allMethodsAndSignupGuidance": true,
+      "emailMaxLength": 200,
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "authenticated": false
+    },
+    {
+      "origin": "https://francois.yolo.scapegoat.dev",
+      "checks": [
+        {
+          "path": "/healthz",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/apps",
+          "status": 200
+        },
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200
+        },
+        {
+          "path": "/feed.xml",
+          "status": 200
+        }
+      ],
+      "signinNoStore": true,
+      "signinNoReferrer": true,
+      "allMethodsAndSignupGuidance": true,
+      "emailMaxLength": 200,
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "authenticated": false
+    }
+  ],
+  "productionEmailRequested": false,
+  "credentialsSaved": false
+}

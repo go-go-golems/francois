@@ -51,3 +51,7 @@ Deployed reviewed shared sign-in source #12 (5721ee8) via k3s #366. Public socia
 ## 2026-10-17
 
 Implemented email-only signup through the shared form with unverified ZITADEL registration, mailbox confirmation, OTP enrollment, atomic ordinary-account/session provisioning and browser-bound one-shot links. Full Go/database suite and build passed; final affected tests, lint/logger and actual pinned-provider first-signup/repeat-login journey passed. Detailed design, diary and sanitized browser evidence retained; no production deployment.
+
+## 2026-10-17
+
+Deployed email-only signup on k3s: source PR #13 / 5068ad1, official release 39078802326, validated image pin PR #369 / 18cdb9d. Verified exact image, ready replica, Synced/Healthy/Succeeded Argo, migration 013 and both public sites without sending production mail. Published the detailed 5,400-word textbook-style report with five figures and three diagrams to go-go-parc; committed and pushed vault main as 2731f8c.

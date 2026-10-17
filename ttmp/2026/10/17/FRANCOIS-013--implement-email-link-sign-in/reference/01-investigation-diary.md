@@ -1070,3 +1070,99 @@ Read UpsertIdentity and TestOIDCWithoutEmailDoesNotCollideWithGuests, along with
 The preflight count excludes guests and empty strings, groups by lower(email) and returned zero duplicate groups. Missing-email identities are still ineligible for the email-link path, which requires an actual verified address and matching provider identity.
 
 Qualification: affected database-backed TestOIDC/TestEmail cases passed in 4.705 seconds; lint reported zero issues and logcopter-check passed. The full remote release suite will qualify the final source revision before merge.
+
+
+## Step 19: Merge the qualified source and prepare its immutable image pin
+
+All checks for source head 113b097 completed successfully, with only the expected PR-only GitOps-opening job skipped. Merged PR #13 through a SHA-conditional API request as 5068ad1c9d35adf10ac143dc00a56d81907ad018. The trusted main publish-image workflow is run 39078802326. Prepared the single image-line change to sha-5068ad1 in the isolated GitOps worktree while the official image publishes.
+
+### Prompt Context
+See Step 16 for the deployment/report requests.
+**Commit (source merge):** 5068ad1c9d35adf10ac143dc00a56d81907ad018 — Support signup through email verification links (#13).
+
+### What I did
+- Checked all final source gates and resolved/assessed every automated review thread. The last revision's tests, lint, security, dependency, secret and image qualification checks passed.
+- Merged only if PR head equaled 113b09798b13398aedd02c2176bebeb6aae454ed; compared the merged pkg tree to that source and found no difference.
+- Updated the local main checkout, preserving the new uncommitted deployment/report tasks.
+- Prepared only the deployment image line in /tmp/francois-email-k3s; retained existing signup/email flags, credentials, startup migration and one-replica strategy.
+- Drafted read-only production verification and public screenshot scripts, plus an append-only vault publisher that refuses unfinished reports and existing historical-note overwrites.
+
+### Why
+The official main pipeline owns the immutable release and automated image-pin PR. Runtime configuration already supports the new path. Following that release preserves the established artifact and GitOps provenance.
+
+### What worked
+PR #13 merged successfully and the official image publish started for the exact merge revision. The package trees match the qualified final source.
+
+### What didn't work
+The first `git switch main` was blocked by local task-file edits, and the following fast-forward pull could not apply while still on the feature branch. Saved only the task diff to /tmp, restored that file, switched/pulled main and reapplied the task patch. No user changes or work were discarded.
+
+### What I learned
+Source merge, image publication and Argo reconciliation are distinct milestones. A merged PR alone is not a production deployment.
+
+### What was tricky to build
+The report/task work continued locally while release review ran. Preserving that work separately avoids committing an unfinished production claim merely to change branches.
+
+### What warrants a second pair of eyes
+Verify the published image tag corresponds to the merged source, then compare the automated GitOps manifest with the validated one-line diff before merging it.
+
+### What should be done in the future
+Wait for official image publication, merge the validated GitOps pin, verify the actual pod/migration/public routes and publish the completed report to the vault.
+
+### Code review instructions
+Source PR #13 and main release run 39078802326 define the release. The production verification script requires an exact expected image and checks Argo, replica state, migration 013 and both public sites without submitting email.
+
+### Technical details
+Previous live image: sha-5721ee8. Intended new image: ghcr.io/go-go-golems/francois:sha-5068ad1. No identity-policy or runtime-secret changes are required.
+
+
+## Step 20: Verify the production rollout and publish the finished vault report
+
+The official main image release succeeded and opened GitOps PR #369. Its generated manifest exactly matched the locally validated image-only change, and its CI validation passed. Merged the pin and refreshed only the francois Argo application. The deployment rolled out successfully, and the exact expected image, applied migration and both public sites passed read-only verification at 2026-10-17T23:28:12Z.
+
+Completed the technical project report using those actual results, then copied it and five figures into the go-go-parc vault. The report contains approximately 5,400 words including metadata, three Mermaid diagrams, request/SQL pseudocode, a pinned API table, file references, failure/review analysis and the source/image/GitOps rollout record. Committed and pushed the vault report as 2731f8c7055e4cc9c7f8cf13e2bdb75190eaf343. Both production and the requested vault publication are complete.
+
+### Prompt Context
+See Step 16 for the exact deployment and detailed vault-report requests.
+**Commit (source):** 5068ad1c9d35adf10ac143dc00a56d81907ad018 — Support signup through email verification links (#13).
+**Commit (GitOps):** 18cdb9dee94d3c2c49ab5adba2f7f5b82138077c — image pin from PR #369.
+**Commit (vault):** 2731f8c7055e4cc9c7f8cf13e2bdb75190eaf343 — Document Francois email signup and verified production rollout.
+
+### What I did
+- Confirmed official release run 39078802326 succeeded, including image publication and its automated GitOps PR.
+- Compared the generated deployment manifest byte-for-byte with the prepared sha-5068ad1 manifest. All 54 rendered packages passed local validation with zero violations, and PR #369's validate check passed.
+- Merged only the exact GitOps head 5cb1fdf0b00af7597681f5e4f21cf57b08a4ca12. Refreshed francois, waited for the desired image, successful Deployment rollout and Argo Healthy state.
+- Script 14 verified expected image, observed generation, ready/updated replica counts, Argo state, migration 013 and both sites. Script 16 captured the actual public form at desktop/mobile widths without submitting an address.
+- Replaced the report's pending-production marker with observed results and updated the design's deployment status. Script 15 published a new dated vault note and colocated assets, preserving historical notes.
+- Checked all five embedded image paths and three Mermaid blocks, staged only the new report and five figures, then committed/pushed the vault's main branch. Vault worktree is clean.
+
+### Why
+A source merge or image publication alone cannot establish a successful runtime rollout. Verification must identify the actual desired/running release and schema and exercise public routes. The report must distinguish isolated end-to-end mailbox proof from production configuration/serving proof and actual external inbox receipt.
+
+### What worked
+- Image: ghcr.io/go-go-golems/francois:sha-5068ad1; one updated and one ready replica.
+- Argo: Synced, Healthy, operation Succeeded at 18cdb9dee94d3c2c49ab5adba2f7f5b82138077c.
+- Migration 013 applied at 2026-10-17 23:27:52.788413+00.
+- slop.boutique and francois.yolo.scapegoat.dev: health, readiness, artifact archive, Lattice Deck and RSS all HTTP 200; sign-in has all methods/signup guidance, maxlength 200, no scripts and no-store/no-referrer. Signup is available; the public journal remains disabled.
+- Production browser captures have no horizontal overflow at 1440 and 390 pixels. No production email was requested and no credential was saved.
+- Vault push succeeded: main advanced from 55feb48 to 2731f8c. The new report and all five figures are self-contained in Projects/2026/10/17.
+
+### What didn't work
+The first attempt to launch the vault publisher used a relative Francois script path while the shell workdir was the GitOps checkout, producing `python3: can't open file '/tmp/francois-email-k3s/ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/scripts/15-publish-vault-report.py': [Errno 2] No such file or directory`. Reinvoked the absolute path successfully. No partial vault note was created by the failed invocation.
+
+### What I learned
+The existing dedicated credential and runtime flags were sufficient; no Terraform/secret change was required for this release. The additive migration applied through the normal startup path, and the existing artifact-only storefront setting remained intact.
+
+### What was tricky to build
+Argo briefly reported Synced/Progressing while the replacement pod started, so verification waited for the actual image and rollout completion, then Healthy. The append-only report publisher refuses an unfinished production marker or an existing historical report and rewrites ticket image references into colocated vault assets.
+
+### What warrants a second pair of eyes
+Production verification did not submit a real address, enroll an unrelated human factor or claim external inbox delivery. The real first-signup/second-login email round trip is proven by the isolated provider receipt, while the production receipt proves this code/configuration/schema is deployed.
+
+### What should be done in the future
+No required deployment or report work remains. A user can now request a new-address registration link at https://slop.boutique/signin. Existing credential rotation and operational settings retain their normal management paths.
+
+### Code review instructions
+Read sources/implementation/email-signup-production.json and reference/02-email-only-signup-production-project-report.md. Scripts 14 and 16 reproduce read-only production checks/captures; script 15 documents the vault copy. Review the vault commit for the exact report and five assets.
+
+### Technical details
+The vault report is Projects/2026/10/17/PROJ - Francois - Passwordless Email Signup and Production Delivery - A Technical Deep Dive.md. Source-relative figures resolve inside the ticket; the vault copy uses _assets/francois-email-signup-*.png. Production observation time is 2026-10-17T23:28:12.448415+00:00. No source/runtime changes followed the merged image; remaining commits only preserve ticket/report evidence.
