@@ -1,17 +1,27 @@
 ---
 Title: Hide the public blog by default behind an admin storefront setting
 Ticket: FRANCOIS-016
-Status: active
+Status: complete
 Topics:
     - frontend
     - backend
 DocType: index
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/feed.go
+      Note: Artifact-only RSS when blog is hidden
+    - Path: repo://pkg/catalog/journal_visibility_test.go
+      Note: Admin-toggle and visibility regression
+    - Path: repo://pkg/catalog/pages.go
+      Note: Public visibility and private editor previews
+    - Path: repo://pkg/catalog/settings/settings.go
+      Note: Default-off public journal setting
+    - Path: repo://pkg/catalog/studio.go
+      Note: Upload reauthorization race found during qualification
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-17T17:15:03.336693646-04:00
+LastUpdated: 2026-10-17T17:23:53.024441501-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -25,4 +35,4 @@ The public site keeps its artifact archive, detail pages and release RSS. While 
 - [Browser validation](sources/browser-validation.json) and the admin screenshots.
 - [Tasks](tasks.md) and [changelog](changelog.md).
 
-Full-suite validation also exposed an existing first-artifact upload authorization race, being fixed in a separate commit before final qualification. No production deployment is included.
+The setting is implemented and verified in the admin browser. Full Go tests, frontend checks/build, Go build and lint pass. Full-suite validation also exposed an existing first-artifact upload authorization race; it was fixed separately using the existing reauthorization path and a deterministic regression. No production deployment is included.

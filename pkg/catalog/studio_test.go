@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/go-go-golems/francois/pkg/catalog/releases"
+	"github.com/pkg/errors"
 )
 
 // multipartTo posts a multipart form with one file to the portal.
@@ -233,5 +236,25 @@ func TestConcurrentNewArtifactUpload(t *testing.T) {
 		if err != nil || len(credits[id]) != 1 || credits[id][0].ID != profile[racers[winner].user.ID] {
 			t.Fatalf("%s credits %v %v (winner %s)", id, credits[id], err, racers[winner].user.DisplayName)
 		}
+	}
+}
+
+// Force the window between mayUpload's new-artifact decision and prepare's
+// fresh lookup: another creator has already won by the time prepare runs.
+func TestNewArtifactAuthorizationMustBeRechecked(t *testing.T) {
+	e := setup(t)
+	ctx := t.Context()
+	admin := e.user("winner", "admin", false)
+	e.publishArtifact(admin, "taken", "")
+	u := uploadOf("taken", "Taken", "2.0.0")
+	u.RequireNewArtifact = true
+	_, _, err := e.srv.Publisher.CreateDraft(ctx, admin.user.ID, u)
+	if !errors.Is(err, releases.ErrArtifactTaken) {
+		t.Fatalf("stale new-artifact authorization was accepted: %v", err)
+	}
+	var count int
+	err = e.store.Pool.QueryRow(ctx, `SELECT count(*) FROM releases WHERE artifact_id=$1`, "taken").Scan(&count)
+	if err != nil || count != 1 {
+		t.Fatalf("stale attempt wrote a release: %d %v", count, err)
 	}
 }

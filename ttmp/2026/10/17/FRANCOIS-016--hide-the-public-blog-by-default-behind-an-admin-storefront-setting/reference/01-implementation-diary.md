@@ -83,3 +83,66 @@ Start with settings.Storefront, Admin Settings, pages.go post/journal/creator ha
 - Existing settings endpoint: PATCH /api/admin/settings with normal admin, CSRF and If-Match requirements.
 - Default and missing-property behavior: storefront.journalEnabled=false.
 - Local preview: http://localhost:18792; no production settings were changed.
+
+## Step 2: Close the upload authorization race and complete the pre-deployment gate
+
+The blog feature was committed separately as **18c8031 — Hide the public blog by default with an admin setting**. Full-suite validation had repeatedly exposed an existing authorization race in first-artifact upload. I traced and fixed the narrow race rather than repeatedly rerunning tests until they happened to pass.
+
+The complete Go suite now passes, including the concurrent-upload test. A deterministic regression also forces the stale authorization state directly. Build, lint/logging checks and frontend validation are clean; the new setting is implemented and locally qualified without a remote deployment.
+
+### Prompt Context
+
+**User prompt:** See Step 1.
+**Assistant interpretation:** Complete the requested pre-deployment change and resolve the concrete failing gate in an isolated follow-up commit.
+**Inferred user intent:** Have a reliable artifact-focused site ready before deployment, with an accurate work history.
+**Feature commit:** 18c8031.
+
+### What I did
+
+- Traced studioUpload's mayUpload decision and Publisher.CreateDraft's later prepare lookup. If another creator inserted the artifact between them, prepare saw an existing artifact and skipped the creation-conflict branch that normally triggers reauthorization.
+- Added the internal RequireNewArtifact upload flag, set from the server's mayUpload result on every attempt. CreateDraft returns the existing ErrArtifactTaken when that decision is stale, and the existing bounded retry performs the actual editor check.
+- Kept the fix separate from the visibility setting. No new route, authorization framework, compatibility wrapper or client-provided permission field was added.
+- Added TestNewArtifactAuthorizationMustBeRechecked to force an already-existing artifact under a stale new-artifact decision and confirm no release is written.
+- Ran the deterministic and concurrent tests together three times, then the full repository suite. Updated ticket status and preserved the final test summary.
+
+### Why
+
+The failure was not merely an assertion timing issue: the stale new-artifact decision could skip the intended editor recheck. Preserving that decision until the publisher's fresh lookup closes the concrete gap while reusing the existing conflict/retry path.
+
+### What worked
+
+- `go test ./pkg/catalog -run 'TestConcurrentNewArtifactUpload|TestNewArtifactAuthorizationMustBeRechecked' -count=3` passed.
+- `TEST_DATABASE_URL=... go test ./... -count=1` passed; catalog integration took 24.939s. All database tests used isolated disposable databases.
+- `go build ./...` and `make lint logcopter-check` passed with zero lint issues.
+- The visibility/admin/browser and frontend checks from Step 1 remain qualified; the follow-up touches only the publisher, upload handler and regression test.
+
+### What didn't work
+
+The first deterministic regression queried Store.Releases with an empty state assuming it meant all states. That method requires a specific state, so it returned zero and the test reported `stale attempt wrote a release: 0 <nil>` in each of three runs. Changed that verification to an explicit total release count for the fixture artifact. The authorization assertion itself already passed; the corrected persistence assertion then passed too.
+
+### What I learned
+
+The first-artifact conflict path already had a correct reauthorization retry, but it only covered conflicts occurring after prepare. A server-owned expectation flag extends that existing path to the earlier lookup window without weakening permission checks or serializing unrelated uploads.
+
+### What was tricky to build
+
+A purely concurrent regression can miss the scheduling window, as the three initial isolated repeats demonstrated. The deterministic test makes the condition explicit and verifies the required error before any new release is stored.
+
+### What warrants a second pair of eyes
+
+Review RequireNewArtifact propagation alongside mayUpload and ErrArtifactTaken handling. The value must remain derived from server authorization, never from an uploaded form field. Existing artifacts still require their normal editor check.
+
+### What should be done in the future
+
+No feature work remains in this ticket. A production deployment is separate; the local preview's storefront.journalEnabled remains false. The recursive catalog API design has been linked to this visibility policy for its later implementation.
+
+### Code review instructions
+
+Review the blog feature commit separately from this three-file upload fix. Reproduce the focused upload tests, the full Go gate and the local admin browser check as needed. The saved browser evidence shows actual enable/disable behavior; final-test-summary.txt records the final passing package results.
+
+### Technical details
+
+- New internal field: releases.Upload.RequireNewArtifact.
+- Existing error/retry contract reused: releases.ErrArtifactTaken; no fallback adapter.
+- Default public setting: storefront.journalEnabled=false.
+- No remote infrastructure or production settings were changed.

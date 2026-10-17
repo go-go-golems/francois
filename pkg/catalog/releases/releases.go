@@ -177,6 +177,9 @@ type Upload struct {
 	Manifest    []byte
 	FreeSample  bool
 	MaxHTML     int64
+	// RequireNewArtifact binds an authorization decision made while the artifact
+	// did not exist. If it appeared meanwhile, the caller must authorize again.
+	RequireNewArtifact bool
 	// Creators are credited on the artifact when this upload creates it.
 	Creators []string
 }
@@ -324,6 +327,9 @@ func (p *Publisher) CreateDraft(ctx context.Context, actor string, u Upload) (st
 	exists, err := p.prepare(ctx, &u)
 	if err != nil {
 		return store.Release{}, nil, err
+	}
+	if exists && u.RequireNewArtifact {
+		return store.Release{}, nil, ErrArtifactTaken
 	}
 	manifest, checks := Validate(u)
 	if Blocking(checks) {
