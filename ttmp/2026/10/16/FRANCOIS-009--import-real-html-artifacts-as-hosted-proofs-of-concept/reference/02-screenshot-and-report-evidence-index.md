@@ -57,9 +57,26 @@ A screenshot proves visible rendering at the captured viewport; it does not prov
 
 Reload/upgrade intentionally aborts old launch requests and event streams. The production receipt retains these ERR_ABORTED entries rather than presenting them as unexpected resource failures. Inspect any other failed request or page error separately.
 
-The original RAG corpus is excluded, including notes marked publish:false. The public fixture is an intentional test upload. This ticket does not change subscription policy, global model lane counts or anonymous-tour settings. The final guide records the actual publication access state.
+The original RAG corpus is excluded, including notes marked publish:false. The public fixture is an intentional test upload. Initial qualification preserved the access policy and global model lane count. The later explicit public-access request enabled the existing bounded tours and free HTML downloads; the current guide and CLI receipt record that change and the preserved limits.
 
 
 ## Diagnostic figure
 
 [Production RAG during the test API mismatch](../various/screenshots/rag-workbench-production-debug.png) preserves the earlier diagnostic capture. The application already rendered the correct ranked results; the test incorrectly read the JSON projection as the runtime object. Use the final production image for the main result and this figure only when explaining that investigation.
+
+
+## Curated public covers and galleries
+
+A second capture pass responds to the request for attractive screenshots and multiple views per app. Sixteen actual application images are published: one cover per app, two further gallery views for Rift/Phantasmagoria/Deck/RAG, and three further views for Tabula. Workspaces use the production HTML hashes, built-in examples and the public sample corpus. Deck/Tabula figures use direct slide-element crops; other figures use a 1800×1125 viewport. These are browser captures, not mockups or retouched illustrations.
+
+The image-selection manifest [sources/showcase.json](../sources/showcase.json) records captions, dimensions, PNG hashes and source HTML hashes. The [CLI publication receipt](../various/gallery-publication-receipt.json) records actual media IDs, cover/gallery order, public release IDs and the preserved tour policy. The [public verification receipt](../various/public-gallery-verification.json) records unauthenticated page/image/download checks and the real bounded tour.
+
+| Application | Selected views | Public page |
+| --- | --- | --- |
+| lattice-rift | [rift-title](../various/showcase/rift-title.png), [rift-arcade](../various/showcase/rift-arcade.png), [rift-world](../various/showcase/rift-world.png) | [View](https://slop.boutique/apps/lattice-rift) |
+| lattice-phantasmagoria | [phantasmagoria-menu](../various/showcase/phantasmagoria-menu.png), [phantasmagoria-cartridge](../various/showcase/phantasmagoria-cartridge.png), [phantasmagoria-kipple](../various/showcase/phantasmagoria-kipple.png) | [View](https://slop.boutique/apps/lattice-phantasmagoria) |
+| lattice-deck | [lattice-deck-procedural](../various/showcase/lattice-deck-procedural.png), [lattice-deck-motion](../various/showcase/lattice-deck-motion.png), [lattice-deck-charts](../various/showcase/lattice-deck-charts.png) | [View](https://slop.boutique/apps/lattice-deck) |
+| tabula-workbench | [tabula-overview](../various/showcase/tabula-overview.png), [tabula-story](../various/showcase/tabula-story.png), [tabula-sensitivity](../various/showcase/tabula-sensitivity.png), [tabula-landscape](../various/showcase/tabula-landscape.png) | [View](https://slop.boutique/apps/tabula-workbench) |
+| rag-workbench | [rag-search](../various/showcase/rag-search.png), [rag-trace](../various/showcase/rag-trace.png), [rag-corpus](../various/showcase/rag-corpus.png) | [View](https://slop.boutique/apps/rag-workbench) |
+
+Use these curated images for the main vault-report figures. Retain the earlier startup/production screenshots as implementation evidence. Final public presentation captures include [the illustrated catalog](../various/showcase/catalog-public-covers.png), [the Deck gallery](../various/showcase/deck-public-gallery.png), and [an anonymous RAG tour](../various/showcase/rag-anonymous-tour.png).

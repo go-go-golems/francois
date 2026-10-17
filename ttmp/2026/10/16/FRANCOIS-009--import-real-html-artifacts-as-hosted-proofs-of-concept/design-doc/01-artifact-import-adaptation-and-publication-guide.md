@@ -141,7 +141,7 @@ Full multi-user room collaboration, every advanced preset, all export formats an
 
 ## Production release and access state
 
-The authoritative exact IDs, versions and HTML digests are `various/production-receipt.json`. Rift, Tabula, Deck and RAG use corrected 0.1.1 releases; Phantasmagoria remains 0.1.0. These public pages are live:
+The initial functional qualification is recorded in `various/production-receipt.json`. The later public versions and curated media are authoritative in `various/gallery-publication-receipt.json`: all five use public 0.1.2 releases with unchanged HTML hashes. One cover per app and the remaining selected views are published in its gallery. These public pages are live:
 
 - https://slop.boutique/apps/lattice-rift
 - https://slop.boutique/apps/lattice-phantasmagoria
@@ -149,4 +149,13 @@ The authoritative exact IDs, versions and HTML digests are `various/production-r
 - https://slop.boutique/apps/lattice-deck
 - https://slop.boutique/apps/rag-workbench
 
-Public discovery and RSS require no login. Running a workspace uses the existing signed-in access policy. Anonymous tours were disabled at publication and no global quota, subscription or tour policy was changed. The optional question about enabling the existing bounded tours remains separate from publishing the applications.
+Public discovery, RSS and the current HTML downloads require no login. After the user requested public access, all five artifacts were marked listed, free-plan eligible and demo-enabled; the existing global demo switch was enabled at settings revision 2. Tours retain 20 minutes, three starts per user/address per hour, five credits per tour, a shared daily budget of 200 and a maximum of 20 active tours. Global model/storage limits remain unchanged. Explicitly approved one-day admin credentials were used only for that single settings change; all content publication used the Studio token and Francois CLI.
+
+`scripts/07-capture-showcase.js` creates the sixteen curated images and `sources/showcase.json` records their captions/hashes. `08-bootstrap-cli-token.mjs` bootstraps a one-day Studio token; its --admin mode requires explicit approval and was approved for the tour switch. `09-publish-galleries.py` performs media upload, page-set/page-publish, public free-sample release publication and the revision-checked setting update through `go run ./cmd/francois catalog ... --format json`. `10-verify-public-galleries.mjs` checks anonymous discovery, image loading, actual HTML hashes and one bounded tour. Tokens remain in private temporary files and are never committed.
+
+
+## Small public-page follow-up
+
+Public artifact pages now select the most recently published release, offer one HTML download and the current release's attachments, and leave manifests/history in Studio. The selection follows PublishedAt rather than upload order. Historical file APIs and release-pinned workspaces retain their existing access behavior.
+
+Instance detail exposes the artifact's current title after membership authorization. The launcher combines that value with the existing site brand for document.title, matching the artifact page even after renaming and while retaining any private workspace name. Browser-title ownership is cleaned up when leaving the launcher. Source PR #8 deploys these small portal changes separately from content publication.

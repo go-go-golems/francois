@@ -19,3 +19,11 @@ Published five real HTML proofs of concept; validated local and isolated product
 ## 2026-10-16
 
 Completed five published HTML imports with verified local/production interactions, storage, model calls and report-ready evidence.
+
+## 2026-10-16
+
+Published sixteen curated screenshots as five covers and eleven gallery images using the token/CLI; made all five releases publicly downloadable and enabled the explicitly approved bounded anonymous tours; verified fresh visitor pages, downloads, image loading and a real RAG tour/model call.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/gallery-publication-receipt.json — CLI-publication-and-policy-evidence

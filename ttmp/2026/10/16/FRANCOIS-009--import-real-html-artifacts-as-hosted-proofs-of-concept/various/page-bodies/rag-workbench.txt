@@ -1,0 +1,7 @@
+## RAG Workbench
+
+An editable retrieval pipeline with public sample documentation, Markdown uploads, lexical search and hosted model access.
+
+This is a working imported proof of concept. The original visual design is preserved. The bundled corpus contains five public Francois guides; the original private dataset is excluded. 
+
+Model calls use the shared hosting limits. Start with the default example; advanced workflows may require additional configuration.

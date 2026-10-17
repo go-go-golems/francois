@@ -1,0 +1,7 @@
+## Tabula Workbench
+
+A programmable reactive workbook with live inputs, charts and model-assisted editing. Workbook drafts live in this browser.
+
+This is a working imported proof of concept. The original visual design is preserved. 
+
+Workbook draft state is browser-local. Model calls use the shared hosting limits. Start with the default example; advanced workflows may require additional configuration.

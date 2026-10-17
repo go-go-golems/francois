@@ -1,0 +1,7 @@
+## Lattice Deck
+
+A programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.
+
+This is a working imported proof of concept. The original visual design is preserved. 
+
+Model calls use the shared hosting limits. Start with the default example; advanced workflows may require additional configuration.

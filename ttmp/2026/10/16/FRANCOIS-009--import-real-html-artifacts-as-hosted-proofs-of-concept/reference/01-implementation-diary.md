@@ -232,3 +232,139 @@ Final release versions: Rift, Tabula, Deck and RAG 0.1.1; Phantasmagoria 0.1.0. 
 
 
 Ticket tasks are complete and docmgr closed FRANCOIS-009 successfully (close-cd083c793c7c7fde5538b8ddbd4b9b5a, committed). Its completed recovery journal was verified and archived under /tmp/francois-009-completed-docmgr-operations; permanent status/changelog remain in the ticket. Final doctor reports only the intentional upload-fixture filename warning. Authored diffs pass whitespace checks; scripts pass syntax checks; no Go/platform code changed, so a backend test-suite rerun is not relevant to these content imports. Thirteen PNG screenshots are preserved, including a diagnostic capture. Milestone commits and the final evidence commit are on feat/francois-009-real-artifact-imports.
+
+
+## Step 4: Curate multiple real screenshots and simplify public downloads
+
+The user asked for screenshots that present the applications well, multiple images per application, publication through the token/CLI and public access. Composed sixteen real screenshots using built-in scenes, presenter mode, workbook-generated slides and retrieval views. Also investigated the duplicate Download HTML links: the public page rendered every published release, so 0.1.0 and 0.1.1 appeared with the same label.
+
+### Prompt Context
+
+**User prompts (verbatim):**
+
+- “can you take screenshots to make things look good?”
+- “Also why are there two download links? https://slop.boutique/apps/lattice-deck Maybe we only need the latest version”
+- “take multiple screenshots per thing”
+- “we can upload multiple right?”
+- “can you use the token and the CLI?”
+- “make them all public as well”
+- “yes, create a token”
+
+The last answer explicitly approves the one-day administrative token requested for the single global tour-setting change. **Assistant interpretation:** Publish attractive covers and galleries, expose all five through bounded anonymous tours/public HTML downloads and reduce the public download UI to the current HTML release. **Inferred user intent:** A minimal usable public catalog with good visual examples, while retaining operator history and hosting limits.
+
+### What I did
+
+- Added scripts/07-capture-showcase.js and sources/showcase.json. Captures use 1800×1125 workspaces and direct slide-element crops for clean presentation figures. Recorded PNG dimensions, SHA256, captions and corresponding published HTML hashes.
+- Captured three Rift sections, three Phantasmagoria scenes, three Deck examples, four Tabula views/slides and three RAG views. Used actual app controls; no generated mockups or image retouching. Selected a cover plus the remaining images for each gallery.
+- Found two published Deck releases, 0.1.0 and 0.1.1, rendered as repeated Download HTML/Manifest rows. Changed pkg/catalog/pages.go to offer only the current release's HTML, with current attachments. Studio history, manifests, historical file APIs and workspace pins remain available.
+- Added TestArtifactPageLatestDownload: two releases, exactly one current HTML link for entitled users, no manifest link, no stale free-sample fallback to anonymous visitors, and historical files/manifests still downloadable through the authorized API.
+- Targeted tests TestArtifactPageLatestDownload, TestStorefrontPages and TestAttachments pass. Full TEST_DATABASE_URL=local PostgreSQL go test ./... -count=1 passes with actual catalog integration tests enabled.
+- Standard token file and FRANCOIS_TOKEN environment fallback were absent. Added a normal-login bootstrap for one-day API tokens, storing only the requested tokens in private temporary files with mode 0600. Session cookies and Vault values are never exported.
+- Added the CLI-only gallery/publication workflow: media upload, artifact page-set/page-publish, metadata update, new immutable free-sample releases of unchanged HTML, and settings show/apply for the single approved demo.enabled change. Public access retains the existing duration/concurrency/start/budget limits.
+
+### Why
+
+Public users should see one current download, while release history remains operational data. A free-sample flag belongs to an immutable release, so public download access requires a new release of the same HTML bytes rather than editing the stored release. Cover and gallery images are page metadata, so they can publish immediately without rebuilding the application service.
+
+### What worked
+
+The apps already support rich visual examples: Deck's presenter mode gives clean graphics/chart frames; Tabula generates a dark slide deck from its live workbook; RAG exposes ranked sections and execution traces. Narrow and full PostgreSQL-backed tests pass for the download-page simplification. The CLI authenticates successfully using the Studio token and supports all required image/page/artifact operations.
+
+### What didn't work
+
+- A Deck preset selector initially assumed accessible-name spacing from textContent and timed out; selecting the actual preset-menu button text worked.
+- Tabula Reset layout activates Grid; the capture script initially waited for take buttons while Stage was hidden. It now selects the Stage tab explicitly.
+- Stage/Trace/Corpus are button elements with tab roles, so getByRole(button) did not match. The capture script uses their actual button/tab text selectors.
+- Collapsing RAG's agent exposed an existing narrow-rail overflow in the export. Kept the complete agent panel for the final captures rather than masking content with screenshot-only CSS.
+- The image relay rejected detail low; used the supported default image detail for visual review.
+- CLI --output json was rejected with unknown flag. Installed command help specifies --format json; the publication script uses it.
+- Automatic approval review rejected the initial admin-scoped token as broader than gallery publishing required. Used a Studio-only token first, explained the separate global setting, requested explicit approval for a one-day admin:read/admin:write token, and received “yes, create a token”. The approved administrative token is separate and used only for the existing tour-setting operation.
+
+### What I learned
+
+The gallery supports up to 24 media entries plus a cover. All published image bytes can be reused for the vault report, with captions and the source-release hash recorded. Public listing, anonymous running and public downloading are separate policies: visibility, artifact/global demo controls and immutable release free-sample access must all be handled deliberately.
+
+### What was tricky to build
+
+The display regression was caused by looping over release history, not duplicate media uploads. Selecting the current release in the page model fixes both duplicate HTML links and stale attachments without touching the underlying releases. The gallery publisher preserves each existing Markdown write-up and checks for an existing draft before modifying page metadata.
+
+### What warrants a second pair of eyes
+
+Review latest-only page rendering, access checks and the regression test. Confirm the CLI publication receipt keeps HTML hashes identical and changes only demo.enabled globally. The short-lived tokens are in /tmp/francois-009-private, excluded from Git and tool logs.
+
+### What should be done in the future
+
+Verify the public covers/galleries, anonymous downloads and a bounded tour after publication. Release the small download-page renderer fix through the existing image/GitOps workflow. Update the report evidence index with all final media IDs and live figures.
+
+### Code review instructions
+
+Start with pkg/catalog/pages.go and TestArtifactPageLatestDownload in pkg/catalog/storefront_test.go. Then inspect scripts/07–09, sources/showcase.json and the final gallery receipt. Do not run the publishing scripts as unit tests: they mutate the real catalog and require the scoped temporary tokens.
+
+### Technical details
+
+Current CLI structured output is --format json. The content token has only studio; the approved administrative token has admin:read/admin:write. Each expires after one day. Media upload is catalog media upload; page images use artifacts page-set --cover/--gallery then page-publish. Tour settings use an explicit base revision and preserve every field except demo.enabled. Final publication/deployment evidence is appended below after execution.
+
+
+#### Public gallery/access checkpoint
+
+All sixteen curated images were uploaded with the Francois CLI, then published as five covers plus eleven gallery entries. Five new immutable 0.1.2 releases expose public HTML downloads while preserving each generated HTML SHA256. All artifact metadata is listed/free-plan eligible/demo-enabled. Settings revision 2 changes only demo.enabled to true; 20-minute tours, three starts per user/address/hour, five credits, twenty concurrent tours and shared daily budget 200 are unchanged. Global model/storage settings are identical to revision 1.
+
+`scripts/10-verify-public-galleries.mjs` uses a fresh unauthenticated browser context: all five public pages have the expected loaded image counts, a Try button and a successful anonymous HTML download whose SHA256 matches the original build inventory. A fresh anonymous RAG tour has five bundled guides, zero uploaded files from the administrator's workspace, and a real quick-tier GLM sampling reply of pong. Final public catalog/gallery/tour captures are retained under various/showcase.
+
+The focused rendering fix is commit 5133753 on the import branch, cherry-picked as 83e7312 on the isolated fix/francois-latest-download worktree/branch. Source PR https://github.com/go-go-golems/francois/pull/8 changes only pages.go and its regression tests, so the service rollout is independent of the larger imported-source/screenshot archive. Full PostgreSQL-backed go test ./... -count=1 passes; GitHub tests, lint, dependency/secret scans and CodeQL have passed while the image build and GoSec finish. Production rollout evidence follows after CI.
+
+
+## Step 5: Address publication-order review and match instance browser titles
+
+Source PR #8 received an automated P1 review pointing out that Store.Releases orders by creation time while the catalog considers publication time current. Corrected the selection before rollout, and expanded the regression to publish drafts out of creation order. The user then requested matching instance document titles, which had remained the generic static portal title.
+
+### Prompt Context
+
+**User prompt (verbatim):** “The HTML TITLE on https://slop.boutique/instances/ins_9c5a9d0c6055a2bf3168 and probably other instance pages should match the relevant post page title, btw”
+
+**Assistant interpretation:** Use the current corresponding artifact page title and site brand for the outer instance page's document.title. **Inferred user intent:** Browser tabs/history should identify the application consistently with its public page, including after artifact renames. **Commit (code):** 4fa1b57 on the import branch; cherry-picked as 0ac2190 onto the isolated source PR branch.
+
+### What I did
+
+- Replaced creation-order truncation with selection of the maximum PublishedAt release. The page card and single HTML download now use the same selected release, matching the catalog/upgrade definition of newer.
+- Changed TestArtifactPageLatestDownload to create two drafts then publish the earlier-created one last. The older-published release is a free sample, so the test also proves an anonymous visitor cannot receive a stale free download while the current release is paid.
+- Added artifactTitle to the authorized instance-detail response and optional Go/TypeScript client fields. It is read after membership authorization, from the artifact's current metadata; no instance names are exposed to anonymous readers.
+- Launcher sets document.title to artifactTitle plus the existing session brand and restores the previous title on unmount. The instance's custom name and iframe label remain distinct.
+- Added TestInstanceUsesCurrentArtifactTitle: create a workspace with a custom private title, rename its artifact, then assert detail returns both the unchanged custom title and the current public artifact title.
+- pnpm check and pnpm build pass; the generated catalog.js is committed. The complete PostgreSQL-backed catalog/client integration suites pass after both changes. The earlier full Go suite passed before these targeted review/title changes; GitHub reruns its complete checks on the final head.
+
+### Why
+
+The published page title is artifact metadata, not a snapshot taken when a workspace was created. Returning it with the authorized detail avoids another frontend request and works for permitted pinned/hidden artifacts. The existing session already exposes the correct configured site brand, so the launcher uses the same suffix as the server-rendered page.
+
+### What worked
+
+The semantic regression covers artifact renaming while preserving private workspace naming. Publication-order coverage exercises the actual bug identified by review rather than asserting the implementation's loop shape. Generated assets and TypeScript types build successfully.
+
+### What didn't work
+
+The first download patch selected the first store result, which was creation-sorted. Review correctly identified its mismatch with publication-time semantics. The initial P1 finding was addressed before merging. The generic SPA HTML has no per-instance data, so document.title must be updated after the authorized detail/session load; no metadata is leaked from an unauthenticated server route.
+
+### What I learned
+
+An artifact's latest public release is a publication-time decision, not necessarily its highest version or newest uploaded draft. Application display names can change independently of saved-workspace names. Those distinctions belong in the test cases.
+
+### What was tricky to build
+
+The launcher must update only while it owns the page and restore the prior title when routing away, avoiding a stale app name on account/admin pages. It waits for both the current artifact title and site brand before composing the document title.
+
+### What warrants a second pair of eyes
+
+Review PublishedAt ordering and the authorized detail field, then verify live document titles against public artifact pages. Confirm no historical release data is deleted and both anonymous/free and entitled download policies remain correct.
+
+### What should be done in the future
+
+Wait for final CI, merge the isolated source PR and resulting image-only GitOps PR, then verify the rollout, single public download and instance titles in a real visitor session. Retain gallery/report evidence on the import branch.
+
+### Code review instructions
+
+Start with pkg/catalog/pages.go, pkg/catalog/instances.go, ui/catalog/instances.tsx and the two semantic integration tests. Compare the updated PR description with the final scope; frontend output is generated by pnpm build.
+
+### Technical details
+
+Source PR: https://github.com/go-go-golems/francois/pull/8. Final browser title format is artifact.Title + " · " + session.brand. No additional settings fields, migrations, queue or service were introduced. Current public HTML/media and tour policy were already verified independently of this service-code rollout.
