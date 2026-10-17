@@ -1,3 +1,4 @@
+import { bindInstanceLaunch } from "./instance-launch";
 import { serviceNotice } from "./service-notice";
 // public.ts adds the session-dependent actions to server-rendered storefront
 // pages: sign out, run an artifact, try a demo. Pages are complete without
@@ -31,7 +32,10 @@ class RequestError extends Error {
 type Failure = { error?: { code?: string; message?: string } };
 
 let session: Promise<Session> | undefined;
-const getSession = () => (session ??= fetch("/api/session", { credentials: "same-origin" }).then((r) => r.json() as Promise<Session>));
+const getSession = () =>
+  (session ??= fetch("/api/session", { credentials: "same-origin" }).then(
+    (r) => r.json() as Promise<Session>,
+  ));
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const s = await getSession();
@@ -46,18 +50,28 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   const out = (await r.json().catch(() => ({}))) as T & Failure;
-  if (!r.ok) throw new RequestError(out.error?.message || "Request failed", out.error?.code || "");
+  if (!r.ok)
+    throw new RequestError(
+      out.error?.message || "Request failed",
+      out.error?.code || "",
+    );
   return out;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string>, text?: string): HTMLElementTagNameMap[K] {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string>,
+  text?: string,
+): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
   if (text) e.textContent = text;
   return e;
 }
 
-const loginHref = () => "/auth/login?return=" + encodeURIComponent(location.pathname + location.search);
+const loginHref = () =>
+  "/signin?return=" +
+  encodeURIComponent(location.pathname + location.search);
 
 function fail(box: HTMLElement, message: string) {
   box.querySelector(".action-error")?.remove();
@@ -69,55 +83,187 @@ function fail(box: HTMLElement, message: string) {
 async function renderActions(box: HTMLElement) {
   const s = await getSession();
   const { release, title, demo } = box.dataset;
-  const meta = box.querySelector(".muted");
-  box.replaceChildren();
   const required = Number(box.dataset.rank ?? "1");
   const plan = s.plan;
-  // Mirrors Entitlement.CanRun plus the instance allowance; the server decides.
-  const canRun = !!plan && (plan.source === "staff" || (plan.source !== "guest" && plan.source !== "disabled" && plan.rank >= required && plan.instances > 0));
-  // One black button per screen: running when the plan allows it, otherwise
-  // the demo when there is one; everything else is a text link.
-  const hasDemo = demo === "true";
-  const demoAction = (primary: boolean) => {
-    const btn = el("button", { class: primary ? "btn btn-ink" : "tlink", type: "button" }, "Try");
-    btn.addEventListener("click", async () => {
-      btn.setAttribute("disabled", "");
-      try {
-        const inst = await post<{ id: string }>("/api/demos", {
-          artifactId: box.dataset.artifact,
-        });
-        location.assign("/instances/" + inst.id);
-      } catch (e) {
-        btn.removeAttribute("disabled");
-        fail(box, (e as Error).message);
-      }
-    });
-    return btn;
-  };
-  if (release && canRun) {
-    const run = el("button", { class: "btn btn-ink", type: "button" }, "Open");
-    run.addEventListener("click", async () => {
-      run.setAttribute("disabled", "");
-      try {
-        const inst = await post<{ id: string }>("/api/instances/open", {
-          releaseId: release,
-          title,
-        });
-        location.assign("/instances/" + inst.id);
-      } catch (e) {
-        run.removeAttribute("disabled");
-        fail(box, (e as Error).message);
-      }
-    });
-    box.append(run);
-  } else {
-    if (hasDemo) box.append(demoAction(true));
-    if (release && !hasDemo) {
-      const cls = hasDemo ? "tlink" : "btn btn-ink";
-      const name = box.dataset.plan;
-      box.append(el("a", { class: cls, href: loginHref() }, "Sign in"));
-    }
+  const canRun =
+    !!plan &&
+    (plan.source === "staff" ||
+      (plan.source !== "guest" &&
+        plan.source !== "disabled" &&
+        plan.rank >= required &&
+        plan.instances > 0));
+  const runner = box.closest<HTMLElement>("[data-runner]");
+  box.replaceChildren();
+  if (!release) return;
+  if (!canRun && demo !== "true") {
+    box.append(
+      el("a", { class: "site-button", href: loginHref() }, "Sign in to run"),
+    );
+    return;
   }
+  const start = el(
+    "button",
+    { class: "site-button", type: "button" },
+    "Start experiment →",
+  );
+  box.append(start);
+  let instance:
+    | { id: string; origin: string; launchBlocked?: string }
+    | undefined;
+  let unbind: (() => void) | undefined;
+  start.addEventListener("click", async () => {
+    start.disabled = true;
+    start.textContent = "Starting…";
+    box.querySelector(".action-error")?.remove();
+    try {
+      if (!instance) {
+        const created = canRun
+          ? await post<{ id: string }>("/api/instances/open", {
+              releaseId: release,
+              title,
+            })
+          : await post<{ id: string }>("/api/demos", {
+              artifactId: box.dataset.artifact,
+            });
+        // A new guest visit sets a cookie. Discard the pre-guest CSRF snapshot.
+        session = undefined;
+        await getSession();
+        const response = await fetch("/api/instances/" + created.id);
+        const out = await response.json();
+        if (!response.ok)
+          throw new RequestError(
+            out.error?.message || "Could not open the experiment",
+            out.error?.code || "",
+          );
+        instance = out;
+      }
+      if (!instance) throw new Error("Could not open the experiment");
+      if (instance.launchBlocked) throw new Error(instance.launchBlocked);
+      if (!runner) {
+        location.assign("/instances/" + instance.id);
+        return;
+      }
+      const surface = runner.querySelector<HTMLElement>(
+        "[data-runner-surface]",
+      )!;
+      const state = runner.querySelector<HTMLElement>("[data-runner-state]")!;
+      const frame = el("iframe", {
+        title: title || "Experiment",
+        sandbox:
+          "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
+        allow: "clipboard-write; fullscreen",
+        allowfullscreen: "",
+      });
+      const current = instance;
+      unbind?.();
+      unbind = bindInstanceLaunch(
+        frame,
+        current.origin,
+        (challenge) =>
+          post("/api/instances/" + current.id + "/launch", { challenge }),
+        (message) => {
+          state.textContent = message ? "Unavailable" : "Live";
+          runner.classList.toggle("is-live", !message);
+          if (message) fail(runner, message);
+          else runner.querySelector(".action-error")?.remove();
+        },
+      );
+      frame.src = current.origin + "/launch";
+      surface.replaceChildren(frame);
+      state.textContent = "Starting…";
+      runner.querySelector<HTMLAnchorElement>("[data-runner-link]")!.href =
+        "/instances/" + current.id;
+      runner
+        .querySelectorAll<HTMLElement>("[data-runner-control]")
+        .forEach((e) => (e.hidden = false));
+      box.hidden = true;
+      runner.querySelector<HTMLButtonElement>("[data-runner-reload]")!.onclick =
+        () => {
+          runner.querySelector(".action-error")?.remove();
+          state.textContent = "Starting…";
+          runner.classList.remove("is-live");
+          frame.src = current.origin + "/launch";
+        };
+      runner.querySelector<HTMLButtonElement>(
+        "[data-runner-fullscreen]",
+      )!.onclick = async () => {
+        if (surface.requestFullscreen) {
+          try {
+            await surface.requestFullscreen();
+          } catch {
+            fail(runner, "Use Open full screen to open the experiment.");
+          }
+        } else location.assign("/instances/" + current.id);
+      };
+    } catch (e) {
+      start.disabled = false;
+      start.textContent = "Try again →";
+      fail(box, (e as Error).message);
+    }
+  });
+  addEventListener("pagehide", (event) => {
+    if (!event.persisted) unbind?.();
+  });
+}
+
+function bindArchive() {
+  document
+    .querySelectorAll<HTMLImageElement>(".archive-thumb img")
+    .forEach((image) => {
+      const fallback = () => {
+        image.hidden = true;
+      };
+      image.addEventListener("error", fallback);
+      if (image.complete && image.naturalWidth === 0) fallback();
+    });
+  document
+    .querySelector<HTMLSelectElement>("[data-archive-sort]")
+    ?.addEventListener("change", (event) => {
+      (event.target as HTMLSelectElement).form?.requestSubmit();
+    });
+  const preview = document.querySelector<HTMLElement>("[data-archive-preview]");
+  if (!preview) return;
+  document
+    .querySelectorAll<HTMLElement>("[data-archive-row]")
+    .forEach((row) => {
+      const show = () => {
+        if (!matchMedia("(min-width: 901px) and (hover: hover)").matches)
+          return;
+        const media = row.querySelector(
+          "img:not([hidden]),video:not([hidden])",
+        );
+        if (!media) return;
+        const clone = media.cloneNode(true) as HTMLElement;
+        clone.setAttribute("aria-hidden", "true");
+        preview.replaceChildren(clone);
+        preview.hidden = false;
+        const rect = row.getBoundingClientRect();
+        preview.style.left =
+          Math.min(
+            innerWidth - preview.offsetWidth - 20,
+            rect.left + rect.width * 0.46,
+          ) + "px";
+        preview.style.top =
+          Math.max(
+            12,
+            Math.min(innerHeight - preview.offsetHeight - 12, rect.top + 24),
+          ) + "px";
+      };
+      const hide = () => {
+        preview.hidden = true;
+      };
+      row.addEventListener("mouseenter", show);
+      row.addEventListener("focus", show);
+      row.addEventListener("mouseleave", hide);
+      row.addEventListener("blur", hide);
+    });
+  addEventListener(
+    "scroll",
+    () => {
+      preview.hidden = true;
+    },
+    { passive: true },
+  );
 }
 
 // bindCheckout turns the pricing page's subscribe links into Checkout for
@@ -165,12 +311,15 @@ function bindSignOut(btn: HTMLElement) {
 }
 
 function main() {
+  bindArchive();
   // Looping cover videos stay still for visitors who prefer reduced motion.
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    document.querySelectorAll<HTMLVideoElement>("video[autoplay]").forEach((v) => {
-      v.autoplay = false;
-      v.pause();
-    });
+    document
+      .querySelectorAll<HTMLVideoElement>("video[autoplay]")
+      .forEach((v) => {
+        v.autoplay = false;
+        v.pause();
+      });
   }
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
   document.querySelectorAll<HTMLElement>("[data-checkout]").forEach((box) => {
@@ -185,5 +334,6 @@ function main() {
   });
 }
 
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", main);
+if (document.readyState === "loading")
+  document.addEventListener("DOMContentLoaded", main);
 else main();

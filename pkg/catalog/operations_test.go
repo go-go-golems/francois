@@ -248,8 +248,9 @@ func TestOpenWorkspaceAndTourResumeUnderConcurrency(t *testing.T) {
 	}
 }
 
-func TestCombinedFeedAndMinimalPublicStream(t *testing.T) {
+func TestCombinedFeedAndSeparatePublicPages(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	ctx := t.Context()
 	admin := e.user("writer", "admin", false)
 	release := e.publishArtifact(admin, "board", "")
@@ -274,8 +275,10 @@ func TestCombinedFeedAndMinimalPublicStream(t *testing.T) {
 	}
 	for _, path := range []string{"/", "/apps", "/journal"} {
 		code, page, _ := e.do(&admin, "portal.test", "GET", path, nil, nil)
-		if code != 200 || !strings.Contains(string(page), "A new note") || !strings.Contains(string(page), "/apps/board") {
-			t.Fatalf("merged page %s %d %s", path, code, page)
+		hasPost := strings.Contains(string(page), "A new note")
+		hasApp := strings.Contains(string(page), "/apps/board")
+		if code != 200 || (path == "/journal" && (!hasPost || hasApp)) || (path != "/journal" && (hasPost || !hasApp)) {
+			t.Fatalf("separate page %s %d %s", path, code, page)
 		}
 		for _, removed := range []string{`class="hero"`, `>Made by<`, `>Instances</a>`, `>Pricing</a>`} {
 			if strings.Contains(string(page), removed) {

@@ -99,11 +99,31 @@ func (s *Store) SetUserRole(ctx context.Context, id, role string) error {
 	if role != "subscriber" && role != "creator" && role != "admin" {
 		return errors.New("role must be subscriber, creator or admin")
 	}
-	tag, err := s.Pool.Exec(ctx, `UPDATE users SET role=$2 WHERE id=$1`, id, role)
-	if err == nil && tag.RowsAffected() == 0 {
-		return ErrNotFound
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return err
 	}
-	return err
+	defer func() { _ = tx.Rollback(ctx) }()
+	var old string
+	if err = tx.QueryRow(ctx, `SELECT role FROM users WHERE id=$1 FOR UPDATE`, id).Scan(&old); err != nil {
+		return notFound(err)
+	}
+	if old == role {
+		return tx.Commit(ctx)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE users SET role=$2 WHERE id=$1`, id, role); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE sessions SET revoked_at=now(),id_token='' WHERE user_id=$1 AND revoked_at IS NULL`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE runtime_grants SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM email_signins WHERE user_id=$1`, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // SetUserDisabled toggles hosted access. Disabling revokes runtime grants;

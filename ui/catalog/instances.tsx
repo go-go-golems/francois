@@ -1,3 +1,4 @@
+import { bindInstanceLaunch } from "./instance-launch";
 import React, { useEffect, useRef, useState } from "react";
 import { api, errorMessage, Instance } from "./api";
 import { navigate } from "./store";
@@ -29,13 +30,21 @@ export function Instances() {
       </div>
       {session?.access && !session.access.allowed && (
         <p className="notice bad">
-          {reasonLabel(session.access.reason)} — instances are frozen until access is active.{" "}
+          {reasonLabel(session.access.reason)} — instances are frozen until
+          access is active.{" "}
           <Link className="u" to="/account">
             Account
           </Link>
         </p>
       )}
-      {isLoading ? <Empty>Loading…</Empty> : <InstanceList list={own} empty="No instances yet. Run an application from the catalog." />}
+      {isLoading ? (
+        <Empty>Loading…</Empty>
+      ) : (
+        <InstanceList
+          list={own}
+          empty="No instances yet. Run an application from the catalog."
+        />
+      )}
       {shared.length > 0 && (
         <>
           <div className="lib-head">
@@ -53,8 +62,13 @@ function InstanceList({ list, empty }: { list: Instance[]; empty: string }) {
   return (
     <div className="lib-list">
       {list.map((i) => (
-        <div className={"lib-row" + (i.state !== "active" ? " is-unlisted" : "")} key={i.id}>
-          <div className="lib-thumb mono-mini">{i.title.slice(0, 2).toUpperCase()}</div>
+        <div
+          className={"lib-row" + (i.state !== "active" ? " is-unlisted" : "")}
+          key={i.id}
+        >
+          <div className="lib-thumb mono-mini">
+            {i.title.slice(0, 2).toUpperCase()}
+          </div>
           <div className="lib-main">
             <Link to={"/instances/" + i.id}>
               <strong>{i.title}</strong>
@@ -66,7 +80,11 @@ function InstanceList({ list, empty }: { list: Instance[]; empty: string }) {
           <span className="lib-tags">
             {i.members} {i.members === 1 ? "member" : "members"}
           </span>
-          <span className={"lib-status" + (i.state === "active" ? " on" : " bad")}>{i.state === "active" ? i.role : "suspended"}</span>
+          <span
+            className={"lib-status" + (i.state === "active" ? " on" : " bad")}
+          >
+            {i.state === "active" ? i.role : "suspended"}
+          </span>
           <span className="lib-added">{date(i.updatedAt)}</span>
           <div className="lib-actions">
             <Link className="btn btn-soft" to={"/instances/" + i.id}>
@@ -100,42 +118,18 @@ export function Launcher({ id }: { id: string }) {
   }, [inst?.artifactTitle, session?.brand]);
   useEffect(() => {
     if (!origin) return;
-    const receive = async (e: MessageEvent) => {
-      if (e.origin !== origin || e.source !== frame.current?.contentWindow) return;
-      const d = e.data;
-      if (d?.type !== "francois-launch-ready" || typeof d.challenge !== "string") return;
-      const target = frame.current!.contentWindow!;
-      try {
-        const r = await launch({ id, challenge: d.challenge }).unwrap();
-        setDenied("");
-        target.postMessage(
-          {
-            type: "francois-launch-code",
-            code: r.code,
-            challenge: d.challenge,
-          },
-          origin,
-        );
-      } catch (err: any) {
-        const message = errorMessage(err, "This instance cannot be opened right now");
-        setDenied(message);
-        target.postMessage(
-          {
-            type: "francois-launch-denied",
-            code: err?.data?.error?.code ?? "denied",
-            message,
-            challenge: d.challenge,
-          },
-          origin,
-        );
-      }
-    };
-    addEventListener("message", receive);
-    return () => removeEventListener("message", receive);
-  }, [origin, id]);
+    if (!frame.current) return;
+    return bindInstanceLaunch(
+      frame.current,
+      origin,
+      (challenge) => launch({ id, challenge }).unwrap(),
+      setDenied,
+    );
+  }, [origin, id, ready, launch]);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && document.activeElement?.tagName !== "IFRAME") navigate("/");
+      if (e.key === "Escape" && document.activeElement?.tagName !== "IFRAME")
+        navigate("/");
     };
     addEventListener("keydown", esc);
     document.body.classList.add("has-window");
@@ -161,7 +155,11 @@ export function Launcher({ id }: { id: string }) {
     );
   return (
     <div className="viewer">
-      <Link className="viewer-close u" to={inst.kind === "preview" ? "/studio" : "/"} aria-label="Close application">
+      <Link
+        className="viewer-close u"
+        to={inst.kind === "preview" ? "/studio" : "/"}
+        aria-label="Close application"
+      >
         Close
       </Link>
       <div className="v-table">

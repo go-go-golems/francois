@@ -1,0 +1,10 @@
+{
+  "observed": "2026-10-17",
+  "method": "kubectl get deployments,statefulsets -A -o json; filtered names/images only",
+  "namespace": "zitadel",
+  "images": [
+    "ghcr.io/zitadel/zitadel:v4.16.1",
+    "ghcr.io/zitadel/zitadel-login:v4.16.1"
+  ],
+  "mutations": false
+}

@@ -1,0 +1,10 @@
+{
+  "goTests": "go test ./... -count=1 with isolated TEST_DATABASE_URL: passed",
+  "race": "go test -race ./pkg/catalog ./pkg/catalog/identity -run TestEmail -count=1: passed",
+  "realProvider": "TestEmailSigninRealZitadel with explicit local fixture: passed",
+  "browser": "Chromium at 1440 and 390: actual mail, confirmation, account, replay and logout passed",
+  "frontend": "pnpm check, pnpm test (9 tests), pnpm build using Node v24.18.0/corepack: passed",
+  "lint": "make lint logcopter-check: passed",
+  "featureDefault": false,
+  "productionChanged": false
+}

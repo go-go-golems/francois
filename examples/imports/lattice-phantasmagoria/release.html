@@ -1,0 +1,2215 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Lattice Phantasmagoria</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Jacquard+24&family=Silkscreen:wght@400;700&family=VT323&display=swap">
+<style>
+/* Layout: the handheld is the page. Its notes sit in a narrow column beside it, and under it on phones. One dark look, chosen on purpose: the screens are the only light. */
+:root {
+  --bg: #0E0C12; --shell: #221E29; --shell-2: #2D2836; --edge: #3B3446; --glass: #060509;
+  --ink: #EDE6D8; --dim: #A69DB1; --faint: #5E566A; --pink: #FF4FA3;
+  --f-display: "Jacquard 24", Georgia, serif; --f-body: "Courier Prime", "Courier New", monospace; --f-label: "Silkscreen", "Courier New", monospace;
+  --s: clamp(300px, calc((100vh - 150px) / 1.78), 600px);
+  --side: calc(var(--s) * .34);
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { margin: 0; font: 16px/1.5 var(--f-body); }
+.wrap { box-sizing: border-box; max-width: 1280px; margin: 0 auto; padding-block: 18px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: auto minmax(0, 380px); gap: 44px; justify-content: center; align-items: start; }
+
+/* ---------- the handheld ---------- */
+.device { width: calc(var(--s) + 2 * var(--side)); user-select: none; -webkit-user-select: none; }
+.lid, .base { background: linear-gradient(180deg, var(--shell-2), var(--shell)); border: 1px solid var(--edge); }
+.lid { border-radius: 22px 22px 10px 10px; padding: calc(var(--s) * .07) var(--side) calc(var(--s) * .055); position: relative; }
+.lid::before, .lid::after { content: ""; position: absolute; top: 50%; width: calc(var(--side) * .32); height: calc(var(--s) * .2); transform: translateY(-50%);
+  background: radial-gradient(circle, var(--glass) 1.2px, transparent 1.6px) 0 0 / 9px 9px; opacity: .9; }
+.lid::before { left: calc(var(--side) * .34); } .lid::after { right: calc(var(--side) * .34); }
+.hinge { height: calc(var(--s) * .065); margin: 0 calc(var(--side) * .35); border-radius: 0 0 10px 10px; position: relative;
+  background: linear-gradient(180deg, #17141C, var(--shell-2) 45%, #17141C); }
+.led { position: absolute; right: 12%; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+.base { border-radius: 10px 10px 26px 26px; position: relative; display: grid; grid-template-columns: var(--side) var(--s) var(--side);
+  grid-template-areas: "dpad scr face" "dpad scr sys"; padding: calc(var(--s) * .075) 0 calc(var(--s) * .08); }
+.screen { position: relative; width: var(--s); aspect-ratio: 4 / 3; background: #000; border-radius: 3px; overflow: hidden;
+  box-shadow: 0 0 0 calc(var(--s) * .02) var(--glass), 0 0 0 calc(var(--s) * .02 + 1px) var(--edge); }
+.screen canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+.screen.bot { grid-area: scr; }
+.screen.grid::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .16;
+  background-image: linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px);
+  background-size: calc(100% / var(--cw, 256)) calc(100% / var(--ch, 192)); }
+
+.ctl { font: 700 11px/1 var(--f-label); color: var(--dim); background: radial-gradient(circle at 35% 30%, #3A3444, #18151D 70%); border: 1px solid #0B0A0E;
+  box-shadow: 0 2px 0 #08070A, inset 0 1px 0 rgba(255, 255, 255, .08); cursor: pointer; touch-action: none; padding: 0; }
+.ctl:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.ctl.on, .ctl:active { background: radial-gradient(circle at 50% 50%, #4A3150, #1E1424 70%); color: var(--ink); box-shadow: 0 0 0 1px var(--pink), 0 0 14px rgba(255, 79, 163, .45); transform: translateY(1px); }
+.dpad { grid-area: dpad; align-self: center; justify-self: center; display: grid; grid-template-columns: repeat(3, 1fr); width: min(132px, calc(var(--side) * .74)); aspect-ratio: 1; }
+.dpad .ctl { border-radius: 4px; }
+.dpad .c { background: #18151D; border-radius: 2px; }
+.dpad [data-b="UP"] { grid-column: 2; } .dpad [data-b="LEFT"] { grid-column: 1; grid-row: 2; } .dpad [data-b="RIGHT"] { grid-column: 3; grid-row: 2; } .dpad [data-b="DOWN"] { grid-column: 2; grid-row: 3; }
+.face { grid-area: face; align-self: end; justify-self: center; display: grid; grid-template-columns: repeat(3, 1fr); width: min(132px, calc(var(--side) * .76)); aspect-ratio: 1; gap: 2px; }
+.face .ctl { border-radius: 50%; font-size: 12px; }
+.face [data-b="X"] { grid-column: 2; } .face [data-b="Y"] { grid-column: 1; grid-row: 2; } .face [data-b="A"] { grid-column: 3; grid-row: 2; } .face [data-b="B"] { grid-column: 2; grid-row: 3; }
+.sys { grid-area: sys; align-self: start; justify-self: center; display: flex; gap: 8px; margin-top: 14px; }
+.sys .ctl { border-radius: 99px; padding: 6px 9px; font-size: 9px; letter-spacing: .08em; }
+.shoulder { position: absolute; top: -14px; width: calc(var(--side) * .62); height: 22px; border-radius: 12px 12px 4px 4px; font-size: 10px; }
+.shoulder.l { left: 10px; } .shoulder.r { right: 10px; }
+
+/* ---------- notes ---------- */
+.notes { min-width: 0; display: grid; gap: 22px; padding-top: 6px; }
+.kicker { margin: 0; font: 400 11px/1.4 var(--f-label); letter-spacing: .14em; color: var(--dim); }
+h1 { margin: 2px 0 0; font: 400 clamp(40px, 5vw, 58px)/.95 var(--f-display); text-wrap: balance; }
+.now h2 { margin: 0; font: 400 clamp(34px, 4vw, 46px)/1 var(--f-display); color: var(--pink); text-wrap: balance; }
+.meta { margin: 8px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; font-size: 14px; }
+.meta dt { font: 400 10px/1.9 var(--f-label); letter-spacing: .1em; color: var(--dim); }
+.meta dd { margin: 0; }
+.hints { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; }
+.hints li { padding-left: 16px; position: relative; }
+.hints li::before { content: ""; position: absolute; left: 0; top: .62em; width: 7px; height: 7px; background: var(--pink); }
+h3 { margin: 0 0 8px; font: 400 11px/1.4 var(--f-label); letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.verbs dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 14px; font-size: 14px; }
+.verbs dt { font: 700 11px/1.75 var(--f-label); color: var(--ink); }
+.verbs dd { margin: 0; color: var(--dim); }
+.keys { font-size: 13px; color: var(--dim); }
+.keys kbd { font: 700 11px/1 var(--f-label); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; background: var(--shell); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 400 10px/1 var(--f-label); letter-spacing: .08em; color: var(--ink); background: transparent; border: 1px solid var(--edge); border-radius: 99px; padding: 7px 10px; cursor: pointer; }
+.chip:hover { border-color: var(--dim); }
+.chip[aria-current="true"] { border-color: var(--pink); color: var(--pink); }
+.chip:focus-visible, .opt:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { font: 400 10px/1 var(--f-label); letter-spacing: .08em; color: var(--dim); background: var(--shell); border: 1px solid var(--edge); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+.opt[aria-pressed="true"] { color: var(--ink); border-color: var(--dim); }
+.note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--dim); max-width: 62ch; }
+.err { margin: 0; padding: 12px 14px; border: 1px solid var(--pink); color: var(--ink); font-size: 14px; }
+
+@media (max-width: 1080px) { .wrap { grid-template-columns: minmax(0, 1fr); justify-items: center; } .notes { max-width: 640px; width: 100%; } }
+@media (max-width: 760px) {
+  :root { --s: calc(100vw - 32px - 28px); --side: 14px; }
+  .lid { padding: 16px 14px 12px; } .lid::before, .lid::after { display: none; }
+  .hinge { margin: 0 24px; }
+  .base { grid-template-columns: 1fr 1fr; grid-template-areas: "scr scr" "dpad face" "sys sys"; padding: 16px 14px 18px; row-gap: 18px; }
+  .screen.bot { justify-self: center; }
+  .dpad, .face { width: 128px; }
+  .face { align-self: center; }
+  .sys { margin-top: 0; }
+  .shoulder { width: 84px; }
+}
+@media (prefers-reduced-motion: reduce) { .ctl.on, .ctl:active { transform: none; } }
+</style>
+
+<div class="wrap">
+  <div class="device" id="device" role="application" aria-label="Lattice handheld. The bottom screen is the touch screen. Keys: arrows, X, Z, S, A, Q, W, Enter, Shift.">
+    <div class="lid"><div class="screen top" id="topWrap"><canvas id="scrTop" width="1024" height="768" aria-label="Top screen"></canvas></div></div>
+    <div class="hinge" aria-hidden="true"><span class="led"></span></div>
+    <div class="base">
+      <button type="button" class="ctl shoulder l" data-b="L" id="btnL">L</button>
+      <button type="button" class="ctl shoulder r" data-b="R" id="btnR">R</button>
+      <div class="dpad" aria-label="Direction pad">
+        <button type="button" class="ctl" data-b="UP" id="btnUp" aria-label="Up">&#9650;</button>
+        <button type="button" class="ctl" data-b="LEFT" id="btnLeft" aria-label="Left">&#9664;</button>
+        <span class="c" style="grid-column:2;grid-row:2"></span>
+        <button type="button" class="ctl" data-b="RIGHT" id="btnRight" aria-label="Right">&#9654;</button>
+        <button type="button" class="ctl" data-b="DOWN" id="btnDown" aria-label="Down">&#9660;</button>
+      </div>
+      <div class="screen bot" id="botWrap"><canvas id="scrBot" width="1024" height="768" aria-label="Bottom screen, touch it"></canvas></div>
+      <div class="face" aria-label="Face buttons">
+        <button type="button" class="ctl" data-b="X" id="btnX">X</button>
+        <button type="button" class="ctl" data-b="Y" id="btnY">Y</button>
+        <button type="button" class="ctl" data-b="A" id="btnA">A</button>
+        <button type="button" class="ctl" data-b="B" id="btnB">B</button>
+      </div>
+      <div class="sys">
+        <button type="button" class="ctl" data-b="SELECT" id="btnSelect">SELECT</button>
+        <button type="button" class="ctl" data-b="START" id="btnStart">START</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="notes">
+    <div>
+      <p class="kicker">LATTICE &middot; FIRMWARE 1992.3</p>
+      <h1>Lattice Phantasmagoria</h1>
+    </div>
+    <p class="err" id="err" hidden></p>
+    <section class="now" aria-live="polite">
+      <h2 id="scName">Boot</h2>
+      <dl class="meta">
+        <dt>ELEMENT</dt><dd id="scEl">Boot screen</dd>
+        <dt>AFTER</dt><dd><i id="scBook">The Electric Ant</i></dd>
+      </dl>
+      <ul class="hints" id="scHint"></ul>
+    </section>
+    <section class="verbs">
+      <h3>Breaking it, anywhere</h3>
+      <dl>
+        <dt>ANY KEY</dt><dd>melts whatever it touched. Mash to melt more.</dd>
+        <dt>L / R</dt><dd>tear the console open along the hinge. Both tear wider.</dd>
+        <dt>HOLD X</dt><dd>everything turns into microglobular molecules.</dd>
+        <dt>STYLUS</dt><dd>drag on the bottom screen to draw strands of hyperreality. They climb onto the top screen.</dd>
+        <dt>HOLD Y</dt><dd>sprays Ubik. It puts reality back, for a while.</dd>
+        <dt>START</dt><dd>pauses any cartridge. SELECT goes back to the menu.</dd>
+      </dl>
+    </section>
+    <p class="keys">Keyboard: <kbd>&larr;&uarr;&rarr;&darr;</kbd> pad, <kbd>X</kbd> A, <kbd>Z</kbd> B, <kbd>S</kbd> X, <kbd>A</kbd> Y, <kbd>Q</kbd> L, <kbd>W</kbd> R, <kbd>Enter</kbd> START, <kbd>Shift</kbd> SELECT. A gamepad works too.</p>
+    <section>
+      <h3>Go to</h3>
+      <div class="chips" id="chips"></div>
+    </section>
+    <section>
+      <h3>Display</h3>
+      <div class="opts">
+        <button type="button" class="opt" id="res256" aria-pressed="true">DS 256&times;192</button>
+        <button type="button" class="opt" id="res512" aria-pressed="false">LATTICE 512&times;384</button>
+        <button type="button" class="opt" id="motion" aria-pressed="true">MOTION ON</button>
+      </div>
+    </section>
+    <p class="note">Every console element here still does its job: A confirms, B backs out, the health bar drains and the inventory holds your things. Each screen's UI is drawn plainly, the way Lattice draws its widgets. The shaders receive only that picture and the game state, then take it apart. Each screen renders at 256&times;192, as it would on the device, and is scaled up without smoothing. None of this has run on the RG DS Plus yet.</p>
+  </aside>
+</div>
+
+<script>
+/* dshost.js — the browser twin of the DS shader contract (DSSHADE-001 guide §8, Phase 0).
+
+   One shared WebGL2 context renders every screen of every sketch at that sketch's internal resolution,
+   then each screen is copied nearest-neighbour into its own 2D canvas. That is the device's shape too:
+   one GL context, two windows (FL:src/main.cpp:101-118, LD:src/platform/platform.cpp:64-76).
+
+   A sketch is { glsl: {name: source}, params, res, frame(h) }. frame() is plain JS that calls the host:
+     h.screen('top'|'bottom', prog, opts)   final pass of a screen → its canvas
+     h.pass(prog, target, opts)             offscreen pass
+     h.sim(key, prog, w, h, opts)           ping-pong simulation stepped at a fixed 60 Hz → texture
+     h.typeField(key, spec)                 text as a field: r crisp, g soft, b halo (no_shade's typeAt)
+     h.svg(key, svg, w, h)                  an SVG drawing as a texture (UI mock-ups stand in for Lattice frames)
+   Every shader gets the same header: the uniforms of guide §8.1, no_shade's LIB, typeAt, prev().
+   Textures are uploaded with y flipped, so every sampler in every shader is y-up, like gl_FragCoord. */
+(function () {
+'use strict';
+
+const LW = 512, LH = 384, GAP = 92;                 // logical screen and hinge, in Lattice logical px
+const BUDGET = 13.33e6;                              // Mali-G52 GPU-active cycles per 60 Hz frame (Falllinie PERF-009/010)
+const BUTTONS = ['A', 'B', 'X', 'Y', 'L', 'R', 'START', 'SELECT', 'UP', 'DOWN', 'LEFT', 'RIGHT'];
+const KEYMAP = { x: 'A', z: 'B', s: 'X', a: 'Y', q: 'L', w: 'R', Enter: 'START', Backspace: 'SELECT',
+  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT' };   // LD:src/platform/input.hpp:20-22
+
+/* palettes: four tokens, as in no_shade; the Lattice ones are its real theme tokens (LD:src/gl/theme.cpp:11-31) */
+const PALETTES = {
+  'Lattice dark': { ground: '#121518', ink: '#E3E6E9', hot: '#F07158', cool: '#86A2F7' },
+  'Lattice light': { ground: '#FAFAF8', ink: '#111417', hot: '#D23B1E', cool: '#1F4FD1' },
+  'Blueprint': { ground: '#123A78', ink: '#F2F6FF', hot: '#FFC857', cool: '#A9C1EA' },
+  'no_shade': { ground: '#161616', ink: '#F2F2F2', hot: '#FF3B1F', cool: '#3D5AFE' }
+};
+
+/* ---------- colour on the CPU: palettes glide in OKLab (no_shade NS.themeStep, NS:runtime.js:97) ---------- */
+const lin = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const srgb = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055;
+const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const toLab = ([r, g, b]) => { r = lin(r); g = lin(g); b = lin(b);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s]; };
+const fromLab = ([L, a, b]) => { let l = L + 0.3963377774 * a + 0.2158037573 * b, m = L - 0.1055613458 * a - 0.0638541728 * b, s = L - 0.0894841775 * a - 1.2914855480 * b; l = l * l * l; m = m * m * m; s = s * s * s;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s].map(c => Math.max(0, Math.min(1, srgb(c)))); };
+
+/* ---------- GLSL: the contract header (guide §8.1) ---------- */
+const LIB = `
+float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }
+vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*vec3(.1031, .1030, .0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz)*p3.zy); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f);
+  return mix(mix(hash12(i), hash12(i + vec2(1., 0.)), u.x), mix(hash12(i + vec2(0., 1.)), hash12(i + vec2(1., 1.)), u.x), u.y); }
+float fbm(vec2 p){ float v = 0., a = .5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int i = 0; i < 5; i++){ v += a*vnoise(p); p = m*p; a *= .5; } return v; }
+vec3 ns_lin(vec3 c){ return mix(c/12.92, pow((c + .055)/1.055, vec3(2.4)), step(.04045, c)); }
+vec3 ns_srgb(vec3 c){ c = clamp(c, 0., 1.); return mix(c*12.92, 1.055*pow(c, vec3(1./2.4)) - .055, step(.0031308, c)); }
+vec3 toOklab(vec3 s){ vec3 c = ns_lin(s);
+  vec3 l = vec3(dot(c, vec3(.4122214708, .5363325363, .0514459929)), dot(c, vec3(.2119034982, .6806995451, .1073969566)), dot(c, vec3(.0883024619, .2817188376, .6299787005)));
+  l = pow(max(l, 0.), vec3(1./3.));
+  return vec3(dot(l, vec3(.2104542553, .7936177850, -.0040720468)), dot(l, vec3(1.9779984951, -2.4285922050, .4505937099)), dot(l, vec3(.0259040371, .7827717662, -.8086757660))); }
+vec3 fromOklab(vec3 L){ vec3 l = vec3(L.x + .3963377774*L.y + .2158037573*L.z, L.x - .1055613458*L.y - .0638541728*L.z, L.x - .0894841775*L.y - 1.2914855480*L.z); l = l*l*l;
+  return ns_srgb(vec3(dot(l, vec3(4.0767416621, -3.3077115913, .2309699292)), dot(l, vec3(-1.2684380046, 2.6097574011, -.3413193965)), dot(l, vec3(-.0041960863, -.7034186147, 1.7076147010)))); }
+vec3 mixOk(vec3 a, vec3 b, float t){ return fromOklab(mix(toOklab(a), toOklab(b), clamp(t, 0., 1.))); }
+`;
+const header = (params, hasFloat) => `#version 300 es
+precision highp float; precision highp int; precision highp sampler2D;
+uniform vec3  iResolution;   // screens: (512, 384, internal scale); offscreen targets: (w, h, 1)
+uniform float iTime;         // seconds, wrapped at 600
+uniform int   iFrame;        // frame index (for a sim: its own step count)
+uniform int   iScreen;       // 0 top (DSI-2), 1 bottom (DSI-1)
+uniform vec4  iTouch;        // bottom screen only: xy logical px y-up, z down, w smoothed 0..1
+uniform vec4  iPointer;      // this screen's pointer; on the top screen: mouse there, else the touch projected through the hinge
+uniform ivec2 iButtons;      // x held, y pressed this frame; bits: A B X Y L R START SELECT UP DOWN LEFT RIGHT
+uniform vec2  iTouchVel;     // lab extension: smoothed touch velocity, logical px/s
+uniform vec3  u_ground, u_ink, u_hot, u_cool;
+uniform float p_0, p_1, p_2, p_3, p_4, p_5;
+uniform sampler2D iChannel0, iChannel1, iChannel2, u_type;
+${params.map((p, i) => `#define p_${p[0]} p_${i}`).join('\n')}
+#define HAS_FLOAT ${hasFloat ? 1 : 0}
+const float DS_GAP = ${GAP}.;
+const float PI = 3.14159265;
+const int BTN_A = 0, BTN_B = 1, BTN_X = 2, BTN_Y = 3, BTN_L = 4, BTN_R = 5, BTN_START = 6, BTN_SELECT = 7, BTN_UP = 8, BTN_DOWN = 9, BTN_LEFT = 10, BTN_RIGHT = 11;
+bool held(int b){ return (iButtons.x & (1 << b)) != 0; }
+bool pressed(int b){ return (iButtons.y & (1 << b)) != 0; }
+// both screens as one canvas, bottom screen at y 0..384, the hinge above it, the top screen above that
+vec2 dsCanvas(vec2 f){ return iScreen == 0 ? f + vec2(0., ${LH}. + DS_GAP) : f; }
+vec2 dsCanvasSize(){ return vec2(${LW}., ${2 * LH}. + DS_GAP); }
+// text drawn by shaders (no_shade typeAt): x crisp coverage, y soft (crosses .5 at the edge), z wide halo
+vec3 typeAt(vec2 f){ vec2 uv = f/vec2(${LW}., ${LH}.); if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) return vec3(0.); return texture(u_type, uv).rgb; }
+// a simulation's last state (iChannel0), in its own cells
+vec4 prev(vec2 f){ ivec2 s = textureSize(iChannel0, 0); return texelFetch(iChannel0, ivec2(mod(floor(f), vec2(s))), 0); }
+vec4 prevClamp(vec2 f, vec4 outside){ ivec2 s = textureSize(iChannel0, 0), i = ivec2(floor(f)); if (any(lessThan(i, ivec2(0))) || any(greaterThanEqual(i, s))) return outside; return texelFetch(iChannel0, i, 0); }
+vec4 prevSmooth(vec2 uv){ return texture(iChannel0, uv); }
+` + LIB;
+const FOOTER = `
+out vec4 ns_out;
+void main(){ mainImage(ns_out, gl_FragCoord.xy/iResolution.z); }`;
+const VS = `#version 300 es
+void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p*2. - 1., 0., 1.); }`;   // FL:assets/shaders/post_vs.glsl
+
+/* ---------- the shared GL context ---------- */
+class Host {
+  constructor(canvas) {
+    this.canvas = canvas || document.createElement('canvas');   // the arcade passes its full-page stage canvas
+    if (!canvas) { this.canvas.width = 1024; this.canvas.height = 768; }
+    const gl = this.canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true, premultipliedAlpha: false });
+    if (!gl) throw new Error('This browser has no WebGL2, so the sketches cannot run.');
+    this.gl = gl;
+    this.hasFloat = !!gl.getExtension('EXT_color_buffer_float');
+    this.vao = gl.createVertexArray();
+    this.vs = this.shader(gl.VERTEX_SHADER, VS);
+    this.progs = new Map();
+    this.white = this.texFromPixels(1, 1, new Uint8Array([0, 0, 0, 255]));
+  }
+  shader(type, src) {
+    const gl = this.gl, sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(sh); gl.deleteShader(sh); throw new Error(log); }
+    return sh;
+  }
+  /** Assemble header + user source + footer, compile, link, and reflect every active uniform. Cached by source. */
+  program(user, params) {
+    const src = header(params, this.hasFloat) + '\n#line 1\n' + user + FOOTER;
+    let P = this.progs.get(src); if (P) return P;
+    const gl = this.gl, p = gl.createProgram();
+    gl.attachShader(p, this.vs); gl.attachShader(p, this.shader(gl.FRAGMENT_SHADER, src)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i), name = info.name.replace(/\[0\]$/, ''); u[name] = { loc: gl.getUniformLocation(p, info.name), type: info.type }; }
+    P = { p, u }; this.progs.set(src, P); return P;
+  }
+  set(P, name, v) {
+    const e = P.u[name]; if (!e) return;   // the driver strips unused uniforms; setting one is never an error
+    const gl = this.gl, L = e.loc;
+    switch (e.type) {
+      case gl.FLOAT: gl.uniform1f(L, v); break;
+      case gl.FLOAT_VEC2: gl.uniform2fv(L, v); break;
+      case gl.FLOAT_VEC3: gl.uniform3fv(L, v); break;
+      case gl.FLOAT_VEC4: gl.uniform4fv(L, v); break;
+      case gl.INT: case gl.BOOL: gl.uniform1i(L, v); break;
+      case gl.INT_VEC2: gl.uniform2iv(L, v); break;
+      default: gl.uniform1i(L, v);
+    }
+  }
+  texFromPixels(w, h, data) {
+    const gl = this.gl, t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    this.params(gl.LINEAR); return t;
+  }
+  texFromCanvas(c, t) {
+    const gl = this.gl; t = t || gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    this.params(gl.LINEAR); return t;
+  }
+  params(filter, wrap) {
+    const gl = this.gl;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap || gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap || gl.CLAMP_TO_EDGE);
+  }
+  /** A render target. float: RGBA16F when the browser can render to it, else RGBA8 (the shader sees HAS_FLOAT). */
+  target(w, h, o = {}) {
+    const gl = this.gl, tex = gl.createTexture(), f = o.float && this.hasFloat;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, f ? gl.RGBA16F : gl.RGBA8, w, h, 0, gl.RGBA, f ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+    this.params(o.linear ? gl.LINEAR : gl.NEAREST, o.repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { tex, fb, w, h };
+  }
+}
+
+/* ---------- one sketch on the page ---------- */
+class SketchRun {
+  constructor(host, sk, ui) {
+    this.H = host; this.sk = sk; this.ui = ui;
+    this.res = sk.res || [256, 192];
+    this.palName = sk.palette || 'Lattice dark';
+    this.pal = Object.fromEntries(Object.entries(PALETTES[this.palName]).map(([k, v]) => [k, toLab(hexRgb(v))]));
+    this.rgb = {}; this.glide(0);
+    this.params = Object.fromEntries((sk.params || []).map(p => [p[0], p[2]]));
+    this.time = 0; this.frame = 0; this.dt = 0; this.running = true; this.dirty = true;
+    this.touch = { x: 256, y: 192, down: 0, w: 0, vx: 0, vy: 0, tapped: false };
+    this.top = { x: 256, y: 192, down: 0, active: false };
+    this.heldMask = 0; this.latch = 0; this.pressedMask = 0;
+    this.state = {}; this.scr = [null, null]; this.targets = new Map(); this.sims = new Map(); this.tex = new Map();
+    this.error = null;
+  }
+  setPalette(name) { this.palName = name; this.dirty = true; }
+  /** palette glide in OKLab; returns true while still moving */
+  glide(dt) {
+    const want = PALETTES[this.palName], k = dt > 0 ? 1 - Math.exp(-dt * 6) : 1; let moving = false;
+    for (const n of ['ground', 'ink', 'hot', 'cool']) {
+      const w = toLab(hexRgb(want[n])), c = this.pal[n].map((x, i) => x + (w[i] - x) * k);
+      if (Math.hypot(...c.map((x, i) => x - w[i])) > 0.002) moving = true; else c.splice(0, 3, ...w);
+      this.pal[n] = c; this.rgb[n] = fromLab(c);
+    }
+    return moving;
+  }
+  /* ----- the API a sketch's frame(h) uses ----- */
+  param(n) { return this.params[n]; }
+  pressed(b) { return !!(this.pressedMask & (1 << BUTTONS.indexOf(b))); }
+  held(b) { return !!(this.heldMask & (1 << BUTTONS.indexOf(b))); }
+  prog(name) { const src = this.sk.glsl[name]; if (src == null) throw new Error('no shader named ' + name); try { return this.H.program(src, this.sk.params || []); } catch (e) { throw new Error(name + '.glsl\n' + e.message); } }
+  pointerFor(screen) {
+    const t = this.touch;
+    if (screen === 1) return [t.x, t.y, t.down, t.w];
+    if (this.top.active) return [this.top.x, this.top.y, this.top.down, 1];
+    return [t.x, t.y - (LH + GAP), t.down, t.w];   // the finger seen through the hinge
+  }
+  bind(P, o, screen, res, simFrame) {
+    const H = this.H, gl = H.gl;
+    gl.useProgram(P.p);
+    H.set(P, 'iResolution', res); H.set(P, 'iTime', this.time % 600); H.set(P, 'iFrame', simFrame ?? this.frame);
+    H.set(P, 'iScreen', screen); H.set(P, 'iTouch', [this.touch.x, this.touch.y, this.touch.down, this.touch.w]);
+    H.set(P, 'iPointer', this.pointerFor(screen)); H.set(P, 'iButtons', [this.heldMask, this.pressedMask]);
+    H.set(P, 'iTouchVel', [this.touch.vx, this.touch.vy]);
+    for (const n of ['ground', 'ink', 'hot', 'cool']) H.set(P, 'u_' + n, this.rgb[n]);
+    (this.sk.params || []).forEach((p, i) => H.set(P, 'p_' + i, +this.params[p[0]]));
+    for (const [k, v] of Object.entries(o.uniforms || {})) H.set(P, k, v);
+    let unit = 0;
+    for (const name of ['iChannel0', 'iChannel1', 'iChannel2', 'u_type']) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, H.white); H.set(P, name, unit); unit++; }
+    unit = 0;
+    for (const [k, t] of Object.entries(o.textures || {})) { const u = ['iChannel0', 'iChannel1', 'iChannel2', 'u_type'].indexOf(k); const at = u >= 0 ? u : 4 + unit++; gl.activeTexture(gl.TEXTURE0 + at); gl.bindTexture(gl.TEXTURE_2D, t && t.tex ? t.tex : t); H.set(P, k, at); }
+    gl.bindVertexArray(H.vao);
+  }
+  /** The final pass of one screen, drawn at the internal resolution, then copied to the screen's canvas. */
+  screen(which, name, o = {}) {
+    const H = this.H, gl = H.gl, s = which === 'top' ? 0 : 1, [rw, rh] = this.res;
+    if (this.ui.offscreen) {   // the arcade: keep the screen as a mipmapped texture; the stage composites it
+      let T = this.scr[s];
+      if (!T || T.w !== rw || T.h !== rh) { T = this.scr[s] = H.target(rw, rh); gl.bindTexture(gl.TEXTURE_2D, T.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, T.fb); gl.viewport(0, 0, rw, rh); gl.disable(gl.BLEND);
+      this.bind(this.prog(name), o, s, [LW, LH, rw / LW]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindTexture(gl.TEXTURE_2D, T.tex); gl.generateMipmap(gl.TEXTURE_2D);
+      return;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, rw, rh); gl.disable(gl.BLEND);
+    this.bind(this.prog(name), o, s, [LW, LH, rw / LW]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const c = this.ui.screens[s], ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;   // nearest-neighbour upscale, like Falllinie's copy_fs
+    ctx.drawImage(H.canvas, 0, H.canvas.height - rh, rw, rh, 0, 0, c.width, c.height);
+  }
+  target(key, w, h, o) { let T = this.targets.get(key); if (!T || T.w !== w || T.h !== h) { T = this.H.target(w, h, o); this.targets.set(key, T); } return T; }
+  /** An offscreen pass into target T (iResolution = its size, f = its pixels). */
+  pass(name, T, o = {}) {
+    const gl = this.H.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, T.fb); gl.viewport(0, 0, T.w, T.h); gl.disable(gl.BLEND);
+    this.bind(this.prog(name), o, o.screen ?? 1, [T.w, T.h, 1], o.frame);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  /** A ping-pong simulation, stepped at a fixed 60 Hz whatever the display rate (no_shade toys, NS:runtime.js:2562). */
+  sim(key, name, w, h, o = {}) {
+    let S = this.sims.get(key);
+    if (!S || S.w !== w || S.h !== h) { S = { a: this.H.target(w, h, o), b: this.H.target(w, h, o), w, h, steps: 0, acc: 0 }; this.sims.set(key, S); }
+    if (this.running || S.steps === 0) {
+      S.acc = Math.min(2 / 60, S.acc + (S.steps === 0 ? 1 / 60 : this.dt));
+      const ticks = Math.min(2, Math.floor(S.acc * 60 + 0.08)); S.acc = Math.max(0, S.acc - ticks / 60);
+      const n = o.everyFrame ? 1 : ticks * (o.steps || 1);   // everyFrame: exactly one step per drawn frame
+      for (let i = 0; i < n; i++) {
+        this.pass(name, S.b, Object.assign({}, o, { frame: S.steps, textures: Object.assign({}, o.textures, { iChannel0: S.a }) }));
+        const t = S.a; S.a = S.b; S.b = t; S.steps++;
+      }
+    }
+    return S.a;
+  }
+  resetSims() { for (const S of this.sims.values()) S.steps = 0; this.dirty = true; }
+  /** Text as a field, the way no_shade's textTex does it (NS:runtime.js:2085): crisp coverage in red,
+      a soft copy in green and a wide halo in blue, drawn off-canvas so only their shadows land. */
+  typeField(key, spec) {
+    const sig = JSON.stringify(spec); let T = this.tex.get(key);
+    if (T && T.sig === sig) return T.tex;
+    const k = 2, c = document.createElement('canvas'); c.width = LW * k; c.height = LH * k;
+    const x = c.getContext('2d'), OFF = 20000, px = spec.size * k;
+    x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
+    x.font = `${spec.weight || 800} ${px}px ${spec.font || 'Archivo, Arial Black, sans-serif'}`;
+    x.textAlign = spec.align || 'center'; x.textBaseline = 'middle';
+    if ('letterSpacing' in x) x.letterSpacing = ((spec.track || 0) * px) + 'px';
+    const lines = String(spec.text).split('\n'), lh = px * (spec.lh || 1.05);
+    const at = (i) => [(spec.x ?? 256) * k, (LH - (spec.y ?? 192)) * k + (i - (lines.length - 1) / 2) * lh];
+    x.globalCompositeOperation = 'lighter';
+    const shadow = (col, blur) => { x.save(); x.shadowColor = col; x.shadowBlur = blur; x.shadowOffsetX = OFF; x.fillStyle = col; lines.forEach((l, i) => { const [a, b] = at(i); x.fillText(l, a - OFF, b); }); x.restore(); };
+    shadow('#00ff00', Math.max(3, px * 0.1));
+    shadow('#0000ff', px * 0.55);
+    x.fillStyle = '#ff0000'; lines.forEach((l, i) => { const [a, b] = at(i); x.fillText(l, a, b); });
+    const tex = this.H.texFromCanvas(c, T && T.tex);
+    this.tex.set(key, { sig, tex }); return tex;
+  }
+  /** An SVG drawing as a texture. Until it has loaded, a flat placeholder. */
+  svg(key, svg, w = 1024, h = 768) {
+    let T = this.tex.get(key);
+    if (T && T.svg === svg) return T.tex;
+    const tex = T ? T.tex : this.H.texFromPixels(1, 1, new Uint8Array([128, 128, 128, 255]));
+    T = { svg, tex }; this.tex.set(key, T);
+    const img = new Image();
+    img.onload = () => { try { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); this.H.texFromCanvas(c, tex); this.dirty = true; } catch (e) { console.warn('svg texture', e); } };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    return tex;
+  }
+  budget() { const px = this.res[0] * this.res[1] * 2; return { px, cpp: BUDGET / px }; }
+}
+
+/* ---------- the page loop: only sketches on screen run; one has the keyboard ---------- */
+const DS = { LW, LH, GAP, BUDGET, PALETTES, BUTTONS, KEYMAP, runs: [], focus: null, host: null };
+DS.init = (canvas) => { if (!DS.host) DS.host = new Host(canvas); return DS.host; };
+DS.add = (sk, ui) => { const r = new SketchRun(DS.init(), sk, ui); r.visible = false; DS.runs.push(r); wireInput(r); return r; };
+
+function wireInput(r) {
+  const [top, bot] = r.ui.screens;
+  const pos = (e, c) => { const b = c.getBoundingClientRect(); return [(e.clientX - b.left) / b.width * LW, (1 - (e.clientY - b.top) / b.height) * LH]; };
+  let last = null;
+  bot.addEventListener('pointerdown', e => { bot.setPointerCapture(e.pointerId); const [x, y] = pos(e, bot); Object.assign(r.touch, { x, y, down: 1, tapped: true }); last = [x, y, performance.now()]; DS.focus = r; r.dirty = true; e.preventDefault(); });
+  bot.addEventListener('pointermove', e => { if (!r.touch.down) return; const [x, y] = pos(e, bot), now = performance.now();
+    if (last) { const dt = Math.max(1, now - last[2]) / 1000; r.touch.vx = r.touch.vx * 0.5 + (x - last[0]) / dt * 0.5; r.touch.vy = r.touch.vy * 0.5 + (y - last[1]) / dt * 0.5; }
+    last = [x, y, now]; Object.assign(r.touch, { x, y }); r.dirty = true; });
+  const up = () => { r.touch.down = 0; r.touch.vx = r.touch.vy = 0; r.dirty = true; };
+  bot.addEventListener('pointerup', up); bot.addEventListener('pointercancel', up);
+  top.addEventListener('pointermove', e => { const [x, y] = pos(e, top); Object.assign(r.top, { x, y, active: true }); r.dirty = true; });
+  top.addEventListener('pointerdown', e => { top.setPointerCapture(e.pointerId); const [x, y] = pos(e, top); Object.assign(r.top, { x, y, down: 1, active: true }); DS.focus = r; r.dirty = true; e.preventDefault(); });
+  top.addEventListener('pointerup', () => { r.top.down = 0; });
+  top.addEventListener('pointerleave', () => { if (!r.top.down) r.top.active = false; r.dirty = true; });
+  r.ui.card.addEventListener('pointerdown', () => { DS.focus = r; DS.onFocus && DS.onFocus(r); });
+}
+DS.press = (r, b, down) => { const bit = 1 << BUTTONS.indexOf(b); if (down) { r.heldMask |= bit; r.latch |= bit; } else r.heldMask &= ~bit; r.dirty = true; };
+addEventListener('keydown', e => { const b = KEYMAP[e.key]; const r = DS.focus; if (!b || !r || !r.visible || /INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return; if (!e.repeat) DS.press(r, b, true); e.preventDefault(); });
+addEventListener('keyup', e => { const b = KEYMAP[e.key]; if (b && DS.focus) DS.press(DS.focus, b, false); });
+
+let lastT = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  for (const r of DS.runs) {
+    if (!r.visible || r.error) continue;
+    const moving = r.glide(dt);
+    r.touch.w += (r.touch.down - r.touch.w) * (1 - Math.exp(-dt * 12));
+    if (!r.running && !r.dirty && !moving && Math.abs(r.touch.down - r.touch.w) < 0.01) continue;
+    r.dt = r.running ? dt : 0;
+    if (r.running) { r.time += dt; r.frame++; }
+    r.pressedMask = r.latch; r.latch = 0;
+    try { r.sk.frame(r); } catch (e) { r.error = e; DS.onError && DS.onError(r, e); console.error(r.sk.id, e); }
+    r.touch.tapped = false; r.pressedMask = 0; r.dirty = false;
+  }
+  if (DS.after) { try { DS.after(dt, now); } catch (e) { console.error(e); } }   // the arcade's stage composites here
+  requestAnimationFrame(tick);
+}
+DS.start = () => requestAnimationFrame(tick);
+window.DS = DS;
+})();
+
+</script>
+<script>
+/* phant-a.js — the console's own furniture: boot, the cartridge menu, pause and game over. */
+(function () {
+'use strict';
+const PH = window.PHANT = window.PHANT || { list: [], byId: {} };
+const scene = (s) => { PH.list.push(s); PH.byId[s.id] = s; return s; };
+const LH = 384;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* the six cartridges, each a console element seen through one of Dick's books */
+PH.CARTS = [
+  { id: 'halflife', name: 'HALF-LIFE', label: ['HALF-LIFE'], slip: 'SAVE FILES', book: 'Ubik', c: [-.8, .156],
+    desc: 'Three save files in cold-pac. They are running down, back toward 1939.' },
+  { id: 'kipple', name: 'KIPPLE', label: ['KIPPLE'], slip: 'INVENTORY', book: 'Do Androids Dream of Electric Sheep?', c: [.285, .01],
+    desc: 'Twenty-four slots for your things. Kipple drives out nonkipple.' },
+  { id: 'empathy', name: 'EMPATHY BOX', label: ['EMPATHY', 'BOX'], slip: 'HEALTH BAR', book: 'Do Androids Dream of Electric Sheep?', c: [-.4, .6],
+    desc: 'Grip the handles. Everyone’s health bar is one health bar.' },
+  { id: 'scramble', name: 'SCRAMBLE SUIT', label: ['SCRAMBLE', 'SUIT'], slip: 'DIALOGUE BOX', book: 'A Scanner Darkly', c: [-.70176, -.3842],
+    desc: 'Somebody is talking to you. Their face is everybody’s face.' },
+  { id: 'beam', name: 'PINK BEAM', label: ['PINK', 'BEAM'], slip: 'WORLD MAP', book: 'VALIS', c: [-.835, -.2321],
+    desc: 'A map in two times at once. The Empire never ended.' },
+  { id: 'layout', name: 'LAYOUT', label: ['LAYOUT'], slip: 'THE CONSOLE', book: 'The Three Stigmata of Palmer Eldritch', c: [.355, .355],
+    desc: 'A little room with a little console in it. Chew to go in.' }
+];
+const ANG = [-.06, .05, -.03, .07, -.05, .04];   // each slip of paper lies a little crooked (the shader knows the same angles)
+const tileXY = i => [24 + (i % 3) * 158, 50 + Math.floor(i / 3) * 156];   // top-left, y down
+
+/* ═══════════════════════ BOOT · The Electric Ant ═══════════════════════ */
+const PHRASE = 'LATTICE REALITY SUPPLY 1992.3 * BELIEVE WHAT IS READ * ';
+const WARN = 'Before you play, make sure you are real. Your world is read from a punched tape that runs through this console. Touch the tape to change what you are.';
+const TAPE = `
+// the reality tape: eight tracks of holes, running down through both screens and the hinge
+float tape(vec2 c, out float hole){
+  const float X0 = 446., W = 46.;
+  hole = 0.;
+  if (c.x < X0 || c.x > X0 + W) return 0.;
+  float y = c.y + u_p0.y, lx = c.x - X0 - 3.;
+  float row = floor(y/9.), tr = floor(lx/5.);
+  vec2 q = vec2(mod(lx, 5.) - 2.5, mod(y, 9.) - 4.5);
+  float bit = (tr >= 0. && tr < 8.) ? texelFetch(u_mem, ivec2(int(tr), int(mod(row, 128.))), 0).r : 0.;
+  hole = step(length(q), 1.8)*step(.5, bit);
+  hole = max(hole, step(length(vec2(lx - 15., q.y)), .9));
+  return 1.;
+}
+vec3 tapeColour(vec2 c, vec3 col){
+  float hole, on = tape(c, hole);
+  if (on < .5) return col*(1. - .5*exp(-min(abs(c.x - 446.), abs(c.x - 492.))/3.));
+  vec3 paper = vec3(.93, .86, .66)*(.86 + .1*vnoise(c*vec2(.5, .05)) + .04*step(.5, fract(c.x*.5)));
+  return mix(paper, u_ground*.35, hole);
+}`;
+scene({
+  id: 'boot', name: 'BOOT', status: 'BOOT', element: 'Boot screen and the health-and-safety warning', book: 'The Electric Ant',
+  pal: { ground: '#0B0A10', ink: '#ECE6D6', hot: '#FF3D8B', cool: '#38E2B4' },
+  statusBar: false, drain: false, inDur: 3.2,
+  hint: ['The logo crystallises out of static. Every boot is a little different.', 'Touch the paper tape on the right to punch a hole. The hole flips one bit of the logo.', 'Touch anywhere else, or press A, to start.'],
+  enter(S, G) {
+    G.boots++; G.store.set('boots', G.boots); G.reality = 1; G.heat = []; G.mol = 0; G.strandsClear = true;
+    S.word = ['LATTICE', 'LATTICE', 'LATTICF', 'KIPPLE'][G.boots % 4];
+    S.scroll = 0; S.glitch = 0; S.hue = Math.random() * 6;
+    S.bits = new Uint8Array(8 * 128 * 4);
+    for (let r = 0; r < 128; r++) { const ch = PHRASE.charCodeAt(r % PHRASE.length); for (let t = 0; t < 8; t++) { const i = (r * 8 + t) * 4; S.bits[i] = ((ch >> (7 - t)) & 1) * 255; S.bits[i + 3] = 255; } }
+    S.tapeDirty = true;
+  },
+  update(S, G, I, dt) {
+    S.scroll += dt * 26; S.glitch = Math.max(0, S.glitch - dt * 2.5);
+    const tap = I.tap;
+    if (tap && tap[0] >= 446 && tap[0] <= 492) {
+      const y = (LH - tap[1]) + S.scroll, row = ((Math.floor(y / 9) % 128) + 128) % 128, tr = clamp(Math.floor((tap[0] - 449) / 5), 0, 7);
+      const i = (row * 8 + tr) * 4; S.bits[i] = S.bits[i] ? 0 : 255; S.tapeDirty = true; S.glitch = 1;
+      const k = Math.floor(Math.random() * S.word.length), code = S.word.charCodeAt(k) ^ (1 << (7 - tr));
+      S.word = S.word.slice(0, k) + (code >= 33 && code <= 126 ? String.fromCharCode(code) : '?') + S.word.slice(k + 1);
+      G.splat(469, LH - tap[1], .5);
+    } else if ((tap && S.t > 1.2) || I.press('A') || I.press('START')) G.go('home', 'tape');
+  },
+  focus: () => [220, 270],
+  sig: (S, G, s) => s ? `${Math.min(WARN.length, Math.floor(Math.max(0, S.t - .5) * 55))}` : S.word,
+  ui: {
+    top(U, S, G) {
+      const size = Math.min(118, 100 * 380 / Math.max(1, U.measure(S.word, { f: 'jac', size: 100 })));
+      U.text(S.word, 220, 196 + size * .3, { f: 'jac', size, align: 'center' });
+      U.text(`REALITY TAPE 1992.3  REEL ${String(G.boots).padStart(3, '0')}`, 220, 300, { size: 16, align: 'center', ch: 'g' });
+    },
+    bot(U, S) {
+      U.text('!', 220, 136, { size: 48, w: 700, align: 'center', ch: 'b' });
+      U.text('WARNING - REALITY AND SAFETY', 220, 196, { size: 16, align: 'center' });
+      U.wrap(WARN.slice(0, Math.floor(Math.max(0, S.t - .5) * 55)), 26, 224, 396, { f: 'vt', size: 22, lh: 21 });
+      U.text('TOUCH THE SCREEN TO CONTINUE', 220, 370, { size: 16, align: 'center', ch: 'g' });
+    }
+  },
+  tex(h, S) {
+    const gl = h.H.gl;
+    if (!S.tape) S.tape = h.H.texFromPixels(8, 128, S.bits);
+    else if (S.tapeDirty) { gl.bindTexture(gl.TEXTURE_2D, S.tape); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 8, 128, 0, gl.RGBA, gl.UNSIGNED_BYTE, S.bits); }
+    S.tapeDirty = false; return { u_mem: S.tape };
+  },
+  uni: (S) => ({ u_p0: [S.hue, S.scroll, S.glitch, S.t > 3.4 ? 1 : 0] }),
+  common: TAPE,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec2 c = dsCanvas(f); float t = u_t, form = u_in;
+  vec2 g = f + vec2((hash12(vec2(floor(f.y/6.), floor(t*20.))) - .5)*46.*u_p0.z, 0.);   // a punch makes the rows slip
+  vec3 col = u_ground*(.7 + .3*f.y/384.);
+  vec3 U = ui(g), Us = uiL(g, 2.5);
+  vec2 ip = ipx(f);
+  float n = hash12(ip + floor(t*24.)*vec2(17., 31.));
+  col = mix(col, u_ink*.7, step(1. - (Us.r*1.6 + .05)*(1. - form)*.95, n)*.8);          // static, densest where the letters will be
+  float front = form*1.4 - fbm(f*.025 + u_p0.x)*.9 - .1;
+  float logo = smoothstep(.3, .6, U.r)*step(hash12(ip + 7.), front);                   // the logo joins pixel by pixel behind a noisy front
+  vec2 sub = mod(g*5. + vec2(t*30., 0.), LS);
+  float inner = smoothstep(.3, .6, textureLod(u_ui, sub/LS, UILOD() + 1.).r);         // inside, the logo is made of the logo
+  vec3 lc = mixOk(u_hot, u_cool, .5 + .5*sin(f.x*.02 + t*1.3 + u_p0.x));
+  col = mix(col, mix(lc*.5, mixOk(u_ink, lc, .3), inner), logo);
+  col += lc*Us.r*.32*form;
+  col = mix(col, u_ink*.8, smoothstep(.3, .6, U.g)*smoothstep(.85, 1., form));
+  col = tapeColour(c, col);
+  if (c.x > 446. && c.x < 492.) col = mix(col, u_hot, exp(-f.y/3.)*.9);              // the read head, right at the hinge
+  o = vec4(col, 1.);
+}`,
+    bot: `
+float sdTri(vec2 p, float r){ const float k = 1.7320508; p.x = abs(p.x) - r; p.y = p.y + r/k; if (p.x + k*p.y > 0.) p = vec2(p.x - k*p.y, -k*p.x - p.y)/2.; p.x -= clamp(p.x, -2.*r, 0.); return -length(p)*sign(p.y); }
+// the warning triangle is a Sierpinski gasket, zooming forever into its own apex
+float gasket(vec2 p, float z){
+  const vec2 A = vec2(0., 1.1547), B = vec2(-1., -.57735), C = vec2(1., -.57735);
+  p = A + (p - A)*exp2(-z);
+  float s = 1.;
+  for (int i = 0; i < 8; i++) { vec2 v = A; float d = dot(p - A, p - A), db = dot(p - B, p - B), dc = dot(p - C, p - C);
+    if (db < d) { v = B; d = db; } if (dc < d) v = C; p = 2.*p - v; s *= 2.; }
+  return sdTri(p, 1.)/s;
+}
+void mainImage(out vec4 o, in vec2 f){
+  float t = u_t;
+  vec3 col = u_ground*(.8 + .2*f.y/384.);
+  vec2 p = (f - vec2(220., 270.))/86.6;
+  float outer = sdTri(p, 1.)*86.6;
+  float gk = gasket(p, fract(t*.18))*86.6;
+  vec3 warm = mixOk(u_hot, u_ink, .15 + .25*sin(length(p)*6. - t*2.));
+  col = mix(col, warm, aa(max(gk, outer)));
+  col = mix(col, u_ink, aa(abs(outer) - 1.));
+  col += u_hot*exp(-max(outer, 0.)/10.)*.12;
+  float drift = smoothstep(5., 25., t)*7.;
+  vec2 g = f + curl(f*.012 + t*.07)*drift;                                             // the paragraph slowly forgets where it was printed
+  vec3 U = ui(g);
+  col = mix(col, u_ground, smoothstep(.3, .6, ui(f).b));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  float blink = step(.5, fract(t*.9))*u_p0.w;
+  col = mix(col, u_cool, smoothstep(.3, .6, U.g)*blink);
+  col = tapeColour(f, col);
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ HOME · Time Out of Joint ═══════════════════════ */
+scene({
+  id: 'home', name: 'CARTRIDGES', status: 'CARTRIDGES', element: 'Home menu: icons, cursor, clock', book: 'Time Out of Joint',
+  pal: { ground: '#17131D', ink: '#F2E7CF', hot: '#E8452E', cool: '#79C6D4' },
+  hint: ['Move with the arrows or touch a cartridge. The cursor is a gravity well.', 'Cartridges you ignore turn into slips of paper with their real name typed on them.', 'A or a second touch starts one. SELECT wakes up the whole screen.'],
+  enter(S, G, o) {
+    S.sel = o.sel ?? (PH.lastCart || 0); S.cur = null; S.pres = (PH.homePres || [1, 1, 1, 1, 1, 1]).slice(); S.slip = 0; S.slipT = 0; S.slipOn = 0;
+    S.c = PH.CARTS[S.sel].c.slice(); S.lens = 0;
+  },
+  update(S, G, I, dt) {
+    let sel = S.sel; const col = sel % 3, row = Math.floor(sel / 3);
+    if (I.press('LEFT')) sel = row * 3 + (col + 2) % 3; if (I.press('RIGHT')) sel = row * 3 + (col + 1) % 3;
+    if (I.press('UP') || I.press('DOWN')) sel = (sel + 3) % 6;
+    let go = I.press('A') || I.press('START');
+    if (I.tap) for (let i = 0; i < 6; i++) { const [x, y] = tileXY(i); if (I.tap[0] >= x && I.tap[0] <= x + 148 && I.tap[1] >= y && I.tap[1] <= y + 146) { if (i === S.sel) go = true; sel = i; } }
+    S.sel = sel; PH.lastCart = sel;
+    const [tx, ty] = tileXY(sel), want = [tx + 74, LH - (ty + 73)];
+    if (!S.cur) S.cur = want.slice();
+    S.cur[0] += (want[0] - S.cur[0]) * (1 - Math.exp(-dt * 10)); S.cur[1] += (want[1] - S.cur[1]) * (1 - Math.exp(-dt * 10));
+    S.lens = Math.min(1, S.lens + dt * 2);
+    const c = PH.CARTS[sel].c; S.c[0] += (c[0] - S.c[0]) * (1 - Math.exp(-dt * 4)); S.c[1] += (c[1] - S.c[1]) * (1 - Math.exp(-dt * 4));
+    for (let i = 0; i < 6; i++) S.pres[i] = i === sel ? Math.min(1, S.pres[i] + dt * 1.5) : Math.max(0, S.pres[i] - dt * .034);
+    PH.homePres = S.pres;
+    S.slipT += dt;
+    if (I.press('SELECT') || S.slipT > 26) { S.slipOn = 2.6; S.slipT = 0; }
+    S.slipOn = Math.max(0, S.slipOn - dt);
+    S.slip += ((S.slipOn > 0 ? 1 : 0) - S.slip) * (1 - Math.exp(-dt * 3));
+    if (go) G.go(PH.CARTS[sel].id, 'open', { focus: [256, 192, want[0], want[1]] });
+  },
+  focus: (S) => S.cur ? [S.cur[0], S.cur[1]] : [256, 192],
+  sig: (S, G, s) => s ? 'tiles' : `${S.sel}|${Math.floor(G.now / 7)}|${new Date().getMinutes()}`,
+  ui: {
+    top(U, S, G) {
+      const cart = PH.CARTS[S.sel];
+      U.text(cart.name, 244, 92, { f: 'jac', size: 44 });
+      U.wrap(cart.desc, 244, 124, 248, { f: 'vt', size: 22, lh: 21 });
+      U.text(`after ${cart.book}`, 244, 124 + 21 * U.lines(cart.desc, 248, { f: 'vt', size: 22 }).length + 6, { f: 'vt', size: 18, a: .7 });
+      const d = new Date(), years = ['1959', '1959', '1998', '1959', '1992', '1959'];
+      U.text(d.toTimeString().slice(0, 5), 492, 336, { size: 48, align: 'right', ch: 'g' });
+      U.text(`${d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase().replace(',', '')} ${years[Math.floor(G.now / 7) % 6]}`, 492, 362, { size: 16, align: 'right' });
+      U.text('PREVIEW', 124, 270, { size: 8, align: 'center', a: .7, track: 2 });
+      U.text('A INSERT', 24, 300, { size: 16 }); U.text('SELECT WAKE UP', 24, 322, { size: 16, a: .7 });
+      U.text('HOME MENU', 256, 222, { f: 'cou', w: 700, size: 62, align: 'center', ch: 'b', rot: .05 });
+    },
+    bot(U) {
+      U.text('CARTRIDGES', 24, 34, { size: 16 }); U.text('6 INSERTED', 488, 34, { size: 8, align: 'right', a: .7, track: 2 });
+      PH.CARTS.forEach((c, i) => {
+        const [x, y] = tileXY(i);
+        U.rect(x, y, 148, 146, { ch: 'g', r: 7 });
+        c.label.forEach((l, k) => U.text(l, x + 74, y + 118 + k * 18 - (c.label.length - 1) * 9, { size: 16, align: 'center' }));
+        U.text(c.slip, x + 74, y + 79, { f: 'cou', w: 700, size: 17, align: 'center', ch: 'b', rot: ANG[i] });
+      });
+      U.text('TOUCH TWICE OR PRESS A TO START', 256, 376, { size: 8, align: 'center', a: .6, track: 1 });
+    }
+  },
+  uni: (S) => ({ u_sel: S.sel, u_p0: [S.cur ? S.cur[0] : 256, S.cur ? S.cur[1] : 192, S.lens, 0], u_p1: S.pres.slice(0, 4), u_p2: [S.pres[4], S.pres[5], S.c[0], S.c[1]], u_p3: [S.slip, 0, 0, 0] }),
+  common: `
+const float ANG[6] = float[6](-.06, .05, -.03, .07, -.05, .04);
+vec2 tileC(int i){ float col = float(i - 3*(i/3)), row = float(i/3); return vec2(24. + col*158. + 74., 384. - (50. + row*156. + 73.)); }
+vec3 paperOf(vec2 g){ return mixOk(u_ink, vec3(.95, .9, .78), .6)*(.88 + .12*vnoise(g*.4)); }`,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = u_ground*(.85 + .15*f.y/384.);
+  vec2 w = mod(f + vec2(0., u_t*3.), 72.) - 36.; float ang = atan(w.y, w.x);
+  col += u_cool*.035*(1. - smoothstep(0., 1.5, abs(length(w) - 6. - 4.*step(.5, fract(ang*8./6.2832)))));   // 1959 wallpaper
+  vec2 pc = vec2(124., 384. - 152.), q = (f - pc)/100.;
+  if (max(abs(q.x), abs(q.y)) < 1.) {                                       // the preview: the cartridge's Julia set, morphing between them
+    vec2 z = q*1.45, c = u_p2.zw; float it = 0., trap = 1e9;
+    for (int i = 0; i < 48; i++) { z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c; trap = min(trap, abs(z.y) + .5*abs(z.x - .3)); if (dot(z, z) > 16.) break; it += 1.; }
+    float sm = it/48.;
+    col = it >= 48. ? u_ground*.5 + u_cool*.3*exp(-trap*5.) : mixOk(mixOk(u_ground, u_cool, sqrt(sm)*1.4), u_hot, smoothstep(.35, .9, sm)) + u_ink*exp(-trap*14.)*.5;
+  }
+  col = mix(col, u_ink, aa(abs(sdBox(f - pc, vec2(100.))) - 1.));
+  vec3 U = ui(f);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  float j = 2. + 1.5*sin(u_t*.7);                                            // the clock, printed three times out of register
+  col = mix(col, u_hot, smoothstep(.3, .6, ui(f + vec2(j, 0.)).g)*.85);
+  col = mix(col, u_cool, smoothstep(.3, .6, ui(f - vec2(j*.6, j*.6)).g)*.85);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.g));
+  float sl = u_p3.x;                                                        // time out of joint: the screen is a slip of paper with its name on it
+  if (sl > .002) {
+    float th = fbm(f*.03 + 4.), fr = sl*1.3 - .15;
+    vec2 sp = rot2(.05)*(f - vec2(256., 190.));
+    float slip = sdBox(sp, vec2(190., 64.));
+    vec3 sc = mix(u_ground*.5, paperOf(f), aa(slip));
+    sc = mix(sc, u_ground*.85, smoothstep(.3, .6, U.b)*aa(slip));
+    col = mix(col, sc, smoothstep(th - .04, th + .04, fr));
+    col += u_hot*(1. - smoothstep(0., .035, abs(th - fr)))*step(.02, sl)*step(sl, .98);
+  }
+  o = vec4(col, 1.);
+}`,
+    bot: `
+float ia(float d){ return clamp(.5 - d*42.*iResolution.z, 0., 1.); }   // coverage in icon units (42 px)
+vec4 icon(int i, vec2 p, float t){
+  vec3 c = u_ink; float a = 0.;
+  if (i == 0) {                                                             // Ubik: the can and its mist
+    float body = sdBox(p - vec2(-.2, -.2), vec2(.3, .55)) - .06, cap = sdBox(p - vec2(-.2, .5), vec2(.2, .12)), noz = sdBox(p - vec2(.02, .62), vec2(.1, .045));
+    float d = min(body, min(cap, noz)); a = ia(d);
+    c = mix(u_hot, u_ink, step(abs(p.y + .2), .12)*step(body, 0.)); c = mix(c, u_ground, step(abs(p.y + .2), .03)*step(body, 0.));
+    float mist = 0.; for (int k = 0; k < 10; k++) { float fk = float(k); vec2 m = vec2(.18 + .07*fk, .62 + (.04 + .03*fk)*sin(fk*2.3 + t*4.)); mist += exp(-dot(p - m, p - m)*(260. - 12.*fk)); }
+    c = mix(c, mixOk(u_ink, u_hot, .3), clamp(mist, 0., 1.)*(1. - a)); a = max(a, clamp(mist, 0., 1.));
+  } else if (i == 1) {                                                      // an electric sheep
+    float d = 1e9; for (int k = 0; k < 7; k++) { float fk = float(k)*.9; d = smin(d, length(p - vec2(-.1 + cos(fk)*.36, .05 + sin(fk)*.2)) - .24, .06); }
+    float head = length((p - vec2(.55, .24))*vec2(1., 1.25)) - .17, legs = min(sdBox(p - vec2(-.32, -.42), vec2(.05, .17)), sdBox(p - vec2(.18, -.42), vec2(.05, .17)));
+    a = ia(min(d, min(head, legs)));
+    c = d < .0 ? u_ink*(.85 + .15*sin(length(p)*40.)) : u_ground*1.8 + u_cool*.2;
+    float bolt = sdSeg(p, vec2(-.05, .1), vec2(.05, -.05)); c = mix(c, u_hot, ia(bolt - .04)*step(d, 0.));
+  } else if (i == 2) {                                                      // the empathy box
+    float box = sdBox(p - vec2(0., -.1), vec2(.5, .42)) - .04, scr = sdBox(p - vec2(0., -.05), vec2(.36, .27));
+    float hl = sdBox(vec2(abs(p.x) - .62, p.y + .05), vec2(.07, .2));
+    a = ia(min(box, hl)); c = mix(mixOk(u_cool, u_ground, .3), u_ink, step(0., -hl)*step(0., box));
+    float glow = .5 + .5*sin(t*2.);
+    c = mix(c, mixOk(u_hot, u_ink, .3 + .3*glow), ia(scr));
+  } else if (i == 3) {                                                      // a scramble suit: one head, many people
+    float hd = length(p*vec2(1., .82)) - .62; a = ia(hd);
+    vec2 g = p*5. + vec2(0., floor(t*3.)*.0); vec2 id = floor(g); float best = 9.; vec2 bid = id;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 n = id + vec2(float(x), float(y)); vec2 cp = n + .5 + .4*sin(hash22(n)*6.28 + t); float dd = length(g - cp); if (dd < best) { best = dd; bid = n; } }
+    float hs = hash12(bid + floor(t*2.));
+    c = mixOk(mixOk(u_ink, u_hot, hs), u_cool, step(.7, hs));
+  } else if (i == 4) {                                                      // the fish, and the pink beam
+    float d1 = abs(length(p - vec2(0., -.5)) - .78), d2 = abs(length(p - vec2(0., .5)) - .78);
+    float fish = max(min(d1, d2) - .045, max(-p.x - .62, p.x - .78));
+    float beam = sdSeg(p, vec2(.95, .95), vec2(-.1, -.05)) - .04*(1. + .3*sin(t*9.));
+    a = max(ia(fish), ia(beam)*.9);
+    c = ia(beam) > .5 ? mixOk(u_hot, u_ink, .25) : u_ink;
+  } else {                                                                  // a little console, in a little room, holding a little console
+    float room = abs(sdBox(p, vec2(.8, .75))) - .03;
+    vec2 q = p - vec2(0., -.1); float dev = sdBox(q, vec2(.32, .52)) - .04;
+    float s1 = sdBox(q - vec2(0., .24), vec2(.25, .19)), s2 = sdBox(q + vec2(0., .24), vec2(.25, .19));
+    a = max(ia(room), ia(dev));
+    c = mix(u_ink, mixOk(u_ground, u_ink, .3), ia(dev));
+    vec2 r = q*3.2; float in2 = min(sdBox(r - vec2(0., .24), vec2(.25, .19)), sdBox(r + vec2(0., .24), vec2(.25, .19)));
+    c = mix(c, mix(u_cool, mixOk(u_ground, u_ink, .3), ia(sdBox(r, vec2(.32, .52)))*(1. - ia(in2))), ia(min(s1, s2)));
+  }
+  return vec4(c, a);
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec2 cur = u_p0.xy, d = f - cur; float lens = u_p0.z, r2 = dot(d, d);
+  vec2 g = f - d*.24*lens*exp(-r2/9000.);                                    // the cursor is a gravity well: things near it swell toward it
+  vec3 col = u_ground + u_cool*.05*(.5 + .5*sin(sqrt(r2)*.12 - u_t*3.))*exp(-r2/60000.);
+  vec3 U = ui(g);
+  float cx = floor((g.x - 24.)/158.), ry = floor(((384. - g.y) - 50.)/156.);
+  if (cx >= 0. && cx < 3. && ry >= 0. && ry < 2.) {
+    int ti = int(ry)*3 + int(cx); vec2 tc = tileC(ti), lp = g - tc;
+    float pres = ti < 4 ? u_p1[ti] : u_p2[ti - 4];
+    vec3 tcol = mix(col, mixOk(u_ground, u_cool, .22), smoothstep(.3, .6, U.g));
+    vec4 ic = icon(ti, (lp - vec2(0., 20.))/42., u_t + float(ti));
+    tcol = mix(tcol, ic.rgb, ic.a*smoothstep(.3, .6, U.g));
+    tcol = mix(tcol, u_ink, smoothstep(.3, .6, U.r));
+    vec2 sp = rot2(ANG[ti])*lp;                                              // the slip of paper it really is
+    float slip = sdBox(sp - vec2(0., 7.), vec2(66., 24.));
+    vec3 scol = col*(1. - .5*exp(-max(sdBox(sp - vec2(4., 2.), vec2(66., 24.)), 0.)/5.));
+    scol = mix(scol, paperOf(g), aa(slip));
+    scol = mix(scol, u_ground*.85, smoothstep(.3, .6, U.b)*aa(slip));
+    float th = fbm(g*.035 + float(ti)*3.7), fr = 1.15*(1. - pres) - .08;
+    col = mix(tcol, scol, smoothstep(th - .04, th + .04, fr));
+    col += u_hot*(1. - smoothstep(0., .03, abs(th - fr)))*step(.02, 1. - pres)*step(.02, pres)*.9;
+  } else col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  vec2 z = d/70.; float trap = 1e9; vec2 c = vec2(-.745, .113) + .03*vec2(cos(u_t*.7), sin(u_t*.9));
+  for (int i = 0; i < 14; i++) { z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c; trap = min(trap, abs(length(z) - .6)); if (dot(z, z) > 8.) break; }
+  col += u_hot*exp(-trap*18.)*lens*.5*exp(-r2/14000.);                        // the event horizon
+  col = mix(col, u_hot, (1. - smoothstep(0., 2.5, abs(sdBox(f - tileC(int(u_sel + .5)), vec2(77., 76.)) - 1.)))*lens);
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ PAUSE · Ubik's cold-pac ═══════════════════════ */
+const PAUSE_OPTS = ['RESUME', 'BACK TO CARTRIDGES', 'REBOOT REALITY'];
+scene({
+  id: 'pause', name: 'PAUSED', status: 'COLD-PAC', element: 'Pause screen', book: 'Ubik',
+  pal: { ground: '#0A1018', ink: '#E2F4FF', hot: '#9FE3FF', cool: '#4A78A8' },
+  hint: ['The game is frozen, and frost grows over it from the edges.', 'Stay too long and something writes to you through the ice.', 'START or B resumes. Up and down choose, A confirms.'],
+  enter(S, G, o) { S.from = o.from; S.sel = 0; },
+  update(S, G, I) {
+    if (I.press('UP')) S.sel = (S.sel + 2) % 3; if (I.press('DOWN')) S.sel = (S.sel + 1) % 3;
+    let act = I.press('A') ? S.sel : -1;
+    if (I.tap) for (let i = 0; i < 3; i++) { const y = 110 + i * 70; if (I.tap[1] >= y && I.tap[1] <= y + 54 && I.tap[0] >= 56 && I.tap[0] <= 456) act = i; }
+    if (I.press('START') || I.press('B')) act = 0;
+    if (act === 0 && S.from) G.go(S.from.sc.id, 'cut', { resume: S.from });
+    else if (act === 1 || (act === 0 && !S.from)) G.go('home', 'regress');
+    else if (act === 2) G.go('boot', 'tape');
+  },
+  sig: (S, G, s) => s ? `${S.sel}` : `${Math.floor(S.t)}`,
+  ui: {
+    top(U, S) {
+      U.text('PAUSED', 256, 168, { f: 'jac', size: 92, align: 'center' });
+      const s = Math.floor(S.t); U.text(`COLD-PAC  00:${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`, 256, 206, { size: 16, align: 'center', ch: 'g' });
+      U.wrap('Do not stay paused too long. Something in here is eating the other saves.', 76, 268, 360, { f: 'cou', w: 700, size: 20, lh: 24, ch: 'b' });
+    },
+    bot(U, S) {
+      U.text('START RESUMES', 256, 62, { size: 8, align: 'center', a: .7, track: 2 });
+      PAUSE_OPTS.forEach((t, i) => { const y = 110 + i * 70; U.rect(56, y, 400, 54, { ch: i === S.sel ? 'gb' : 'g', r: 4 }); U.text(t, 256, y + 34, { size: 16, align: 'center' }); });
+    }
+  },
+  tex(h) { const a = h.targets.get('frz0'), b = h.targets.get('frz1'); return { u_aux: a ? a.tex : h.H.white, u_aux2: b ? b.tex : h.H.white }; },
+  common: `
+vec3 frozen(sampler2D t, vec2 f){ vec2 e = vec2(1.5, 0.); vec3 c = (texture(t, (f + e)/LS).rgb + texture(t, (f - e)/LS).rgb + texture(t, (f + e.yx)/LS).rgb + texture(t, (f - e.yx)/LS).rgb)*.25;
+  return mix(c, vec3(luma(c)), .55)*.72; }
+vec3 frost(vec2 f, vec3 base, float t){
+  float de = min(min(f.x, 512. - f.x), min(f.y, 384. - f.y));
+  float front = t*15. + (fbm(f*.025 + 2.) - .5)*90. + 4.;
+  float m = smoothstep(front, front - 12., de);
+  float cr = 0.;
+  for (int i = 0; i < 3; i++) { vec2 q = rot2(float(i)*1.0472 + .3)*f; float r = 1. - abs(vnoise(q*vec2(.11, .014) + float(i)*7.)*2. - 1.); cr = max(cr, pow(r, 9.)); }
+  float fine = 1. - abs(vnoise(f*.4)*2. - 1.);
+  vec3 ice = mix(base*vec3(.55, .72, .95) + u_cool*.25, u_ink, clamp(cr*.85 + pow(fine, 14.)*.35, 0., 1.));
+  return mix(base, ice, m) + u_hot*.5*(1. - smoothstep(0., 3., abs(de - front)))*step(de, front + 4.);
+}`,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = frost(f, frozen(u_aux, f), u_t);
+  vec3 U = ui(f);
+  col = mix(col, col*.35, smoothstep(.05, .5, uiL(f, 3.).r));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  col = mix(col, u_hot, smoothstep(.3, .6, U.g));
+  float msg = smoothstep(.3, .6, ui(f + vec2(sin(f.y*.2 + u_t*3.), 0.)).b)*smoothstep(6., 9., u_t);   // it writes through the ice
+  col = mix(col, mixOk(u_hot, u_ink, .5), msg);
+  o = vec4(col, 1.);
+}`,
+    bot: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = frost(f, frozen(u_aux2, f), u_t);
+  vec3 U = ui(f);
+  col = mix(col, mix(u_ground*.8, u_cool*.6, smoothstep(.3, .6, U.b)), smoothstep(.3, .6, U.g)*.85);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ GAME OVER · kipple garden ═══════════════════════ */
+scene({
+  id: 'over', name: 'GAME OVER', status: 'GAME OVER', element: 'Game over and the continue countdown', book: 'Do Androids Dream of Electric Sheep?',
+  pal: { ground: '#0A0F0D', ink: '#F4FFE9', hot: '#FF4F79', cool: '#8BFFB0' },
+  drain: false,
+  hint: ['The words GAME OVER are planted and grow a coral across both screens and the hinge.', 'Each number of the countdown is planted too. Touch to plant more.', 'A or a touch continues. At zero the console reboots.'],
+  enter(S, G, o) { S.reason = o.reason || 'GAME OVER'; S.digit = 9; S.seed = 1; S.seedB = 1; },
+  update(S, G, I, dt) {
+    const d = Math.max(0, 9 - Math.floor(S.t));
+    if (d !== S.digit) { S.digit = d; S.seedB = 1; }
+    S.seed = Math.max(0, S.seed - dt * 1.2); S.seedB = Math.max(0, S.seedB - dt * 4);
+    if (S.t > 10) { G.reality = 1; G.go('boot', 'tape'); return; }
+    if ((I.tap && S.t > 1.5) || I.press('A')) { G.reality = Math.max(G.reality, .6); G.go('home', 'scramble'); }
+    if (I.press('START')) G.go('boot', 'tape');
+  },
+  sig: (S, G, s) => s ? `${S.digit}` : S.reason,
+  ui: {
+    top(U, S) { U.text('GAME', 256, 150, { f: 'jac', size: 120, align: 'center' }); U.text('OVER', 256, 262, { f: 'jac', size: 120, align: 'center' });
+      U.text(S.reason, 256, 330, { size: 16, align: 'center', ch: 'g', track: 1 }); },
+    bot(U, S) { U.text('CONTINUE?', 256, 56, { size: 16, align: 'center', ch: 'g' }); U.text(String(S.digit), 256, 290, { size: 210, w: 700, align: 'center' });
+      U.text('TOUCH OR PRESS A', 256, 360, { size: 16, align: 'center', ch: 'g' }); }
+  },
+  tex(h, S, G, inst) {
+    const [a, b] = inst.L;
+    if (!S.init) { const R = h.sims.get('over.rd'); if (R) R.steps = 0; S.init = 1; }
+    const rd = h.sim('over.rd', 'over.sim', 128, 215, { steps: 4, float: true, linear: true, textures: { u_ui: a.tex || h.H.white, u_aux: b.tex || h.H.white }, uniforms: { u_p0: [S.seed, S.seedB, 0, 0] } });
+    return { u_mem: rd };
+  },
+  glsl: {
+    sim: `
+void mainImage(out vec4 o, in vec2 f){
+  vec2 C = f*4.;
+  vec4 c = prev(f);
+  if (iFrame == 0) c = vec4(1., 0., 0., 0.);
+  vec4 n = prev(f + vec2(0., 1.)) + prev(f - vec2(0., 1.)) + prev(f + vec2(1., 0.)) + prev(f - vec2(1., 0.));
+  vec4 g = prev(f + vec2(1.)) + prev(f - vec2(1.)) + prev(f + vec2(1., -1.)) + prev(f + vec2(-1., 1.));
+  vec2 lap = iFrame == 0 ? vec2(0.) : -c.xy + .2*n.xy + .05*g.xy;
+  vec2 q = C/CS;
+  float m = .5 + .5*sin(q.x*5. + q.y*7. + vnoise(q*3.)*4. + iTime*.05);   // feed and kill drift: mazes here, coral there
+  float F = mix(.029, .055, m), k = mix(.057, .062, m);
+  float A = c.x, B = c.y, r = A*B*B;
+  A += lap.x - r + F*(1. - A);
+  B += .5*lap.y + r - (k + F)*B;
+  if (C.y > LS.y + DS_GAP) B = max(B, smoothstep(.4, .7, textureLod(u_ui, (C - vec2(0., LS.y + DS_GAP))/LS, 1.).r)*u_p0.x);   // only the strokes are planted
+  if (C.y < LS.y) B = max(B, smoothstep(.4, .7, textureLod(u_aux, C/LS, 1.).r)*u_p0.y);
+  vec2 d = C - iTouch.xy; B = max(B, iTouch.z*step(dot(d, d), 160.));
+  B *= 1. - .08*smoothstep(.8, .86, vnoise(C*.006 + vec2(iTime*.031, -iTime*.017)));
+  o = vec4(clamp(A, 0., 1.), clamp(B, 0., 1.), c.z*.985 + B*.015, 1.);
+}`,
+    top: `
+vec3 bloom(vec2 C){
+  vec2 uv = C/CS, px = 1./vec2(textureSize(u_mem, 0));
+  vec4 s = texture(u_mem, uv);
+  float bx = texture(u_mem, uv + vec2(px.x, 0.)).y - texture(u_mem, uv - vec2(px.x, 0.)).y, by = texture(u_mem, uv + vec2(0., px.y)).y - texture(u_mem, uv - vec2(0., px.y)).y;
+  vec3 n = normalize(vec3(-bx, -by, .3)), l = normalize(vec3(-.5, .6, .65));
+  float t = smoothstep(.06, .32, s.y), age = smoothstep(.05, .2, s.z);
+  vec3 tint = mixOk(mixOk(u_hot, u_ink, t*.5), mixOk(u_cool*.45, u_cool, t), age);
+  float dif = max(dot(n, l), 0.), sp = pow(max(dot(reflect(-l, n), vec3(0., 0., 1.)), 0.), 18.);
+  return mix(u_ground + u_cool*.04*s.z, tint*(.35 + .85*dif) + sp*.5, t);
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = bloom(dsCanvas(f)); vec3 U = ui(f);
+  col += u_hot*uiL(f, 3.).r*.18; col = mix(col, u_ink, smoothstep(.3, .6, U.r)*.22);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.g));
+  o = vec4(col, 1.);
+}`,
+    bot: `
+vec3 bloom(vec2 C){
+  vec2 uv = C/CS, px = 1./vec2(textureSize(u_mem, 0));
+  vec4 s = texture(u_mem, uv);
+  float bx = texture(u_mem, uv + vec2(px.x, 0.)).y - texture(u_mem, uv - vec2(px.x, 0.)).y, by = texture(u_mem, uv + vec2(0., px.y)).y - texture(u_mem, uv - vec2(0., px.y)).y;
+  vec3 n = normalize(vec3(-bx, -by, .3)), l = normalize(vec3(-.5, .6, .65));
+  float t = smoothstep(.06, .32, s.y), age = smoothstep(.05, .2, s.z);
+  vec3 tint = mixOk(mixOk(u_hot, u_ink, t*.5), mixOk(u_cool*.45, u_cool, t), age);
+  float dif = max(dot(n, l), 0.), sp = pow(max(dot(reflect(-l, n), vec3(0., 0., 1.)), 0.), 18.);
+  return mix(u_ground + u_cool*.04*s.z, tint*(.35 + .85*dif) + sp*.5, t);
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = bloom(f); vec3 U = ui(f);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r)*.3);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.g)*(.55 + .45*step(.5, fract(u_t))));
+  vec2 d = f - iTouch.xy; col = mix(col, u_ink, (1. - smoothstep(1., 2.5, abs(length(d) - 13.)))*iTouch.w);
+  o = vec4(col, 1.);
+}`
+  }
+});
+})();
+
+</script>
+<script>
+/* phant-b.js — cartridges 1–3: save files that regress (Ubik), an inventory that fills with kipple, a HUD you fuse with. */
+(function () {
+'use strict';
+const PH = window.PHANT = window.PHANT || { list: [], byId: {} };
+const scene = (s) => { PH.list.push(s); PH.byId[s.id] = s; return s; };
+const LH = 384;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* ═══════════════════════ HALF-LIFE · save files in cold-pac (Ubik) ═══════════════════════ */
+const SLOTS = [
+  { who: 'JOE', game: 'KIPPLE', time: '41:07', md: '06-05', to: 'kipple' },
+  { who: 'PAT', game: 'PINK BEAM', time: '12:58', md: '11-02', to: 'beam' },
+  { who: 'GLEN', game: 'EMPATHY BOX', time: '03:33', md: '02-19', to: 'empathy' }
+];
+const ERAS = ['TRUE COLOUR', '64 COLOURS', '4 COLOURS', '1-BIT', 'PUNCH CARD', 'COLD'];
+const eraOf = life => clamp(Math.floor((1 - life) * 5.8 - .4), 0, 5);
+const MEMORY = `
+// three remembered pictures, in true colour while they last
+vec3 memory(int k, vec2 p, float t){
+  vec3 col;
+  if (k == 0) {                                                             // a street at sunset, 1959
+    col = mix(vec3(1., .58, .32), vec3(.3, .2, .5), smoothstep(.12, .7, p.y));
+    float sun = length(p - vec2(.68, .36)) - .075;
+    col = mix(col, vec3(1., .93, .72), 1. - smoothstep(0., .005, sun)) + vec3(1., .55, .3)*.3*exp(-max(sun, 0.)*10.);
+    float wire = abs(p.y - .5 + .05*cos((fract(p.x*2.5) - .5)*3.)); col = mix(col, vec3(.12, .08, .12), 1. - smoothstep(.0015, .004, wire));
+    float hill = .25 + .025*sin(p.x*9. + 1.) + .02*fbm(vec2(p.x*8., 1.));
+    float hid = floor(p.x*6.), hx = fract(p.x*6.) - .5, hh = .07 + .035*hash12(vec2(hid, 2.)), base = hill - .012;
+    float wall = max(abs(hx) - .3, max(p.y - base - hh, base - .06 - p.y));
+    float roof = max(abs(hx)*.22 + (p.y - base - hh) - .075, base + hh - p.y);
+    if (p.y < hill) col = mix(vec3(.16, .28, .15), vec3(.05, .09, .05), clamp((hill - p.y)*4., 0., 1.));
+    if (wall < 0.) { col = mix(vec3(.88, .78, .62), vec3(.62, .82, .86), hash12(vec2(hid, 5.)));
+      vec2 w = vec2(abs(hx) - .14, p.y - base - hh*.5); col = mix(col, mix(vec3(1., .82, .4), vec3(.15, .15, .2), step(.6, hash12(vec2(hid, floor(t*.3))))), step(abs(w.x), .05)*step(abs(w.y), .014)); }
+    if (roof < 0. && wall >= 0.) col = mix(vec3(.55, .22, .2), vec3(.3, .3, .38), hash12(vec2(hid, 7.)));
+  } else if (k == 1) {                                                      // the moon, 1992: the Earth comes up over the domes
+    col = vec3(.02, .02, .05) + vec3(step(.996, hash12(floor(p*300.))))*.8;
+    float earth = length(p - vec2(.3, .56)) - .1;
+    vec3 eC = mix(vec3(.15, .35, .8), vec3(.25, .6, .3), smoothstep(.45, .6, fbm(p*14. + vec2(t*.01, 0.))));
+    eC = mix(eC, vec3(1.), smoothstep(.55, .7, fbm(p*9. - vec2(t*.02, 0.))));
+    eC *= smoothstep(-.06, .05, (p.x - .3)*.7 + (p.y - .56)*.7 + .02);
+    col = mix(col, eC, 1. - smoothstep(0., .004, earth)) + vec3(.2, .4, .9)*.25*exp(-max(earth, 0.)*40.);
+    float ground = .2 + .04*fbm(vec2(p.x*4., 3.)) + .015*sin(p.x*30.);
+    if (p.y < ground) { col = vec3(.5, .5, .52)*(.6 + .4*fbm(p*30.)); vec2 cp = fract(p*vec2(9., 14.)) - .5; col *= 1. - .3*smoothstep(.25, .2, length(cp))*step(.5, hash12(floor(p*vec2(9., 14.)))); }
+    float dome = length((p - vec2(.72, ground))*vec2(1., 1.4)) - .12; float dome2 = length((p - vec2(.88, ground))*vec2(1., 1.4)) - .07;
+    if (min(dome, dome2) < 0.) col = mix(vec3(.75, .8, .85), vec3(1., .85, .5), step(.7, fract((p.x - .6)*30.))*step(p.y, ground + .06));
+  } else {                                                                  // a city at night with cars in the air
+    col = mix(vec3(.05, .03, .12), vec3(.35, .12, .35), smoothstep(.75, .1, p.y));
+    for (int i = 0; i < 3; i++) { float fi = float(i);
+      float bw = .05 + .03*fi, id = floor((p.x + fi*.37)/bw), bh = .18 + .32*hash12(vec2(id, fi + 1.))*(1. - .3*fi);
+      if (p.y < bh) { col = mix(vec3(.04, .03, .08), vec3(.1, .08, .16), fi*.4);
+        vec2 wq = fract(vec2((p.x + fi*.37)/bw*4., p.y*60.)); col = mix(col, mix(vec3(1., .75, .35), vec3(.4, .9, 1.), hash12(vec2(id, 9.))), step(.55, wq.x)*step(.45, wq.y)*step(.55, hash12(vec2(floor((p.x + fi*.37)/bw*4.), floor(p.y*60.)))) *.9); } }
+    for (int i = 0; i < 4; i++) { float fi = float(i); vec2 cp = vec2(fract(t*(.03 + .02*fi) + fi*.3)*1.2 - .1, .45 + .07*fi); float car = length((p - cp)*vec2(1., 3.)) - .012;
+      col = mix(col, vec3(1., .3, .5), 1. - smoothstep(0., .004, car)); col += vec3(1., .3, .5)*.08*exp(-length(p - cp)*40.); }
+  }
+  return col;
+}`;
+scene({
+  id: 'halflife', name: 'HALF-LIFE', status: 'FILE SELECT', element: 'Save files and file select', book: 'Ubik', cart: true,
+  pal: { ground: '#10131A', ink: '#F4EFE6', hot: '#F2B134', cool: '#5B7CFA' },
+  hint: ['Each save file runs down at its own speed, back through colour, four colours, one bit and the punch card.', 'Hold Y to spray Ubik on the chosen file. Messages from the other side show through the worn patches.', 'A loads the file into its cartridge, if it is still warm. B goes back.'],
+  enter(S) { S.sel = 0; S.life = (PH.saveLife || [.97, .62, .36]).slice(); S.cold = 0; },
+  update(S, G, I, dt) {
+    if (I.press('UP')) S.sel = (S.sel + 2) % 3; if (I.press('DOWN')) S.sel = (S.sel + 1) % 3;
+    if (I.tap) for (let i = 0; i < 3; i++) { const y = 50 + i * 98; if (I.tap[1] >= y && I.tap[1] <= y + 88) { if (i === S.sel) S.load = true; S.sel = i; } }
+    const rate = [.006, .011, .017];
+    for (let i = 0; i < 3; i++) S.life[i] = Math.max(0, S.life[i] - dt * rate[i]);
+    S.spray = I.held('Y') ? Math.min(1, (S.spray || 0) + dt * 5) : Math.max(0, (S.spray || 0) - dt * 3);
+    if (I.held('Y')) S.life[S.sel] = Math.min(1, S.life[S.sel] + dt * .45);
+    PH.saveLife = S.life; S.cold = Math.max(0, S.cold - dt);
+    if (I.press('A') || S.load) { S.load = false; if (S.life[S.sel] < .1) S.cold = 2; else G.go(SLOTS[S.sel].to, 'regress'); }
+    if (I.press('B')) G.go('home', 'regress');
+  },
+  focus: (S) => [256, LH - (50 + S.sel * 98 + 44)],
+  sig: (S, G, s) => s ? S.life.map(l => `${eraOf(l)}${Math.round(1992 - (1 - l) * 53)}`).join('|') + S.sel + (S.cold > 0) : `${S.sel}|${Math.round(1992 - (1 - S.life[S.sel]) * 53)}`,
+  ui: {
+    top(U, S) {
+      const s = SLOTS[S.sel], yr = Math.round(1992 - (1 - S.life[S.sel]) * 53);
+      U.text(`${s.who}, ${yr}`, 24, 352, { f: 'jac', size: 44 });
+      const msgs = [['THIS SAVE IS STILL WARM', 60, 110, -.08], ['I AM ON THE OTHER SIDE OF THE FILE', 150, 200, .05], ['SPRAY BEFORE IT IS TOO LATE', 230, 290, -.03], ['WE ARE ALL IN HERE WITH YOU', 40, 260, .04]];
+      msgs.forEach(([t, x, y, r], i) => { if (i !== 3 || S.sel === 2) U.text(t, x, y, { f: 'cou', w: 700, size: 22, ch: 'b', rot: r }); });
+    },
+    bot(U, S) {
+      U.text('FILE SELECT', 16, 34, { size: 16 }); U.text('HOLD Y: UBIK', 496, 34, { size: 8, align: 'right', track: 2, a: .8 });
+      SLOTS.forEach((s, i) => {
+        const y = 50 + i * 98, l = S.life[i], yr = Math.round(1992 - (1 - l) * 53);
+        U.rect(14, y, 484, 88, { ch: 'g', r: 5 });
+        U.text(`FILE ${i + 1}  ${s.who}`, 150, y + 28, { size: 16 });
+        U.text(`${s.game}   ${s.time}`, 150, y + 52, { f: 'vt', size: 22 });
+        U.text(`SAVED ${yr}-${s.md}   ${ERAS[eraOf(l)]}`, 150, y + 76, { f: 'vt', size: 22, a: .85 });
+      });
+      U.text(S.cold > 0 ? 'THIS FILE HAS GONE COLD. SPRAY IT FIRST.' : 'A LOAD    Y SPRAY UBIK    B BACK', 256, 368, { f: 'vt', size: 22, align: 'center' });
+    }
+  },
+  uni: (S) => ({ u_sel: S.sel, u_p0: [0, 0, S.spray || 0, 0], u_p1: [...S.life, 0] }),
+  common: MEMORY,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  int k = int(u_sel + .5); float life = k == 0 ? u_p1.x : k == 1 ? u_p1.y : u_p1.z;
+  float e = eraAt(f + float(k)*97., life);
+  vec2 s = eraSrc(f, e);
+  vec3 col = eraCol(memory(k, s/512., u_t), f, e, ipx(f));
+  col += u_hot*.5*(1. - smoothstep(0., .04, fract(e)))*step(.5, e);       // the seams where one year gives way to an older one
+  vec3 U = ui(f);
+  col = mix(col, u_hot, smoothstep(.3, .6, U.b)*smoothstep(2.4, 2.9, e));  // messages from the other side, only where reality has worn through
+  col = mix(col, col*.25, smoothstep(.05, .4, uiL(f, 2.).r));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  float sp = u_p0.z;
+  if (sp > .01) {                                                          // Ubik, sprayed from the right
+    vec2 dir = normalize(vec2(-1., .45)), q = f - vec2(512., 70.);
+    float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x));
+    float cone = step(0., along)*smoothstep(along*.35 + 6., along*.18, abs(across))*smoothstep(420., 60., along);
+    float grain = step(.8, hash12(floor(f/2.) + floor(u_now*30.)*vec2(3., 7.)));
+    col = mix(col, vec3(1., .86, .45), cone*grain*sp) + vec3(1., .8, .4)*cone*sp*.15;
+  }
+  o = vec4(col, 1.);
+}`,
+    bot: `
+void mainImage(out vec4 o, in vec2 f){
+  float yd = 384. - f.y; int j = -1;
+  for (int i = 0; i < 3; i++) if (yd >= 50. + float(i)*98. && yd < 138. + float(i)*98.) j = i;
+  float life = j == 0 ? u_p1.x : j == 1 ? u_p1.y : j == 2 ? u_p1.z : 1.;
+  float e = j >= 0 ? eraAt(f*1.3 + float(j)*53., life) : 0.;
+  vec2 s = eraSrc(f, e);
+  vec3 U = ui(s), col = u_ground;
+  col = mix(col, mixOk(u_ground, u_cool, .2), smoothstep(.3, .6, U.g));
+  if (j >= 0) { vec2 tp = (s - vec2(26., 384. - (50. + float(j)*98. + 80.)))/vec2(110., 72.);
+    if (all(greaterThan(tp, vec2(0.))) && all(lessThan(tp, vec2(1.)))) col = memory(j, vec2(tp.x, tp.y*.75), u_t); }
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  if (j >= 0) col = eraCol(col, f, e, ipx(f));
+  float sel = floor(u_sel + .5);
+  col = mix(col, u_hot, aa(abs(sdBox(f - vec2(256., 384. - (50. + sel*98. + 44.)), vec2(243., 45.))) - 1.)*(.7 + .3*sin(u_t*5.)));
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ KIPPLE · the inventory (Do Androids Dream of Electric Sheep?) ═══════════════════════ */
+const ITEMS = [
+  ['ELECTRIC SHEEP', 'Grazes on three volts. The wool has to be replaced every spring.', 4],
+  ['MOOD ORGAN', 'Dial a feeling. Someone has left it set to wanting to watch television.', 61],
+  ['EMPATHY BOX', 'Two handles. While you hold them you are not alone.', 88],
+  ['OWL', 'Listed as extinct. No price is given.', 50],
+  ['TOAD', 'Very rare. Check its belly for a little control panel.', 12],
+  ['SPIDER', 'Somebody has been counting its legs.', 70],
+  ['LASER TUBE', 'Standard issue. Do not point it at anyone you are unsure about.', 99],
+  ['KIPPLE', 'Junk mail, empty matchbooks, gum wrappers. It reproduces when nobody is looking.', 100]
+];
+const START_INV = [0, 1, -1, 3, 6, -1, -1, 2, 4, -1, 7, 5, 6, -1, 0, -1, -1, 1, -1, 5, -1, 4, -1, 3];
+const ITEM_GLSL = `
+uniform vec4 u_cells[6], u_kip[6];
+float cellV(vec4 a[6], int i){ return a[i/4][i - 4*(i/4)]; }
+// the things you own, drawn in units where the slot is -1..1; ppu: logical px per unit
+vec4 item(int id, vec2 p, float t, float ppu){
+  float d = 1e9; vec3 c = u_ink; float px = 1./(ppu*iResolution.z);
+  if (id == 0) {
+    for (int k = 0; k < 7; k++) { float fk = float(k)*.9; d = smin(d, length(p - vec2(-.1 + cos(fk)*.36, .05 + sin(fk)*.2)) - .24, .06); }
+    float wool = d, head = length((p - vec2(.55, .24))*vec2(1., 1.25)) - .17, legs = min(sdBox(p - vec2(-.32, -.42), vec2(.05, .17)), sdBox(p - vec2(.18, -.42), vec2(.05, .17)));
+    d = min(d, min(head, legs)); c = wool < 0. ? u_ink*(.85 + .15*sin(length(p)*40.)) : mixOk(u_ground, u_ink, .35);
+    c = mix(c, u_hot, clamp(.5 - (sdSeg(p, vec2(-.05, .12), vec2(.06, -.04)) - .04)/px, 0., 1.)*step(wool, 0.));
+  } else if (id == 1) {
+    float r = length(p); d = r - .78; c = mixOk(u_ground, u_cool, .55);
+    c = mix(c, u_ink, step(.58, r)*step(r, .72)*step(.8, fract(atan(p.y, p.x)/6.2832*12.)));
+    c = mix(c, u_hot, clamp(.5 - (sdSeg(p, vec2(0.), .55*vec2(cos(t*.6 + 2.), sin(t*.6 + 2.))) - .05)/px, 0., 1.));
+    c = mix(c, u_ink, step(length(p), .1));
+  } else if (id == 2) {
+    float box = sdBox(p - vec2(0., -.1), vec2(.5, .42)) - .04, scr = sdBox(p - vec2(0., -.05), vec2(.36, .27)), hl = sdBox(vec2(abs(p.x) - .64, p.y + .05), vec2(.07, .2));
+    d = min(box, hl); c = mix(mixOk(u_cool, u_ground, .3), u_ink, step(hl, 0.));
+    c = mix(c, mixOk(u_hot, u_ink, .3 + .3*sin(t*2.)), step(scr, 0.));
+  } else if (id == 3) {
+    float body = length((p - vec2(0., -.1))*vec2(1.25, 1.)) - .62, ears = min(sdSeg(p, vec2(-.38, .42), vec2(-.5, .78)), sdSeg(p, vec2(.38, .42), vec2(.5, .78))) - .06;
+    d = min(body, ears); c = mixOk(u_hot, u_ground, .45);
+    vec2 e = vec2(abs(p.x) - .24, p.y - .12); float er = length(e);
+    float spiral = .5 + .5*sin(atan(e.y, e.x)*2. + er*40. - t*3.);
+    c = mix(c, mix(u_ink, u_ground, spiral*step(.06, er)), step(er, .2));
+  } else if (id == 4) {
+    float body = length((p - vec2(0., -.2))*vec2(1., 1.5)) - .7, eyes = length(vec2(abs(p.x) - .32, p.y - .25)) - .14;
+    d = min(body, eyes); c = mixOk(u_cool, u_ground, .35);
+    c = mix(c, u_ink, step(eyes, 0.)); c = mix(c, u_ground, step(length(vec2(abs(p.x) - .32, p.y - .25)), .06));
+    float panel = sdBox(p - vec2(0., -.35), vec2(.22, .12)); c = mix(c, mixOk(u_hot, u_ink, .4), step(panel, 0.)*(.6 + .4*step(.5, fract(t*2.))));
+  } else if (id == 5) {
+    float body = min(length(p - vec2(0., -.05)) - .22, length(p - vec2(0., .25)) - .14);
+    float legs = 1e9; for (int k = 0; k < 4; k++) { float fk = float(k); float a = .5 + fk*.35; vec2 knee = vec2(.45, -.1 + .25*sin(a*2. + t*3. + fk));
+      legs = min(legs, min(sdSeg(vec2(abs(p.x), p.y), vec2(.15, .05 - fk*.08), knee), sdSeg(vec2(abs(p.x), p.y), knee, vec2(.75, -.55 + fk*.12)))); }
+    d = min(body, legs - .035); c = mix(u_ink, mixOk(u_ground, u_ink, .6), step(0., body));
+  } else if (id == 6) {
+    float tube = sdBox(rot2(.6)*p, vec2(.62, .1)) - .06, beam = abs(dot(p - vec2(.42, .32), normalize(vec2(-.68, .57))))*.0 + sdSeg(p, vec2(.45, .38), vec2(.95, .8)) - .03;
+    d = min(tube, beam); c = mix(mixOk(u_ground, u_ink, .6), mixOk(u_hot, u_ink, .3 + .3*sin(t*12.)), step(beam, 0.));
+  } else {
+    vec2 g = p*3.; vec2 id = floor(g); float best = 9., b2 = 9.; vec2 bid = id;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 n = id + vec2(float(x), float(y)); vec2 cp = n + hash22(n); float dd = length(g - cp); if (dd < best) { b2 = best; best = dd; bid = n; } else b2 = min(b2, dd); }
+    d = length(p*vec2(.9, 1.15)) - .8 + .12*fbm(p*4.);
+    float hs = hash12(bid);
+    c = mixOk(mixOk(u_ground, u_hot, .35 + .4*hs), u_ink, step(.75, hs)*.5)*(.6 + .4*smoothstep(0., .15, b2 - best));
+  }
+  return vec4(c, clamp(.5 - d/px, 0., 1.));
+}`;
+scene({
+  id: 'kipple', name: 'KIPPLE', status: 'INVENTORY', element: 'Inventory grid', book: 'Do Androids Dream of Electric Sheep?', cart: true,
+  pal: { ground: '#18150F', ink: '#E6DAC2', hot: '#C9D33A', cool: '#8F74F2' },
+  hint: ['Kipple grows into empty slots and spreads to its neighbours. Full slots go to kipple too, in the end.', 'Touch a slot to examine it, touch it again (or press A) to sort it. Dragging across the grid sweeps.', 'When twenty slots are kipple, kipple has won.'],
+  enter(S) { S.sel = 7; S.inv = (PH.inv || START_INV).slice(); S.kip = S.inv.map(v => v === 7 ? 1 : Math.random() * .3); S.pulse = 0; S.fresh = true; },
+  update(S, G, I, dt) {
+    let sel = S.sel; const c = sel % 6, r = Math.floor(sel / 6);
+    if (I.press('LEFT')) sel = r * 6 + (c + 5) % 6; if (I.press('RIGHT')) sel = r * 6 + (c + 1) % 6;
+    if (I.press('UP')) sel = ((r + 3) % 4) * 6 + c; if (I.press('DOWN')) sel = ((r + 1) % 4) * 6 + c;
+    let act = I.press('A');
+    if (I.tap) { const cx = Math.floor((I.tap[0] - 44) / 72), ry = Math.floor((I.tap[1] - 56) / 72); if (cx >= 0 && cx < 6 && ry >= 0 && ry < 4) { const i = ry * 6 + cx; if (i === sel) act = true; sel = i; } }
+    if (I.touch.down) { const cx = Math.floor((I.touch.x - 44) / 72), ry = Math.floor((LH - I.touch.y - 56) / 72); if (cx >= 0 && cx < 6 && ry >= 0 && ry < 4) S.kip[ry * 6 + cx] = Math.max(0, S.kip[ry * 6 + cx] - dt * .8); }
+    if (sel !== S.sel) S.pulse = 1; S.sel = sel; S.pulse = Math.max(0, S.pulse - dt * 2);
+    if (act) { if (S.inv[sel] === 7) S.inv[sel] = -1; S.kip[sel] = 0; S.pulse = 1; }
+    const next = S.kip.slice();
+    for (let i = 0; i < 24; i++) {
+      if (S.inv[i] === 7) { next[i] = 1; continue; }
+      const cc = i % 6, rr = Math.floor(i / 6); let n = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = cc + dx, y = rr + dy; if (x >= 0 && x < 6 && y >= 0 && y < 4 && S.inv[y * 6 + x] === 7) n++; }
+      next[i] = Math.min(1, S.kip[i] + dt * (.004 + .045 * n + (S.inv[i] < 0 ? .012 : 0)));
+      if (next[i] >= 1) S.inv[i] = 7;
+    }
+    S.kip = next; PH.inv = S.inv;
+    const n7 = S.inv.filter(v => v === 7).length; S.frac = n7 / 24;
+    if (n7 >= 20) { PH.inv = null; G.over('KIPPLE DRIVES OUT NONKIPPLE'); }
+    if (I.press('B')) G.go('home', 'regress');
+  },
+  focus: (S) => [44 + (S.sel % 6) * 72 + 32, LH - (56 + Math.floor(S.sel / 6) * 72 + 32)],
+  sig: (S, G, s) => s ? `${S.inv.filter(v => v === 7).length}` : `${S.inv[S.sel]}|${S.sel}`,
+  ui: {
+    top(U, S) {
+      const id = S.inv[S.sel], it = id < 0 ? ['EMPTY SLOT', 'Nothing is here yet. Something will be.', 0] : ITEMS[id];
+      U.text(it[0], 300, 92, { f: 'jac', size: id === 0 ? 34 : 40 });
+      U.wrap(it[1], 300, 124, 196, { f: 'vt', size: 22, lh: 21 });
+      U.text('VOIGHT-KAMPFF', 300, 296, { size: 8, track: 2, a: .8 }); U.text(`AUTHENTIC ${it[2]}%`, 300, 348, { size: 16 });
+    },
+    bot(U, S) {
+      U.text('INVENTORY', 44, 40, { size: 16 }); U.text(`KIPPLE ${S.inv.filter(v => v === 7).length}/24`, 468, 40, { size: 16, align: 'right', ch: 'rb' });
+      U.text('TOUCH TWICE OR A TO SORT    DRAG TO SWEEP', 256, 372, { size: 8, align: 'center', a: .7, track: 1 });
+    }
+  },
+  tex(h, S) {
+    if (S.fresh) { const R = h.sims.get('kipple.rd'); if (R) R.steps = 0; S.fresh = false; }
+    const rd = h.sim('kipple.rd', 'kipple.sim', 128, 96, { steps: 3, float: true, linear: true, uniforms: { u_kip: new Float32Array(S.kip) } });
+    return { u_mem: rd };
+  },
+  uni: (S) => ({ u_sel: S.sel, u_cells: new Float32Array(S.inv), u_kip: new Float32Array(S.kip), u_p0: [S.inv[S.sel], S.inv[S.sel] < 0 ? 0 : ITEMS[S.inv[S.sel]][2] / 100, S.pulse, S.frac || 0] }),
+  common: ITEM_GLSL,
+  glsl: {
+    sim: `
+uniform vec4 u_kip[6];
+float kipAt(vec2 L){
+  float col = floor((L.x - 44.)/72.), row = floor(((384. - L.y) - 56.)/72.);
+  if (col < 0. || col > 5. || row < 0. || row > 3.) return .3;
+  vec2 lc = vec2(L.x - 44. - col*72., (384. - L.y) - 56. - row*72.);
+  if (lc.x > 64. || lc.y > 64.) return .45;                                  // kipple likes the cracks between slots
+  int i = int(row)*6 + int(col); return u_kip[i/4][i - 4*(i/4)];
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec2 L = f*4.;
+  vec4 c = prev(f); if (iFrame == 0) c = vec4(1., 0., 0., 0.);
+  vec4 n = prev(f + vec2(0., 1.)) + prev(f - vec2(0., 1.)) + prev(f + vec2(1., 0.)) + prev(f - vec2(1., 0.));
+  vec4 g = prev(f + vec2(1.)) + prev(f - vec2(1.)) + prev(f + vec2(1., -1.)) + prev(f + vec2(-1., 1.));
+  vec2 lap = iFrame == 0 ? vec2(0.) : -c.xy + .2*n.xy + .05*g.xy;
+  float kv = kipAt(L);
+  float F = .0545, k = mix(.07, .062, smoothstep(.05, .85, kv));
+  float A = c.x, B = c.y, r = A*B*B;
+  A += lap.x - r + F*(1. - A);
+  B += .5*lap.y + r - (k + F)*B;
+  B = max(B, step(.9975, hash12(f + floor(iTime*3.)*vec2(7., 3.)))*smoothstep(.15, .6, kv));   // kipple seeds itself
+  vec2 d = L - iTouch.xy; B *= 1. - iTouch.z*step(dot(d, d), 700.);                              // the stylus sweeps it away
+  o = vec4(clamp(A, 0., 1.), clamp(B, 0., 1.), 0., 1.);
+}`,
+    top: `
+float foam(vec2 p){ float trap = 9.; for (int i = 0; i < 6; i++) { p = -1. + 2.*fract(.5*p + .5); float r2 = dot(p, p); p *= 1.2/r2; trap = min(trap, r2); } return trap; }
+void mainImage(out vec4 o, in vec2 f){
+  int id = int(u_p0.x + (u_p0.x < 0. ? -.5 : .5));
+  vec3 col = u_ground*(.8 + .2*f.y/384.);
+  vec2 ctr = vec2(150., 190.), p = (f - ctr)/105.;
+  col += u_cool*.08*exp(-length(p)*1.5)*(.6 + .4*sin(length(p)*20. - u_t*2.));
+  col = mix(col, u_ground*.6, (1. - smoothstep(0., 3., abs(length(f - ctr) - 140.)))*.0);
+  if (id >= 0) {
+    vec4 it = item(id, p/(1. + .06*u_p0.z), u_t, 105.);
+    float fm = foam(rot2(u_t*.05)*p*1.6 + float(id)*1.7);              // looked at closely, everything you own is foam
+    vec3 inner = it.rgb*(.55 + .6*smoothstep(.0, .5, fm)) + mixOk(u_hot, u_cool, fract(fm*2. + u_t*.1))*.25*exp(-fm*3.);
+    col = mix(col, inner, it.a);
+    col += mixOk(u_hot, u_ink, .5)*exp(-max(length(p) - .9, 0.)*5.)*.12*(1. - it.a);
+  } else { float n = fbm(f*.02 + u_t*.2); col = mix(col, u_ink*.2, smoothstep(.55, .8, n)*smoothstep(150., 40., length(f - ctr))); }
+  vec3 U = ui(f);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  vec2 b = f - vec2(300., 384. - 316.);                                  // the authenticity bar, with its scan line
+  if (b.x > 0. && b.x < 196. && b.y > -6. && b.y < 6.) { float fill = step(b.x/196., u_p0.y); col = mix(u_ground*1.4, mixOk(u_hot, u_cool, b.x/196.), fill);
+    col = mix(col, u_ink, (1. - smoothstep(0., 2., abs(b.x - fract(u_t*.5)*196.)))*.8); }
+  o = vec4(col, 1.);
+}`,
+    bot: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = u_ground, U = ui(f);
+  float B = texture(u_mem, f/LS).y;
+  float cx = floor((f.x - 44.)/72.), ry = floor(((384. - f.y) - 56.)/72.);
+  vec2 lc = vec2(f.x - 44. - cx*72., (384. - f.y) - 56. - ry*72.);
+  if (cx >= 0. && cx < 6. && ry >= 0. && ry < 4. && lc.x < 64. && lc.y < 64.) {
+    int i = int(ry)*6 + int(cx);
+    float id = cellV(u_cells, i), kv = cellV(u_kip, i);
+    col = mixOk(u_ground, u_cool, .13)*(1. - .35*kv);
+    col = mix(col, u_ground*.7, (1. - smoothstep(0., 2., min(min(lc.x, lc.y), min(64. - lc.x, 64. - lc.y))))*.6);
+    if (id > -.5) { vec4 it = item(int(id + .5), vec2(lc.x - 32., 32. - lc.y)/27., u_t + float(i)*1.3, 27.); col = mix(col, it.rgb*(1. - .5*kv*step(id, 6.5)), it.a); }
+    if (i == int(u_sel + .5)) col = mix(col, u_hot, (1. - smoothstep(0., 2., abs(sdBox(lc - 32., vec2(31.))) - .5 - 2.*u_p0.z)));
+  }
+  float kb = smoothstep(.12, .3, B);                                        // kipple, everywhere it has got to
+  vec3 kc = mixOk(mixOk(u_ground, u_hot, .5), u_ink, smoothstep(.28, .5, B)*.45)*(.7 + .3*vnoise(f*.5));
+  col = mix(col, kc, kb*.92);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  col = mix(col, u_hot, smoothstep(.3, .6, U.b));
+  vec2 d = f - iTouch.xy; col = mix(col, u_ink, (1. - smoothstep(1., 2.5, abs(length(d) - 26.)))*iTouch.w*.8);
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ EMPATHY BOX · the HUD (Mercerism) ═══════════════════════ */
+scene({
+  id: 'empathy', name: 'EMPATHY BOX', status: 'HUD', element: 'HUD: hearts, health bar, score', book: 'Do Androids Dream of Electric Sheep?', cart: true,
+  pal: { ground: '#140E0C', ink: '#F3E4D2', hot: '#FF5A36', cool: '#E9B44C' },
+  hint: ['The bottom screen is a game’s HUD: hearts, a health tree, a score.', 'Hold A, or touch a handle at the edge, to fuse. The hinge goes away and you climb with everyone else.', 'While fused, the stones thrown at the climber hit your hearts. Let go to heal.'],
+  enter(S) { S.hp = PH.hp ?? 12; S.fused = 0; S.others = 4103226; S.score = 0; S.rocks = []; S.next = 1; S.hit = 9; S.climb = 0; },
+  update(S, G, I, dt) {
+    const t = I.touch, grip = I.held('A') || (t.down && (t.x < 60 || t.x > 452));
+    S.fused += ((grip ? 1 : 0) - S.fused) * (1 - Math.exp(-dt * 3));
+    S.hit += dt;
+    if (S.fused > .8) {
+      S.others += Math.floor(dt * (20000 + Math.random() * 60000)); S.score += dt * 10; S.climb += dt * .012;
+      S.next -= dt; if (S.next <= 0) { S.rocks.push({ t0: S.t, side: Math.random() < .5 ? -1 : 1 }); S.next = 1.1 + Math.random() * 1.6; }
+    } else { S.hp = Math.min(12, S.hp + dt * .3); S.others = Math.max(4103226, S.others - Math.floor(dt * 30000)); }
+    S.rocks = S.rocks.filter(r => { if (S.t - r.t0 >= .9) { S.hp -= 1; S.hit = 0; const fx = .42 + .1 * Math.sin(S.climb * 6.28); G.splat(fx * 512, (.14 + .62 * fx) * 860 + 40, .7); return false; } return true; });
+    PH.hp = S.hp;
+    if (S.hp <= 0) { PH.hp = 12; G.over('THE CLIMB IS OVER'); }
+    if (I.press('B')) G.go('home', 'regress');
+  },
+  focus: (S) => S.fused > .5 ? [256, 500] : [150, 200],
+  sig: (S, G, s) => s ? `${Math.floor(S.others / 997)}|${Math.floor(S.score)}|${Math.ceil(S.hp)}` : '',
+  ui: {
+    top(U) { U.text('MERCER IS CLIMBING', 24, 358, { size: 16, ch: 'g', a: .9 }); },
+    bot(U, S) {
+      U.text(`HP ${Math.ceil(S.hp)}/12`, 300, 60, { size: 16 });
+      U.text('OTHERS FUSED', 300, 120, { size: 8, track: 2, a: .8 }); U.text(S.others.toLocaleString('en-US'), 300, 158, { size: 32, ch: 'g' });
+      U.text('EMPATHY', 300, 206, { size: 8, track: 2, a: .8 }); U.text(String(Math.floor(S.score)).padStart(6, '0'), 300, 244, { size: 32, ch: 'g' });
+      U.rect(0, 112, 26, 170, { ch: 'b', r: 6 }); U.rect(486, 112, 26, 170, { ch: 'b', r: 6 });
+      U.text('HOLD A OR A HANDLE TO FUSE', 256, 362, { f: 'vt', size: 22, align: 'center' });
+    }
+  },
+  uni: (S) => { const r = new Float32Array(16); S.rocks.slice(0, 4).forEach((k, i) => r.set([S.t - k.t0, k.side, 1, 0], i * 4)); return { u_p0: [S.fused, S.hp, S.hit, S.climb], u_p2: [0, 0, 0, 0], u_rocks: r }; },
+  common: `
+uniform vec4 u_rocks[4];
+float ground(float x){ return .14 + .62*x + .05*(fbm(vec2(x*5., 1.)) - .5) + .012*sin(x*40.); }
+float sdHeart(vec2 p){ p.x = abs(p.x); if (p.y + p.x > 1.) return sqrt(dot(p - vec2(.25, .75), p - vec2(.25, .75))) - .35355;
+  return sqrt(min(dot(p - vec2(0., 1.), p - vec2(0., 1.)), dot(p - .5*max(p.x + p.y, 0.), p - .5*max(p.x + p.y, 0.))))*sign(p.x - p.y); }
+// the hill: q is 0..1 across, 0..1 up; H is the height in logical px that q.y spans
+vec3 climb(vec2 q, float H, float t, float fused){
+  float x = q.x;
+  vec3 col = mixOk(mixOk(u_cool, u_hot, .35), u_ground, smoothstep(.2, 1., q.y));
+  vec2 sp = (q - vec2(.8, .8))*vec2(1., H/512.);
+  float sun = length(sp) - .13;
+  col = mix(col, mixOk(u_cool, u_ink, .3), (1. - smoothstep(0., 2./H, sun))*step(.35, fract(q.y*H/9. + t*.3) + smoothstep(.85, .7, q.y)));
+  float g = ground(x);
+  float fx = .42 + .1*sin(u_p0.w*6.2832), fy = ground(fx);
+  float ppx = 1./H;
+  if (q.y < g) col = mix(mixOk(u_ground, u_cool, .25), u_ground*.6, clamp((g - q.y)*3., 0., 1.)) + u_cool*.05*fbm(q*vec2(40., 120.));
+  float crowd = step(.6, hash12(vec2(floor(x*180.), 3.)))*step(q.y, g + .018 + .01*hash12(vec2(floor(x*180.), 4.)))*step(g, q.y);
+  col = mix(col, u_ground*.4, crowd*fused*step(abs(x - fx), .6)*.85);
+  vec2 fp = (q - vec2(fx, fy))*vec2(512./H, 1.)/.07;                       // the old man, his robe and his staff
+  float robe = max(sdBox(fp - vec2(0., .38), vec2(.17 - .1*fp.y, .4)), -fp.y), head = length(fp - vec2(.02, .92)) - .12, staff = sdSeg(fp, vec2(.3, 0.), vec2(.42, 1.1)) - .025;
+  float fig = min(min(robe, head), staff);
+  col = mix(col, u_ground*.35, clamp(.5 - fig*.07*H*iResolution.z, 0., 1.));
+  for (int i = 0; i < 4; i++) { vec4 r = u_rocks[i]; if (r.z < .5) continue;
+    float s = clamp(r.x/.9, 0., 1.);
+    vec2 a = vec2(r.y < 0. ? -.05 : 1.05, .9 + .05*r.y), b = vec2(fx, fy + .06);
+    vec2 rp = mix(a, b, s) + vec2(0., .22*sin(PI*s));
+    float rd = length((q - rp)*vec2(512./H, 1.)) - .012*(1. + .3*sin(atan(q.y - rp.y, q.x - rp.x)*5.));
+    col = mix(col, mixOk(u_ground, u_hot, .4), clamp(.5 - rd*H*iResolution.z, 0., 1.)); }
+  return col;
+}`,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  float fu = smoothstep(0., 1., u_p0.x);
+  vec2 pos = mix(f, f + vec2(0., 384. + DS_GAP), fu); float H = mix(384., CS.y, fu);
+  vec3 col = climb(pos/vec2(512., H), H, u_t, fu);
+  col = mix(col, u_hot, exp(-u_p0.z*3.)*.45*smoothstep(150., 380., length(f - vec2(256., 192.))));
+  vec3 U = ui(f); col = mix(col, u_ink, smoothstep(.3, .6, U.g)*(1. - fu));
+  o = vec4(col, 1.);
+}`,
+    bot: `
+float tree(vec2 p, float alive, out float lv){
+  float d = 1e9, s = 1.; lv = 0.; const float L = .3, R = .72;
+  for (int i = 0; i < 8; i++) {
+    float di = (sdSeg(p, vec2(0.), vec2(0., L)) - .045)*s;
+    if (di < d) { d = di; lv = float(i); }
+    p.y -= L; p.x = abs(p.x); p = rot2(.5 + .08*sin(u_t + float(i)))*p; p /= R; s *= R;
+  }
+  return d;
+}
+void mainImage(out vec4 o, in vec2 f){
+  float fu = smoothstep(0., 1., u_p0.x), hp = u_p0.y;
+  vec3 hud = u_ground*(.9 + .1*f.y/384.);
+  vec3 U = ui(f);
+  for (int i = 0; i < 6; i++) {                                              // hearts, beating faster as they empty
+    vec2 c = vec2(40. + float(i)*44., 384. - 62.); float fi = float(i);
+    float beat = 1. + .08*pow(.5 + .5*sin(u_t*(6. + (12. - hp)*.8)), 6.);
+    vec2 p = (f - c)/(17.*beat) + vec2(0., .5);
+    float d = sdHeart(p)*17.;
+    float full = clamp(hp*.5 - fi, 0., 1.);
+    vec2 z = (p - vec2(0., .5))*1.4; vec2 jc = vec2(-.4, .6) + .05*vec2(cos(u_t), sin(u_t*1.3)); float tr = 9.;
+    for (int k = 0; k < 10; k++) { z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + jc; tr = min(tr, length(z)); }
+    vec3 hc = mixOk(u_hot, u_ink, exp(-tr*4.)*.8);
+    float shown = full >= 1. ? 1. : step(p.x, 0.)*step(.5, full);
+    hud = mix(hud, mix(u_ground*1.6, hc, shown), aa(d));
+    hud = mix(hud, u_ink, aa(abs(d) - .8)*.8);
+    if (full <= 0.) hud = mix(hud, u_ground, aa(abs(p.x - .1*sin(p.y*14.))*17. - .7)*step(d, 0.));
+  }
+  float lv; vec2 tp = (f - vec2(150., 40.))/250.;
+  float td = tree(tp, 0., lv)*250.;
+  float alive = hp/12.*8.;
+  vec3 tc = lv < alive ? mixOk(u_cool, u_ink, lv/8.) : mixOk(u_ground, u_ink, .18);
+  hud = mix(hud, tc, aa(td));
+  if (lv >= alive - 1. && lv < alive) hud += u_hot*.6*exp(-max(td, 0.)/2.)*(.5 + .5*sin(u_t*4.));
+  vec2 dg = mod(f*vec2(4., 3.), vec2(512., 384.));                           // the numbers are made of numbers
+  float sub = smoothstep(.3, .6, textureLod(u_ui, dg/LS, UILOD() + 1.).g);
+  hud = mix(hud, mix(u_hot, u_ink, sub), smoothstep(.3, .6, U.g));
+  hud = mix(hud, u_ink, smoothstep(.3, .6, U.r));
+  hud = mix(hud, mixOk(u_cool, u_hot, fu), smoothstep(.3, .6, U.b)*(.5 + .5*fu));
+  vec3 hill = climb(f/vec2(512., CS.y), CS.y, u_t, fu);
+  vec3 col = mix(hud, mix(hill, hud, .22), fu);
+  col = mix(col, u_hot, exp(-u_p0.z*3.)*.35*smoothstep(150., 380., length(f - vec2(256., 192.))));
+  o = vec4(col, 1.);
+}`
+  }
+});
+})();
+
+</script>
+<script>
+/* phant-c.js — cartridges 4–6: a dialogue box with a scramble suit, a world map under the pink beam, a layout with the console inside it. */
+(function () {
+'use strict';
+const PH = window.PHANT = window.PHANT || { list: [], byId: {} };
+const scene = (s) => { PH.list.push(s); PH.byId[s.id] = s; return s; };
+const LH = 384;
+
+/* ═══════════════════════ SCRAMBLE SUIT · the dialogue box (A Scanner Darkly) ═══════════════════════ */
+const LINES = [
+  'Hello. I am wearing the {suit|scramble suit|blur}, so you see {everyone|a million people|nobody} and {no one|someone|you}.',
+  'Somebody in this {house|room|console} is an {informant|addict|agent}. Maybe {the console|me|you}.',
+  'The {left|right} half of your brain is reading this. The {right|left} half {already knows|disagrees|is somebody else}.',
+  'Are you ready to turn yourself in?',
+  'Either way I write the report. I am the one who writes the reports on {myself|you|Bob|Fred}.'
+];
+const NAMES = ['FRED', 'BOB', 'ARCTOR', 'FRED', '???', 'YOU'];
+const plain = s => s.replace(/\{([^}|]*)[^}]*\}/g, '$1');
+const roll = (s, r) => s.replace(/\{([^}]*)\}/g, (_, a) => { const o = a.split('|'); return o[Math.floor(r() * o.length)]; });
+const SUIT = `
+vec4 hash4(vec2 p){ return vec4(hash22(p), hash22(p + 17.31)); }
+// one face, from eight numbers
+vec3 face(vec2 p, vec4 a, vec4 b, float talk){
+  vec3 skin = mixOk(mixOk(u_ink, u_hot, .2 + .35*a.x), u_ground, .12 + .35*a.y*a.y);
+  vec3 hair = mixOk(u_ground, mixOk(u_hot, u_cool, a.z), .2 + .5*b.w*b.w);
+  vec3 col = mixOk(u_ground, u_cool, .2 + .25*b.x);
+  float sh = length(max(abs(p - vec2(0., -2.3)) - vec2(.85 + .3*a.x, 1.15), 0.)) - .5;
+  if (sh < 0.) { col = mixOk(mixOk(u_cool, u_hot, b.y), u_ground, .3 + .3*a.w);
+    float pat = a.z < .33 ? step(.5, fract(p.x*4.*(1. + b.z))) : a.z < .66 ? step(.5, fract((p.x + p.y)*3.)) : step(.25, fract(p.x*2.)*fract(p.y*2.));
+    col = mix(col, col*.68, pat*.6); }
+  if (sdBox(p - vec2(0., -.95), vec2(.2 + .05*b.x, .3)) < 0.) col = skin*.78;
+  float hb = length((p - vec2(0., .1))*vec2(1., .9)) - (.86 + .2*a.w);
+  if (hb < 0. && p.y > -.45 + .3*a.z) col = hair;
+  float head = length(p*vec2(1., .8 + .15*a.z)) - (.76 + .08*b.y);
+  if (head < 0.) {
+    col = skin*(.84 + .22*p.x*(b.x - .5)*2.);
+    if (p.y > .36 - .25*b.x + .08*sin(p.x*(4. + 6.*a.w))) col = hair;
+    vec2 e = vec2(abs(p.x) - (.27 + .1*b.y), p.y - .07 - .06*a.w);
+    if (length(e*vec2(1., 1.6 + .8*b.z)) < .1 + .04*b.w) { col = u_ink; if (length(e - vec2(.025*sin(u_t*.7), 0.)) < .045 + .02*a.x) col = u_ground*.4; }
+    if (sdSeg(vec2(abs(p.x), p.y), vec2(.13, .25 + .05*a.y), vec2(.45, .25 - .08*(b.z - .5))) < .028) col = hair*.7;
+    if (sdSeg(p, vec2(0., .01), vec2(.06*(a.w - .5), -.2 - .1*a.x)) < .03) col = skin*.62;
+    if (length((p - vec2(0., -.44 - .04*b.w))/vec2(.16 + .1*b.x, .025 + .1*talk)) < 1.) col = mixOk(u_hot, u_ground, .55);
+  }
+  return col;
+}
+// the suit: a mosaic of fragments, each cut from somebody else, drifting and re-casting; the two hemispheres wear different people
+vec3 suit(vec2 C, float talk){
+  vec2 g = C/22., id = floor(g); float best = 9., b2 = 9.; vec2 bid = id;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 n = id + vec2(float(x), float(y)); vec2 cp = n + .5 + .38*sin(hash22(n)*6.28 + u_t*(.5 + hash12(n)));
+    float d = length(g - cp); if (d < best) { b2 = best; best = d; bid = n; } else b2 = min(b2, d); }
+  float ph = u_t*(.35 + .7*hash12(bid + 5.)) + hash12(bid)*10., side = step(256., C.x)*50.;
+  float k = smoothstep(.75, 1., fract(ph));
+  vec4 A = mix(hash4(bid + floor(ph) + side), hash4(bid + floor(ph) + 1. + side), k), B = mix(hash4(bid*1.7 + floor(ph) + 9. + side), hash4(bid*1.7 + floor(ph) + 10. + side), k);
+  vec2 off = (hash22(bid + 3.) - .5)*12.;
+  vec3 col = face((C + off - vec2(256., 384. + DS_GAP + 178.))/128., A, B, talk);
+  float edge = b2 - best;
+  return col*(.82 + .18*smoothstep(0., .12, edge)) + u_hot*.12*(1. - smoothstep(0., .05, edge));
+}`;
+scene({
+  id: 'scramble', name: 'SCRAMBLE SUIT', status: 'DIALOGUE', element: 'Dialogue box and speaker portrait', book: 'A Scanner Darkly', cart: true,
+  pal: { ground: '#0E0F13', ink: '#E7E9EC', hot: '#FF3FC9', cool: '#35EFC9' },
+  hint: ['The speaker wears a scramble suit: a mosaic of a million other people, across both screens.', 'A skips the typing, and the letters smear. The other half of your brain reads a different version above the box.', 'At the question, A answers yes and B answers no. It makes no difference.'],
+  enter(S) { S.line = 0; S.chars = 0; S.smear = 0; S.alt = LINES[0]; S.rollT = 0; S.name = 0; },
+  update(S, G, I, dt) {
+    const txt = plain(LINES[S.line]); const done = S.chars >= txt.length;
+    if (!done) S.chars = Math.min(txt.length, S.chars + dt * 30);
+    S.smear = Math.max(0, S.smear - dt * 1.4);
+    S.rollT -= dt; if (S.rollT <= 0) { S.alt = roll(LINES[S.line], Math.random); S.rollT = .7; S.name = (S.name + 1) % NAMES.length; }
+    const ask = S.line === 3 && done;
+    if (I.press('A') || (I.tap && !ask)) {
+      if (!done) { S.chars = txt.length; S.smear = 1; }
+      else { S.line = S.line === 3 ? 4 : (S.line + 1) % LINES.length; S.chars = 0; S.rollT = 0; S.answer = ask ? 'YES' : S.answer; }
+    } else if (I.press('B')) { if (ask) { S.line = 4; S.chars = 0; S.answer = 'NO'; } else G.go('home', 'regress'); }
+    S.talk = done ? 0 : .5 + .5 * Math.sin(S.t * 22);
+  },
+  focus: () => [256, 120],
+  sig: (S, G, s) => s ? `${S.line}|${Math.floor(S.chars)}|${S.alt}` : NAMES[S.name],
+  ui: {
+    top(U, S) { U.rect(16, 40, 176, 26, { ch: 'g', r: 3 }); U.text(`SPEAKER  ${NAMES[S.name]}`, 26, 59, { size: 16 }); },
+    bot(U, S) {
+      const txt = plain(LINES[S.line]).slice(0, Math.floor(S.chars));
+      U.wrap(S.alt.replace(/[{}]/g, ''), 30, 40, 452, { f: 'cou', w: 700, size: 19, lh: 22, ch: 'b' });
+      U.rect(12, 156, 488, 216, { ch: 'g', r: 6 }); U.frame(21, 165, 470, 198, { ch: 'r', lw: 1.5, r: 3 });
+      U.rect(28, 140, 132, 28, { ch: 'g', r: 4 }); U.text(NAMES[S.name], 94, 160, { size: 16, align: 'center' });
+      U.wrap(txt, 38, 204, 436, { f: 'vt', size: 26, lh: 26 });
+      if (S.line === 3 && S.chars >= plain(LINES[3]).length) { U.text('A  YES', 120, 340, { size: 16, align: 'center', ch: 'rb' }); U.text('B  NO', 392, 340, { size: 16, align: 'center', ch: 'rb' }); }
+    }
+  },
+  uni: (S) => ({ u_p0: [S.smear, S.chars >= plain(LINES[S.line]).length && S.line !== 3 ? 1 : 0, S.talk || 0, 0] }),
+  common: SUIT,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = suit(dsCanvas(f), u_p0.z);
+  col *= .92 + .08*sin(f.y*1.6 + u_t*8.);
+  vec3 U = ui(f);
+  col = mix(col, u_ground*.9, smoothstep(.3, .6, U.g));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  o = vec4(col, 1.);
+}`,
+    bot: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = suit(f, u_p0.z), U = ui(f);
+  col = mix(col, col*.3, smoothstep(.05, .5, uiL(f, 2.).b));
+  col = mix(col, mixOk(u_cool, u_ink, .35), smoothstep(.3, .6, U.b)*(.75 + .25*step(.5, hash12(vec2(floor(u_t*8.), floor(f.y/11.))))));
+  col = mix(col, u_ground*.94, smoothstep(.3, .6, U.g));
+  float sm = u_p0.x, trail = 0.;                                             // skipped text smears
+  for (int i = 1; i < 8; i++) trail = max(trail, smoothstep(.3, .6, ui(f + vec2(float(i)*sm*9., 0.)).r)*(1. - float(i)/8.));
+  col = mix(col, u_hot, trail*sm*step(f.y, 230.));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  vec2 q = f - vec2(470., 30. + 3.*sin(u_t*4.));
+  col = mix(col, u_hot, aa(max(q.y - 4., -6. + abs(q.x)*1.2 - q.y))*u_p0.y*step(.4, fract(u_t*1.2)));
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ PINK BEAM · the world map (VALIS) ═══════════════════════ */
+const MSGS = ['THE EMPIRE NEVER ENDED', 'TIME IS NOT REAL', 'YOU ARE ALSO THIS ONE', 'THE PRISON IS MADE OF IRON AND IT IS EVERYWHERE', 'IT IS 70 AD AND IT IS 1974', 'A FISH WAS DRAWN ON THE DOOR'];
+scene({
+  id: 'beam', name: 'PINK BEAM', status: 'WORLD MAP', element: 'World map, minimap and the two screens', book: 'VALIS', cart: true,
+  pal: { ground: '#09070D', ink: '#FAEADF', hot: '#FF4FA3', cool: '#4D63E8' },
+  hint: ['The bottom screen is the map in 1974. The top screen is the same ground in 70 AD, as a mosaic.', 'An iron prison closes in from the edges. Press A to fire the pink beam from the fish, through the hinge, at your marker.', 'Move with the arrows or touch the map.'],
+  enter(S) { S.pw = [256, 192]; S.cam = [0, 0]; S.prison = PH.prison ?? .3; S.beamT = 9; S.msg = -1; S.target = null; },
+  update(S, G, I, dt) {
+    const v = 110 * dt;
+    if (I.held('LEFT')) S.pw[0] -= v; if (I.held('RIGHT')) S.pw[0] += v; if (I.held('UP')) S.pw[1] += v; if (I.held('DOWN')) S.pw[1] -= v;
+    if (I.touch.down) S.target = [I.touch.x + S.cam[0], I.touch.y + S.cam[1]];
+    if (S.target) { const dx = S.target[0] - S.pw[0], dy = S.target[1] - S.pw[1], d = Math.hypot(dx, dy); if (d < 2) S.target = null; else { S.pw[0] += dx / d * Math.min(d, v * 1.6); S.pw[1] += dy / d * Math.min(d, v * 1.6); } }
+    const k = 1 - Math.exp(-dt * 2.5); S.cam[0] += (S.pw[0] - 256 - S.cam[0]) * k; S.cam[1] += (S.pw[1] - 192 - S.cam[1]) * k;
+    S.beamT += dt;
+    if (I.press('A') && S.beamT > .9) { S.beamT = 0; S.prison = Math.max(0, S.prison - .2); S.msg = (S.msg + 1) % MSGS.length; G.splat(S.pw[0] - S.cam[0], S.pw[1] - S.cam[1], .45); }
+    S.prison = Math.min(1, S.prison + dt * .011); PH.prison = S.prison;
+    if (S.prison >= 1) { PH.prison = .3; G.over('THE EMPIRE NEVER ENDED'); }
+    if (I.press('B')) G.go('home', 'regress');
+  },
+  focus: (S) => [S.pw[0] - S.cam[0], S.pw[1] - S.cam[1]],
+  sig: (S, G, s) => s ? `${S.msg}|${Math.round(S.pw[0] / 8)}|${Math.round(S.pw[1] / 8)}` : `${S.msg}`,
+  ui: {
+    top(U, S) { U.text('AD 70', 24, 80, { f: 'jac', size: 44 }); U.text('1974', 488, 80, { f: 'jac', size: 44, align: 'right' });
+      U.text(S.msg >= 0 ? MSGS[S.msg] : 'THE EMPIRE NEVER ENDED', 256, 352, { f: 'jac', size: S.msg === 3 ? 22 : 30, align: 'center', ch: 'b' }); },
+    bot(U, S) {
+      const lat = (33.7 + S.pw[1] / 4000).toFixed(2), lon = (117.9 - S.pw[0] / 4000).toFixed(2);
+      U.text('WORLD MAP', 16, 26, { size: 16 }); U.text(`${lat}N ${lon}W`, 496, 26, { size: 8, align: 'right', track: 1 });
+      U.text(S.msg >= 0 ? `RECEIVED: ${MSGS[S.msg]}` : 'A  FIRE THE BEAM', 16, 372, { f: 'vt', size: 22, ch: S.msg >= 0 ? 'b' : 'r' });
+    }
+  },
+  uni: (S) => ({ u_p0: [S.cam[0], S.cam[1], S.pw[0] - S.cam[0], S.pw[1] - S.cam[1]], u_p1: [S.prison, S.beamT, 0, 0] }),
+  common: `
+float land(vec2 w){ return fbm(w*.0045 + vec2(3.1, 1.7))*1.1 + .35*fbm(w*.018 + 9.) - .78; }
+vec2 FISH(){ return vec2(256., 384. + DS_GAP + 196.); }
+// the ichthys: the top of the lower circle and the bottom of the upper one meet at the head and cross into the tail
+float fish(vec2 p){ float d1 = p.y > -.5 ? abs(length(p - vec2(0., -.5)) - .78) : 9., d2 = p.y < .5 ? abs(length(p - vec2(0., .5)) - .78) : 9.;
+  return max(min(d1, d2) - .05, max(-.6 - p.x, p.x - .78)); }
+vec3 beam(vec2 C, vec3 col){
+  float bt = u_p1.y, I = smoothstep(1.3, 0., bt)*step(0., bt);
+  if (I <= 0.) return col;
+  vec2 A = FISH(), B = u_p0.zw; vec2 dir = normalize(B - A);
+  float d = sdSeg(C, A, B), along = dot(C - A, dir);
+  float pulse = step(.6, fract(along/16. - bt*9.))*exp(-d*d/6.);
+  return col + u_hot*(exp(-d*d/16.)*1.6 + exp(-d/20.)*.45 + pulse*1.2)*I + u_ink*exp(-d*d/2.)*I;
+}`,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec2 C = dsCanvas(f), w = f + u_p0.xy + vec2(0., 300.);
+  float T = 7.; vec2 cell = floor(w/T), cq = fract(w/T) - .5 + (hash22(cell) - .5)*.18;
+  float h = land((cell + .5)*T), hs = hash12(cell);
+  vec3 tess = h < 0. ? mixOk(mixOk(u_cool, u_ground, .35), u_ink, .12*hs + .1*step(.8, fract(h*10.))) : mixOk(mixOk(u_ink, u_hot, .25 + .25*hs), u_ground, smoothstep(.0, .3, h)*.5);
+  vec3 col = mix(tess*(.88 + .14*hs), u_ground*.5, smoothstep(.36, .46, max(abs(cq.x), abs(cq.y))));
+  col = mix(col, u_ground*.25, (1. - smoothstep(1.5, 3., abs(mod(f.x, 34.) - 17.)))*u_p1.x*.45);   // the bars are already here, faintly
+  vec2 fp = (f - vec2(256., 196.))/62.;
+  float fd = fish(fp)*62.;
+  col = mix(col, u_ground, aa(fd - 5.)*.85);
+  col = mix(col, mixOk(u_hot, u_ink, .2 + .2*sin(u_t*3.)), aa(fd));
+  col += u_hot*exp(-max(fd, 0.)/14.)*.35*(.6 + .4*sin(u_t*2.));
+  col = beam(C, col);
+  vec3 U = ui(f);
+  col = mix(col, col*.3, smoothstep(.05, .5, uiL(f, 2.).r));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  col = mix(col, u_hot, smoothstep(.3, .6, U.b)*smoothstep(2.5, .2, u_p1.y));
+  o = vec4(col, 1.);
+}`,
+    bot: `
+float hypEdge(vec2 z, out float n){
+  const float a = PI/7., cr = 1.7461, cd = 2.0122;                          // {7,3}: the circle orthogonal to the rim that meets the mirror at 60°
+  vec2 nl = vec2(-sin(a), cos(a)); n = 0.;
+  for (int i = 0; i < 16; i++) {
+    bool done = true;
+    if (z.y < 0.) { z.y = -z.y; n += 1.; done = false; }
+    float d = dot(z, nl); if (d > 0.) { z -= 2.*d*nl; n += 1.; done = false; }
+    vec2 q = z - vec2(cd, 0.); float l2 = dot(q, q); if (l2 < cr*cr) { z = vec2(cd, 0.) + q*cr*cr/l2; n += 1.; done = false; }
+    if (done) break;
+  }
+  return abs(length(z - vec2(cd, 0.)) - cr);
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec2 w = f + u_p0.xy;
+  float h = land(w), hx = land(w + vec2(2., 0.)) - h, hy = land(w + vec2(0., 2.)) - h;
+  vec3 col;
+  if (h < 0.) col = mixOk(u_ground, u_cool, .3 + .25*smoothstep(-.25, 0., h)) + u_cool*.12*step(.85, fract(h*14. - u_t*.15))*smoothstep(-.3, 0., h);
+  else { col = mixOk(mixOk(u_ground, u_cool, .5), u_ink, smoothstep(.0, .3, h)*.55)*(.72 + .5*clamp(.5 - (hx - hy)*30., 0., 1.)); col = mix(col, u_ink*.6, step(.9, fract(h*20.))*.25); }
+  col = mix(col, u_ink, 1. - smoothstep(.5, 1.5, abs(h)/max(length(vec2(hx, hy))/2., 1e-4)));
+  vec2 gq = abs(fract(w/64.) - .5)*64.; col = mix(col, u_ink, (1. - smoothstep(0., 1., min(gq.x, gq.y)))*.08);
+  float R = mix(470., 140., u_p1.x);                                         // the Black Iron Prison, a hyperbolic tiling whose disk shrinks
+  vec2 z = rot2(u_t*.03)*(f - vec2(256., 192.))/R; float r = length(z);
+  vec3 iron = mixOk(u_ground, u_ink, .14)*(.75 + .25*vnoise(f*vec2(.02, .35))) + u_hot*.05;
+  if (r >= 1.) col = mix(col, iron, .93);
+  else { float n, e = hypEdge(z, n)*R, wd = 2.2*(1. - r*r) + .4;
+    col = mix(col, col*.82, mod(n, 2.)*.5*u_p1.x);
+    col = mix(col, iron, 1. - smoothstep(wd, wd + 1.4, e));
+    col += u_hot*.25*exp(-e/2.)*smoothstep(.6, 1., r); }
+  col = mix(col, iron, (1. - smoothstep(0., 3., abs(r - 1.)*R))*.9);
+  vec2 P = u_p0.zw; float pd = length(f - P);
+  col = mix(col, u_ground, aa(abs(pd - 7.) - 2.5)); col = mix(col, u_hot, aa(abs(pd - 7.) - 1.2)); col = mix(col, u_ink, aa(pd - 2.));
+  float bt = u_p1.y; col += u_hot*exp(-abs(pd - bt*240.)/3.)*exp(-bt*2.)*step(bt, 2.);
+  col = beam(f, col);
+  vec3 U = ui(f);
+  col = mix(col, col*.3, smoothstep(.05, .5, uiL(f, 2.).r + uiL(f, 2.).b));
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r)); col = mix(col, u_hot, smoothstep(.3, .6, U.b));
+  o = vec4(col, 1.);
+}`
+  }
+});
+
+/* ═══════════════════════ LAYOUT · the console inside the console (The Three Stigmata of Palmer Eldritch) ═══════════════════════ */
+scene({
+  id: 'layout', name: 'LAYOUT', status: 'LAYOUT', element: 'The console itself', book: 'The Three Stigmata of Palmer Eldritch', cart: true,
+  pal: { ground: '#1C1530', ink: '#FFF0D8', hot: '#FF7A59', cool: '#6BDDF2' },
+  hint: ['A little room, and on its table a little console showing these two screens, which show the little console, and so on.', 'Hold A to chew Can-D and go into the layout. Each level down, more of the room has Palmer Eldritch’s marks.', 'The recursion is real: the little screens show the last frame of the big ones.'],
+  enter(S) { S.u = 0; S.depth = 0; },
+  update(S, G, I, dt) {
+    if (I.held('A')) { S.u += dt * .42; if (S.u >= 1) { S.u -= 1; S.depth++; } }
+    else S.u = Math.max(0, S.u - dt * .6);
+    if (I.press('B')) G.go('home', 'regress');
+  },
+  focus: () => [256, 170],
+  sig: (S, G, s) => s ? '' : `${S.depth}`,
+  ui: {
+    top(U, S) { U.text(`LAYOUT  DEPTH ${S.depth}`, 24, 60, { size: 16, ch: 'g' }); if (S.depth >= 3) U.text('PALMER ELDRITCH IS IN THE LAYOUT', 24, 84, { size: 8, ch: 'g', track: 1 }); },
+    bot(U) { U.text('HOLD A TO CHEW CAN-D', 256, 372, { size: 16, align: 'center' }); }
+  },
+  tex(h) { const a = h.sims.get('comp0'), b = h.sims.get('comp1'); return { u_aux: a ? a.a.tex : h.H.white, u_aux2: b ? b.a.tex : h.H.white }; },
+  uni: (S, G) => ({ u_p0: [S.u, S.depth, 0, 0], u_p1: [G.h ? G.h.touch.x : 256, G.h ? G.h.touch.y : 192, G.h ? G.h.touch.w : 0, 0] }),
+  common: `
+const vec2 C0 = vec2(256., 430.), MC = vec2(256., 172.);
+const float MS = .2;
+vec3 room(vec2 p, float depth){
+  vec3 col; const float HZ = 300.;
+  if (p.y > HZ) {
+    vec2 w = p - vec2(0., HZ), g = mod(w, vec2(48., 56.)) - vec2(24., 28.); float ang = atan(g.y, g.x);
+    col = mixOk(mixOk(u_ground, u_cool, .45), u_ink, .12);
+    col = mix(col, mixOk(u_hot, u_ink, .35), step(length(g), 3. + 7.*step(.6, fract(ang*5./6.2832 + .1)))*.45);   // 1960s starbursts
+    vec2 wq = p - vec2(120., 640.); float win = sdBox(wq, vec2(72., 92.));
+    if (win < 0.) { col = mix(vec3(.5, .18, .1), vec3(.88, .46, .24), fbm(wq*.03 + vec2(u_now*.5, 0.)));          // outside: Mars, and its dust
+      col = mix(col, vec3(1., .8, .6), smoothstep(34., 0., length(wq - vec2(18., 40.)))*.6);
+      col = mix(col, u_ground*.5, step(abs(wq.x), 2.5) + step(abs(wq.y), 2.5)); }
+    col = mix(col, u_ground*.4, 1. - smoothstep(0., 2., abs(win) - 4.));
+    vec2 pq = p - vec2(392., 650.); float pf = sdBox(pq, vec2(54., 68.));
+    if (pf < 0.) { vec2 q = pq/40. + vec2(0., .2); col = mixOk(u_cool, u_ink, .6);                                   // Perky Pat, framed
+      float doll = min(length(q - vec2(0., .95)) - .3, max(abs(q.x) - .42 + q.y*.22, abs(q.y + .2) - .85)); col = mix(col, mixOk(u_hot, u_ground, .15), step(doll, 0.)); }
+    col = mix(col, u_ground*.45, 1. - smoothstep(0., 2., abs(pf) - 4.));
+    if (depth > 1.5) {                                                                                                  // artificial eyes, open in the wall
+      vec2 eq = vec2(abs(p.x - 256.) - 46., p.y - 790.); float eye = length(eq*vec2(1., 2.6)) - 26.;
+      vec2 look = normalize(u_p1.xy - vec2(256., 790.) + 1e-3)*7.;
+      col = mix(col, mixOk(u_ink, vec3(.7, .75, .8), .5), step(eye, 0.));
+      col = mix(col, vec3(.1, .12, .14), step(length(eq - look*vec2(1., .4)), 8.)*step(eye, 0.));
+      col = mix(col, u_hot, (1. - smoothstep(0., 2., abs(eye)))*.8); }
+    col = mix(col, u_ground*.6, step(p.y, HZ + 14.));
+  } else {
+    float Z = 340./max(340. - p.y, 1.), X = (p.x - 256.)/60.*Z;                                                         // checked lino in perspective
+    col = mix(mixOk(u_ink, u_cool, .25), mixOk(u_ground, u_hot, .25), mod(floor(X) + floor(Z*2.5), 2.))*(.6 + .4/Z);
+  }
+  float top = sdBox(p - vec2(256., 150.), vec2(130., 32.));                                                              // the card table
+  if (top < 0.) col = mixOk(u_hot, u_ground, .45)*(.85 + .15*vnoise(p*vec2(.05, .4)));
+  float legs = min(sdBox(p - vec2(146., 70.), vec2(7., 52.)), sdBox(p - vec2(366., 70.), vec2(7., 52.)));
+  if (legs < 0. && top > 0.) col = mixOk(u_hot, u_ground, .65);
+  if (depth > .5) { float tooth = (p.y - 118.) + 8.*abs(fract(p.x/10.) - .5)*2.;                                        // steel teeth along the table's edge
+    if (abs(p.x - 256.) < 130. && p.y < 118. && tooth > 0.) col = mix(vec3(.75, .78, .82), u_ink, step(.5, fract(p.x/10.))*.3); }
+  return col;
+}
+// the little console on the table: its screens are the big screens' last frame
+vec3 mini(vec2 p, vec3 col){
+  float body = sdBox(p - MC, vec2(256., 430.)*MS + 6.) - 4.;
+  col = mix(col, col*.55, (1. - smoothstep(-2., 10., sdBox(p - MC - vec2(5., -6.), vec2(256., 430.)*MS + 6.) - 4.))*.7);
+  if (body < 0.) {
+    col = mixOk(u_ground, u_ink, .3)*(.8 + .2*smoothstep(-8., 0., body));
+    vec2 cp = C0 + (p - MC)/MS;
+    if (cp.x > 0. && cp.x < 512.) {
+      if (cp.y > 384. + DS_GAP && cp.y < CS.y) col = texture(u_aux, (cp - vec2(0., 384. + DS_GAP))/LS).rgb;
+      else if (cp.y > 0. && cp.y < 384.) col = texture(u_aux2, cp/LS).rgb;
+    }
+  }
+  return col;
+}
+vec3 diorama(vec2 f){
+  vec2 C = dsCanvas(f);
+  float k = pow(MS, u_p0.x);
+  vec2 F = C0 + (MC - C0)/(1. - MS), p = F + (C - F)*k;                    // Can-D: zoom into the little console until it is the big one
+  vec3 col = mini(p, room(p, u_p0.y));
+  vec2 lamp = vec2(470., 520.); col += mixOk(u_hot, u_ink, .5)*.25*exp(-length(p - lamp)/(160.*k + 1.));
+  if (u_p0.y > 2.5 && iScreen == 1 && u_p1.z > .05) {                      // the mechanical hand, where you touch
+    vec2 h = (f - u_p1.xy)/16.; float hand = sdBox(h - vec2(0., -.6), vec2(.55, .6)) - .1;
+    for (int i = 0; i < 4; i++) hand = min(hand, sdSeg(h, vec2(-.42 + float(i)*.28, 0.), vec2(-.48 + float(i)*.3, .9 + .15*sin(float(i)*2.))) - .1);
+    col = mix(col, mix(vec3(.6, .64, .7), u_ink, .3), aa(hand*16.)*u_p1.z); col = mix(col, vec3(.1), aa(abs(hand*16.) - .7)*u_p1.z); }
+  return col;
+}`,
+  glsl: {
+    top: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = diorama(f), U = ui(f);
+  col = mix(col, u_ground*.6, smoothstep(.05, .5, uiL(f, 2.).g)*.6);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.g));
+  o = vec4(col, 1.);
+}`,
+    bot: `
+void mainImage(out vec4 o, in vec2 f){
+  vec3 col = diorama(f), U = ui(f);
+  col = mix(col, u_ground*.6, smoothstep(.05, .5, uiL(f, 2.).r)*.6);
+  col = mix(col, u_ink, smoothstep(.3, .6, U.r));
+  o = vec4(col, 1.);
+}`
+  }
+});
+})();
+
+</script>
+<script>
+/* phant.js — Lattice Phantasmagoria: a console whose own furniture comes apart. One dshost sketch drives both screens.
+
+   The idea mirrors no_shade. no_shade kept a real web page (text, links, scroll) and let shaders turn each element
+   into a material. Here the console keeps a real UI: A confirms, B backs out, HP drains, the save files and inventory are
+   state. Each screen's UI is drawn plainly into a 2D layer, the way Lattice draws its widget tree, and the shaders only
+   get that picture (red ink, green panels, blue focus) plus the state.
+
+   Per frame:
+     1. input → the verbs (keys melt, L/R tear the hinge, X molecules, Y Ubik, stylus strands) and reality's half-life;
+     2. the scene's update (and the outgoing scene's, during a transition);
+     3. UI layers redrawn when their signature changes → mipmapped textures;
+     4. each screen's scene shader at the internal resolution (256×192 like the DS, or 512×384);
+     5. STRANDS: one memory over both screens and the hinge (512×860 logical px at half resolution);
+     6. COMP per screen, with its own last frame as feedback: tear, strands drag, reality regression, transition,
+        status bar, melt, molecules, strand glow, Ubik;
+     7. present: nearest-neighbour ×4 (or ×2) onto the panel. */
+(function () {
+'use strict';
+const DS = window.DS, PH = window.PHANT;
+const LW = DS.LW, LH = DS.LH, GAP = DS.GAP, CHT = 2 * LH + GAP;
+const FONTS = { sil: '"Silkscreen", "Courier New", monospace', vt: '"VT323", "Courier New", monospace', jac: '"Jacquard 24", Georgia, serif', cou: '"Courier Prime", "Courier New", monospace' };
+Object.assign(DS.KEYMAP, { X: 'A', Z: 'B', S: 'X', A: 'Y', Q: 'L', W: 'R', Shift: 'SELECT', Escape: 'START', ' ': 'A' });
+
+/* ---------- a UI layer: a 2D canvas in logical px (y down), red ink, green panels, blue focus ---------- */
+class Layer {
+  constructor(w = LW, h = LH, k = 2) { this.c = document.createElement('canvas'); this.c.width = w * k; this.c.height = h * k; this.k = k; this.w = w; this.h = h; this.x = this.c.getContext('2d'); this.tex = null; this.sig = null; }
+  begin() { const x = this.x; x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.fillStyle = '#000'; x.fillRect(0, 0, this.c.width, this.c.height);
+    x.setTransform(this.k, 0, 0, this.k, 0, 0); x.globalCompositeOperation = 'lighter'; return this; }
+  col(ch, a = 1) { const v = Math.round(255 * Math.max(0, Math.min(1, a))); return `rgb(${ch.includes('r') ? v : 0},${ch.includes('g') ? v : 0},${ch.includes('b') ? v : 0})`; }
+  font(f, size, w) { this.x.font = `${w || 400} ${size}px ${FONTS[f] || f}`; }
+  text(s, x, y, o = {}) {
+    const X = this.x; this.font(o.f || 'sil', o.size || 16, o.w); X.textAlign = o.align || 'left'; X.textBaseline = o.base || 'alphabetic';
+    if ('letterSpacing' in X) X.letterSpacing = (o.track || 0) + 'px';
+    X.fillStyle = this.col(o.ch || 'r', o.a ?? 1);
+    if (o.rot) { X.save(); X.translate(x, y); X.rotate(o.rot); X.fillText(s, 0, 0); X.restore(); } else X.fillText(s, x, y);
+    const w = X.measureText(s).width; if ('letterSpacing' in X) X.letterSpacing = '0px'; return w;
+  }
+  measure(s, o = {}) { this.font(o.f || 'sil', o.size || 16, o.w); return this.x.measureText(s).width; }
+  lines(s, w, o = {}) { this.font(o.f || 'vt', o.size || 20, o.w); const out = []; for (const para of String(s).split('\n')) { let line = '';
+      for (const wd of para.split(' ')) { const t = line ? line + ' ' + wd : wd; if (this.x.measureText(t).width > w && line) { out.push(line); line = wd; } else line = t; }
+      out.push(line); } return out; }
+  wrap(s, x, y, w, o = {}) { const lh = o.lh || (o.size || 20) * 1.1, L = this.lines(s, w, o); L.forEach((l, i) => this.text(l, x, y + i * lh, o)); return y + L.length * lh; }
+  rect(x, y, w, h, o = {}) { const X = this.x; X.fillStyle = this.col(o.ch || 'g', o.a ?? 1); X.beginPath(); if (o.r) X.roundRect(x, y, w, h, o.r); else X.rect(x, y, w, h); X.fill(); }
+  frame(x, y, w, h, o = {}) { const X = this.x; X.strokeStyle = this.col(o.ch || 'r', o.a ?? 1); X.lineWidth = o.lw || 2; X.beginPath(); if (o.r) X.roundRect(x, y, w, h, o.r); else X.rect(x, y, w, h); X.stroke(); }
+  path(fn, o = {}) { const X = this.x; X.beginPath(); fn(X); if (o.fill) { X.fillStyle = this.col(o.ch || 'r', o.a ?? 1); X.fill(); } else { X.strokeStyle = this.col(o.ch || 'r', o.a ?? 1); X.lineWidth = o.lw || 2; X.stroke(); } }
+  upload(H) {
+    const gl = H.gl; this.tex = H.texFromCanvas(this.c, this.tex);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex); gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    return this.tex;
+  }
+}
+PH.Layer = Layer;
+
+/* ---------- GLSL shared by every scene and by COMP ---------- */
+const LIB = `
+const vec2 LS = vec2(${LW}., ${LH}.);        // one screen, logical px
+const vec2 CS = vec2(${LW}., ${CHT}.);       // both screens and the hinge
+uniform float u_life;                        // reality left, 1 → 0 (Ubik's half-life)
+uniform float u_now;                         // seconds, not wrapped
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
+float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return length(max(d, 0.)) + min(max(d.x, d.y), 0.); }
+float sdSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; return length(pa - ba*clamp(dot(pa, ba)/max(dot(ba, ba), 1e-4), 0., 1.)); }
+float smin(float a, float b, float k){ float h = clamp(.5 + .5*(b - a)/k, 0., 1.); return mix(b, a, h) - k*h*(1. - h); }
+vec2 curl(vec2 p){ float e = .12; return vec2(vnoise(p + vec2(0., e)) - vnoise(p - vec2(0., e)), vnoise(p - vec2(e, 0.)) - vnoise(p + vec2(e, 0.)))/(2.*e); }
+vec3 spec(float h){ return .5 + .5*cos(6.2832*(h + vec3(0., .33, .67))); }
+float luma(vec3 c){ return dot(c, vec3(.299, .587, .114)); }
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(.5, a.y*.75))); }
+float bayer4(vec2 a){ return bayer2(.5*a)*.25 + bayer2(a); }
+// reality running out, era by era: 0 true colour · 1 sixty-four colours · 2 the four tokens · 3 one bit · 4 punch card · 5 nothing
+float eraAt(vec2 c, float life){ return clamp((1. - life)*5.8 - .4 + (fbm(c*.009 + 7.3) - .5)*1.7, 0., 5.); }
+const vec2 CARD = vec2(${(LW / 40).toFixed(2)}, ${(LH / 12).toFixed(2)});   // 40 columns × 12 rows per screen
+vec2 eraSrc(vec2 p, float e){ int k = int(e);
+  if (k == 2) return (floor(p/4.) + .5)*4.;
+  if (k == 3) return (floor(p/8.) + .5)*8.;
+  if (k == 4) return (floor(p/CARD) + .5)*CARD;
+  return p; }
+vec3 eraCol(vec3 c, vec2 p, float e, vec2 px){ int k = int(e); float b = bayer4(px) - .5;
+  if (k == 0) return c;
+  if (k == 1) return clamp(floor(c*3. + .5 + b*.9)/3., 0., 1.);
+  if (k == 2) { float L = luma(c) + b*.28; return L < .2 ? u_ground : L < .42 ? u_cool : L < .66 ? u_hot : u_ink; }
+  if (k == 3) return luma(c) + b*.7 > .4 ? u_ink : u_ground;
+  if (k == 4) { vec2 q = fract(p/CARD); vec3 card = mix(u_ink, vec3(.93, .84, .62), .55);
+    float hole = step(abs(q.x - .5), .2)*step(abs(q.y - .5), .3)*step(.4, luma(c));
+    float printed = step(abs(q.x - .5), .14)*step(abs(q.y - .5), .2)*step(.5, hash12(floor(p/CARD) + 3.))*.08;
+    return mix(card - printed, u_ground*.5, hole); }
+  float n = hash12(floor(px) + fract(u_now*17.)*vec2(91., 37.)); return mix(u_ground*.6, u_ink*.55, n*n*n); }
+`;
+const SCENE_HEAD = `
+uniform float u_t, u_in, u_sel;              // scene time, entrance 0→1, selection
+uniform vec4 u_p0, u_p1, u_p2, u_p3;         // scene numbers
+uniform sampler2D u_ui, u_mem, u_aux, u_aux2;
+${LIB}
+float UILOD(){ return log2(2./iResolution.z); }
+vec3 ui(vec2 f){ return textureLod(u_ui, f/LS, UILOD()).rgb; }        // this screen's UI layer: r ink, g panels, b focus
+vec3 uiL(vec2 f, float l){ return textureLod(u_ui, f/LS, UILOD() + l).rgb; }
+vec2 ipx(vec2 f){ return floor(f*iResolution.z); }                    // the internal pixel under f
+float aa(float d){ return clamp(.5 - d*iResolution.z, 0., 1.); }        // coverage of a distance in logical px
+`;
+
+const STRANDS = `
+${LIB}
+uniform vec4 u_seg; uniform float u_down, u_hue, u_clear, u_fade;
+void mainImage(out vec4 o, in vec2 f){
+  vec2 size = iResolution.xy;
+  if (u_clear > .5) { o = vec4(.5, .5, 0., 0.); return; }
+  vec2 v0 = texture(iChannel0, f/size).xy*2. - 1.;
+  vec2 c = curl(f/size.y*3.5 + iTime*.06);
+  vec2 back = f - (v0*1.1 + c*.9 + vec2(0., .22));        // strands creep along themselves, bend with the noise, rise toward the top screen
+  vec4 s = texture(iChannel0, back/size);
+  vec2 v = normalize(mix(s.xy*2. - 1., normalize(c + 1e-4), .025) + 1e-4);
+  float dens = s.z*.997 - .0004 - u_fade*.04, hue = s.w;
+  float side = texture(iChannel0, (back + vec2(-v.y, v.x)*2.*sin(iTime*3. + f.x*.05))/size).z;
+  dens = max(dens, side*.985*step(.9, vnoise(f*.08 + iTime)));
+  if (u_down > .5) {
+    float d = sdSeg(f, u_seg.xy, u_seg.zw), m = exp(-d*d/4.5);
+    vec2 dir = normalize(u_seg.zw - u_seg.xy + 1e-4);
+    dens = max(dens, m); v = normalize(mix(v, dir, m) + 1e-4); hue = mix(hue, u_hue, m);
+  }
+  o = vec4(v*.5 + .5, clamp(dens, 0., 1.), hue);
+}`;
+
+const COMP = `
+${LIB}
+uniform sampler2D u_a, u_b, u_str, u_status;
+uniform float u_tr, u_kind, u_tear, u_mol, u_ubik, u_chaos, u_sb, u_seed;
+uniform vec4 u_focus;            // transition focus: top screen xy, bottom screen zw (logical px)
+uniform vec4 u_heat[12];         // melt: canvas x, y, start time, strength
+vec3 scn(sampler2D t, vec2 L){ return texture(t, clamp(L/LS, .0005, .9995)).rgb; }
+float heat(vec2 C){ float h = 0.;
+  for (int i = 0; i < 12; i++) { vec4 s = u_heat[i]; if (s.w <= 0.) continue; vec2 d = (C - s.xy)/78.; h += s.w*exp(-dot(d, d))*exp(-(u_now - s.z)*.5); }
+  return h; }
+// what is under the console: its own picture folded through a kaleidoscope and a foam of circle inversions
+vec3 hyper(vec2 C){
+  vec2 p = (C - .5*CS)/CS.x*2.6; float t = u_now*.13;
+  float a = atan(p.y, p.x), r = length(p), k = 2.*PI/7.; a = abs(mod(a + t, k) - k*.5); p = r*vec2(cos(a), sin(a));
+  float trap = 1e9;
+  for (int i = 0; i < 7; i++) { p = abs(p) - vec2(.55, .32); float m = clamp(.75/dot(p, p), 1., 3.5); p *= m; trap = min(trap, abs(length(p) - .7)); p = rot2(t)*p; }
+  vec3 c = mixOk(u_hot, u_cool, .5 + .5*sin(trap*5. + u_now*.4))*(.2 + 1.2*exp(-trap*2.5)) + spec(trap*1.4 + u_now*.07)*.25*exp(-trap*4.);
+  vec3 g = texture(u_a, 1. - abs(1. - mod(p*.05 + .5, 2.))).rgb;
+  return mix(c, g, .3);
+}
+// the hinge tears: each screen's picture is pushed away from it, and the gap shows hyperreality
+vec2 tearSrc(vec2 L, inout float gap, inout float edge){
+  if (u_tear < .003) return L;
+  float w = u_tear*150. + (fbm(vec2(L.x*.013, 4.2 + u_seed)) - .5)*110.*u_tear + (hash12(vec2(floor(L.x/3.), 9.)) - .5)*7.*u_tear;
+  w = max(w, 0.);
+  float d = (iScreen == 0 ? L.y : LS.y - L.y) - w;
+  if (d < 0.) { gap = 1.; edge += exp(d/2.); return L; }
+  edge += exp(-d/2.) + .4*exp(-d/14.);
+  return iScreen == 0 ? L - vec2(w*.12, w) : L + vec2(w*.12, w);
+}
+void mainImage(out vec4 o, in vec2 f){
+  vec2 L = f*LS/iResolution.xy, C = dsCanvas(L);
+  float gap = 0., edge = 0.;
+  vec2 src = tearSrc(L, gap, edge);
+  vec4 st = texture(u_str, C/CS);
+  src -= (st.xy*2. - 1.)*st.z*14.;                                   // reality is dragged along the strands
+  float k = u_tr; int kind = int(u_kind + .5);
+  float eT = (kind == 1 && k < 1.) ? 5.4*(1. - abs(2.*k - 1.)) : 0.;  // "regress": the old scene runs out, the new one comes back
+  float e = max(eraAt(C, u_life), eT);
+  vec2 s = eraSrc(src, e);
+  bool useB = false; vec2 sA = s, sB = s; float band = 1e9;
+  if (k < 1.) {
+    if (kind == 1) useB = k < .5;
+    else if (kind == 2) { float y = mix(CS.y + 60., -60., k); band = C.y - y; useB = band < 0.; }   // a paper tape feeds through both screens
+    else if (kind == 3) {                                              // the new scene opens out of the thing you chose
+      vec2 F = iScreen == 0 ? u_focus.xy : u_focus.zw; float z = mix(.04, 1., k*k*(3. - 2.*k));
+      sA = F + (s - F)/z; useB = any(lessThan(sA, vec2(0.))) || any(greaterThan(sA, LS)); sB = F + (s - F)/(1. + 4.*k); }
+    else if (kind == 4) useB = hash12(floor(C/24.) + u_seed) > k*1.1 - .05;   // scramble: cell by cell
+  }
+  vec3 fresh;
+  if (gap > .5) fresh = hyper(C);
+  else {
+    vec2 q = useB ? sB : sA; float ch = min(u_chaos, 3.)*1.3;
+    fresh = useB ? scn(u_b, q) : scn(u_a, q);
+    if (ch > .3) { fresh.r = (useB ? scn(u_b, q + vec2(ch, 0.)) : scn(u_a, q + vec2(ch, 0.))).r; fresh.b = (useB ? scn(u_b, q - vec2(ch, 0.)) : scn(u_a, q - vec2(ch, 0.))).b; }
+    if (iScreen == 0 && u_sb > .01 && s.y > LS.y - 30.) {             // the status bar: system UI, and just as breakable
+      vec3 sb = texture(u_status, vec2(s.x/LS.x, (s.y - (LS.y - 30.))/30.)).rgb;
+      fresh = mix(fresh, u_ground*.72, sb.g*.88*u_sb); fresh = mix(fresh, u_hot, sb.b*u_sb); fresh = mix(fresh, u_ink, sb.r*u_sb);
+    }
+    fresh = eraCol(fresh, src, e, f);
+  }
+  if (abs(band) < 22.) {                                               // the tape itself, with its feed holes
+    float hx = mod(C.x, 11.) - 5.5, hy = band;
+    fresh = mix(vec3(.93, .86, .66)*(.85 + .15*hash12(vec2(floor(C.x/11.), 2.))), u_ground*.4, step(length(vec2(hx, hy - 9.)), 2.2) + step(length(vec2(hx, hy + 6.)), 3.4)*step(.5, hash12(vec2(floor(C.x/11.), floor(u_now*6.)))));
+  }
+  fresh += mixOk(u_hot, vec3(1., .9, .75), .5)*min(edge, 1.5)*(1. - gap);
+  vec3 c = fresh;
+  float h = heat(C);                                                   // melt: hot pixels keep sliding down their own last frame
+  if (h > .003) {
+    float rs = iResolution.x/LS.x;
+    float col = floor(f.x/max(1., 3.*rs));
+    float sp = (.3 + 2.6*hash12(vec2(col, 1.)))*min(h, 2.5)*max(2.*rs, 1.);
+    vec2 from = f + vec2(sin(f.y*.06/rs + u_now*2.)*h*.8*rs, sp);
+    vec3 dr = texture(iChannel0, from/iResolution.xy).rgb;
+    float keep = smoothstep(.04, .4, h);
+    c = mix(c, mix(dr, c, .04), keep);
+    float re = smoothstep(.003, .04, h)*(1. - keep);                  // cooling: tiles come back in the wrong places first
+    if (re > 0.) { vec2 T = floor(L/48.); vec2 jump = (hash22(T + floor(u_now*7.)) - .5)*190.;
+      c = mix(c, scn(u_a, s + jump), step(hash12(T + floor(u_now*4.)), re*min(1., h*4.))); }
+  }
+  if (u_mol > .002) {                                                  // microglobular: every pixel joins a bead
+    float S = 20.*(1. + .6*vnoise(L/260. + u_now*.05));
+    vec2 id = floor(L/S);
+    float dm = 1e9, best = 1e9, br = 1.; vec2 bc = L;
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+      vec2 cc = id + vec2(float(i), float(j)); float hs = hash12(cc + float(iScreen)*31.);
+      float on = smoothstep(hs*.7, hs*.7 + .3, u_mol);
+      if (on < .01) continue;
+      vec2 ctr = (cc + .5 + .3*vec2(sin(u_now*(1. + hs)*2.1 + hs*20.), cos(u_now*(1.3 + hs)*1.7 + hs*9.)))*S;
+      float r = S*(.18 + .42*hash12(cc + 3.))*on*(.85 + .3*u_mol);
+      float d = length(L - ctr) - r;
+      dm = smin(dm, d, 7.);
+      if (d < best) { best = d; bc = ctr; br = max(r, .5); }
+    }
+    vec2 q = (L - bc)/br; float l = min(length(q), 1.);
+    vec3 n = vec3(q/max(1., length(q)), sqrt(1. - l*l));
+    vec3 lensC = scn(u_a, bc - q*br*2.6);                               // each bead holds the screen, small and upside down
+    float sp = pow(max(dot(n, normalize(vec3(-.4, .6, .7))), 0.), 36.), fres = pow(1. - n.z, 2.);
+    vec3 irid = spec(fres*.9 + u_now*.1);
+    vec3 bead = lensC*(.6 + .55*n.z) + sp*1.2 + irid*fres*.7;
+    float ao = smoothstep(0., 9., dm);
+    vec3 goo = c*mix(.25, .85, ao)*(1. - .35*u_mol) + irid*.06*(1. - ao);
+    c = mix(c, mix(bead, goo, smoothstep(-1., 1., dm)), smoothstep(0., .15, u_mol));
+  }
+  vec2 uv = C/CS, e2 = 3./CS;                                           // the strands of hyperreality, glowing
+  vec3 sc = spec(st.w + st.z*.5)*.9 + .1;
+  float halo = .25*(texture(u_str, uv + vec2(e2.x, 0.)).z + texture(u_str, uv - vec2(e2.x, 0.)).z + texture(u_str, uv + vec2(0., e2.y)).z + texture(u_str, uv - vec2(0., e2.y)).z);
+  c = c*(1. - .3*st.z) + sc*(smoothstep(.12, .85, st.z)*1.25 + st.z*.3 + halo*.45) + smoothstep(.8, 1., st.z)*.5;
+  if (u_ubik > .01) {                                                  // Ubik: safe when used as directed
+    float g = step(1. - .035*u_ubik, hash12(floor(L/2.) + floor(u_now*20.)*vec2(7., 13.)));
+    c = mix(c, vec3(1., .86, .45), g*.9) + vec3(1., .8, .35)*u_ubik*.10*vnoise(L*.03 + vec2(0., u_now*3.));
+  }
+  c += (hash12(f + fract(u_now*7.)*311.) - .5)*.04*(.4 + u_chaos);
+  o = vec4(c, 1.);
+}`;
+const PRESENT = `void mainImage(out vec4 o, in vec2 f){ o = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0); }`;
+
+/* ---------- assemble the sketch's programs ---------- */
+const glsl = { strands: STRANDS, comp: COMP, present: PRESENT, copy: PRESENT };
+for (const sc of PH.list) {
+  for (const [k, src] of Object.entries(sc.glsl || {})) glsl[`${sc.id}.${k}`] = k.startsWith('sim')
+    ? `uniform vec4 u_p0, u_p1, u_p2, u_p3; uniform float u_t; uniform sampler2D u_ui, u_aux, u_aux2;\n${LIB}\n${src}`   // simulations: no UI helpers
+    : `${SCENE_HEAD}${sc.common || ''}\n${src}`;
+}
+const KINDS = { cut: 0, regress: 1, tape: 2, open: 3, scramble: 4 };
+
+/* ---------- the console's global state ---------- */
+const store = { get(k, d) { try { const v = localStorage.getItem('phant.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('phant.' + k, JSON.stringify(v)); } catch (e) { /* private mode: no memory */ } } };
+const G = PH.G = {
+  boots: store.get('boots', 0), reality: 1, heat: [], presses: [], tear: 0, tearV: 0, mol: 0, ubik: 0, chaos: 0, now: 0,
+  cur: null, prev: null, tr: 1, trKind: 0, trDur: 0.9, focus: [256, 192, 256, 192], seed: Math.random() * 10,
+  strandsClear: true, lastSeg: null, hue: 0, freeze: false, motion: true,
+  store,
+  pool: [[new Layer(), new Layer()], [new Layer(), new Layer()]],
+  status: new Layer(LW, 30, 2),
+  go(id, kind = 'regress', o = {}) {
+    const sc = PH.byId[id]; if (!sc) return;
+    if (this.tr < 1 && !o.force) return;
+    const pool = this.cur && this.cur.pool === 0 ? 1 : 0;
+    const inst = o.resume || { sc, S: { t: 0 }, pool, L: this.pool[pool] };
+    if (!o.resume) { inst.L[0].sig = inst.L[1].sig = null; sc.enter && sc.enter(inst.S, this, o); }
+    this.prev = this.cur; this.cur = inst;
+    this.trKind = KINDS[kind] ?? 1; this.tr = this.prev && this.trKind ? 0 : 1; this.trDur = o.dur || (kind === 'tape' ? 1.4 : kind === 'open' ? 1.1 : 0.9);
+    if (o.focus) this.focus = o.focus;
+    if (id === 'pause') this.freeze = true;
+    if (PH.onScene) PH.onScene(sc, inst.S);
+  },
+  over(reason) { if (this.cur && this.cur.sc.id !== 'over') this.go('over', 'regress', { reason, force: true }); },
+  splat(x, y, s) { this.heat.push([x, y, this.now, s]); if (this.heat.length > 12) this.heat.shift(); }
+};
+
+/* ---------- gamepad: east A, south B, north X, west Y, as on the console ---------- */
+const PAD = { 1: 'A', 0: 'B', 3: 'X', 2: 'Y', 4: 'L', 5: 'R', 8: 'SELECT', 9: 'START', 12: 'UP', 13: 'DOWN', 14: 'LEFT', 15: 'RIGHT' };
+let padMask = 0;
+function pollPad(r) {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : []; let m = 0;
+  for (const p of pads) { if (!p) continue; for (const [i, b] of Object.entries(PAD)) if (p.buttons[i] && p.buttons[i].pressed) m |= 1 << DS.BUTTONS.indexOf(b);
+    if (p.axes && p.axes.length >= 2) { if (p.axes[0] < -.6) m |= 1 << 10; if (p.axes[0] > .6) m |= 1 << 11; if (p.axes[1] < -.6) m |= 1 << 8; if (p.axes[1] > .6) m |= 1 << 9; } }
+  const ch = m ^ padMask; if (ch) DS.BUTTONS.forEach((b, i) => { if (ch & (1 << i)) DS.press(r, b, !!(m & (1 << i))); });
+  padMask = m;
+}
+
+/* ---------- one frame ---------- */
+function drawLayers(h, inst) {
+  const { sc, S, L } = inst;
+  for (let s = 0; s < 2; s++) {
+    const fn = sc.ui && sc.ui[s ? 'bot' : 'top']; if (!fn) continue;
+    const sig = (sc.sig ? sc.sig(S, G, s) : '') + '|' + PH.fontsReady;
+    if (L[s].sig === sig && L[s].tex) continue;
+    L[s].begin(); fn(L[s], S, G); L[s].upload(h.H); L[s].sig = sig;
+  }
+}
+function drawStatus(h) {
+  const d = new Date(), years = ['1992', '1959', '1974', 'AD 70', '1992', '1998'];
+  const yr = years[Math.floor(G.now / 7) % years.length], hm = d.toTimeString().slice(0, 5);
+  const MSG = ['YOU ARE THE ONE RUNNING DOWN', 'TRY UBIK', 'DO NOT RESUME', 'THIS IS NOT 1992', 'IT IS STILL WARM IN HERE'];
+  const k = Math.floor(G.now / 37), slip = G.now % 37 > 33;   // every so often the system bar carries a message from the other side
+  const name = slip ? MSG[k % MSG.length] : G.cur ? (G.cur.sc.status || G.cur.sc.name) : '';
+  const pct = Math.round(G.reality * 100);
+  const sig = [hm, yr, name, pct, slip, PH.fontsReady].join('|');   // day is gone: the year is what is out of joint
+  if (G.status.sig === sig && G.status.tex) return;
+  const U = G.status.begin();   // 256×192 is the target: nothing smaller than Silkscreen 16 survives it
+  U.rect(0, 0, LW, 30, { ch: 'g' });
+  U.text(hm, 10, 21, { size: 16 }); U.text(yr, 84, 21, { size: 16, a: .65 });
+  U.text(name, slip ? 256 : 300, 21, { size: slip ? 8 : 16, align: 'center', a: .9, ch: slip ? 'b' : 'r', track: slip ? 1 : 0 });
+  U.text(`${pct}%`, 432, 21, { size: 16, align: 'right' });
+  U.frame(440, 8, 58, 15, { lw: 2 }); U.rect(444, 12, 50 * G.reality, 7, { ch: 'b' }); U.rect(498, 12, 4, 7, { ch: 'r' });
+  G.status.upload(h.H); G.status.sig = sig;
+}
+function scenePass(h, inst, s, slot) {
+  const { sc, S, L } = inst, [rw, rh] = h.res, gl = h.H.gl;
+  const T = h.target(`scn${slot}${s}`, rw, rh);
+  const tex = Object.assign({ u_ui: L[s].tex || h.H.white, u_mem: h.H.white, u_aux: h.H.white, u_aux2: h.H.white }, inst.tex || {});
+  const uni = Object.assign({ u_t: S.t, u_in: Math.min(1, S.t / (sc.inDur || 1)), u_sel: S.sel || 0, u_life: G.reality, u_now: G.now }, inst.uni || {});
+  gl.bindFramebuffer(gl.FRAMEBUFFER, T.fb); gl.viewport(0, 0, rw, rh); gl.disable(gl.BLEND);
+  h.bind(h.prog(`${sc.id}.${s ? 'bot' : 'top'}`), { textures: tex, uniforms: uni }, s, [LW, LH, rw / LW]);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return T;
+}
+function prepare(h, inst) {   // the scene's per-frame numbers and its own memories
+  const { sc, S } = inst;
+  inst.uni = sc.uni ? sc.uni(S, G) : {};
+  inst.tex = sc.tex ? sc.tex(h, S, G, inst) : {};
+}
+
+const sketch = {
+  id: 'phant', res: [256, 192], palette: 'Lattice dark', glsl, params: [],
+  frame(h) {
+    const dt = h.dt; G.now += dt; G.h = h;
+    pollPad(h);
+    if (!G.cur) G.go('boot', 'cut');
+    /* ---- verbs ---- */
+    const pressed = DS.BUTTONS.filter(b => h.pressed(b));
+    G.presses = G.presses.filter(t => G.now - t < 1.5);
+    const focus = G.cur.sc.focus ? G.cur.sc.focus(G.cur.S, G) : [256, 192];
+    for (const b of pressed) {
+      if (b === 'Y') continue;
+      G.presses.push(G.now);
+      const mash = Math.min(4, G.presses.length);
+      const heat = [0, .05, .13, .26, .4][mash];   // one press barely drips; mashing melts
+      if (G.cur.sc.id !== 'boot' || mash > 2) G.splat(focus[0] + (Math.random() - .5) * 120, focus[1] + (Math.random() - .5) * 80, heat);
+    }
+    const ub = h.held('Y');
+    G.ubik = ub ? Math.min(1, G.ubik + dt * 4) : Math.max(0, G.ubik - dt * 1.5);
+    const want = G.ubik > .2 ? 0 : (h.held('L') ? .55 : 0) + (h.held('R') ? .55 : 0);
+    G.tearV += ((Math.min(1, want) - G.tear) * 40 - G.tearV * 7) * dt; G.tear = Math.max(0, G.tear + G.tearV * dt);
+    G.mol = h.held('X') ? Math.min(1, G.mol + dt * .9) : Math.max(0, G.mol - dt * (.4 + G.ubik));
+    if (G.ubik > 0) { for (const s of G.heat) s[3] *= Math.exp(-dt * 4 * G.ubik); G.reality = Math.min(1, G.reality + dt * .3 * G.ubik); }
+    G.heat = G.heat.filter(s => G.now - s[2] < 9 && s[3] > .01);
+    const heatSum = G.heat.reduce((a, s) => a + s[3] * Math.exp(-(G.now - s[2]) * .5), 0);
+    G.chaos = Math.min(3, heatSum * .5 + G.tear * 2 + G.mol * 1.5);
+    if (G.cur.sc.drain !== false && G.tr >= 1) G.reality = Math.max(0, G.reality - dt * (.0032 + .006 * G.chaos));
+    if (G.reality <= 0) G.over('REALITY 0%');
+    /* ---- strands: the stylus, on the bottom screen only ---- */
+    const t = h.touch; let seg = [0, 0, 0, 0], down = 0;
+    if (t.down) { const p = [t.x / 2, t.y / 2]; seg = G.lastSeg ? [G.lastSeg[0], G.lastSeg[1], p[0], p[1]] : [p[0], p[1], p[0], p[1]];
+      if (!G.lastSeg || Math.hypot(p[0] - G.lastSeg[0], p[1] - G.lastSeg[1]) > .5) down = G.lastSeg ? 1 : 0; G.lastSeg = p; G.hue = (G.hue + dt * .15) % 1; }
+    else G.lastSeg = null;
+    /* ---- scenes ---- */
+    const I = { press: b => h.pressed(b), held: b => h.held(b), touch: t, tap: t.tapped ? [t.x, LH - t.y] : null, dt };
+    const inst = G.cur; inst.S.t += dt;
+    if (inst.sc.cart && G.tr >= 1 && I.press('START')) G.go('pause', 'cut', { from: inst });          // every cartridge pauses the same way
+    else if (inst.sc.cart && G.tr >= 1 && I.press('SELECT')) G.go('home', 'regress');
+    else if (inst.sc.update) inst.sc.update(inst.S, G, I, dt);
+    if (G.tr < 1) { G.tr = Math.min(1, G.tr + dt / G.trDur); if (G.prev) { G.prev.S.t += dt; if (G.prev.sc.idle) G.prev.sc.idle(G.prev.S, G, dt); } }
+    const active = G.tr < 1 && G.prev ? [G.cur, G.prev] : [G.cur];
+    for (const a of active) drawLayers(h, a);
+    drawStatus(h);
+    /* ---- the frozen frame for pause (Ubik's cold-pac) ---- */
+    const [rw, rh] = h.res;
+    if (G.freeze) { for (let s = 0; s < 2; s++) { const C = h.sims.get('comp' + s); if (C) h.pass('copy', h.target('frz' + s, rw, rh), { textures: { iChannel0: C.a } }); } G.freeze = false; }
+    const strands = h.sim('strands', 'strands', 256, Math.round(CHT / 2), { everyFrame: true, float: true, linear: true,
+      uniforms: { u_seg: seg, u_down: down, u_hue: G.hue, u_clear: G.strandsClear ? 1 : 0, u_fade: G.ubik } });
+    G.strandsClear = false;
+    for (const a of active) prepare(h, a);
+    const A = [0, 1].map(s => scenePass(h, G.cur, s, G.cur.pool));
+    const B = G.tr < 1 && G.prev ? [0, 1].map(s => scenePass(h, G.prev, s, G.prev.pool)) : A;
+    const heatArr = new Float32Array(48); G.heat.forEach((s, i) => heatArr.set(s, i * 4));
+    for (let s = 0; s < 2; s++) {
+      const C = h.sim('comp' + s, 'comp', rw, rh, { everyFrame: true, screen: s,
+        textures: { u_a: A[s], u_b: B[s], u_str: strands, u_status: G.status.tex },
+        uniforms: { u_tr: G.tr, u_kind: G.trKind, u_tear: G.tear, u_mol: G.mol, u_ubik: G.ubik, u_chaos: G.chaos, u_life: G.reality, u_now: G.now,
+          u_sb: G.cur.sc.statusBar === false ? 0 : 1, u_seed: G.seed, u_focus: G.focus, u_heat: heatArr } });
+      h.screen(s ? 'bottom' : 'top', 'present', { textures: { iChannel0: C } });
+    }
+    if (PH.onFrame) PH.onFrame(G);
+  }
+};
+
+/* ---------- the page ---------- */
+PH.start = function (ui) {
+  let H;
+  try { H = DS.init(); } catch (e) { PH.onError && PH.onError(e); return null; }
+  for (const sc of PH.list) DS.PALETTES[sc.id] = sc.pal;
+  sketch.palette = 'boot';
+  const r = DS.add(sketch, ui); r.visible = true; DS.focus = r; PH.run = r;
+  DS.onError = (run, e) => PH.onError && PH.onError(e);
+  const orig = sketch.frame; sketch.frame = (h) => { orig(h); if (G.cur && G.cur.sc.id !== G.palId) { G.palId = G.cur.sc.id; h.setPalette(G.palId); } };   // scenes can change outside a frame (the page's jump buttons)
+  PH.fontsReady = 0;
+  const faces = ['16px "Silkscreen"', '700 16px "Silkscreen"', '20px "VT323"', '24px "Jacquard 24"', '16px "Courier Prime"', '700 16px "Courier Prime"'];
+  Promise.all(faces.map(f => document.fonts.load(f).catch(() => null))).then(() => { PH.fontsReady = 1; r.dirty = true; });
+  DS.start();
+  return r;
+};
+PH.press = (b, down) => PH.run && DS.press(PH.run, b, down);
+PH.jump = (id) => { G.go(id, 'scramble', { force: true }); };
+PH.setRes = (w, hgt) => { if (PH.run) { PH.run.res = [w, hgt]; PH.run.sims.forEach((S, k) => { if (k.startsWith('comp')) S.steps = 0; }); } };
+PH.setMotion = (on) => { if (PH.run) { PH.run.running = on; PH.run.dirty = true; } };
+})();
+
+</script>
+<script>
+(function () {
+  const PH = window.PHANT, $ = id => document.getElementById(id);
+  const err = (e) => { const b = $('err'); b.hidden = false; b.textContent = 'The screens could not start: ' + (e && e.message ? e.message.split('\n').slice(0, 3).join(' ') : e) + ' The notes still describe what each part does.'; };
+  PH.onError = err;
+  const chips = $('chips');
+  const JUMPS = [['boot', 'BOOT'], ['home', 'MENU'], ...PH.CARTS.map(c => [c.id, c.name]), ['over', 'GAME OVER']];
+  for (const [id, label] of JUMPS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.id = id; b.id = 'go-' + id; b.textContent = label; b.addEventListener('click', () => { PH.jump(id); }); chips.appendChild(b); }
+  PH.onScene = (sc) => {
+    $('scName').textContent = sc.name.charAt(0) + sc.name.slice(1).toLowerCase();
+    $('scEl').textContent = sc.element; $('scBook').textContent = sc.book;
+    $('scHint').innerHTML = ''; for (const t of sc.hint || []) { const li = document.createElement('li'); li.textContent = t; $('scHint').appendChild(li); }
+    for (const c of chips.children) c.setAttribute('aria-current', c.dataset.id === sc.id ? 'true' : 'false');
+  };
+  const buttons = [...document.querySelectorAll('[data-b]')];
+  for (const el of buttons) {
+    const b = el.dataset.b; let held = false;
+    const down = (e) => { e.preventDefault(); held = true; el.setPointerCapture && el.setPointerCapture(e.pointerId); PH.press(b, true); };
+    const up = () => { if (held) { held = false; PH.press(b, false); } };
+    el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    el.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); e.stopPropagation(); PH.press(b, true); } });
+    el.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.stopPropagation(); PH.press(b, false); } });
+  }
+  let lastMask = -1;
+  PH.onFrame = () => { const m = PH.run.heldMask; if (m === lastMask) return; lastMask = m; for (const el of buttons) el.classList.toggle('on', !!(m & (1 << DS.BUTTONS.indexOf(el.dataset.b)))); };
+  const wraps = [$('topWrap'), $('botWrap')]; let res = [256, 192];
+  const grid = () => { const w = wraps[0].getBoundingClientRect().width; for (const s of wraps) { s.style.setProperty('--cw', res[0]); s.style.setProperty('--ch', res[1]); s.classList.toggle('grid', w / res[0] >= 3); } };
+  addEventListener('resize', grid);
+  const setRes = (w, h) => { res = [w, h]; PH.setRes(w, h); $('res256').setAttribute('aria-pressed', w === 256); $('res512').setAttribute('aria-pressed', w === 512); grid(); };
+  $('res256').addEventListener('click', () => setRes(256, 192)); $('res512').addEventListener('click', () => setRes(512, 384));
+  let motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const setMotion = (on) => { motion = on; PH.setMotion(on); $('motion').setAttribute('aria-pressed', on); $('motion').textContent = on ? 'MOTION ON' : 'MOTION OFF'; };
+  $('motion').addEventListener('click', () => setMotion(!motion));
+  const r = PH.start({ screens: [$('scrTop'), $('scrBot')], card: $('device') });
+  if (r) { if (!motion) setMotion(false); grid(); }
+})();
+</script>
+
+</body></html>

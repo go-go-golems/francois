@@ -1,0 +1,125 @@
+{
+  "pngBytes": 10605879,
+  "webpBytes": 1983916,
+  "images": [
+    {
+      "source": "rift-title.png",
+      "sourceSHA256": "e2327606ec508719c44bb02c577ec3c5a98c04304562038a9b4b6d9116b71906",
+      "file": "web/rift-title.webp",
+      "pngBytes": 3213622,
+      "webpBytes": 416138
+    },
+    {
+      "source": "rift-arcade.png",
+      "sourceSHA256": "40672dc076477fada681c76da1e86da8f1e2a25f97de0c01e347aef8db5ddc26",
+      "file": "web/rift-arcade.webp",
+      "pngBytes": 2550371,
+      "webpBytes": 298642
+    },
+    {
+      "source": "rift-world.png",
+      "sourceSHA256": "200cc9ebabccd791b8f148cc92c6c6b06282265b3bd21a3a10b74c15d474549f",
+      "file": "web/rift-world.webp",
+      "pngBytes": 1792625,
+      "webpBytes": 188184
+    },
+    {
+      "source": "phantasmagoria-menu.png",
+      "sourceSHA256": "c02fdc87baf505923c69caafbbf70598096b056a303aa52d851f3ca75dd44311",
+      "file": "web/phantasmagoria-menu.webp",
+      "pngBytes": 312240,
+      "webpBytes": 102942
+    },
+    {
+      "source": "phantasmagoria-cartridge.png",
+      "sourceSHA256": "1393baab0359dc01f3e39e16fdeb5192dde7066832e7a95e300885c068d4d697",
+      "file": "web/phantasmagoria-cartridge.webp",
+      "pngBytes": 318627,
+      "webpBytes": 135842
+    },
+    {
+      "source": "phantasmagoria-kipple.png",
+      "sourceSHA256": "252682be5596df1d78e510c35fcc28ef536d333c065ee0baeeece91f2a6b9e9c",
+      "file": "web/phantasmagoria-kipple.webp",
+      "pngBytes": 317651,
+      "webpBytes": 91736
+    },
+    {
+      "source": "lattice-deck-cover.png",
+      "sourceSHA256": "b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3",
+      "file": "web/lattice-deck-cover.webp",
+      "pngBytes": 280188,
+      "webpBytes": 24210
+    },
+    {
+      "source": "lattice-deck-procedural.png",
+      "sourceSHA256": "c72b4fd0f999be3dff702fdb7790ea59a3a237e2cc1b6fc6746a544850fb9be3",
+      "file": "web/lattice-deck-procedural.webp",
+      "pngBytes": 325807,
+      "webpBytes": 49100
+    },
+    {
+      "source": "lattice-deck-motion.png",
+      "sourceSHA256": "77bb0c21e36cb43617cac1b1c60b060df27adad46d32f8741220a7cd6017ebb5",
+      "file": "web/lattice-deck-motion.webp",
+      "pngBytes": 198643,
+      "webpBytes": 53002
+    },
+    {
+      "source": "lattice-deck-charts.png",
+      "sourceSHA256": "9ec9af0e0a1317677b136990557ec832f4ca7803e3865aae44cce0586fab79e9",
+      "file": "web/lattice-deck-charts.webp",
+      "pngBytes": 68264,
+      "webpBytes": 31166
+    },
+    {
+      "source": "tabula-overview.png",
+      "sourceSHA256": "a54e5368f42b7715e5512c905ebcb0dab837e64e3540bc7b91ff49592243eef5",
+      "file": "web/tabula-overview.webp",
+      "pngBytes": 161891,
+      "webpBytes": 79654
+    },
+    {
+      "source": "tabula-story.png",
+      "sourceSHA256": "26b35b458fff9289afb9311899fdc86cc580bd2aaeaba1e287a8b49029b6b145",
+      "file": "web/tabula-story.webp",
+      "pngBytes": 30132,
+      "webpBytes": 15248
+    },
+    {
+      "source": "tabula-sensitivity.png",
+      "sourceSHA256": "04cbd8fa90bb779697ae80c9f0dfad3259d716a984e4a3477825f7534164e427",
+      "file": "web/tabula-sensitivity.webp",
+      "pngBytes": 30490,
+      "webpBytes": 14770
+    },
+    {
+      "source": "tabula-landscape.png",
+      "sourceSHA256": "a18b99f553380aaa7564b73004aba3c1035c08123af0bb792af139cf7a150f9c",
+      "file": "web/tabula-landscape.webp",
+      "pngBytes": 148201,
+      "webpBytes": 41382
+    },
+    {
+      "source": "rag-search.png",
+      "sourceSHA256": "f626bd3498459aba35a0cf063f4fe3458f9f52198de7760b6347da38c032de4d",
+      "file": "web/rag-search.webp",
+      "pngBytes": 308847,
+      "webpBytes": 159672
+    },
+    {
+      "source": "rag-trace.png",
+      "sourceSHA256": "aa4833ff59f18c003088bcccf33053747477bbd6d4fc1383232af24e19d6667e",
+      "file": "web/rag-trace.webp",
+      "pngBytes": 287931,
+      "webpBytes": 145694
+    },
+    {
+      "source": "rag-corpus.png",
+      "sourceSHA256": "4885d6104b9cd23a81bf821688a9c3446ab41d58f3b496226352df5698d84199",
+      "file": "web/rag-corpus.webp",
+      "pngBytes": 260349,
+      "webpBytes": 136534
+    }
+  ]
+}

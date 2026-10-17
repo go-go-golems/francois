@@ -177,13 +177,13 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 	for _, who := range []*tactor{&admin, &sub} {
 		code, body, _ := e.do(who, "portal.test", "GET", "/apps/board", nil, nil)
 		s := string(body)
-		if code != 200 || strings.Count(s, ">Download HTML</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
+		if code != 200 || strings.Count(s, ">Get the file ↓</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
 			strings.Contains(s, "/api/releases/"+oldID+"/") || strings.Contains(s, ">Manifest</a>") {
 			t.Fatalf("expected one current HTML download: %d %s", code, body)
 		}
 	}
 	// A historical free sample must not surface as the current paid download.
-	if code, body, _ := e.do(nil, "portal.test", "GET", "/apps/board", nil, nil); code != 200 || bytes.Contains(body, []byte("Download HTML")) {
+	if code, body, _ := e.do(nil, "portal.test", "GET", "/apps/board", nil, nil); code != 200 || bytes.Contains(body, []byte("Get the file")) {
 		t.Fatalf("anonymous download: %d %s", code, body)
 	}
 	// History remains downloadable through its authorized API, including manifests.
@@ -199,6 +199,7 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 // TestStorefrontPages covers the server-rendered public pages and media.
 func TestStorefrontPages(t *testing.T) {
 	e := setup(t)
+	enableJournal(t, e)
 	ctx := context.Background()
 	st := e.store
 	admin := e.user("ada", "admin", false)
@@ -232,7 +233,7 @@ func TestStorefrontPages(t *testing.T) {
 	_ = st.SetArtifactCreators(ctx, "board", []string{c.ID})
 
 	// Home, catalog, tag filter.
-	if code, b, h := get(nil, "/"); code != 200 || !strings.Contains(b, "Board") || !strings.Contains(b, "Cleo Maker") || h.Get("Cache-Control") != "private, no-store" {
+	if code, b, h := get(nil, "/"); code != 200 || !strings.Contains(b, "Board") || h.Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("home %d %s", code, b)
 	}
 	if code, b, _ := get(nil, "/apps?tag=tools"); code != 200 || !strings.Contains(b, `href="/apps/board"`) || !strings.Contains(b, `/media/`+cover.ID) {
@@ -252,10 +253,10 @@ func TestStorefrontPages(t *testing.T) {
 		t.Fatalf("CSP %q", h.Get("Content-Security-Policy"))
 	}
 	// Downloads are offered to entitled users only.
-	if strings.Contains(b, "Download HTML") {
+	if strings.Contains(b, "Get the file") {
 		t.Fatal("download offered anonymously")
 	}
-	if _, b, _ = get(&sub, "/apps/board"); !strings.Contains(b, "Download HTML") || !strings.Contains(b, "data-signout") {
+	if _, b, _ = get(&sub, "/apps/board"); !strings.Contains(b, "Get the file") || !strings.Contains(b, "data-signout") {
 		t.Fatal("subscriber page misses download or sign-out")
 	}
 

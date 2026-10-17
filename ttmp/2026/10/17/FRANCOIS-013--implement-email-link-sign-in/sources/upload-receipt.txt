@@ -1,0 +1,9 @@
+ERROR: 2026/10/17 14:28:54 transport.go:258: http request failed with Post "https://webapp-prod.cloud.remarkable.engineering/token/json/2/user/new": dial tcp: lookup webapp-prod.cloud.remarkable.engineering: no such host
+ERROR: 2026/10/17 14:28:54 auth.go:53: failed to create user token from device token Post "https://webapp-prod.cloud.remarkable.engineering/token/json/2/user/new": dial tcp: lookup webapp-prod.cloud.remarkable.engineering: no such host
+Cached tree found; checking for remote changes (a full resync may still be needed).
+Synchronizing cloud tree… 0s | 0 HTTP responses, 0 active requests
+Cloud tree synchronized. 2s | 1 HTTP responses
+WARNING: 2026/10/17 14:29:13 apictx.go:259: remote tree has changed, refresh the file tree
+WARNING: 2026/10/17 14:29:17 apictx.go:259: remote tree has changed, refresh the file tree
+WARNING: 2026/10/17 14:29:19 apictx.go:259: remote tree has changed, refresh the file tree
+OK: uploaded FRANCOIS 013 Email Sign In Intern Guide.pdf -> /ai/2026/10/17/FRANCOIS-013

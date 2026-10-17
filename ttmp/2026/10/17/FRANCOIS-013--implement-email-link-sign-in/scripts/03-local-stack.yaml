@@ -1,0 +1,46 @@
+# Isolated test infrastructure. All passwords are disposable local fixtures.
+# The bootstrap PAT is written only beneath /tmp, never into the repository.
+name: francois-email-013
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: emailtest
+      POSTGRES_PASSWORD: emailtest
+      POSTGRES_DB: postgres
+    ports: ["127.0.0.1:5437:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "emailtest", "-d", "postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  mail:
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:18025:8025"]
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.16.1
+    user: "0"
+    command: start-from-init --masterkey MasterkeyNeedsToHave32Characters --tlsMode disabled
+    ports: ["127.0.0.1:18083:8080"]
+    volumes: ["/tmp/francois-013-private:/bootstrap"]
+    environment:
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: 18083
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: emailtest
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: emailtest
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: email-test-bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Email test bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2030-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /bootstrap/bootstrap.pat
+    depends_on:
+      postgres:
+        condition: service_healthy

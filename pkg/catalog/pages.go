@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -28,6 +29,19 @@ import (
 var pageFuncs = template.FuncMap{
 	"asset":   web.PortalURL,
 	"join":    strings.Join,
+	"ordinal": func(n int) string { return fmt.Sprintf("%03d", n) },
+	"shortDate": func(t *time.Time) string {
+		if t == nil {
+			return ""
+		}
+		return t.UTC().Format("2 Jan")
+	},
+	"longDate": func(t *time.Time) string {
+		if t == nil {
+			return ""
+		}
+		return t.UTC().Format("2 January 2006")
+	},
 	"isVideo": content.IsVideo,
 	// period ends a title with a full stop unless it already ends in
 	// punctuation ("Polis IDE." but "What is Polis?").
@@ -98,6 +112,9 @@ type pageData struct {
 	Brand, Title, Description, Image, Canonical, Crumb string
 	Nav                                                []navItem
 	User                                               *store.User
+	JournalEnabled                                     bool
+	JournalPreview                                     bool
+	Sensitive                                          bool
 	LoginAvailable                                     bool
 	LoginHref                                          string
 	Draft                                              bool
@@ -112,6 +129,8 @@ type card struct {
 	Tags, Capabilities     []string
 	Creators               []store.Creator
 	Cover                  *store.Media
+	Number                 int
+	FirstPublished         *time.Time
 	Version, ReleaseID     string
 	Published              *time.Time
 	Featured               bool
@@ -136,11 +155,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		s.pageFailed(w, r, err)
 		return
 	}
+	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
 	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + r.URL.Path
-	d.LoginAvailable = site.OIDC.Configured()
-	d.LoginHref = "/auth/login?return=" + url.QueryEscape(r.URL.RequestURI())
+	d.LoginAvailable = site.OIDC.Configured() || s.Config.EmailLogin != nil
+	d.LoginHref = signinURL(r.URL.RequestURI())
 	nav := []navItem{{Href: "/", Label: "Feed"}}
 	// Demo guests browse like visitors: no account pages, and they may sign in.
 	if p != nil && p.User.Role != "guest" {
@@ -170,6 +190,15 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	// The header is personalised by the session cookie.
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Vary", "Cookie")
+	if d.Draft || d.JournalPreview {
+		w.Header().Set("Cache-Control", "private, no-store")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	}
+	if d.Sensitive {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	}
 	w.WriteHeader(status)
 	_, _ = w.Write(buf.Bytes())
 }
@@ -207,7 +236,14 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 		return nil, err
 	}
 	latest := map[string]store.Release{}
+	first := map[string]*time.Time{}
 	for _, rel := range rels {
+		if rel.PublishedAt == nil {
+			continue
+		}
+		if first[rel.ArtifactID] == nil || rel.PublishedAt.Before(*first[rel.ArtifactID]) {
+			first[rel.ArtifactID] = rel.PublishedAt
+		}
 		if cur, ok := latest[rel.ArtifactID]; !ok || rel.PublishedAt.After(*cur.PublishedAt) {
 			latest[rel.ArtifactID] = rel
 		}
@@ -224,6 +260,7 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 			continue
 		}
 		c := cardOf(a, rel, credits[a.ID])
+		c.FirstPublished = first[a.ID]
 		out = append(out, c)
 		if a.Page.Cover != "" {
 			covers = append(covers, a.Page.Cover)
@@ -239,6 +276,15 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 				out[i].Cover = &m
 			}
 		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].FirstPublished.Equal(*out[j].FirstPublished) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].FirstPublished.Before(*out[j].FirstPublished)
+	})
+	for i := range out {
+		out[i].Number = i + 1
 	}
 	return out, nil
 }
@@ -259,71 +305,75 @@ func find(arts []store.Artifact, id string) *store.Artifact {
 
 func listed(a store.Artifact) bool { return a.Visibility == "listed" }
 
-// feedPage presents applications and writing in one chronological stream.
+// feedPage serves the experiment archive, or published writing on /journal.
 func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	if r.URL.Path == "/journal" {
+		rev, err := s.Store.ActiveSettings(ctx)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		if !rev.Document.Storefront.JournalEnabled {
+			s.notFound(w, r)
+			return
+		}
+		posts, err := s.Store.Posts(ctx, "published", "", 0)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		s.render(w, r, http.StatusOK, "home", pageData{Title: "Journal", Body: map[string]any{"Journal": true, "Posts": posts}})
+		return
+	}
 	cards, err := s.cards(ctx, listed)
 	if err != nil {
 		s.pageFailed(w, r, err)
 		return
 	}
-	posts, err := s.Store.Posts(ctx, "published", "", 0)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
-	}
-	type entry struct {
-		Cards []card
-		Posts []store.Post
-		Date  time.Time
-		Key   string
-	}
-	entries := []entry{}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tag := r.URL.Query().Get("tag")
-	counts := map[string]int{}
+	order := r.URL.Query().Get("sort")
+	if order != "oldest" {
+		order = "newest"
+	}
+	link := func(t string) string {
+		v := url.Values{}
+		if q != "" {
+			v.Set("q", q)
+		}
+		if t != "" {
+			v.Set("tag", t)
+		}
+		v.Set("sort", order)
+		return "/?" + v.Encode()
+	}
+	type category struct {
+		Name, Href string
+		Current    bool
+	}
+	tags := []category{}
+	seen := map[string]bool{}
+	matches := []card{}
 	for _, c := range cards {
 		for _, t := range c.Tags {
-			counts[t]++
+			if !seen[t] {
+				tags = append(tags, category{t, link(t), t == tag})
+				seen[t] = true
+			}
 		}
-		if tag != "" && !contains(c.Tags, tag) {
-			continue
+		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
+		if (tag == "" || contains(c.Tags, tag)) && (q == "" || strings.Contains(haystack, strings.ToLower(q))) {
+			matches = append(matches, c)
 		}
-		e := entry{Cards: []card{c}, Key: "app:" + c.ID}
-		if c.Published != nil {
-			e.Date = *c.Published
-		}
-		entries = append(entries, e)
-	}
-	for _, p := range posts {
-		for _, t := range p.Tags {
-			counts[t]++
-		}
-		if tag != "" && !contains(p.Tags, tag) {
-			continue
-		}
-		e := entry{Posts: []store.Post{p}, Key: "post:" + p.ID}
-		if p.PublishedAt != nil {
-			e.Date = *p.PublishedAt
-		}
-		entries = append(entries, e)
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Date.Equal(entries[j].Date) {
-			return entries[i].Key < entries[j].Key
-		}
-		return entries[i].Date.After(entries[j].Date)
-	})
-	type tagCount struct {
-		Name    string
-		Count   int
-		Current bool
-	}
-	tags := []tagCount{}
-	for t, n := range counts {
-		tags = append(tags, tagCount{t, n, t == tag})
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
-	s.render(w, r, http.StatusOK, "home", pageData{Description: "Applications and writing.", Body: map[string]any{"Entries": entries, "Tags": tags, "Tag": tag, "LoginError": r.URL.Query().Get("login_error")}})
+	if order == "newest" {
+		for i, j := 0, len(matches)-1; i < j; i, j = i+1, j-1 {
+			matches[i], matches[j] = matches[j], matches[i]
+		}
+	}
+	s.render(w, r, http.StatusOK, "home", pageData{Description: "A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.", Body: map[string]any{"Rows": matches, "Total": len(cards), "Tags": tags, "Tag": tag, "Query": q, "Sort": order, "AllHref": link(""), "LoginError": r.URL.Query().Get("login_error")}})
 }
 
 func contains(list []string, v string) bool {
@@ -350,7 +400,10 @@ func (s *Server) canEditArtifact(ctx context.Context, u store.User, artifact str
 	return false
 }
 
-type download struct{ Href, Label string }
+type download struct {
+	Href, Label, Name string
+	Size              int64
+}
 
 type releaseLine struct {
 	store.Release
@@ -409,6 +462,11 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		rels = []store.Release{latest}
 	}
 	c := cardOf(a, latest, credits[a.ID])
+	c.Number, c.FirstPublished, err = s.Store.ArchivePosition(ctx, a.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.pageFailed(w, r, err)
+		return
+	}
 	ids := append([]string{page.Cover}, page.Gallery...)
 	media, err := s.Store.MediaByIDs(ctx, ids)
 	if err != nil {
@@ -445,7 +503,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 				if f.Role != "html" {
 					continue
 				}
-				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Download HTML"})
+				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Get the file ↓", Name: f.Name, Size: f.Size})
 			}
 		}
 		lines = append(lines, l)
@@ -464,7 +522,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
-		Body: map[string]any{"Card": c, "Body": s.markdown(ctx, page.Body), "Gallery": gallery, "Releases": lines,
+		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
@@ -504,10 +562,18 @@ func (s *Server) creatorPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
-	posts, err := s.Store.Posts(ctx, "published", c.ID, 0)
+	rev, err := s.Store.ActiveSettings(ctx)
 	if err != nil {
 		s.pageFailed(w, r, err)
 		return
+	}
+	var posts []store.Post
+	if rev.Document.Storefront.JournalEnabled {
+		posts, err = s.Store.Posts(ctx, "published", c.ID, 0)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
 	}
 	d := pageData{Title: c.Name, Crumb: "creators/" + c.Slug, Description: content.Excerpt(c.Bio, 200),
 		Body: map[string]any{"Creator": c, "Bio": s.markdown(ctx, c.Bio), "Cards": cards, "Posts": posts}}
@@ -545,7 +611,17 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
 	pr := principal(ctx)
+	hidden := !rev.Document.Storefront.JournalEnabled
+	if hidden && (pr == nil || !s.canEditPost(ctx, pr.User, post)) {
+		s.notFound(w, r)
+		return
+	}
 	draft := post.State != "published"
 	if draft && (pr == nil || !s.canEditPost(ctx, pr.User, post)) {
 		s.notFound(w, r)
@@ -559,7 +635,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	body["Author"] = author
-	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, Body: body}
+	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, Body: body}
 	if post.Cover != "" {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
@@ -596,6 +672,16 @@ type rssDoc struct {
 }
 
 func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !rev.Document.Storefront.JournalEnabled {
+		s.notFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
 	posts, err := s.Store.Posts(r.Context(), "published", "", 50)
 	if err != nil {
 		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
@@ -603,10 +689,7 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	origin := s.site(r).PortalOrigin()
 	doc := rssDoc{Version: "2.0"}
-	brand := s.site(r).PublicURL.Hostname()
-	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {
-		brand = s.brand(r, rev.Document)
-	}
+	brand := s.brand(r, rev.Document)
 	doc.Channel.Title = brand + " journal"
 	doc.Channel.Link = origin + "/journal"
 	doc.Channel.Description = "Notes on how the applications are made."
@@ -626,6 +709,10 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 // markdown renders author Markdown, embedding referenced portal videos as
 // players. If the media lookup fails, references render as images.
 func (s *Server) markdown(ctx context.Context, source string) template.HTML {
+	return s.md.Render(source, s.markdownEmbeds(ctx, source))
+}
+
+func (s *Server) markdownEmbeds(ctx context.Context, source string) map[string]content.Embed {
 	embeds := map[string]content.Embed{}
 	if ids := content.MediaRefs(source); len(ids) > 0 {
 		media, err := s.Store.MediaByIDs(ctx, ids)
@@ -636,7 +723,7 @@ func (s *Server) markdown(ctx context.Context, source string) template.HTML {
 			embeds[id] = content.Embed{Type: m.MediaType, Poster: m.Poster}
 		}
 	}
-	return s.md.Render(source, embeds)
+	return embeds
 }
 
 func (s *Server) media(w http.ResponseWriter, r *http.Request) {
@@ -693,7 +780,7 @@ func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(plans, func(i, j int) bool { return plans[i].Rank < plans[j].Rank })
-	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Pricing", Crumb: "pricing", Description: "Plans and prices.",
+	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support independent experiments in computation and intelligence.",
 		Body: map[string]any{"Plans": plans, "Current": name, "Paid": paid, "Staff": staff}})
 }
 

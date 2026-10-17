@@ -1,0 +1,24 @@
+digraph G {
+      rankdir=TB;
+      node [shape=box, style=rounded, fontname="DejaVu Sans", fontsize=13];
+      edge [fontname="DejaVu Sans", fontsize=11];
+      form [label="GET /signin
+Create short-lived browser binding"];
+      request [label="POST /auth/email/request
+Validate nonce + origin + quotas"];
+      pending [label="Resolve existing subscriber
+Store token digest; submit email"];
+      ack [label="Same generic acknowledgement
+No account created"];
+      inspect [label="GET emailed verification link
+Show Continue; do not consume"];
+      consume [label="POST Continue with binding
+One database transaction"];
+      commit [label="Delete token + validate user
+Insert normal session + commit"];
+      redirect [label="Set secure session cookie
+303 to stored local return path"];
+      form -> request -> pending -> ack;
+      pending -> inspect [label="email received"];
+      inspect -> consume -> commit -> redirect;
+    }

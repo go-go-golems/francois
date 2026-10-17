@@ -3,10 +3,18 @@ import { useDispatch } from "react-redux";
 import { api, errorMessage } from "./api";
 import { navigate, show } from "./store";
 import { ApiTokens } from "./tokens";
-import { Empty, loginHref, Row } from "./ui";
+import { Empty, loginHref, Row, SignOut } from "./ui";
 
 export function Account() {
   const { data: session } = api.useSessionQuery();
+  useEffect(() => {
+    if (!session?.brand) return;
+    const previous = document.title;
+    document.title = `Account · ${session.brand}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [session?.brand]);
   const params = new URLSearchParams(location.search);
   const returned = params.get("checkout");
   const [polling, setPolling] = useState(!!returned);
@@ -16,7 +24,6 @@ export function Account() {
   });
   const [portal, { isLoading: opening }] = api.usePortalMutation();
   const [refresh] = api.useRefreshBillingMutation();
-  const [logout] = api.useLogoutMutation();
   const dispatch = useDispatch();
   // A Checkout return is advisory: ask for reconciliation and poll the
   // projection for a bounded time; never treat the URL as proof of payment.
@@ -63,37 +70,57 @@ export function Account() {
     }
   };
   return (
-    <main className="sheet account-minimal">
-      <h1>Account</h1>
-      {polling && !a.access.allowed && <p role="status">Checking your subscription…</p>}
-      {a.user.disabled && <p>This account is disabled. You can still manage your subscription.</p>}
-      {a.billingEnabled && a.hasCustomer && (
-        <p>
-          <button className="tlink" onClick={manage} disabled={opening}>
-            Manage subscription
-          </button>
-        </p>
-      )}
-      <p>
-        <button
-          className="tlink"
-          onClick={async () => {
-            try {
-              const out = await logout().unwrap();
-              location.assign(out.redirect || "/");
-            } catch (e) {
-              dispatch(show({ text: errorMessage(e), bad: true }));
-            }
-          }}
-        >
-          Sign out
-        </button>
-      </p>
-      {session.user && (session.user.role === "admin" || session.user.role === "creator") && (
-        <Row label="API tokens">
-          <ApiTokens role={session.user.role} />
-        </Row>
-      )}
+    <main className="final-account">
+      <section className="final-section">
+        <div className="final-label">
+          Account<p>{a.user.email}</p>
+        </div>
+        <div className="final-content">
+          <h1>
+            {a.entitlement.source === "subscription" ||
+            a.entitlement.source === "trial"
+              ? `Thank you, ${a.user.name || "friend"}.`
+              : "Your account."}
+          </h1>
+          <div className="account-detail">
+            <span>Email</span>
+            <p>{a.user.email}</p>
+          </div>
+          <div className="account-detail">
+            <span>
+              {a.entitlement.source === "subscription" ||
+              a.entitlement.source === "trial"
+                ? "Support"
+                : "Access"}
+            </span>
+            <p>{a.entitlement.plan.name}</p>
+          </div>
+          {polling && !a.access.allowed && (
+            <p role="status">Checking your subscription…</p>
+          )}
+          {a.user.disabled && (
+            <p>
+              This account is disabled. You can still manage your subscription.
+            </p>
+          )}
+          {a.billingEnabled && a.hasCustomer && (
+            <p>
+              <button className="tlink" onClick={manage} disabled={opening}>
+                Manage subscription
+              </button>
+            </p>
+          )}
+          <p>
+            <SignOut />
+          </p>
+        </div>
+      </section>
+      {session.user &&
+        (session.user.role === "admin" || session.user.role === "creator") && (
+          <Row label="API tokens">
+            <ApiTokens role={session.user.role} />
+          </Row>
+        )}
     </main>
   );
 }

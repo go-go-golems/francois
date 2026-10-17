@@ -77,6 +77,8 @@ type Config struct {
 	// primary site; all sites must share its scheme because session cookies
 	// use the __Host- prefix on HTTPS.
 	Sites []Site
+	// EmailLogin is nil while email-only supporter sign-in is disabled.
+	EmailLogin *identity.EmailLogin
 	// TrialAllowed enables access while a subscription is trialing. Prices
 	// come from the plans in the settings document.
 	TrialAllowed bool
@@ -122,6 +124,9 @@ func (c Config) Validate() error {
 		if d == "" || strings.HasPrefix(d, ".") || strings.HasSuffix(d, ".") || strings.ContainsAny(d, "/:* ") {
 			return errors.Errorf("site %s needs an application domain such as apps.example", u)
 		}
+		if c.EmailLogin != nil && len(site.PortalOrigin()+"/auth/email/verify?flow="+strings.Repeat("0", 64)+"&code={{.Code}}") > 200 {
+			return errors.Errorf("site %s exceeds ZITADEL email link template length", u)
+		}
 		if site.OIDC == nil {
 			return errors.Errorf("site %s has no OIDC provider", u)
 		}
@@ -137,18 +142,19 @@ func (c Config) Validate() error {
 func (c Config) primary() *Site { return &c.Sites[0] }
 
 type Server struct {
-	Config      Config
-	Store       *store.Store
-	Publisher   *releases.Publisher
-	Payments    *payments.Service // nil when billing is not configured
-	Backend     piworker.Backend
-	Runtime     *hosted.Runtime
-	portal      http.Handler
-	legal       *template.Template
-	pages       map[string]*template.Template
-	md          *content.Markdown
-	demoLimiter *limiter
-	fonts       *fonts
+	Config       Config
+	Store        *store.Store
+	Publisher    *releases.Publisher
+	Payments     *payments.Service // nil when billing is not configured
+	Backend      piworker.Backend
+	Runtime      *hosted.Runtime
+	portal       http.Handler
+	legal        *template.Template
+	pages        map[string]*template.Template
+	md           *content.Markdown
+	emailLimiter *limiter
+	demoLimiter  *limiter
+	fonts        *fonts
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -166,7 +172,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 		}
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
-		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter()}
+		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter()}
 	var err error
 	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {
 		// Validate already checked the directory; serve no fonts rather than fail.

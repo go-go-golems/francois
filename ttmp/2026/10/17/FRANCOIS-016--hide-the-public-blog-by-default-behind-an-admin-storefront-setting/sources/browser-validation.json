@@ -1,0 +1,11 @@
+{
+  "base": "http://localhost:18792",
+  "at": "2026-10-17T21:20:40.265Z",
+  "checks": [
+    "admin checkbox defaults off; SPA footer hides Journal",
+    "admin save enables journal page, RSS posts and SPA footer",
+    "admin save hides journal page, RSS posts and SPA footer",
+    "artifact archive remains available; default-off state retained"
+  ],
+  "credentialsSaved": false
+}

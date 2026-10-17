@@ -1,0 +1,12 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"file\": {\n    \"id\": \"01M4XVT9C83GGYK57CMAAAEJJT\",\n    \"name\": \"slop boutique\"\n  },\n  \"contentHash\": {\n    \"tokens\": \"74b865ac\"\n  }\n}"
+    },
+    {
+      "type": "text",
+      "text": "{\n  \"styles\": {\n    \"CZ5-0\": {\n      \"width\": \"342px\",\n      \"flexShrink\": \"0\",\n      \"fontFamily\": \"var(--font-sans)\",\n      \"fontSize\": \"15px\",\n      \"lineHeight\": \"22px\",\n      \"whiteSpace\": \"pre-wrap\",\n      \"fontWeight\": 500,\n      \"color\": \"var(--color-ink)\"\n    },\n    \"DH1-0\": {\n      \"fontSize\": \"96px\",\n      \"lineHeight\": \"92px\",\n      \"letterSpacing\": \"-0.045em\",\n      \"fontFamily\": \"var(--font-sans)\",\n      \"whiteSpace\": \"pre-wrap\",\n      \"fontWeight\": 400,\n      \"color\": \"var(--color-ink)\"\n    },\n    \"CXJ-0\": {\n      \"display\": \"flex\",\n      \"flexDirection\": \"column\",\n      \"flexGrow\": \"1\",\n      \"gap\": \"2px\"\n    },\n    \"DJX-0\": {\n      \"fontSize\": \"24px\",\n      \"lineHeight\": \"30px\",\n      \"letterSpacing\": \"-0.015em\",\n      \"fontFamily\": \"var(--font-sans)\",\n      \"whiteSpace\": \"pre-wrap\",\n      \"fontWeight\": 400,\n      \"color\": \"var(--color-ink)\"\n    },\n    \"D4U-0\": {\n      \"display\": \"flex\",\n      \"overflow\": \"clip\",\n      \"width\": \"1440px\",\n      \"height\": \"fit-content\",\n      \"flexDirection\": \"column\",\n      \"left\": \"4000px\",\n      \"top\": \"0px\",\n      \"paddingInline\": \"48px\",\n      \"position\": \"absolute\",\n      \"backgroundColor\": \"#FFFFFF\"\n    },\n    \"D12-0\": {\n      \"width\": \"1344px\",\n      \"height\": \"840px\",\n      \"objectPosition\": \"center top\",\n      \"borderTopLeftRadius\": \"0px\",\n      \"borderTopRightRadius\": \"0px\",\n      \"borderBottomRightRadius\": \"3px\",\n      \"borderBottomLeftRadius\": \"3px\",\n      \"flexShrink\": \"0\",\n      \"backgroundImage\": \"url(https://app.paper.design/file-assets/01M4XVT9C83GGYK57CMAAAEJJT/21QADXSBC6PXWBJMHKEJ2KXVSG.png)\",\n      \"backgroundSize\": \"cover\",\n      \"backgroundPosition\": \"50%\"\n    }\n  }\n}"
+    }
+  ]
+}

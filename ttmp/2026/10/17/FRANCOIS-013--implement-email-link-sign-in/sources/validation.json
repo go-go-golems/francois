@@ -1,0 +1,10 @@
+{
+  "guide": "ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/design-doc/01-email-link-sign-in-intern-implementation-guide.md",
+  "words": 3472,
+  "local_links": "passed",
+  "markdown_fences": "balanced",
+  "rendered_diagrams": 2,
+  "starting_revision": "dbef98e",
+  "runtime_code_changed": false,
+  "application_tests": "not run - documentation only"
+}

@@ -1,0 +1,117 @@
+{
+  "base": "https://slop.boutique",
+  "at": "2026-10-17T00:02:13.124Z",
+  "artifacts": [
+    {
+      "id": "lattice-rift",
+      "images": [
+        {
+          "alt": "Recursive title screen and dual-screen WebGL console in Lattice Rift.",
+          "loaded": true
+        },
+        {
+          "alt": "Infinite inventory: a hyperbolic item grid and recursive console screens.",
+          "loaded": true
+        },
+        {
+          "alt": "Branching dialogue: YES and NO rendered as an interactive recursive scene.",
+          "loaded": true
+        }
+      ],
+      "tryAvailable": true,
+      "anonymousDownload": true,
+      "htmlSHA256": "e21ff36352f9050590df902788645bbabf9f3b44748f8cad94f893bdddddb2e6"
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "images": [
+        {
+          "alt": "Phantasmagoria cartridge menu on the dual-screen console.",
+          "loaded": true
+        },
+        {
+          "alt": "Half-life cartridge: fractal visuals on the two console screens.",
+          "loaded": true
+        },
+        {
+          "alt": "Kipple cartridge: inventory grid, selected item and interactive console controls.",
+          "loaded": true
+        }
+      ],
+      "tryAvailable": true,
+      "anonymousDownload": true,
+      "htmlSHA256": "383f8c70392a5b0171ce49cc9ec7e98ea9d8bb1e0a5cc0441c96eb236862827e"
+    },
+    {
+      "id": "lattice-deck",
+      "images": [
+        {
+          "alt": "Procedural 3D: a colored heightfield and parametric shell generated from JavaScript.",
+          "loaded": true
+        },
+        {
+          "alt": "Animated 3D: a rotating knot, shader-driven blob and live surface with controls.",
+          "loaded": true
+        },
+        {
+          "alt": "Sample revenue by region displayed as stacked bars in a presentation slide.",
+          "loaded": true
+        }
+      ],
+      "tryAvailable": true,
+      "anonymousDownload": true,
+      "htmlSHA256": "686cfc2aa431c7395ddecef41a28390f266d876cacc2b7d56c24db9b5a0d9f3a"
+    },
+    {
+      "id": "tabula-workbench",
+      "images": [
+        {
+          "alt": "Tabula workbook overview with live inputs, distribution, sensitivity chart and 3D landscape.",
+          "loaded": true
+        },
+        {
+          "alt": "A workbook-backed presentation showing the simulated unit-economics distribution.",
+          "loaded": true
+        },
+        {
+          "alt": "Sensitivity analysis presented as a tornado chart in a generated slide.",
+          "loaded": true
+        },
+        {
+          "alt": "A 3D unit-economics landscape with simulated samples over the sensitivity surface.",
+          "loaded": true
+        }
+      ],
+      "tryAvailable": true,
+      "anonymousDownload": true,
+      "htmlSHA256": "c5b851a64ac0731aecf835c97aa32c88c3f7408f55455381425a4deebf16428f"
+    },
+    {
+      "id": "rag-workbench",
+      "images": [
+        {
+          "alt": "RAG pipeline editor, ranked results, selected source section and execution graph.",
+          "loaded": true
+        },
+        {
+          "alt": "RAG query execution trace and ranked source explanations for model concurrency.",
+          "loaded": true
+        },
+        {
+          "alt": "RAG corpus files and indexed document metadata alongside search results.",
+          "loaded": true
+        }
+      ],
+      "tryAvailable": true,
+      "anonymousDownload": true,
+      "htmlSHA256": "8807b71b229d48dd0a71cd6feea285015ee5dd008cb9aa46f97aae125428e580"
+    }
+  ],
+  "tour": {
+    "url": "https://slop.boutique/instances/ins_fa730ee34069447f31d4",
+    "bundledFiles": 5,
+    "uploadedFiles": 0,
+    "reply": "pong",
+    "model": "lunaroute/glm-5.3-flash"
+  }
+}

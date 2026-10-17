@@ -1,0 +1,2 @@
+--- FAIL: TestConcurrentNewArtifactUpload (0.32s)
+    studio_test.go:226: race-1 upload 0: 409 map[checks:[] error:map[code:version_exists message:version 1.0.0 already exists for race-1: conflict]]

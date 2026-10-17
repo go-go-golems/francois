@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "dec9f7251a81cd77141e0e947e831282f334dd6628148fc1c7d8ab74544dbabd",
+  "request": {
+    "ticket": "FRANCOIS-016",
+    "status": "complete",
+    "intent": "",
+    "entry": "Blog is hidden by default with working admin enable/disable; browser and full checks passed. Fixed the separately discovered upload authorization race with a deterministic regression."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-02676d8daf1577988354572510ebb391",
+    "state": "committed",
+    "created_at": "2026-10-17T21:23:53.024510649Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "da624925178df231504a3964bf1817c6ad0f589e9c844e2f08dba5c8a04a279d",
+      "index.md": "18a50cdca8e4fff2a3ecca814daa7ce5a2d44c471d00eef35656b056e5369826"
+    },
+    "after": {
+      "changelog.md": "50a80c142045faa6d7bf29eeb04406d7547dd88bbc9bf914f0e0c887341d9776",
+      "index.md": "63f4675981cfc6644e3295cd4eab40844e7f36768d0589a2d8c2c64d2b81901b"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "da624925178df231504a3964bf1817c6ad0f589e9c844e2f08dba5c8a04a279d",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTAtMTcKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMC0xNwoKSW1wbGVtZW50ZWQgZGVmYXVsdC1vZmYgYmxvZyB2aXNpYmlsaXR5IGFuZCBhZG1pbiBjb250cm9sOyBmb2N1c2VkIGFuZCBicm93c2VyIGNoZWNrcyBwYXNzZWQuIEZ1bGwtc3VpdGUgdXBsb2FkIGF1dGhvcml6YXRpb24gcmFjZSBpc29sYXRlZCBmb3IgYSBzZXBhcmF0ZSBmaXguCgojIyAyMDI2LTEwLTE3CgpCbG9nIGlzIGhpZGRlbiBieSBkZWZhdWx0IHdpdGggd29ya2luZyBhZG1pbiBlbmFibGUvZGlzYWJsZTsgYnJvd3NlciBhbmQgZnVsbCBjaGVja3MgcGFzc2VkLiBGaXhlZCB0aGUgc2VwYXJhdGVseSBkaXNjb3ZlcmVkIHVwbG9hZCBhdXRob3JpemF0aW9uIHJhY2Ugd2l0aCBhIGRldGVybWluaXN0aWMgcmVncmVzc2lvbi4K"
+    },
+    {
+      "path": "index.md",
+      "before": "18a50cdca8e4fff2a3ecca814daa7ce5a2d44c471d00eef35656b056e5369826",
+      "after": "LS0tClRpdGxlOiBIaWRlIHRoZSBwdWJsaWMgYmxvZyBieSBkZWZhdWx0IGJlaGluZCBhbiBhZG1pbiBzdG9yZWZyb250IHNldHRpbmcKVGlja2V0OiBGUkFOQ09JUy0wMTYKU3RhdHVzOiBjb21wbGV0ZQpUb3BpY3M6CiAgICAtIGZyb250ZW5kCiAgICAtIGJhY2tlbmQKRG9jVHlwZTogaW5kZXgKSW50ZW50OiBsb25nLXRlcm0KT3duZXJzOiBbXQpSZWxhdGVkRmlsZXM6CiAgICAtIFBhdGg6IHJlcG86Ly9wa2cvY2F0YWxvZy9mZWVkLmdvCiAgICAgIE5vdGU6IEFydGlmYWN0LW9ubHkgUlNTIHdoZW4gYmxvZyBpcyBoaWRkZW4KICAgIC0gUGF0aDogcmVwbzovL3BrZy9jYXRhbG9nL2pvdXJuYWxfdmlzaWJpbGl0eV90ZXN0LmdvCiAgICAgIE5vdGU6IEFkbWluLXRvZ2dsZSBhbmQgdmlzaWJpbGl0eSByZWdyZXNzaW9uCiAgICAtIFBhdGg6IHJlcG86Ly9wa2cvY2F0YWxvZy9wYWdlcy5nbwogICAgICBOb3RlOiBQdWJsaWMgdmlzaWJpbGl0eSBhbmQgcHJpdmF0ZSBlZGl0b3IgcHJldmlld3MKICAgIC0gUGF0aDogcmVwbzovL3BrZy9jYXRhbG9nL3NldHRpbmdzL3NldHRpbmdzLmdvCiAgICAgIE5vdGU6IERlZmF1bHQtb2ZmIHB1YmxpYyBqb3VybmFsIHNldHRpbmcKICAgIC0gUGF0aDogcmVwbzovL3BrZy9jYXRhbG9nL3N0dWRpby5nbwogICAgICBOb3RlOiBVcGxvYWQgcmVhdXRob3JpemF0aW9uIHJhY2UgZm91bmQgZHVyaW5nIHF1YWxpZmljYXRpb24KRXh0ZXJuYWxTb3VyY2VzOiBbXQpTdW1tYXJ5OiAiIgpMYXN0VXBkYXRlZDogMjAyNi0xMC0xN1QxNzoyMzo1My4wMjQ0NDE1MDEtMDQ6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KIyBIaWRkZW4tYnktZGVmYXVsdCBwdWJsaWMgYmxvZwoKQWRkIGBzdG9yZWZyb250LmpvdXJuYWxFbmFibGVkYCwgZmFsc2UgYnkgZGVmYXVsdCwgdG8gdGhlIGV4aXN0aW5nIGFkbWluIHNldHRpbmdzIGRvY3VtZW50LiBUaGUgY29udHJvbCBpcyAqKkFkbWluIOKGkiBTZXR0aW5ncyDihpIgU3RvcmVmcm9udCDihpIgU2hvdyB0aGUgYmxvZyBwdWJsaWNseSoqLiBFeGlzdGluZyBzYXZlZCBkb2N1bWVudHMgd2l0aG91dCB0aGUgcHJvcGVydHkgYWxzbyBkZWZhdWx0IHRvIGhpZGRlbjsgbm8gbWlncmF0aW9uIGlzIG5lZWRlZC4KClRoZSBwdWJsaWMgc2l0ZSBrZWVwcyBpdHMgYXJ0aWZhY3QgYXJjaGl2ZSwgZGV0YWlsIHBhZ2VzIGFuZCByZWxlYXNlIFJTUy4gV2hpbGUgdGhlIHNldHRpbmcgaXMgb2ZmLCBqb3VybmFsIGluZGV4L2ZlZWQvcG9zdCBwYWdlcyBhcmUgaGlkZGVuIGZyb20gdmlzaXRvcnMsIGNyZWF0b3IgcGFnZXMgb21pdCBwb3N0cywgYW5kIGJvdGggcHVibGljIGFuZCBSZWFjdCBmb290ZXJzIG9taXQgSm91cm5hbC4gQXV0aG9yaXplZCBlZGl0b3JzIHJldGFpbiBTdHVkaW8gYWNjZXNzIGFuZCBwcml2YXRlIGluZGl2aWR1YWwgcHJldmlld3MuIE5vIHBvc3RzIGFyZSBkZWxldGVkIG9yIHVucHVibGlzaGVkLgoKLSBbRGV0YWlsZWQgaW1wbGVtZW50YXRpb24gZGlhcnldKHJlZmVyZW5jZS8wMS1pbXBsZW1lbnRhdGlvbi1kaWFyeS5tZCkuCi0gW0Jyb3dzZXIgdmFsaWRhdGlvbl0oc291cmNlcy9icm93c2VyLXZhbGlkYXRpb24uanNvbikgYW5kIHRoZSBhZG1pbiBzY3JlZW5zaG90cy4KLSBbVGFza3NdKHRhc2tzLm1kKSBhbmQgW2NoYW5nZWxvZ10oY2hhbmdlbG9nLm1kKS4KClRoZSBzZXR0aW5nIGlzIGltcGxlbWVudGVkIGFuZCB2ZXJpZmllZCBpbiB0aGUgYWRtaW4gYnJvd3Nlci4gRnVsbCBHbyB0ZXN0cywgZnJvbnRlbmQgY2hlY2tzL2J1aWxkLCBHbyBidWlsZCBhbmQgbGludCBwYXNzLiBGdWxsLXN1aXRlIHZhbGlkYXRpb24gYWxzbyBleHBvc2VkIGFuIGV4aXN0aW5nIGZpcnN0LWFydGlmYWN0IHVwbG9hZCBhdXRob3JpemF0aW9uIHJhY2U7IGl0IHdhcyBmaXhlZCBzZXBhcmF0ZWx5IHVzaW5nIHRoZSBleGlzdGluZyByZWF1dGhvcml6YXRpb24gcGF0aCBhbmQgYSBkZXRlcm1pbmlzdGljIHJlZ3Jlc3Npb24uIE5vIHByb2R1Y3Rpb24gZGVwbG95bWVudCBpcyBpbmNsdWRlZC4K"
+    }
+  ]
+}

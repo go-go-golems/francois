@@ -1,0 +1,12 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"file\": {\n    \"id\": \"01M4XVT9C83GGYK57CMAAAEJJT\",\n    \"name\": \"slop boutique\"\n  },\n  \"contentHash\": {\n    \"tokens\": \"74b865ac\"\n  }\n}"
+    },
+    {
+      "type": "text",
+      "text": "{\n  \"exports\": [\n    {\n      \"nodeId\": \"CT0-0\",\n      \"filePath\": \"/home/manuel/Downloads/Just the archive — Desktop 1440.png\"\n    },\n    {\n      \"nodeId\": \"CVY-0\",\n      \"filePath\": \"/home/manuel/Downloads/Just the archive — Mobile 390.png\"\n    },\n    {\n      \"nodeId\": \"CZL-0\",\n      \"filePath\": \"/home/manuel/Downloads/Experiment — Desktop 1440.png\"\n    },\n    {\n      \"nodeId\": \"D1R-0\",\n      \"filePath\": \"/home/manuel/Downloads/Experiment — Mobile 390.png\"\n    },\n    {\n      \"nodeId\": \"D4U-0\",\n      \"filePath\": \"/home/manuel/Downloads/Support the lab — Desktop 1440.png\"\n    },\n    {\n      \"nodeId\": \"D4V-0\",\n      \"filePath\": \"/home/manuel/Downloads/Support the lab — Mobile 390.png\"\n    },\n    {\n      \"nodeId\": \"DAD-0\",\n      \"filePath\": \"/home/manuel/Downloads/Sign in — Desktop 1440.png\"\n    },\n    {\n      \"nodeId\": \"DAE-0\",\n      \"filePath\": \"/home/manuel/Downloads/Sign in — Mobile 390.png\"\n    },\n    {\n      \"nodeId\": \"DAF-0\",\n      \"filePath\": \"/home/manuel/Downloads/Account, signed in — Desktop 1440.png\"\n    },\n    {\n      \"nodeId\": \"DAG-0\",\n      \"filePath\": \"/home/manuel/Downloads/Account, signed in — Mobile 390.png\"\n    }\n  ]\n}"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-17T00:38:21.479Z",
+  "base": "https://slop.boutique",
+  "artifact": "lattice-deck",
+  "readiness": "Hosted frame has visible text and a nonempty canvas; two animation frames elapsed",
+  "runs": [],
+  "blocked": {
+    "status": 429,
+    "error": {
+      "code": "rate_limited",
+      "message": "Too many demos from your network; try again later"
+    }
+  }
+}

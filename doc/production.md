@@ -759,3 +759,34 @@ Model concurrency is bounded at six globally and one per person across tabs/arti
 Apply migration `011_operations.sql` before deploying this implementation. It transforms saved settings into the new strict shape and applies the stated default caps, preserving accounts, plans and saved work. Rolling back to an older image requires the matching pre-migration database backup because older code rejects the new settings fields.
 
 Normal Open resumes a saved workspace through `POST /api/instances/open`. If its pinned release is withdrawn and current policy forbids running it, Open moves that same workspace to the requested published release, preserving its URL and saved data. Permitted pins stay unchanged. Tour start limits are charged only after successful creation; concurrent resumes and capacity failures spend no starts. Expired lease payloads are purged within the next writable storage transaction before quota measurement. The public stream subscribes through `/feed.xml`; usage remains in administrator analytics. See FRANCOIS-008's implementation receipt for the verified local rollout; it is not evidence of a production deployment.
+
+## Email-only supporter sign-in
+
+The Final `/signin` page supports email magic links through ZITADEL's Session API. It is off by default. Creator/admin accounts continue to use `/auth/login` and the existing OIDC client. Email login selects only an existing enabled subscriber-role user with a unique verified address and the configured ZITADEL issuer. It never creates or links an account. Payment access is still checked separately.
+
+Apply migration `012_email_signins.sql` through the ordinary catalog migration command before running the new binary. To enable the feature, provision a **dedicated** ZITADEL machine user with the built-in `IAM_LOGIN_CLIENT` role and write its short-lived/rotated PAT to a mounted secret file. This role is privileged; do not reuse the Terraform administrator credential. The application requires user read and session read/write/delete permissions. The default ORG_USER_MANAGER role does not include session.write on v4.16.1.
+
+Configure the existing serve command with:
+
+```text
+--email-signin-enabled
+--zitadel-login-token-file=/run/secrets/francois/zitadel-login-token
+--zitadel-organization=<Francois organization ID>
+--oidc-issuer=https://zitadel.yolo.scapegoat.dev
+```
+
+ZITADEL, not Francois, owns SMTP. A read-only check on 2026-10-17 confirmed an active SES provider at `email-smtp.us-east-1.amazonaws.com:587`, TLS enabled, sender `no-reply@mail.scapegoat.dev` / `The Scapegoat`. Its credentials/configuration record is `kv/apps/zitadel/prod/smtp`. The SES identity/DNS/monitoring are owned by the shared Terraform `ses/domains/mail-scapegoat-dev/envs/prod` tree; SMTP credentials are deliberately outside Terraform state. The inspected K3s manifests inject database/bootstrap secrets but do not include an SMTP reconciler; the live provider configuration is stored in ZITADEL. This check did not send mail or qualify external delivery. During controlled supporter provisioning, enroll email OTP with authenticated `POST /v2/users/{zitadel-subject}/otp_email` and `{}`. First check that the user has the intended verified primary address and belongs to Francois. Classify an already-enrolled factor deliberately; do not suppress other errors. Creating a Francois account or enrolling a factor does not grant a subscription.
+
+The application uses `POST /v2/sessions` with `challenges.otpEmail.sendCode.urlTemplate`, pointing to its trusted portal confirmation page. The deployed v4.16.1 proto uses a sendCode/returnCode object oneof; do not copy the older boolean returnCode email example from the MFA guide. The user opens the link **in the same browser**, then confirms with a POST. GET requests from mail scanners cannot authenticate. Both the portal attempt and temporary ZITADEL session expire in five minutes, matching the provider's default email-code expiry.
+
+Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. Unknown, ambiguous, disabled and privileged addresses receive the same generic acknowledgement. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
+
+Email sessions use the existing local idle/absolute expiry and have no OIDC ID token. Logout stays local. Temporary provider proof sessions are deleted after redemption and expire automatically if cleanup fails. Changing a user's role revokes all portal sessions and runtime grants, and invalidates pending email attempts; promotion cannot turn an email session into an admin session.
+
+For a reproducible isolated test, use FRANCOIS-013's `scripts/03-local-stack.yaml` and `04-provision-local.py`. They are fixed to localhost ports 18083 (ZITADEL v4.16.1), 18025 (mail sink) and 5437 (PostgreSQL); they do not configure production. The bootstrap and dedicated test PATs remain under `/tmp/francois-013-private`. The opt-in Go test `TestEmailSigninRealZitadel` accepts `-email-login-fixture=/tmp/francois-013-private/fixture.json`; provide TEST_DATABASE_URL pointing to the isolated database. Test credentials, codes, live links and cookies must never be copied into ticket screenshots/logs.
+
+## Public blog visibility
+
+The public site is artifact-only by default. In **Admin → Settings → Storefront**, enable **Show the blog publicly** to expose journal pages, creator-page posts and blog entries in RSS. The setting is `storefront.journalEnabled` in the existing versioned settings document; missing/false means hidden, including previously saved documents. No migration is needed.
+
+While hidden, `/journal`, public post URLs and `/journal/feed.xml` return 404 to visitors. `/feed.xml` continues serving artifact releases. Authorized editors can still manage posts in Studio and open individual previews with private/no-store caching and noindex; publishing a post does not override the global setting. Turning the blog off does not delete or unpublish any content. This controls public presentation rather than making previously published media URLs secret.

@@ -1,0 +1,140 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Lattice Rift</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Climate+Crisis&family=Instrument+Sans:wght@400;600&family=Instrument+Serif:ital@1&family=JetBrains+Mono:wght@400;700&family=Rubik+Mono+One&family=Syne:wght@800&family=Tilt+Warp&family=Unbounded:wght@900&display=swap">
+<style>
+/* Layout: the arcade's scroll site, broken on purpose. One fixed WebGL stage paints every pixel behind the page; each
+   section is a game screen genre exploded into a fractal. On top of everything sit four verbs that act on the whole
+   page at once: melt, tear, molecules, strands. Deliberately one dark look in both themes. */
+:root {
+  --void: #050307; --smoke: rgba(8, 6, 12, .62); --ink: #F4F0FA; --dim: #BDB5CC; --rule: rgba(244, 240, 250, .17);
+  --hot: #FF2E88; --cool: #2DE2E6; --code: rgba(3, 2, 6, .78); --chaos: 0;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "DejaVu Sans Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html { background: var(--void); }
+body { margin: 0; background: var(--void); color: var(--ink); font: 400 15px/1.6 var(--body); padding-bottom: 76px; }
+#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 0; pointer-events: none; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; }
+
+/* the bar */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--void); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(var(--void), rgba(5, 3, 7, .7)); border-bottom: 1px solid var(--rule); backdrop-filter: blur(10px); }
+.mark { font: 900 15px/1 "Unbounded", var(--body); letter-spacing: .02em; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.mark span { color: var(--hot); display: inline-block; transform: skewX(calc(var(--chaos) * -8deg)) translateY(calc(var(--chaos) * 1px)); }
+.tag { flex: 1 1 260px; min-width: 0; margin: 0; font: 400 12px/1.4 var(--mono); color: var(--dim); }
+.tools { display: flex; gap: 8px; align-items: center; font: 400 12px/1 var(--mono); color: var(--dim); }
+.tools select, .tools button { font: 400 12px/1 var(--mono); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 5px; padding: 6px 8px; cursor: pointer; }
+.tools button[aria-pressed="true"] { border-color: var(--hot); color: var(--hot); }
+
+/* a rift */
+main { position: relative; z-index: 1; }
+.rs { min-height: 100vh; display: flex; align-items: center; padding-block: 72px; scroll-margin-top: 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.rs .in { --devw: min(40vw, calc((100vh - 230px) / 1.86), 500px);
+  width: 100%; max-width: 1280px; margin: 0 auto; display: grid; gap: 28px 56px; align-items: center;
+  grid-template-columns: minmax(0, 1fr) var(--devw); grid-template-areas: "cap dev" "head dev" "panel dev"; }
+.rs.flip .in { grid-template-columns: var(--devw) minmax(0, 1fr); grid-template-areas: "dev cap" "dev head" "dev panel"; }
+.cap { grid-area: cap; align-self: end; margin: 0 0 -18px; font: 400 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); display: flex; gap: 10px; align-items: center; will-change: transform; }
+.cap span { color: var(--void); background: var(--hot); padding: 4px 6px; border-radius: 2px; letter-spacing: .04em; font-weight: 700; }
+.ti { grid-area: head; align-self: end; margin: 0; color: transparent; white-space: pre; font-weight: 400; overflow-wrap: normal; }
+.ti::selection { color: var(--void); background: var(--ink); }
+.nogl + #rifts .ti { color: var(--ink); }
+.panel { grid-area: panel; align-self: start; max-width: 60ch; min-width: 0; background: var(--smoke); backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--rule); border-radius: 4px 18px 4px 18px; padding: 18px 20px; display: grid; gap: 12px; will-change: transform, filter; }
+.lede { margin: 0; font-size: 16.5px; line-height: 1.55; }
+.try { margin: 0; font-size: 14px; }
+.try b { font: 700 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--void); background: var(--cool); padding: 3px 6px; border-radius: 2px; margin-right: 6px; }
+.how { margin: 10px 0 0; font-size: 14px; color: var(--dim); }
+.src summary { cursor: pointer; font: 400 12px/1.4 var(--mono); color: var(--dim); }
+.src summary:hover { color: var(--ink); }
+.tabs { display: flex; gap: 4px; margin: 12px 0 6px; flex-wrap: wrap; }
+.tabs button { font: 400 12px/1 var(--mono); color: var(--dim); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 6px 9px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--void); background: var(--ink); border-color: var(--ink); }
+.src pre { margin: 0; max-height: 420px; overflow: auto; background: var(--code); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; font: 400 12px/1.5 var(--mono); color: var(--ink); tab-size: 2; }
+.src .c { color: #8F88A0; } .src .s { color: #FFC46B; } .src .k { color: #FF7FB8; } .src .n { color: #9CF5E6; }
+.err { margin: 0; white-space: pre-wrap; font: 400 12px/1.4 var(--mono); color: #FF8A80; background: rgba(60, 0, 0, .6); border-radius: 6px; padding: 8px 10px; }
+
+/* the device: transparent boxes the stage paints into; they take the touches */
+.dev { grid-area: dev; width: var(--devw); max-width: 100%; justify-self: center; display: grid; gap: 0; }
+.scr { aspect-ratio: 4 / 3; width: 100%; border-radius: 3px; }
+.scr.bot { touch-action: none; cursor: crosshair; }
+.scr.top { touch-action: pan-y; }
+.hinge { aspect-ratio: 512 / 92; width: 100%; }
+.nogl { position: relative; z-index: 2; margin: 24px auto; max-width: 62ch; padding: 14px 18px; border: 1px solid var(--hot); border-radius: 8px; background: var(--void); }
+
+/* the verbs: they act on the whole page */
+.verbs { position: fixed; z-index: 6; left: 50%; bottom: max(12px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  display: flex; gap: 6px; align-items: stretch; padding: 6px; max-width: calc(100vw - 24px);
+  background: rgba(5, 3, 7, .86); border: 1px solid var(--rule); border-radius: 14px; backdrop-filter: blur(12px);
+  box-shadow: 0 0 calc(var(--chaos) * 26px) rgba(255, 46, 136, .55), 0 10px 30px rgba(0, 0, 0, .5); }
+.verbs button { position: relative; overflow: hidden; display: grid; gap: 4px; justify-items: start; align-content: center; min-height: 48px; padding: 7px 12px 9px;
+  font: 600 13px/1.1 var(--body); color: var(--ink); background: rgba(244, 240, 250, .05); border: 1px solid var(--rule); border-radius: 9px;
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; white-space: nowrap; }
+.verbs button[aria-pressed="true"] { background: var(--hot); border-color: var(--hot); color: var(--void); }
+.verbs kbd { font: 400 10.5px/1 var(--mono); color: var(--dim); }
+.verbs button[aria-pressed="true"] kbd { color: var(--void); }
+.verbs [data-m]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--cool); transform-origin: left; transform: scaleX(var(--m, 0)); }
+.verbs .draw { display: grid; gap: 4px; align-content: center; padding: 7px 12px 9px; font: 600 13px/1.1 var(--body); color: var(--dim); border: 1px dashed var(--rule); border-radius: 9px; white-space: nowrap; }
+.verbs #mend { background: transparent; color: var(--dim); }
+.verbs #mend:hover { color: var(--ink); }
+
+footer { position: relative; z-index: 2; background: var(--void); border-top: 1px solid var(--rule); padding-block: 36px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+footer .in { max-width: 1280px; margin: 0 auto; display: grid; gap: 10px; color: var(--dim); font-size: 14px; }
+footer code, footer kbd { font: 400 12.5px/1.5 var(--mono); color: var(--ink); }
+footer p { margin: 0; max-width: 82ch; }
+
+@media (max-width: 860px) {
+  .rs { padding-block: 64px 48px; min-height: auto; }
+  .rs .in, .rs.flip .in { --devw: min(100%, 460px); grid-template-columns: minmax(0, 1fr); grid-template-areas: "cap" "head" "dev" "panel"; gap: 22px; }
+  .tools label, .tag { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .bar { justify-content: space-between; }
+  .verbs { left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); transform: none; max-width: none; gap: 4px; padding: 5px; }
+  .verbs button { flex: 1 1 0; min-width: 0; padding: 6px 6px 8px; font-size: 12px; justify-items: center; }
+  .verbs kbd, .verbs .draw { display: none; }
+}
+</style>
+
+<canvas id="stage" aria-hidden="true"></canvas>
+<header class="bar">
+  <a class="mark" href="#dissolve">LATTICE <span>RIFT</span></a>
+  <p class="tag">Seven game screens, exploded into fractals and put back together wrong. Then you break them.</p>
+  <div class="tools">
+    <label for="quality">Detail</label>
+    <select id="quality"><option value="sharp">Sharp</option><option value="normal" selected>Normal</option><option value="fast">Fast</option></select>
+    <button type="button" id="motion" aria-pressed="false">Freeze</button>
+  </div>
+</header>
+<main>
+  <h1 class="vh">Lattice Rift: seven game interfaces, exploded into GLSL fractals, which the keyboard melts, a gamepad tears, the space bar turns to molecules and a drag draws strands across</h1>
+  <div id="rifts"></div>
+</main>
+<footer>
+  <div class="in">
+    <p><kbd>any key</kbd> melts the page where that key sits on the keyboard. <kbd>←</kbd> <kbd>→</kbd> tear it down the middle, <kbd>↑</kbd> <kbd>↓</kbd> across; a gamepad’s stick and d-pad tear too, its face buttons make molecules and its shoulders melt. Hold <kbd>space</kbd> for molecules. Drag anywhere that is not text to draw strands. The Mend button puts it back.</p>
+    <p>Each console renders both screens at 256×192, the DS resolution, into textures. The page’s stage composites them with each section’s background, then runs three passes over the whole picture: strands, melt and tear, molecules. It runs in this browser only; none of it has been on the RG DS Plus. The screen shaders follow the DS contract from the DSSHADE-001 guide; the page passes do not exist on the device.</p>
+    <p>Source: <code>lab/web/rift.html</code>, <code>rift.js</code> (the stage and the verbs), <code>dshost.js</code> (the DS contract), <code>rift-a.js</code>, <code>rift-b.js</code>, <code>rift-c.js</code>. Companions: the DS Shader Sketchbook and the Lattice Arcade.</p>
+  </div>
+</footer>
+<nav class="verbs" aria-label="Break the page">
+  <button type="button" data-v="melt" data-m="melt" aria-pressed="false">Melt<kbd>any key</kbd></button>
+  <button type="button" data-v="tearV" data-m="tear" aria-pressed="false">Tear ↔<kbd>← →</kbd></button>
+  <button type="button" data-v="tearH" aria-pressed="false">Tear ↕<kbd>↑ ↓</kbd></button>
+  <button type="button" data-v="mol" data-m="mol" aria-pressed="false">Molecules<kbd>space</kbd></button>
+  <span class="draw">Strands<kbd>drag</kbd></span>
+  <button type="button" id="mend">Mend</button>
+</nav>
+<script src="dshost.js"></script>
+<script src="rift-a.js"></script>
+<script src="rift-b.js"></script>
+<script src="rift-c.js"></script>
+<script src="rift.js"></script>
+
+</body></html>

@@ -1,0 +1,323 @@
+{
+  "base": "https://slop.boutique",
+  "version": "0.1.0",
+  "at": "2026-10-16T23:33:35.800Z",
+  "releases": [
+    {
+      "id": "lattice-rift",
+      "releaseId": "rel_1e376f5c236cec83a1ee6f53",
+      "version": "0.1.1",
+      "sha256": "e21ff36352f9050590df902788645bbabf9f3b44748f8cad94f893bdddddb2e6",
+      "url": "https://slop.boutique/apps/lattice-rift"
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "releaseId": "rel_7666279d21ac37718f31e4e7",
+      "version": "0.1.0",
+      "sha256": "383f8c70392a5b0171ce49cc9ec7e98ea9d8bb1e0a5cc0441c96eb236862827e",
+      "url": "https://slop.boutique/apps/lattice-phantasmagoria"
+    },
+    {
+      "id": "tabula-workbench",
+      "releaseId": "rel_d8227318d8645a1409d1a73c",
+      "version": "0.1.1",
+      "sha256": "c5b851a64ac0731aecf835c97aa32c88c3f7408f55455381425a4deebf16428f",
+      "url": "https://slop.boutique/apps/tabula-workbench"
+    },
+    {
+      "id": "lattice-deck",
+      "releaseId": "rel_7eb142a73b88a690d042c952",
+      "version": "0.1.1",
+      "sha256": "686cfc2aa431c7395ddecef41a28390f266d876cacc2b7d56c24db9b5a0d9f3a",
+      "url": "https://slop.boutique/apps/lattice-deck"
+    },
+    {
+      "id": "rag-workbench",
+      "releaseId": "rel_87f08be07833f2a4c43ac4e1",
+      "version": "0.1.1",
+      "sha256": "8807b71b229d48dd0a71cd6feea285015ee5dd008cb9aa46f97aae125428e580",
+      "url": "https://slop.boutique/apps/rag-workbench"
+    }
+  ],
+  "checks": [
+    {
+      "id": "lattice-rift",
+      "validation": {
+        "blocking": false,
+        "checks": [],
+        "manifest": {
+          "sample": {}
+        },
+        "size": 113708
+      }
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "validation": {
+        "blocking": false,
+        "checks": [],
+        "manifest": {
+          "sample": {}
+        },
+        "size": 152468
+      }
+    },
+    {
+      "id": "tabula-workbench",
+      "validation": {
+        "blocking": false,
+        "checks": [
+          {
+            "code": "external_script",
+            "level": "info",
+            "message": "Loads scripts from cdnjs.cloudflare.com"
+          }
+        ],
+        "manifest": {
+          "downloads": true,
+          "sample": {}
+        },
+        "size": 1067849
+      }
+    },
+    {
+      "id": "lattice-deck",
+      "validation": {
+        "blocking": false,
+        "checks": [
+          {
+            "code": "external_script",
+            "level": "info",
+            "message": "Loads scripts from cdnjs.cloudflare.com"
+          },
+          {
+            "code": "external_script",
+            "level": "info",
+            "message": "Loads scripts from cdn.jsdelivr.net"
+          }
+        ],
+        "manifest": {
+          "db": {},
+          "room": {},
+          "sample": {},
+          "user": {
+            "scopes": [
+              "profile"
+            ]
+          }
+        },
+        "size": 426040
+      }
+    },
+    {
+      "id": "rag-workbench",
+      "validation": {
+        "blocking": false,
+        "checks": [],
+        "manifest": {
+          "db": {},
+          "downloads": true,
+          "sample": {},
+          "user": {
+            "scopes": [
+              "profile"
+            ]
+          }
+        },
+        "size": 502491
+      }
+    }
+  ],
+  "access": {
+    "demoEnabled": false,
+    "demo": {
+      "enabled": false,
+      "ttlMinutes": 20,
+      "maxActive": 20,
+      "perUserPerHour": 3,
+      "perAddressPerHour": 3,
+      "credits": 5,
+      "dailyBudget": 200,
+      "models": []
+    },
+    "revision": 1
+  },
+  "browser": [
+    {
+      "id": "lattice-rift",
+      "instance": "/instances/ins_9e31d4176bfe0835a5e5",
+      "title": "Lattice Rift",
+      "origin": "https://i-9e31d4176bfe0835a5e5.slop.boutique",
+      "interaction": {
+        "before": "Freeze",
+        "after": "Thaw"
+      },
+      "errors": [],
+      "failed": [
+        {
+          "url": "https://slop.boutique/api/instances/ins_9e31d4176bfe0835a5e5/launch",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "instance": "/instances/ins_adaabf34e61b717cb7aa",
+      "title": "Lattice Phantasmagoria",
+      "origin": "https://i-adaabf34e61b717cb7aa.slop.boutique",
+      "interaction": {
+        "before": "Boot",
+        "after": "Cartridges"
+      },
+      "errors": [],
+      "failed": [
+        {
+          "url": "https://slop.boutique/api/instances/ins_adaabf34e61b717cb7aa/launch",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "tabula-workbench",
+      "instance": "/instances/ins_c33e7caf9d4ab1128687",
+      "title": "Tabula Workbench",
+      "origin": "https://i-c33e7caf9d4ab1128687.slop.boutique",
+      "interaction": {
+        "edited": 421,
+        "reloaded": 421,
+        "nodes": 151
+      },
+      "sample": {
+        "text": "pong",
+        "ms": 2299,
+        "model": "lunaroute/glm-5.3-flash",
+        "tier": "quick"
+      },
+      "errors": [],
+      "failed": [
+        {
+          "url": "https://i-c33e7caf9d4ab1128687.slop.boutique/api/launch/exchange",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "https://slop.boutique/api/instances/ins_c33e7caf9d4ab1128687/upgrade",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "https://i-c33e7caf9d4ab1128687.slop.boutique/api/views/v_78de2833b8601092ccee0a30/events",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "lattice-deck",
+      "instance": "/instances/ins_16f059e598772714d5e3",
+      "title": "Lattice Deck",
+      "origin": "https://i-16f059e598772714d5e3.slop.boutique",
+      "interaction": {
+        "results": [
+          "✓ {\"speed\":2.4,\"core\":\"mesh#core\"}  ·  35 ms"
+        ],
+        "errors": []
+      },
+      "sample": {
+        "text": "pong",
+        "ms": 1585,
+        "model": "lunaroute/glm-5.3-flash",
+        "tier": "quick"
+      },
+      "errors": [],
+      "failed": [
+        {
+          "url": "https://i-16f059e598772714d5e3.slop.boutique/api/launch/exchange",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "https://slop.boutique/api/instances/ins_16f059e598772714d5e3/upgrade",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "rag-workbench",
+      "instance": "/instances/ins_85da02b98b8295b7674a",
+      "title": "RAG Workbench",
+      "origin": "https://i-85da02b98b8295b7674a.slop.boutique",
+      "interaction": {
+        "top": {
+          "id": "model-limits#concurrency",
+          "score": 4.7986,
+          "doc": "Model Limits",
+          "heading": "Concurrency"
+        },
+        "uploadedAfterReload": [
+          "poc-note.md"
+        ]
+      },
+      "sample": {
+        "text": "pong",
+        "ms": 1010,
+        "model": "lunaroute/glm-5.3-flash",
+        "tier": "quick"
+      },
+      "errors": [],
+      "failed": [
+        {
+          "url": "https://slop.boutique/api/instances/ins_85da02b98b8295b7674a/launch",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "https://i-85da02b98b8295b7674a.slop.boutique/api/views/v_82662de6426a1e5c777449ba/events",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    }
+  ],
+  "modelLedger": [
+    {
+      "artifact": "rag-workbench",
+      "state": "completed",
+      "model": "lunaroute/glm-5.3-flash",
+      "inputTokens": 17,
+      "outputTokens": 3,
+      "credits": 1,
+      "createdAt": "2026-10-16T23:37:48.698891Z"
+    },
+    {
+      "artifact": "lattice-deck",
+      "state": "completed",
+      "model": "lunaroute/glm-5.3-flash",
+      "inputTokens": 17,
+      "outputTokens": 16,
+      "credits": 1,
+      "createdAt": "2026-10-16T23:35:29.702149Z"
+    },
+    {
+      "artifact": "tabula-workbench",
+      "state": "completed",
+      "model": "lunaroute/glm-5.3-flash",
+      "inputTokens": 17,
+      "outputTokens": 86,
+      "credits": 1,
+      "createdAt": "2026-10-16T23:35:15.996974Z"
+    },
+    {
+      "artifact": "lattice-deck",
+      "state": "completed",
+      "model": "lunaroute/glm-5.3-flash",
+      "inputTokens": 17,
+      "outputTokens": 9,
+      "credits": 1,
+      "createdAt": "2026-10-16T23:32:16.627141Z"
+    },
+    {
+      "artifact": "tabula-workbench",
+      "state": "completed",
+      "model": "lunaroute/glm-5.3-flash",
+      "inputTokens": 17,
+      "outputTokens": 32,
+      "credits": 1,
+      "createdAt": "2026-10-16T23:32:01.477704Z"
+    }
+  ]
+}

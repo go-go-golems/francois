@@ -1,0 +1,175 @@
+{
+  "source": "Actual local hosted applications with the production HTML hashes; built-in examples and public sample data.",
+  "viewport": [
+    1800,
+    1125
+  ],
+  "artifacts": [
+    {
+      "id": "lattice-rift",
+      "releaseHTMLSHA256": "e21ff36352f9050590df902788645bbabf9f3b44748f8cad94f893bdddddb2e6",
+      "images": [
+        {
+          "file": "rift-title.png",
+          "alt": "Recursive title screen and dual-screen WebGL console in Lattice Rift.",
+          "sha256": "e2327606ec508719c44bb02c577ec3c5a98c04304562038a9b4b6d9116b71906",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 3213622
+        },
+        {
+          "file": "rift-arcade.png",
+          "alt": "Infinite inventory: a hyperbolic item grid and recursive console screens.",
+          "sha256": "40672dc076477fada681c76da1e86da8f1e2a25f97de0c01e347aef8db5ddc26",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 2550371
+        },
+        {
+          "file": "rift-world.png",
+          "alt": "Branching dialogue: YES and NO rendered as an interactive recursive scene.",
+          "sha256": "200cc9ebabccd791b8f148cc92c6c6b06282265b3bd21a3a10b74c15d474549f",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 1792625
+        }
+      ]
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "releaseHTMLSHA256": "383f8c70392a5b0171ce49cc9ec7e98ea9d8bb1e0a5cc0441c96eb236862827e",
+      "images": [
+        {
+          "file": "phantasmagoria-menu.png",
+          "alt": "Phantasmagoria cartridge menu on the dual-screen console.",
+          "sha256": "c02fdc87baf505923c69caafbbf70598096b056a303aa52d851f3ca75dd44311",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 312240
+        },
+        {
+          "file": "phantasmagoria-cartridge.png",
+          "alt": "Half-life cartridge: fractal visuals on the two console screens.",
+          "sha256": "1393baab0359dc01f3e39e16fdeb5192dde7066832e7a95e300885c068d4d697",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 318627
+        },
+        {
+          "file": "phantasmagoria-kipple.png",
+          "alt": "Kipple cartridge: inventory grid, selected item and interactive console controls.",
+          "sha256": "252682be5596df1d78e510c35fcc28ef536d333c065ee0baeeece91f2a6b9e9c",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 317651
+        }
+      ]
+    },
+    {
+      "id": "lattice-deck",
+      "releaseHTMLSHA256": "686cfc2aa431c7395ddecef41a28390f266d876cacc2b7d56c24db9b5a0d9f3a",
+      "images": [
+        {
+          "file": "lattice-deck-cover.png",
+          "alt": "A procedural colored heightfield and orange parametric shell rendered in Lattice Deck.",
+          "sha256": "b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3",
+          "width": 1574,
+          "height": 662,
+          "bytes": 280188
+        },
+        {
+          "file": "lattice-deck-procedural.png",
+          "alt": "Procedural 3D: a colored heightfield and parametric shell generated from JavaScript.",
+          "sha256": "c72b4fd0f999be3dff702fdb7790ea59a3a237e2cc1b6fc6746a544850fb9be3",
+          "width": 1764,
+          "height": 993,
+          "bytes": 325807
+        },
+        {
+          "file": "lattice-deck-motion.png",
+          "alt": "Animated 3D: a rotating knot, shader-driven blob and live surface with controls.",
+          "sha256": "77bb0c21e36cb43617cac1b1c60b060df27adad46d32f8741220a7cd6017ebb5",
+          "width": 1764,
+          "height": 993,
+          "bytes": 198643
+        },
+        {
+          "file": "lattice-deck-charts.png",
+          "alt": "Sample revenue by region displayed as stacked bars in a presentation slide.",
+          "sha256": "9ec9af0e0a1317677b136990557ec832f4ca7803e3865aae44cce0586fab79e9",
+          "width": 1764,
+          "height": 993,
+          "bytes": 68264
+        }
+      ]
+    },
+    {
+      "id": "tabula-workbench",
+      "releaseHTMLSHA256": "c5b851a64ac0731aecf835c97aa32c88c3f7408f55455381425a4deebf16428f",
+      "images": [
+        {
+          "file": "tabula-overview.png",
+          "alt": "Tabula workbook overview with live inputs, distribution, sensitivity chart and 3D landscape.",
+          "sha256": "a54e5368f42b7715e5512c905ebcb0dab837e64e3540bc7b91ff49592243eef5",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 161891
+        },
+        {
+          "file": "tabula-story.png",
+          "alt": "A workbook-backed presentation showing the simulated unit-economics distribution.",
+          "sha256": "26b35b458fff9289afb9311899fdc86cc580bd2aaeaba1e287a8b49029b6b145",
+          "width": 1281,
+          "height": 721,
+          "bytes": 30132
+        },
+        {
+          "file": "tabula-sensitivity.png",
+          "alt": "Sensitivity analysis presented as a tornado chart in a generated slide.",
+          "sha256": "04cbd8fa90bb779697ae80c9f0dfad3259d716a984e4a3477825f7534164e427",
+          "width": 1281,
+          "height": 721,
+          "bytes": 30490
+        },
+        {
+          "file": "tabula-landscape.png",
+          "alt": "A 3D unit-economics landscape with simulated samples over the sensitivity surface.",
+          "sha256": "a18b99f553380aaa7564b73004aba3c1035c08123af0bb792af139cf7a150f9c",
+          "width": 1281,
+          "height": 721,
+          "bytes": 148201
+        }
+      ]
+    },
+    {
+      "id": "rag-workbench",
+      "releaseHTMLSHA256": "8807b71b229d48dd0a71cd6feea285015ee5dd008cb9aa46f97aae125428e580",
+      "images": [
+        {
+          "file": "rag-search.png",
+          "alt": "RAG pipeline editor, ranked results, selected source section and execution graph.",
+          "sha256": "f626bd3498459aba35a0cf063f4fe3458f9f52198de7760b6347da38c032de4d",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 308847
+        },
+        {
+          "file": "rag-trace.png",
+          "alt": "RAG query execution trace and ranked source explanations for model concurrency.",
+          "sha256": "aa4833ff59f18c003088bcccf33053747477bbd6d4fc1383232af24e19d6667e",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 287931
+        },
+        {
+          "file": "rag-corpus.png",
+          "alt": "RAG corpus files and indexed document metadata alongside search results.",
+          "sha256": "4885d6104b9cd23a81bf821688a9c3446ab41d58f3b496226352df5698d84199",
+          "width": 1800,
+          "height": 1125,
+          "bytes": 260349
+        }
+      ]
+    }
+  ]
+}

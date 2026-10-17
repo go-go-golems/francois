@@ -75,6 +75,60 @@ func (m *Markdown) Render(source string, embeds map[string]Embed) template.HTML 
 	return template.HTML(buf.String()) // #nosec G203 -- goldmark without WithUnsafe emits no raw HTML
 }
 
+// Section is a rendered editorial block. Only conventional level-two labels
+// are lifted out; arbitrary headings remain ordinary sanitized Markdown.
+type Section struct {
+	Label string
+	HTML  template.HTML
+}
+
+func (m *Markdown) Sections(source string, embeds map[string]Embed) []Section {
+	input := []byte(source)
+	pc := parser.NewContext()
+	pc.Set(embedsKey, embeds)
+	doc := m.md.Parser().Parse(text.NewReader(input), parser.WithContext(pc))
+	sections := []Section{}
+	group := ast.NewDocument()
+	label := ""
+	flush := func() {
+		if group.ChildCount() == 0 {
+			return
+		}
+		var buf bytes.Buffer
+		if err := m.md.Renderer().Render(&buf, input, group); err != nil {
+			sections = append(sections, Section{Label: label, HTML: template.HTML("<p>" + template.HTMLEscapeString(source) + "</p>")}) // #nosec G203 -- escaped
+		} else {
+			sections = append(sections, Section{Label: label, HTML: template.HTML(buf.String())}) // #nosec G203 -- same safe renderer as Render
+		}
+		group = ast.NewDocument()
+	}
+	for node := doc.FirstChild(); node != nil; {
+		next := node.NextSibling()
+		name := ""
+		if heading, ok := node.(*ast.Heading); ok && heading.Level == 2 {
+			switch strings.ToLower(strings.TrimSpace(plainText(heading, input))) {
+			case "what it is":
+				name = "What it is"
+			case "why we made it":
+				name = "Why we made it"
+			case "related":
+				name = "Related"
+			case "sources":
+				name = "Sources"
+			}
+		}
+		if name != "" {
+			flush()
+			label = name
+		} else {
+			group.AppendChild(group, node)
+		}
+		node = next
+	}
+	flush()
+	return sections
+}
+
 // embedTransformer marks image nodes that refer to portal videos, using the
 // embeds passed to Render, so the renderer can emit a video player.
 type embedTransformer struct{}

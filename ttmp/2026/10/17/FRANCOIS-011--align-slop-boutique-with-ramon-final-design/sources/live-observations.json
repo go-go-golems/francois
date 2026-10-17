@@ -1,0 +1,517 @@
+{
+  "capturedAt": "2026-10-17T17:58:26.950Z",
+  "results": [
+    {
+      "name": "archive",
+      "width": 1440,
+      "url": "https://slop.boutique/",
+      "status": 200,
+      "title": "slop.boutique",
+      "text": "slop.boutique/\nFeed\nSign in\nRSS\nagents 1\ngraphics 3\nproof-of-concept 5\nrooms 1\nworkbench 2\nRAG Workbench\n\nAn editable retrieval pipeline with public sample documentation, Markdown uploads, lexical search and hosted model access.\n\nproof-of-concept · workbench\n\nDetails\nv0.1.2 · 17 Oct 2026\n\nTabula Workbench\n\nA programmable reactive workbook with live inputs, charts and model-assisted editing. Workbook drafts live in this browser.\n\nproof-of-concept · workbench\n\nDetails\nv0.1.2 · 17 Oct 2026\n\nLattice Deck\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nLattice Phantasmagoria\n\nA playable dual-screen canvas and WebGL experiment with cartridges and scenes. Browser-only proof of concept.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nLattice Rift\n\nAn interactive WebGL instrument for melting, tearing and mending a lattice. Browser-only proof of concept.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nP\nsample\nPolis\n\nShared-room agent workspace\n\nagents · rooms\n\nDetails\nv1.0.0 · 13 Oct 2026\n\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "RAG Workbench",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        },
+        {
+          "text": "Tabula Workbench",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        },
+        {
+          "text": "Lattice Deck",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        },
+        {
+          "text": "Lattice Phantasmagoria",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        },
+        {
+          "text": "Lattice Rift",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        },
+        {
+          "text": "Polis",
+          "fontSize": "40px",
+          "lineHeight": "42px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2F"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "experiment",
+      "width": 1440,
+      "url": "https://slop.boutique/apps/lattice-deck",
+      "status": 200,
+      "title": "Lattice Deck · slop.boutique",
+      "text": "slop.boutique/\napps/lattice-deck\nFeed\nSign in\nLattice Deck.\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nTry\nLattice Deck\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nThis is a working imported proof of concept. The original visual design is preserved.\n\nModel calls use the shared hosting limits. Start with the default example; advanced workflows may require additional configuration.\n\nProcedural 3D: a colored heightfield and parametric shell generated from JavaScript.\nAnimated 3D: a rotating knot, shader-driven blob and live surface with controls.\nSample revenue by region displayed as stacked bars in a presentation slide.\n\nDownload HTML\n\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Lattice Deck.",
+          "fontSize": "48px",
+          "lineHeight": "52px"
+        },
+        {
+          "text": "Lattice Deck",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Fapps%2Flattice-deck"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "support",
+      "width": 1440,
+      "url": "https://slop.boutique/pricing",
+      "status": 200,
+      "title": "Pricing · slop.boutique",
+      "text": "slop.boutique/\npricing\nFeed\nSign in\nSupport.\n\nSupport helps keep the applications available.\n\nSubscriber\nSupport (month)\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Support.",
+          "fontSize": "34px",
+          "lineHeight": "22px"
+        },
+        {
+          "text": "Subscriber",
+          "fontSize": "25.5px",
+          "lineHeight": "22px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Fpricing"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "account-signed-out",
+      "width": 1440,
+      "url": "https://slop.boutique/account",
+      "status": 200,
+      "title": "Francois — hosted HTML applications",
+      "text": "slop.boutique/\naccount\nFeed\nSign in\nSign in to see your account.\nSign in\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Sign in to see your account.",
+          "fontSize": "48px",
+          "lineHeight": "52px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Faccount"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "archive",
+      "width": 390,
+      "url": "https://slop.boutique/",
+      "status": 200,
+      "title": "slop.boutique",
+      "text": "slop.boutique/\nFeed\nSign in\nRSS\nagents 1\ngraphics 3\nproof-of-concept 5\nrooms 1\nworkbench 2\nRAG Workbench\n\nAn editable retrieval pipeline with public sample documentation, Markdown uploads, lexical search and hosted model access.\n\nproof-of-concept · workbench\n\nDetails\nv0.1.2 · 17 Oct 2026\n\nTabula Workbench\n\nA programmable reactive workbook with live inputs, charts and model-assisted editing. Workbook drafts live in this browser.\n\nproof-of-concept · workbench\n\nDetails\nv0.1.2 · 17 Oct 2026\n\nLattice Deck\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nLattice Phantasmagoria\n\nA playable dual-screen canvas and WebGL experiment with cartridges and scenes. Browser-only proof of concept.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nLattice Rift\n\nAn interactive WebGL instrument for melting, tearing and mending a lattice. Browser-only proof of concept.\n\nproof-of-concept · graphics\n\nDetails\nv0.1.2 · 16 Oct 2026\n\nP\nsample\nPolis\n\nShared-room agent workspace\n\nagents · rooms\n\nDetails\nv1.0.0 · 13 Oct 2026\n\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "RAG Workbench",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        },
+        {
+          "text": "Tabula Workbench",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        },
+        {
+          "text": "Lattice Deck",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        },
+        {
+          "text": "Lattice Phantasmagoria",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        },
+        {
+          "text": "Lattice Rift",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        },
+        {
+          "text": "Polis",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2F"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "experiment",
+      "width": 390,
+      "url": "https://slop.boutique/apps/lattice-deck",
+      "status": 200,
+      "title": "Lattice Deck · slop.boutique",
+      "text": "slop.boutique/\napps/lattice-deck\nFeed\nSign in\nLattice Deck.\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nTry\nLattice Deck\n\nA programmable presentation and live graphics workbench with scripted agents, hosted model access and collaboration rooms.\n\nThis is a working imported proof of concept. The original visual design is preserved.\n\nModel calls use the shared hosting limits. Start with the default example; advanced workflows may require additional configuration.\n\nProcedural 3D: a colored heightfield and parametric shell generated from JavaScript.\nAnimated 3D: a rotating knot, shader-driven blob and live surface with controls.\nSample revenue by region displayed as stacked bars in a presentation slide.\n\nDownload HTML\n\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Lattice Deck.",
+          "fontSize": "34px",
+          "lineHeight": "38px"
+        },
+        {
+          "text": "Lattice Deck",
+          "fontSize": "26px",
+          "lineHeight": "30px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Fapps%2Flattice-deck"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "support",
+      "width": 390,
+      "url": "https://slop.boutique/pricing",
+      "status": 200,
+      "title": "Pricing · slop.boutique",
+      "text": "slop.boutique/\npricing\nFeed\nSign in\nSupport.\n\nSupport helps keep the applications available.\n\nSubscriber\nSupport (month)\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Support.",
+          "fontSize": "34px",
+          "lineHeight": "22px"
+        },
+        {
+          "text": "Subscriber",
+          "fontSize": "25.5px",
+          "lineHeight": "22px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Fpricing"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "name": "account-signed-out",
+      "width": 390,
+      "url": "https://slop.boutique/account",
+      "status": 200,
+      "title": "Francois — hosted HTML applications",
+      "text": "slop.boutique/\naccount\nFeed\nSign in\nSign in to see your account.\nSign in\nPrivacy\nTerms\n\nSet in ABC Areal by Dinamo, made for Are.na",
+      "overflow": false,
+      "headings": [
+        {
+          "text": "Sign in to see your account.",
+          "fontSize": "34px",
+          "lineHeight": "38px"
+        }
+      ],
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "slop.boutique/",
+          "href": "/"
+        },
+        {
+          "text": "Feed",
+          "href": "/"
+        },
+        {
+          "text": "Sign in",
+          "href": "/auth/login?return=%2Faccount"
+        },
+        {
+          "text": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "text": "Terms",
+          "href": "/terms"
+        },
+        {
+          "text": "ABC Areal",
+          "href": "https://abcdinamo.com/free/areal"
+        },
+        {
+          "text": "Dinamo",
+          "href": "https://abcdinamo.com"
+        },
+        {
+          "text": "Are.na",
+          "href": "https://www.are.na"
+        }
+      ]
+    },
+    {
+      "path": "/llms.txt",
+      "status": 404,
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "path": "/feed.json",
+      "status": 404,
+      "contentType": "text/plain; charset=utf-8"
+    }
+  ]
+}

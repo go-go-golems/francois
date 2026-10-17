@@ -1,0 +1,92 @@
+[
+  {
+    "artifact": "lattice-rift",
+    "original": "/home/manuel/Downloads/Lattice Rift.zip",
+    "sha256": "594e82ae2aa07c7a0d30a686916956d8dacc536f341d9d995d5cd4baecf33643",
+    "bytes": 114277,
+    "files": [
+      "examples/imports/lattice-rift/source/index.html",
+      "examples/imports/lattice-rift/source/dshost.js",
+      "examples/imports/lattice-rift/source/rift-a.js",
+      "examples/imports/lattice-rift/source/rift-b.js",
+      "examples/imports/lattice-rift/source/rift-c.js",
+      "examples/imports/lattice-rift/source/rift.js"
+    ]
+  },
+  {
+    "artifact": "lattice-phantasmagoria",
+    "original": "/home/manuel/Downloads/Lattice Phantasmagoria.zip",
+    "sha256": "33dcd9fdd1c420c8c29a81e3b5300bd6806125c302e74248fc42905484203ca9",
+    "bytes": 153132,
+    "files": [
+      "examples/imports/lattice-phantasmagoria/source/index.html",
+      "examples/imports/lattice-phantasmagoria/source/dshost.js",
+      "examples/imports/lattice-phantasmagoria/source/phant-a.js",
+      "examples/imports/lattice-phantasmagoria/source/phant-b.js",
+      "examples/imports/lattice-phantasmagoria/source/phant-c.js",
+      "examples/imports/lattice-phantasmagoria/source/phant.js"
+    ]
+  },
+  {
+    "artifact": "tabula-workbench",
+    "original": "/home/manuel/Downloads/Tabula Workbench.html",
+    "sha256": "e0f1462afb22e99e637a3c0d83e4f56ccf62ae2412bbd641b93f0500b396fcbe",
+    "bytes": 1067766,
+    "files": [
+      "examples/imports/tabula-workbench/source/index.html"
+    ]
+  },
+  {
+    "artifact": "lattice-deck",
+    "original": "/home/manuel/Downloads/Lattice Deck.html",
+    "sha256": "a2c1fe1b1e83e6a21ac571b712ff0ba22ed58a7b7044c523fc977c696f174dd2",
+    "bytes": 425923,
+    "files": [
+      "examples/imports/lattice-deck/source/index.html"
+    ]
+  },
+  {
+    "artifact": "rag-workbench",
+    "original": "/home/manuel/Downloads/RAG Workbench.zip",
+    "sha256": "851a09630718aeedc791d49871b316677cdd089f5e54fd9f2184b6c4f57797fb",
+    "bytes": 929678,
+    "files": [
+      "examples/imports/rag-workbench/source/index.html",
+      "examples/imports/rag-workbench/source/agent.js",
+      "examples/imports/rag-workbench/source/app.js",
+      "examples/imports/rag-workbench/source/gui.js",
+      "examples/imports/rag-workbench/source/kit.js",
+      "examples/imports/rag-workbench/source/presets/agentic.js",
+      "examples/imports/rag-workbench/source/presets/answer-first.js",
+      "examples/imports/rag-workbench/source/presets/canvas-map.js",
+      "examples/imports/rag-workbench/source/presets/chunk-sizes.js",
+      "examples/imports/rag-workbench/source/presets/code-blocks.js",
+      "examples/imports/rag-workbench/source/presets/compare-nodes.js",
+      "examples/imports/rag-workbench/source/presets/context.js",
+      "examples/imports/rag-workbench/source/presets/custom-rerank.js",
+      "examples/imports/rag-workbench/source/presets/dashboard.js",
+      "examples/imports/rag-workbench/source/presets/define-components.js",
+      "examples/imports/rag-workbench/source/presets/doc-browser.js",
+      "examples/imports/rag-workbench/source/presets/doc-cards.js",
+      "examples/imports/rag-workbench/source/presets/facets.js",
+      "examples/imports/rag-workbench/source/presets/fields.js",
+      "examples/imports/rag-workbench/source/presets/fusion.js",
+      "examples/imports/rag-workbench/source/presets/graph.js",
+      "examples/imports/rag-workbench/source/presets/hyde.js",
+      "examples/imports/rag-workbench/source/presets/index.json",
+      "examples/imports/rag-workbench/source/presets/judged.js",
+      "examples/imports/rag-workbench/source/presets/llm-rerank.js",
+      "examples/imports/rag-workbench/source/presets/minimal.js",
+      "examples/imports/rag-workbench/source/presets/outline.js",
+      "examples/imports/rag-workbench/source/presets/per-doc.js",
+      "examples/imports/rag-workbench/source/presets/playground.js",
+      "examples/imports/rag-workbench/source/presets/reports.js",
+      "examples/imports/rag-workbench/source/presets/sweep.js",
+      "examples/imports/rag-workbench/source/presets/synonyms.js",
+      "examples/imports/rag-workbench/source/presets/synthetic-evals.js",
+      "examples/imports/rag-workbench/source/presets/table-rows.js",
+      "examples/imports/rag-workbench/source/presets/two-answers.js",
+      "examples/imports/rag-workbench/source/rag.js"
+    ]
+  }
+]

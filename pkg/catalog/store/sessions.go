@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"time"
 )
 
@@ -47,9 +49,19 @@ const (
 
 // CreateSession stores only the digest of a fresh random token.
 func (s *Store) CreateSession(ctx context.Context, user, idToken string) (string, Session, error) {
+	return insertSession(ctx, s.Pool, user, idToken)
+}
+
+type sessionInserter interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}
+
+var _ sessionInserter = (pgx.Tx)(nil)
+
+func insertSession(ctx context.Context, db sessionInserter, user, idToken string) (string, Session, error) {
 	token := RandomHex(32)
 	sess := Session{Hash: Hash(token), UserID: user, CSRF: RandomHex(24), ExpiresAt: time.Now().Add(SessionIdle), IDToken: idToken}
-	_, err := s.Pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at,id_token) VALUES($1,$2,$3,$4,$5,$6)`,
+	_, err := db.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,absolute_expires_at,id_token) VALUES($1,$2,$3,$4,$5,$6)`,
 		sess.Hash, user, sess.CSRF, sess.ExpiresAt, time.Now().Add(SessionAbsolute), idToken)
 	return token, sess, err
 }

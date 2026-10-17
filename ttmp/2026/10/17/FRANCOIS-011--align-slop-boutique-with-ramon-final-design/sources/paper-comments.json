@@ -1,0 +1,12 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"file\": {\n    \"id\": \"01M4XVT9C83GGYK57CMAAAEJJT\",\n    \"name\": \"slop boutique\"\n  },\n  \"contentHash\": {\n    \"tokens\": \"74b865ac\"\n  }\n}"
+    },
+    {
+      "type": "text",
+      "text": "{\n  \"commentThreads\": [],\n  \"count\": 0,\n  \"offset\": 0\n}"
+    }
+  ]
+}

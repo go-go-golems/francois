@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "name": "Francois Hosting.md",
+      "text": "---\ntitle: Francois Hosting\ntags: [hosting, architecture]\ntype: guide\n---\n# Francois Hosting\n\n## Application model\nAn artifact is an HTML application. A release is an immutable version of HTML and its capability manifest. An instance is a saved workspace pinned to a release, with its own origin and data. It does not allocate a dedicated process or container.\n\n## Runtime\nThe Go server serves portal pages and runtime APIs. Application JavaScript runs in the browser. A shared Node Pi worker executes model calls. PostgreSQL stores users, releases, workspace data and the model ledger.\n\n## Origins and grants\nThe portal and each workspace use separate browser origins. A one-use launch exchange obtains an instance-scoped runtime grant. Runtime operations recheck authorization.\n"
+    },
+    {
+      "name": "Model Limits.md",
+      "text": "---\ntitle: Model Limits\ntags: [models, limits]\ntype: guide\n---\n# Model Limits\n\n## Concurrency\nThe single application process admits at most six model calls globally and one per user. Idle workspaces consume no model slots. Admission remains held through browser tool waits and worker completion.\n\n## Call lifetime\nCalls have a five-minute timeout. The worker sends an ended event after completion or cancellation. The Go client waits for it before releasing admission.\n\n## Accounting\nThe model_calls ledger records calls, input and output tokens, cache tokens, reported cost and artifact identity. Artifact attribution survives workspace deletion. These reports are private to administrators.\n"
+    },
+    {
+      "name": "Storage Policy.md",
+      "text": "---\ntitle: Storage Policy\ntags: [storage, limits]\ntype: guide\n---\n# Storage Policy\n\n## Quotas\nThe default aggregate logical storage quota is 16 MiB per instance, with at most 500 documents. Payloads include documents, assets, comments, thread anchors and live leases. Database indexes and backups are outside the logical-byte calculation.\n\n## Transactions\nAll persistent writers share an instance advisory transaction lock. Usage is checked inside the write transaction. Growth above quota is rolled back, while shrinking and deletion remain possible after a quota reduction. Expired leases are purged during a subsequent writable mutation.\n\n## Modes\nRead-write permits normal storage operations. Read-only rejects persistent mutations while keeping reads available. Off rejects storage reads and writes without deleting saved data.\n"
+    },
+    {
+      "name": "Tours and Operations.md",
+      "text": "---\ntitle: Tours and Operations\ntags: [tours, operations]\ntype: guide\n---\n# Tours and Operations\n\n## Tours\nA tour defaults to twenty minutes with a fixed expiry. Reopening a live tour preserves its expiry. Start limits are three per user and per network per hour by default, and only successful new creation spends a start.\n\n## Service controls\nAdministrators can pause new visits, model sampling or storage independently. Existing workspaces can resume while new creation is paused. Sampling pause drains running calls. A storage rejection produces an explicit unsaved notice.\n\n## Workspace recovery\nOpen resumes the saved workspace for an application. A forbidden withdrawn release pin is moved to the requested published release while preserving workspace identity, URL and data.\n"
+    },
+    {
+      "name": "RAG Retrieval.md",
+      "text": "---\ntitle: RAG Retrieval\ntags: [retrieval, search]\ntype: guide\n---\n# RAG Retrieval\n\n## Retrieval pipeline\nA retrieval-augmented generation workflow divides source documents into chunks, indexes them, retrieves relevant chunks for a query and supplies that evidence to a language model.\n\n## Lexical search\nBM25 ranks chunks by query terms and corpus statistics. It runs locally in this workbench without model calls. Reciprocal rank fusion combines ranked lists from different retrievers.\n\n## Evaluation\nA retrieval evaluation can measure hit rate, mean reciprocal rank and normalized discounted cumulative gain against known relevant documents. An answer evaluation can additionally check whether claims are supported by retrieved evidence.\n"
+    }
+  ]
+}

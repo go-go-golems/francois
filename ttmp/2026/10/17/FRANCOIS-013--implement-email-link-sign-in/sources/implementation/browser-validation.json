@@ -1,0 +1,25 @@
+{
+  "base": "http://localhost:18793",
+  "at": "2026-10-17T20:43:24.275Z",
+  "checks": [
+    "form no-store/no-referrer; works without client scripts",
+    "actual ZITADEL SMTP email delivered",
+    "GET confirmation did not sign in",
+    "same supporter signed in through actual browser POST",
+    "link replay denied",
+    "local logout revoked session"
+  ],
+  "screenshots": [
+    "signin-form-1440.png",
+    "signin-form-390.png",
+    "signin-sent-1440.png",
+    "signin-sent-390.png",
+    "signin-confirm-1440.png",
+    "signin-confirm-390.png",
+    "signin-account-1440.png",
+    "signin-account-390.png",
+    "signin-used-1440.png",
+    "signin-used-390.png"
+  ],
+  "credentialsSaved": false
+}

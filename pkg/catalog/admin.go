@@ -211,6 +211,7 @@ func (s *Server) adminPatchUser(w http.ResponseWriter, r *http.Request) {
 			httpx.Fail(w, 400, "invalid_request", err.Error())
 			return
 		}
+		s.Runtime.RevokeUser(id)
 		_ = s.Store.Audit(r.Context(), actor(r), "user.role", id, map[string]any{"role": *in.Role})
 	}
 	if in.Disabled != nil {

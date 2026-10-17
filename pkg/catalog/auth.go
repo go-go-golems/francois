@@ -263,7 +263,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	// credentials instead of silently reusing it. The portal session is
 	// already gone if this fails; the browser then simply stays signed out
 	// of Francois only.
-	if site := s.site(r); site.OIDC.Configured() {
+	if site := s.site(r); p.Session.IDToken != "" && site.OIDC.Configured() {
 		target, err := site.OIDC.LogoutURL(r.Context(), p.Session.IDToken, site.PortalOrigin()+"/", "")
 		if err != nil {
 			log.Warn().Err(err).Msg("Identity provider logout unavailable")

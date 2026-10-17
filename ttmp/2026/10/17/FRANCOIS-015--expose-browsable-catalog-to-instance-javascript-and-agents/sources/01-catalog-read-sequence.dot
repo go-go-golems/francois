@@ -1,0 +1,12 @@
+digraph sequence {
+ graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.2", ranksep="0.38", dpi=180];
+ node [shape=box, style="rounded,filled", fillcolor="#f7f7f7", color="#444444", fontname="DejaVu Sans", fontsize=13, margin="0.16,0.12"];
+ edge [fontname="DejaVu Sans", fontsize=10, color="#555555", arrowsize=0.7];
+ app [label="1. Hosted HTML or browser agent\nCalls slop_boutique.list"];
+ runtime [label="2. Injected runtime.js\nPOST view RPC with instance grant"];
+ auth [label="3. Instance RPC handler\nChecks current user, grant and membership", fillcolor="#eaf0ff"];
+ service [label="4. Catalog read service\nReceives verified user and bounded query"];
+ db [label="5. Existing PostgreSQL\nListed artifacts with published releases"];
+ response [label="6. Public summaries and next cursor\nReturned to the caller", fillcolor="#eef7ee"];
+ app -> runtime -> auth -> service -> db -> response;
+}

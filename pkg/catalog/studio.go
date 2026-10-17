@@ -585,6 +585,7 @@ func (s *Server) studioUpload(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
+		u.RequireNewArtifact = isNew
 		u.Creators = nil
 		if isNew && profile != nil {
 			u.Creators = []string{profile.ID}

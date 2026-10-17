@@ -1,0 +1,12 @@
+{
+  "base": "http://localhost:18792",
+  "at": "2026-10-17T21:46:11.642Z",
+  "checks": [
+    "Account → /studio restores title and retains footer sign-out",
+    "Account → /admin restores title and retains footer sign-out",
+    "failed logout shows error and preserves session",
+    "footer logout revokes session and returns home",
+    "anonymous shell hides sign-out"
+  ],
+  "credentialsSaved": false
+}

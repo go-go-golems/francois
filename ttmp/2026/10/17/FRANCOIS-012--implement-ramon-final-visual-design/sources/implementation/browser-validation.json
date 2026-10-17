@@ -1,0 +1,78 @@
+{
+  "base": "http://localhost:18792",
+  "localDemoLeftEnabled": true,
+  "at": "2026-10-17T19:28:22.647Z",
+  "pages": [
+    {
+      "name": "archive",
+      "width": 1440,
+      "title": "slop boutique"
+    },
+    {
+      "name": "experiment",
+      "width": 1440,
+      "title": "Lattice Deck · slop boutique"
+    },
+    {
+      "name": "support",
+      "width": 1440,
+      "title": "Support the lab · slop boutique"
+    },
+    {
+      "name": "account-signed-out",
+      "width": 1440,
+      "title": "Account · slop boutique"
+    },
+    {
+      "name": "archive",
+      "width": 900,
+      "title": "slop boutique"
+    },
+    {
+      "name": "experiment",
+      "width": 900,
+      "title": "Lattice Deck · slop boutique"
+    },
+    {
+      "name": "support",
+      "width": 900,
+      "title": "Support the lab · slop boutique"
+    },
+    {
+      "name": "account-signed-out",
+      "width": 900,
+      "title": "Account · slop boutique"
+    },
+    {
+      "name": "archive",
+      "width": 390,
+      "title": "slop boutique"
+    },
+    {
+      "name": "experiment",
+      "width": 390,
+      "title": "Lattice Deck · slop boutique"
+    },
+    {
+      "name": "support",
+      "width": 390,
+      "title": "Support the lab · slop boutique"
+    },
+    {
+      "name": "account-signed-out",
+      "width": 390,
+      "title": "Account · slop boutique"
+    }
+  ],
+  "checks": [
+    "Published five Markdown pages through local Studio; covers/gallery preserved",
+    "Layout, search, ordinal identity, sort and zero visit allocation at 1440px",
+    "Layout, search, ordinal identity, sort and zero visit allocation at 900px",
+    "Layout, search, ordinal identity, sort and zero visit allocation at 390px",
+    "Search renders without JavaScript",
+    "Mocked paused-start 503 renders service message and no iframe; backend operation switches covered by Go integration tests",
+    "Hosted application DOM rendered after the launch handshake",
+    "Actual guest startup, new guest CSRF refresh, same-instance reload and fullscreen passed",
+    "Expired visit shows server denial; reload does not allocate a replacement"
+  ]
+}

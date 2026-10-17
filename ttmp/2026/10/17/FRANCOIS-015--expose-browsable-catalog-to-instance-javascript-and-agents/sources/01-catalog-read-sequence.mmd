@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant App as Hosted HTML or browser agent
+    participant Runtime as runtime.js
+    participant Hosted as Instance RPC handler
+    participant Catalog as Catalog read service
+    participant DB as Existing PostgreSQL and blobs
+    App->>Runtime: slop_boutique.list({kind: artifact})
+    Runtime->>Hosted: POST view RPC with instance grant
+    Hosted->>Hosted: Authenticate current user and membership
+    Hosted->>Catalog: List(ctx, verified user, query)
+    Catalog->>DB: Select listed artifacts with published releases
+    DB-->>Catalog: Bounded rows
+    Catalog-->>App: Public summaries and next cursor

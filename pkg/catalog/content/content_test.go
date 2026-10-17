@@ -100,3 +100,17 @@ func TestDetectMedia(t *testing.T) {
 		t.Error("broken png accepted")
 	}
 }
+
+func TestEditorialSectionsKeepMarkdownSafety(t *testing.T) {
+	source := "Introduction.\n\n## What it is\n\nA **board**.\n\n![clip](/media/med_vid)\n\n## Why we made it\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))\n\n## Other heading\n\nDetails.\n\n## Sources\n\n[Reference](https://example.com)"
+	sections := NewMarkdown().Sections(source, map[string]Embed{"med_vid": {Type: "video/mp4"}})
+	if len(sections) != 4 || sections[0].Label != "" || sections[1].Label != "What it is" || sections[2].Label != "Why we made it" || sections[3].Label != "Sources" {
+		t.Fatalf("sections %+v", sections)
+	}
+	if !strings.Contains(string(sections[1].HTML), "<strong>board</strong>") || !strings.Contains(string(sections[1].HTML), "<video") {
+		t.Fatalf("lost markdown/media: %s", sections[1].HTML)
+	}
+	if strings.Contains(string(sections[2].HTML), "<script") || strings.Contains(string(sections[2].HTML), "javascript:") || !strings.Contains(string(sections[2].HTML), `<h2 id="other-heading">`) {
+		t.Fatalf("unsafe or missing supplemental content: %s", sections[2].HTML)
+	}
+}

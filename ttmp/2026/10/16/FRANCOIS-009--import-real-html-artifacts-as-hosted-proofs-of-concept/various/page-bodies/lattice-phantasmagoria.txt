@@ -1,0 +1,7 @@
+## Lattice Phantasmagoria
+
+A playable dual-screen canvas and WebGL experiment with cartridges and scenes. Browser-only proof of concept.
+
+This is a working imported proof of concept. The original visual design is preserved. 
+
+This app runs in your browser without model calls.

@@ -65,32 +65,35 @@ func openCatalog(ctx context.Context, s dbSettings) (*cstore.Store, error) {
 
 type CatalogServeSettings struct {
 	dbSettings
-	Listen             string   `glazed:"listen"`
-	PublicURL          string   `glazed:"public-url"`
-	AppDomain          string   `glazed:"app-domain"`
-	Sites              []string `glazed:"site"`
-	LegalContact       string   `glazed:"legal-contact"`
-	TrustProxyHeaders  bool     `glazed:"trust-proxy-headers"`
-	FontDir            string   `glazed:"font-dir"`
-	MCP                bool     `glazed:"mcp"`
-	ReleaseDir         string   `glazed:"release-dir"`
-	Migrate            bool     `glazed:"migrate"`
-	OIDCIssuer         string   `glazed:"oidc-issuer"`
-	OIDCClientID       string   `glazed:"oidc-client-id"`
-	OIDCClientIDFile   string   `glazed:"oidc-client-id-file"`
-	OIDCClientSecret   string   `glazed:"oidc-client-secret-file"`
-	OIDCExtraScopes    []string `glazed:"oidc-extra-scopes"`
-	SignupAllowed      bool     `glazed:"signup-allowed"`
-	StripeKeyFile      string   `glazed:"stripe-secret-key-file"`
-	StripeWebhookFiles []string `glazed:"stripe-webhook-secret-files"`
-	StripeLiveMode     bool     `glazed:"stripe-live-mode"`
-	TrialAllowed       bool     `glazed:"trial-allowed"`
-	GrantTTL           string   `glazed:"grant-ttl"`
-	Backend            string   `glazed:"backend"`
-	Node               string   `glazed:"node"`
-	Worker             string   `glazed:"worker"`
-	PiAgentDir         string   `glazed:"pi-agent-dir"`
-	WorkerDir          string   `glazed:"worker-dir"`
+	Listen                string   `glazed:"listen"`
+	PublicURL             string   `glazed:"public-url"`
+	AppDomain             string   `glazed:"app-domain"`
+	Sites                 []string `glazed:"site"`
+	LegalContact          string   `glazed:"legal-contact"`
+	TrustProxyHeaders     bool     `glazed:"trust-proxy-headers"`
+	FontDir               string   `glazed:"font-dir"`
+	MCP                   bool     `glazed:"mcp"`
+	ReleaseDir            string   `glazed:"release-dir"`
+	Migrate               bool     `glazed:"migrate"`
+	OIDCIssuer            string   `glazed:"oidc-issuer"`
+	OIDCClientID          string   `glazed:"oidc-client-id"`
+	OIDCClientIDFile      string   `glazed:"oidc-client-id-file"`
+	OIDCClientSecret      string   `glazed:"oidc-client-secret-file"`
+	OIDCExtraScopes       []string `glazed:"oidc-extra-scopes"`
+	EmailSigninEnabled    bool     `glazed:"email-signin-enabled"`
+	ZitadelLoginTokenFile string   `glazed:"zitadel-login-token-file"`
+	ZitadelOrganization   string   `glazed:"zitadel-organization"`
+	SignupAllowed         bool     `glazed:"signup-allowed"`
+	StripeKeyFile         string   `glazed:"stripe-secret-key-file"`
+	StripeWebhookFiles    []string `glazed:"stripe-webhook-secret-files"`
+	StripeLiveMode        bool     `glazed:"stripe-live-mode"`
+	TrialAllowed          bool     `glazed:"trial-allowed"`
+	GrantTTL              string   `glazed:"grant-ttl"`
+	Backend               string   `glazed:"backend"`
+	Node                  string   `glazed:"node"`
+	Worker                string   `glazed:"worker"`
+	PiAgentDir            string   `glazed:"pi-agent-dir"`
+	WorkerDir             string   `glazed:"worker-dir"`
 }
 
 type CatalogServe struct{ *glazed.CommandDescription }
@@ -161,6 +164,16 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		sites = append(sites, site(u, appDomain))
 	}
 	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
+	if s.EmailSigninEnabled {
+		token, err := secret("", s.ZitadelLoginTokenFile)
+		if err != nil {
+			return errors.Wrap(err, "read ZITADEL login service credential")
+		}
+		cfg.EmailLogin, err = identity.NewEmailLogin(s.OIDCIssuer, s.ZitadelOrganization, token)
+		if err != nil {
+			return err
+		}
+	}
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
@@ -479,6 +492,9 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),
+			fields.New("email-signin-enabled", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Enable ZITADEL email-only sign-in for existing supporter accounts")),
+			fields.New("zitadel-login-token-file", fields.TypeString, fields.WithHelp("Secret file containing the dedicated ZITADEL login service token")),
+			fields.New("zitadel-organization", fields.TypeString, fields.WithHelp("ZITADEL organization whose users may sign in by email")),
 			fields.New("oidc-issuer", fields.TypeString, fields.WithHelp("OIDC issuer URL (ZITADEL)")),
 			fields.New("oidc-client-id", fields.TypeString, fields.WithHelp("OIDC web client ID (PKCE)")),
 			fields.New("oidc-client-id-file", fields.TypeString, fields.WithHelp("File containing the OIDC client ID (written by provisioning)")),

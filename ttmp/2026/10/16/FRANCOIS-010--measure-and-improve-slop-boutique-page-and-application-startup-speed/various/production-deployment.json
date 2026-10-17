@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-10-17T00:47:16Z",
+  "sourcePR": "https://github.com/go-go-golems/francois/pull/9",
+  "sourceHead": "b52d97ba14ee7a182d5935a3b1ad5c665b6123d7",
+  "sourceMerge": "393bf35d51ab467081d7a09460937df66ba446b9",
+  "imageWorkflow": 38987577959,
+  "image": "ghcr.io/go-go-golems/francois:sha-393bf35",
+  "gitOpsPR": "https://github.com/wesen/2026-03-27--hetzner-k3s/pull/361",
+  "gitOpsHead": "44e096b1fcc4655a729ba5a890f3362f6b74557e",
+  "gitOpsMerge": "e3ccf7b09784bb6fadef6dd847216badee7e2f2c",
+  "argo": {"sync": "Synced", "health": "Healthy", "operation": "Succeeded"},
+  "deployment": {
+    "namespace": "francois",
+    "name": "francois",
+    "generation": 13,
+    "observedGeneration": 13,
+    "desiredReplicas": 1,
+    "updatedReplicas": 1,
+    "readyReplicas": 1,
+    "availableReplicas": 1
+  },
+  "schemaChanges": false,
+  "settingsChanges": false,
+  "browserMeasurement": "cache-after.json",
+  "contractVerification": "cache-contract-verification.json"
+}

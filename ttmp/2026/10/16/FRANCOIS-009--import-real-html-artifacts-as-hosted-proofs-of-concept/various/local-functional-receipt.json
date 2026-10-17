@@ -1,0 +1,76 @@
+{
+  "scope": "Local hosted runtime on localhost:8090; observed through Playwright browser session",
+  "checks": {
+    "lattice-rift": {
+      "toggle": [
+        "Freeze",
+        "Thaw"
+      ],
+      "revisedRelease": "rel_e92872f1acebf2ecdfcd9971",
+      "version": "1.0.1",
+      "viewport": [
+        1440,
+        1000
+      ]
+    },
+    "lattice-phantasmagoria": {
+      "button": "A",
+      "scene": [
+        "Boot",
+        "Cartridges"
+      ]
+    },
+    "tabula-workbench": {
+      "initialNodes": 151,
+      "cell": "Inputs!B2",
+      "before": 420,
+      "edited": 421,
+      "afterReload": 421,
+      "restored": 420,
+      "sample": {
+        "text": "pong",
+        "model": "lunaroute/glm-5.3-flash",
+        "ms": 623
+      }
+    },
+    "lattice-deck": {
+      "version": "1.0.1",
+      "scriptedAgent": "Spin faster and make it pulse",
+      "result": "\u2713 {\"speed\":2.4,\"core\":\"mesh#core\"}  \u00b7  10 ms",
+      "errors": [],
+      "sample": {
+        "text": "pong",
+        "model": "lunaroute/glm-5.3-flash",
+        "ms": 613
+      }
+    },
+    "rag-workbench": {
+      "version": "1.0.1",
+      "corpusFiles": 5,
+      "chunks": 15,
+      "query": "model concurrency",
+      "topDocument": "Model Limits",
+      "topHeading": "Concurrency",
+      "uploaded": "poc-note.md",
+      "presentAfterReload": true,
+      "sample": {
+        "text": "pong",
+        "model": "lunaroute/glm-5.3-flash",
+        "ms": 1076
+      }
+    }
+  },
+  "secretScan": {
+    "tool": "trufflehog filesystem --no-verification",
+    "findings": 0
+  },
+  "limits": "Representative workflows tested; not exhaustive preset, collaboration or browser compatibility coverage. A Download book event probe timed out; export formats are not qualified.",
+  "finalToolbarBuild": {
+    "tabula-workbench": "1.0.2",
+    "lattice-deck": "1.0.2",
+    "rag-workbench": "1.0.2",
+    "startupPageErrors": 0,
+    "startupFailedRequests": 0,
+    "evidence": "All five rerun through scripts/03-local-browser-check.js after final toolbar changes; screenshots refreshed."
+  }
+}
