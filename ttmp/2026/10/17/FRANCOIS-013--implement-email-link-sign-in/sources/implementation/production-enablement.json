@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-17T22:12:12.786172+00:00",
+  "terraformPR": 35,
+  "terraformRevision": "ba7cd3c7f0d11efdee0739dd316b7e9ada7db078",
+  "gitopsPR": 364,
+  "gitopsRevision": "a4c34e97f80ae174f02af5987fb11e90928267df",
+  "terraformChanges": {
+    "created": 2,
+    "updated": 0,
+    "destroyed": 0
+  },
+  "postApplyPlan": "no changes",
+  "gitopsPackagesValidated": 54,
+  "gitopsViolations": 0,
+  "vsoDeliveredMatchingPAT": true,
+  "argoSync": "Synced",
+  "argoHealth": "Healthy",
+  "emailFormEnabledOn": [
+    "https://slop.boutique",
+    "https://francois.yolo.scapegoat.dev"
+  ],
+  "staffSigninAvailable": true,
+  "loginEmailsRequested": 0,
+  "humanOTPEnrollmentChanged": false,
+  "humanOTPEnrollmentApproval": "auto-review rejected; pending explicit user authorization"
+}

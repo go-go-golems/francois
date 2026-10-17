@@ -785,6 +785,14 @@ Email sessions use the existing local idle/absolute expiry and have no OIDC ID t
 
 For a reproducible isolated test, use FRANCOIS-013's `scripts/03-local-stack.yaml` and `04-provision-local.py`. They are fixed to localhost ports 18083 (ZITADEL v4.16.1), 18025 (mail sink) and 5437 (PostgreSQL); they do not configure production. The bootstrap and dedicated test PATs remain under `/tmp/francois-013-private`. The opt-in Go test `TestEmailSigninRealZitadel` accepts `-email-login-fixture=/tmp/francois-013-private/fixture.json`; provide TEST_DATABASE_URL pointing to the isolated database. Test credentials, codes, live links and cookies must never be copied into ticket screenshots/logs.
 
+### Production enablement and rotation (2026-10-17)
+
+Email-link sign-in is enabled by infrastructure PR #364. Terraform PR #35 owns the dedicated Francois machine user and its `IAM_LOGIN_CLIENT` membership. The PAT is stored at `kv/apps/francois/prod/runtime`, key `zitadel-login-token`, and mounted at `/run/secrets/francois/zitadel-login-token`. Metadata keys `zitadel-login-user-id`, `zitadel-login-pat-id` and `zitadel-login-expires-at` identify the credential without exposing it. The initial PAT expires **2027-01-15T22:07:33Z**.
+
+Rotate using `zitadel/francois/envs/prod/provision-email-login.py --service-user-id <id> --rotate` in the shared Terraform repository. It issues a 90-day PAT outside Terraform state, checks session create/read/delete without sending mail, and updates Vault with CAS read/merge/write. Wait for VSO delivery and a healthy application restart before revoking the previous PAT by ID. The bootstrap script preserves these fields. No SMTP configuration change is required.
+
+The public email form and staff fallback were verified on both hostnames. The existing supporter has a matching verified provider email but is not enrolled in email OTP; enrollment remains pending explicit authorization after automatic approval review rejected changing the human authentication factor. No login email was sent and no human factor was changed during this setup. Credential/session API checks do not constitute an end-to-end production mail-delivery test.
+
 ## Public blog visibility
 
 The public site is artifact-only by default. In **Admin → Settings → Storefront**, enable **Show the blog publicly** to expose journal pages, creator-page posts and blog entries in RSS. The setting is `storefront.journalEnabled` in the existing versioned settings document; missing/false means hidden, including previously saved documents. No migration is needed.

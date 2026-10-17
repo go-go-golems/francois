@@ -7,9 +7,13 @@ Topics:
 DocType: reference
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://doc/production.md
+      Note: Credential rotation and production enablement contract
+    - Path: repo://ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/sources/implementation/production-enablement.json
+      Note: Redacted identity and rollout receipt
 ExternalSources: []
-Summary: "Guide authorship, source investigation, design choices and delivery evidence."
+Summary: Guide authorship, source investigation, design choices and delivery evidence.
 LastUpdated: 2026-10-17T14:27:28-04:00
 WhatFor: Preserve evidence and handoff decisions.
 WhenToUse: Resuming or reviewing the guide.
@@ -425,3 +429,78 @@ Review remote-smtp-check.json and the production runbook paragraph. Check the re
 - SMTP credential record: kv/apps/zitadel/prod/smtp.
 - Sender identity: mail.scapegoat.dev; SMTP region: us-east-1; port 587 with TLS enabled.
 - Existing login feature default remains off; no external message was sent.
+
+## Step 7: Provision the production login credential into Vault and enable the form
+
+Created the dedicated Francois ZITADEL machine identity through Terraform, verified its Session API permissions, and stored a 90-day PAT directly in Vault. Merged the identity and runtime changes through separate repositories, confirmed VSO delivered the exact credential, and enabled the already deployed email-sign-in implementation. Both production hostnames now show the email form alongside staff OIDC.
+
+The existing subscriber has a matching verified provider email but lacks an email OTP factor. Attempting to enroll it was rejected by automatic approval review because the user authorized credential/Vault setup, not a human authentication-factor change. No enrollment or login-email request occurred; this remaining step needs explicit authorization.
+
+### Prompt Context
+
+**User prompt (verbatim):** "would you be able to set it up and store it in vault?"
+
+**Assistant interpretation:** Provision the dedicated ZITADEL credential, store it safely in Vault, deliver it through VSO and enable the deployed feature.
+
+**Inferred user intent:** Finish the production credential setup rather than require manual token handling.
+
+**Commits (infrastructure):** Terraform PR wesen/terraform#35 → ba7cd3c7f0d11efdee0739dd316b7e9ada7db078; k3s PR wesen/2026-03-27--hetzner-k3s#364 → a4c34e97f80ae174f02af5987fb11e90928267df.
+
+### What I did
+
+- Read existing Terraform/Vault conventions and refreshed remote main. The stale local Terraform checkout lacked Francois, but origin/main already owned its organization, client, login policy and external IdPs. Used isolated worktrees instead of changing either user's checkout.
+- Added only zitadel_machine_user.email_login and zitadel_instance_member.email_login with IAM_LOGIN_CLIENT. The complete plan contained exactly two creates; apply reported two added, zero changed/destroyed. A subsequent complete plan reported no changes.
+- Kept PAT issuance outside Terraform because its PAT resource persists token values in state. Added provision-email-login.py to the identity environment; it reads the administrator credential ephemerally, validates the machine's organization, issues a 90-day PAT, verifies empty Session API create/read/delete without a challenge, and CAS-updates Vault through stdin.
+- Stored the token as zitadel-login-token at kv/apps/francois/prod/runtime, with nonsecret user-ID, PAT-ID and expiry metadata. The PAT expires 2027-01-15T22:07:33Z. It was never printed, passed as a process argument or written to disk.
+- Confirmed VSO's Kubernetes Secret contained the exact Vault PAT using an in-memory comparison; only the boolean result was printed.
+- Added the explicit secret-file mount and email enablement/organization flags to the existing Deployment. Updated runtime-secret comments and the bootstrap script so future reseeding preserves the PAT/metadata and CAS rejects concurrent modifications.
+- Merged both source PRs, refreshed Argo and verified the new ready pod. Saved bounded production receipts and desktop/mobile screenshots.
+
+### Why
+
+Terraform owns the shared identity; Vault owns credential delivery. Existing runtime-secret/VSO wiring is sufficient, so no new Vault policy, secret controller, service, queue or mail provider was introduced. A finite PAT expiry and explicit rotation script provide a concrete operational contract.
+
+### What worked
+
+- Existing operator AWS_PROFILE=manuel resolved S3 state access. Installed-provider schema confirmed machine-user and instance-membership contracts.
+- Terraform fmt and Python compilation checks passed; apply created exactly the intended two resources; the post-apply plan was clean.
+- The dedicated PAT successfully created, read and deleted a factor-free 60-second session. That session could not authenticate a user and requested no email challenge.
+- Vault readback and VSO comparison matched; unrelated runtime fields were retained.
+- All 54 GitOps packages validated with zero violations. Bash syntax and an offline mock verified CAS version handling, retention of PAT/expiry/password, and ordinary bootstrap fields.
+- GitOps PR #364's CI validate check passed. Argo reached Synced/Healthy/Succeeded at a4c34e97; pod francois-75d8574c5b-d6g8c was ready with zero restarts when inspected.
+- Both https://slop.boutique/signin and the original portal expose the real email-request form, preserve return=/account, retain staff login and pass readiness. Chromium verified the form, fallback and no horizontal overflow at 1440px and 390px.
+- Read-only readiness inspection found one existing subscriber, with a matching verified provider email and no email OTP factor. No address, subject or other human identifying data was archived in the count receipt.
+
+### What didn't work
+
+- Provider-schema inspection initially used ambient AWS credentials and received S3 HeadObject HTTP 403; the downstream JSON parser received empty output. Repeated with the documented manuel profile successfully.
+- The first credential store returned `Vault CAS patch failed; no unrelated fields were overwritten`. Capability inspection showed create/delete/list/read/update but no patch. The script's cleanup revoked that unstored PAT. Changed Vault's method to version-checked read/merge/write and issued/stored a new PAT successfully without changing operator permissions.
+- The account-list CLI omits email verification, so its projection cannot prove verification eligibility. Checked ZITADEL directly rather than treating missing fields as false.
+- Automatic approval review rejected the attempted human email OTP enrollment: "This mutates an existing supporter’s ZITADEL authentication factors; the user authorized credential/Vault setup but did not explicitly authorize enrolling a human account’s OTP factor". The command was rejected before execution; no human factor was changed. Do not retry through another mechanism without explicit approval.
+
+### What I learned
+
+The production identity environment was already present on remote main; the earlier missing local path was checkout staleness. Vault's update and patch capabilities are distinct. The existing credentials are sufficient for CAS read/merge/write, which avoids introducing a new operator policy solely for this write.
+
+### What was tricky to build
+
+Credential issuance and delivery must complete before a Deployment references a newly required Secret key. VSO delivered the key first; only afterward did the manifest enable the flag and explicit mount. The bootstrap script also needed to preserve separately provisioned fields so a later routine reseed would not silently remove the login credential.
+
+### What warrants a second pair of eyes
+
+IAM_LOGIN_CLIENT is a privileged trusted-login role; keep this PAT confined to the backend. Confirm the expiry/rotation receipt and wait for delivery plus restart before revoking an old token. Existing-human OTP enrollment remains a separately authorized operation. Form visibility and Session API capability checks are not an end-to-end external mail-delivery test.
+
+### What should be done in the future
+
+Obtain explicit approval before enrolling the existing supporter in email OTP. After that, verify sign-in through a user-requested email. Rotate the current PAT before 2027-01-15; the script supports explicit --rotate and records the prior PAT ID for revocation after a successful rollout.
+
+### Code review instructions
+
+Inspect Terraform PR #35's two identity resources and provisioning script, k3s PR #364's explicit mount/flags and bootstrap JSON merge, and production-enablement.json for exact evidence. The initial identity apply and credential checks are complete; do not rerun issuance casually, because replacing an existing credential intentionally requires --rotate.
+
+### Technical details
+
+- Issuer: https://zitadel.yolo.scapegoat.dev; organization 394966170567966836.
+- Dedicated service user: 395571221485322384; credential metadata receipt contains the PAT ID and expiry, never its value.
+- Runtime file: /run/secrets/francois/zitadel-login-token. Existing FRANCOIS_ZITADEL_ORG_ID supplies --zitadel-organization.
+- No SMTP settings, subscriptions, staff users or human authentication factors were modified. No login email was requested.
