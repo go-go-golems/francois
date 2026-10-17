@@ -44,19 +44,23 @@ func (s *Store) UpsertIdentity(ctx context.Context, id Identity) (User, error) {
 		return User{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1),0))`, id.Email); err != nil {
-		return User{}, err
-	}
-	// A signup may have committed while this OIDC callback waited for the
-	// email lock. Neither a new identity nor an existing identity's profile
-	// refresh may claim an address belonging to a different issuer/subject.
-	var collision bool
-	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1) AND (issuer<>$2 OR subject<>$3))`, id.Email, id.Issuer, id.Subject).Scan(&collision)
-	if err != nil {
-		return User{}, err
-	}
-	if collision {
-		return User{}, ErrNotFound
+	// Missing email is not an address: guests and OIDC identities may all
+	// have an empty placeholder. Coordinate ownership only for actual email.
+	if id.Email != "" {
+		if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1),0))`, id.Email); err != nil {
+			return User{}, err
+		}
+		// A signup may have committed while this OIDC callback waited for the
+		// email lock. Neither a new identity nor an existing identity's profile
+		// refresh may claim an address belonging to a different issuer/subject.
+		var collision bool
+		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1) AND (issuer<>$2 OR subject<>$3))`, id.Email, id.Issuer, id.Subject).Scan(&collision)
+		if err != nil {
+			return User{}, err
+		}
+		if collision {
+			return User{}, ErrNotFound
+		}
 	}
 	u, err := scanUser(tx.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
 VALUES($1,$2,$3,$4,$5,$6,now())

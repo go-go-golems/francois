@@ -421,3 +421,23 @@ func TestOIDCRefreshCannotTakeAnotherAccountsEmail(t *testing.T) {
 		t.Fatalf("email owners %d %v", len(users), err)
 	}
 }
+
+func TestOIDCWithoutEmailDoesNotCollideWithGuests(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	if _, err := e.store.CreateGuest(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, subject := range []string{"no-email-one", "no-email-two"} {
+		id := store.Identity{Issuer: "issuer", Subject: subject, Name: "Initial"}
+		u, err := e.store.UpsertIdentity(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id.Name = "Refreshed"
+		updated, err := e.store.UpsertIdentity(ctx, id)
+		if err != nil || updated.ID != u.ID || updated.DisplayName != "Refreshed" || updated.Email != "" {
+			t.Fatalf("missing-email refresh %+v %v", updated, err)
+		}
+	}
+}

@@ -1025,3 +1025,48 @@ Read store/users.go, TestOIDCRefreshCannotTakeAnotherAccountsEmail, identity/ema
 Provider creation recovery recognizes only HTTP 409 and an email-search result equal to the reserved subject; other errors and unrelated results remain failures. After a successful re-read, the same validated unverified resend or verified OTP path handles the current attempt.
 
 Final repair qualification: the complete PostgreSQL-backed Go suite passed, including the new refresh and concurrent-provider-creation cases; lint reported zero issues and logcopter-check passed. Receipts are retained as email-signup-final-review-{tests,lint}.txt.
+
+
+## Step 18: Preserve missing-email OIDC and assess the legacy-data comment
+
+The next review completed with a valid missing-email case and a legacy-duplicate compatibility suggestion. Empty email claims are valid for native OIDC identities, and demo guests use the same empty schema placeholder. Restricted email coordination to actual nonempty addresses and added coverage for two missing-email identities, their profile refreshes and an existing guest.
+
+The legacy-data suggestion does not require an exception in this deployment: a read-only production query counted zero duplicate nonempty human-email groups. The repository explicitly says not to add backward-compatibility branches unless requested. Kept the strict different-owner rule for actual addresses and documented this decision rather than adding an unused legacy-account path.
+
+### Prompt Context
+See Step 16. This remains the authorized production rollout and report, not a request to design compatibility behavior for nonexistent production records.
+
+### What I did
+- Wrapped the normalized-email lock and ownership query in a nonempty-email condition; issuer/subject upsert remains unchanged for identities without email.
+- Added TestOIDCWithoutEmailDoesNotCollideWithGuests covering creation and refresh while guest placeholders exist.
+- Assessed the legacy-duplicate finding against the production aggregate (zero groups) and the explicit no-compatibility instruction. No personal addresses or credentials were printed.
+- Updated the report with the missing-email distinction and the data-based reason for declining a legacy exception.
+
+### Why
+An empty optional claim does not identify a mailbox and must not participate in address ownership. Preserving nonexistent legacy collisions would add conditional behavior without a current operational need.
+
+### What worked
+The stricter real-address check and concurrent creation recovery already passed the full suite and lint at f8e97b3. Production preflight confirmed no duplicate human emails before rollout.
+
+### What didn't work
+The prior collision predicate interpreted empty guest placeholders as owned addresses, blocking otherwise valid no-email OIDC identities. The reviewer also proposed a compatibility exception that is inapplicable to current production data; it was deliberately not implemented. A redundant attempt to fetch a single review comment through a nonmatching REST path returned HTTP 404; the full comments endpoint supplied the finding successfully.
+
+### What I learned
+Optional OIDC email and a verified mailbox proof have different contracts. Account identity remains issuer/subject even when no email is provided.
+
+### What was tricky to build
+The email collision protection must not become a requirement that every OIDC provider return an email claim. Scope the extra coordination to its actual resource: a nonempty address.
+
+### What warrants a second pair of eyes
+The new guard should cover both the lock and collision query; real-address ownership remains strict. Deliberate ambiguous fixtures still exercise fail-closed email sign-in.
+
+### What should be done in the future
+Complete affected authentication tests/lint, resolve the assessed comments and proceed with source/image/GitOps release checks. No additional compatibility layer is planned.
+
+### Code review instructions
+Read UpsertIdentity and TestOIDCWithoutEmailDoesNotCollideWithGuests, along with the current report's concurrency section.
+
+### Technical details
+The preflight count excludes guests and empty strings, groups by lower(email) and returned zero duplicate groups. Missing-email identities are still ineligible for the email-link path, which requires an actual verified address and matching provider identity.
+
+Qualification: affected database-backed TestOIDC/TestEmail cases passed in 4.705 seconds; lint reported zero issues and logcopter-check passed. The full remote release suite will qualify the final source revision before merge.
