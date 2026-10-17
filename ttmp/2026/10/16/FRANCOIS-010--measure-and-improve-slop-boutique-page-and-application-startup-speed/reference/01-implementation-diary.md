@@ -93,3 +93,60 @@ Source baseline for the focused worktree is 0440798 from PR #8. The active PR's 
 The new vault report and six colocated evidence assets were committed as e08db6e and pushed to go-go-parc main. The note is Projects/2026/10/16/PROJ - Francois - Page Speed and Browser Cache Engineering - A Technical Deep Dive.md. It contains the complete ticket report, preserved source references, native Mermaid diagrams, actual catalog screenshot, a Matplotlib byte-comparison figure and self-contained measurement JSON. Matplotlib ran through uv's isolated /tmp cache; no repository runtime dependency changed. The publisher refuses to overwrite an existing note or evidence asset.
 
 All final source-head checks passed, including CodeQL, GoSec, tests, lint, frontend, image build and dependency/secret checks. PR #9 merged with an exact-head guard on b52d97ba14ee7a182d5935a3b1ad5c665b6123d7, producing 393bf35d51ab467081d7a09460937df66ba446b9. The main image workflow is 38987577959. The production release remains pending; final evidence will be appended after its image-only GitOps change and live verification. The report explicitly marks its initial publication boundary so later results can be added without rewriting historical prose.
+
+## Step 2: Deploy the focused change and publish measured outcomes
+
+Completed the normal image/GitOps rollout and repeated the same fresh-context browser measurement. The verified improvement is a substantial transfer reduction and correct reuse of public code, with protected responses retaining their uncached policy. Added the live outcomes to the ticket report and vault as an append-only checkpoint, including cold timing results that did not improve.
+
+### Prompt Context
+
+**User prompt:** See Step 1 for the verbatim ticket, vault and implementation request. **Assistant interpretation:** Finish shipping and retain evidence that distinguishes implemented behavior from measured performance. **Inferred user intent:** A completed deploy and a technically accurate report. **Commits:** 393bf35 source merge; 4eda420 report/media/diary checkpoint; vault e08db6e initial report and 49b0d45 verified outcome.
+
+### What I did
+
+- Confirmed workflow 38987577959 published ghcr.io/go-go-golems/francois:sha-393bf35 successfully. Reviewed GitOps PR #361: its sole diff changes the image from sha-0440798 to sha-393bf35. Validation passed in 15 seconds.
+- Merged GitOps PR #361 with exact-head guard 44e096b1fcc4655a729ba5a890f3362f6b74557e. The merge is e3ccf7b09784bb6fadef6dd847216badee7e2f2c. Requested the normal Argo refresh and observed Synced/Healthy/Succeeded, deployment generation 13, and one updated/ready/available replica. kubectl rollout status reports success.
+- Ran scripts/01-measure-cache.mjs https://slop.boutique after. All three cold/warm route pairs completed. Wrote various/cache-after.json using the same instrumentation as the baseline.
+- Ran scripts/05-verify-cache-contract.mjs successfully. Verified immutable headers and ETags for emitted static references; gzip on cold JavaScript; zero static wire bytes on warm visits; exact gzip-decoded bundle identity; distinct representation validators; conditional 304; HEAD; unversioned revalidation; session no-store; and eager/high-priority cover markup.
+- Extended that verifier to a known pre-existing workspace origin, without creating a tour or requesting a grant. Its /launch remains no-store and emits a versioned script; runtime.js is immutable/gzipped; unauthenticated /page returns 401/no-store. These live checks and the earlier integration suite cover the intended cache boundary.
+- Generated the after/before transfer plot from actual receipts. Appended production-outcome.txt to the ticket/vault report, copied four new self-contained evidence assets and committed the vault addition as 49b0d45. The initial report and its evidence remain intact.
+
+### Why
+
+A lower compressed file size alone does not demonstrate warm-cache behavior. The browser check proves reuse under ordinary navigation, while explicit HTTP checks cover revalidation and protected routes. Publishing raw timing and byte tables prevents a lower byte requirement from being misrepresented as an across-the-board elapsed-time guarantee.
+
+### What worked
+
+The portal bundle's identical 413644 source bytes transfer as 124245 gzip bytes, approximately 70% smaller. Warm static response transfer is zero on every measured route. Overall warm /account response wire bytes fall from 451089 to 1048; cold catalog response wire bytes fall from 4493872 to 967742. All seventeen optimized image copies were already verified live. The report's tables and receipts preserve exact values and units.
+
+### What didn't work
+
+No rollout or cache-contract assertion failed. Cold timing samples were mixed: catalog load 1141→1266 ms, Deck detail 1221→1131 ms, account 1490→1933 ms. Warm samples improved to 167/147/140 ms from 251/262/627 ms respectively. These are single samples, so no latency percentile or end-to-end startup improvement is claimed. The earlier public tour probe remains rate-limited; no limit was changed or additional anonymous launch attempted for final verification.
+
+Final documentation validation initially reported frontmatter delimiters missing from the generated production-outcome.md excerpt, and git diff --check found a new blank line at EOF in the report. Retained the generated append fragment as production-outcome.txt rather than registering a duplicate analysis document, and normalized the source report's final newline. Ticket close's completed recovery journal is archived to /tmp after verifying its committed state; index/changelog remain the durable completion record.
+
+The first journal archival guard looked for a top-level state and stopped with AssertionError without moving anything. Inspected the journal keys, verified receipt.state is committed and then archived it. Final docmgr doctor and git diff --check pass; every copied vault asset link resolves.
+
+### What I learned
+
+The expected transfer improvement is deterministic for these bytes, but elapsed time also contains network setup, scheduling and execution. The strongest completion evidence combines byte identity, browser reuse, explicit HTTP semantics and rollout identity. Existing workspace origins allow a read-only check of public runtime assets and unauthorized-page policy without consuming a public tour start.
+
+### What was tricky to build
+
+The production change has two independent paths: image publication/GitOps for embedded code and catalog metadata publication for delivery images. The receipts tie both to their actual content identities. The final vault update adds a dated result rather than replacing the initial draft's review/deployment boundary.
+
+### What warrants a second pair of eyes
+
+Inspect various/cache-contract-verification.json and production-deployment.json together, then compare the raw before/after receipts with the report tables. Ensure a future startup benchmark uses a permitted existing workspace or a naturally available tour allowance and does not equate canvas presence with full application qualification.
+
+### What should be done in the future
+
+The accepted shipping scope is complete. Smaller card thumbnails, route-specific bundles and selected dependency packaging remain measurement-driven follow-ups documented in report section 10. Full hosted application startup latency is still unmeasured; this is an explicit evidence limitation, not an undeployed part of the cache change.
+
+### Code review instructions
+
+Review source PR #9 and GitOps PR #361 for the production change. The complete local PostgreSQL-backed suite passed before release, the affected suites passed after the final edit, every required source/GitOps check passed, and the final browser/HTTP assertions passed live. Documentation uses Matplotlib only through an isolated temporary uv environment; the service acquired no new dependency.
+
+### Technical details
+
+Authoritative final receipts: various/cache-after.json, various/cache-contract-verification.json, various/production-deployment.json and various/production-outcome.txt. The final report includes native Mermaid diagrams, source/API references, both performance figures and copied JSON evidence. Vault path: Projects/2026/10/16/PROJ - Francois - Page Speed and Browser Cache Engineering - A Technical Deep Dive.md. No private cookie, runtime grant, token value, model prompt or user payload is stored in the evidence.

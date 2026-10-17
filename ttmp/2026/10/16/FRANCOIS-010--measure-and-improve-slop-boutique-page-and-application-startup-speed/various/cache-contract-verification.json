@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-17T00:47:58.025Z",
+  "base": "https://slop.boutique",
+  "visits": [
+    {
+      "route": "/apps",
+      "pass": "cold",
+      "staticWireBytes": 9580,
+      "totalWireBytes": 967742
+    },
+    {
+      "route": "/apps",
+      "pass": "warm",
+      "staticWireBytes": 0,
+      "totalWireBytes": 7312
+    },
+    {
+      "route": "/apps/lattice-deck",
+      "pass": "cold",
+      "staticWireBytes": 9575,
+      "totalWireBytes": 299964
+    },
+    {
+      "route": "/apps/lattice-deck",
+      "pass": "warm",
+      "staticWireBytes": 0,
+      "totalWireBytes": 4938
+    },
+    {
+      "route": "/account",
+      "pass": "cold",
+      "staticWireBytes": 132468,
+      "totalWireBytes": 260900
+    },
+    {
+      "route": "/account",
+      "pass": "warm",
+      "staticWireBytes": 0,
+      "totalWireBytes": 1048
+    }
+  ],
+  "assets": [
+    {
+      "path": "/static/catalog.js?v=2dcc3eca8329774f36d28030bf5f378315bfe76cef315992ced6d8c0907ae657",
+      "identityBytes": 413644,
+      "gzipBytes": 124245,
+      "identityETag": "\"2dcc3eca8329774f36d28030bf5f378315bfe76cef315992ced6d8c0907ae657\"",
+      "gzipETag": "\"2dcc3eca8329774f36d28030bf5f378315bfe76cef315992ced6d8c0907ae657-gzip\"",
+      "sha256": "2dcc3eca8329774f36d28030bf5f378315bfe76cef315992ced6d8c0907ae657",
+      "conditionalStatus": 304,
+      "headStatus": 200
+    }
+  ],
+  "sessionNoStore": true,
+  "eagerCover": true,
+  "hosted": {
+    "origin": "https://i-9e31d4176bfe0835a5e5.slop.boutique",
+    "launchNoStore": true,
+    "versionedLaunchScript": true,
+    "runtimeImmutable": true,
+    "runtimeGzip": true,
+    "unauthorizedPageStatus": 401,
+    "pageNoStore": true
+  }
+}

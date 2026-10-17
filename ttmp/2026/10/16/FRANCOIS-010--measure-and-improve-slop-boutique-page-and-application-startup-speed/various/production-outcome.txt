@@ -1,0 +1,24 @@
+### Production checkpoint: 16 October 2026
+
+The focused source change is deployed from PR #9, merge 393bf35d51ab467081d7a09460937df66ba446b9. Image workflow 38987577959 published ghcr.io/go-go-golems/francois:sha-393bf35; [GitOps PR #361](https://github.com/wesen/2026-03-27--hetzner-k3s/pull/361) changed only that image pin and merged as e3ccf7b09784bb6fadef6dd847216badee7e2f2c. The deployment has one desired, updated, ready and available replica at generation 13. Argo CD reports Synced, Healthy and Succeeded. No settings or schema change was required.
+
+The repeated browser test and the live contract verifier both passed. The exact same portal JavaScript bytes now transfer as 124,245 gzip bytes instead of 413,644 identity bytes. All measured warm portal/static requests transfer zero response bytes. A conditional request returns a bodyless 304, HEAD returns no body, and unversioned URLs still require revalidation. The session API remains no-store. On a known existing instance origin, the launch document remains no-store, its script is versioned, the common runtime is immutable/gzipped, and an unauthorized /page request returns 401 with no-store. No tour or model call is needed for these checks.
+
+| Route | Cold observed wire bytes, before → after | Warm observed wire bytes, before → after |
+| --- | ---: | ---: |
+| `/apps` | 4,493,872 → 967,742 | 46,760 → 7,312 |
+| `/apps/lattice-deck` | 1,045,827 → 299,964 | 44,468 → 4,938 |
+| `/account` | 578,490 → 260,900 | 451,089 → 1,048 |
+
+![Measured warm-navigation response transfer](../various/warm-transfer.png)
+
+The elapsed-time observations remain a separate result:
+
+| Route | Cold load event, before → after | Warm load event, before → after |
+| --- | ---: | ---: |
+| `/apps` | 1141 ms → 1266 ms | 251 ms → 167 ms |
+| `/apps/lattice-deck` | 1221 ms → 1131 ms | 262 ms → 147 ms |
+| `/account` | 1490 ms → 1933 ms | 627 ms → 140 ms |
+
+The warm samples improved on all three routes. Cold elapsed times did not improve uniformly: the account load took longer in the later sample, even with substantially fewer bytes. These single observations cannot separate network variation, connection setup, browser scheduling and execution. The verified result is the lower transfer requirement and correct reuse; this report does not turn that into an unsupported latency guarantee. An end-to-end application-start speedup remains unmeasured because the baseline tour probe was declined by the existing network limit. Smaller catalog thumbnails, route-specific bundles and app dependency packaging remain conditional follow-ups after a permitted startup profile.
+

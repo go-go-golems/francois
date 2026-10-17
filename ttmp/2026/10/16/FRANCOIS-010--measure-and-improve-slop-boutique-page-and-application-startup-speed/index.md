@@ -1,7 +1,7 @@
 ---
 Title: Measure and improve slop.boutique page and application startup speed
 Ticket: FRANCOIS-010
-Status: active
+Status: complete
 Topics:
     - frontend
     - performance
@@ -10,8 +10,8 @@ Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: "Measured public-page and portal transfer improvements, with a detailed vault report and a focused production release."
-LastUpdated: 2026-10-16T20:36:11.385359511-04:00
+Summary: Measured public-page and portal transfer improvements, with a detailed vault report and a focused production release.
+LastUpdated: 2026-10-16T20:49:48.368453338-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -27,6 +27,9 @@ Improve the actual loading cost of slop.boutique using existing handlers and pub
 - [Technical report and implementation guide](analysis/01-page-speed-engineering-measured-costs-cache-design-and-implementation-guide.md)
 - [Detailed implementation diary](reference/01-implementation-diary.md)
 - [Cold/warm baseline](various/cache-before.json)
+- [Live after measurement](various/cache-after.json)
+- [Verified HTTP/cache behavior](various/cache-contract-verification.json)
+- [Production deployment](various/production-deployment.json)
 - [Startup probe: network tour limit](various/startup-before.json)
 - Source PR: https://github.com/go-go-golems/francois/pull/9
 - Vault note: /home/manuel/code/wesen/go-go-golems/go-go-parc/Projects/2026/10/16/PROJ - Francois - Page Speed and Browser Cache Engineering - A Technical Deep Dive.md
@@ -34,9 +37,9 @@ Improve the actual loading cost of slop.boutique using existing handlers and pub
 
 ## Status
 
-Current status: **active**
+Current status: **complete**
 
-The detailed report is published and pushed to go-go-parc. Source PR #9 passed all checks and merged as 393bf35; its normal production image/GitOps rollout is in progress. Final rollout and browser measurements will be retained here before completion. No end-to-end app-startup speedup is claimed from a declined tour probe.
+The detailed report and final deployment/measurement appendix are published in go-go-parc (e08db6e and 49b0d45). Source PR #9 and image-only GitOps PR #361 are deployed as sha-393bf35, with Healthy/Synced status. The repeated browser and HTTP checks pass: the portal bundle transfers as 124245 gzip bytes and warm static requests transfer zero bytes. All seventeen images use smaller delivery copies. The report preserves mixed cold elapsed-time samples and makes no end-to-end app-startup speed claim from a declined tour probe.
 
 ## Topics
 
