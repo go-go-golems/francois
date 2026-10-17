@@ -83,6 +83,8 @@ type CatalogServeSettings struct {
 	EmailSigninEnabled    bool     `glazed:"email-signin-enabled"`
 	ZitadelLoginTokenFile string   `glazed:"zitadel-login-token-file"`
 	ZitadelOrganization   string   `glazed:"zitadel-organization"`
+	ZitadelGoogleIDP      string   `glazed:"zitadel-google-idp-id"`
+	ZitadelGitHubIDP      string   `glazed:"zitadel-github-idp-id"`
 	SignupAllowed         bool     `glazed:"signup-allowed"`
 	StripeKeyFile         string   `glazed:"stripe-secret-key-file"`
 	StripeWebhookFiles    []string `glazed:"stripe-webhook-secret-files"`
@@ -163,7 +165,7 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
+	cfg := catalog.Config{Sites: sites, GoogleIDP: s.ZitadelGoogleIDP, GitHubIDP: s.ZitadelGitHubIDP, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
 	if s.EmailSigninEnabled {
 		token, err := secret("", s.ZitadelLoginTokenFile)
 		if err != nil {
@@ -500,6 +502,8 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("oidc-client-id-file", fields.TypeString, fields.WithHelp("File containing the OIDC client ID (written by provisioning)")),
 			fields.New("oidc-client-secret-file", fields.TypeString, fields.WithHelp("Optional OIDC client secret file")),
 			fields.New("oidc-extra-scopes", fields.TypeStringList, fields.WithHelp("Additional OIDC scopes, e.g. urn:zitadel:iam:org:id:<id> to select the ZITADEL organization")),
+			fields.New("zitadel-google-idp-id", fields.TypeString, fields.WithHelp("ZITADEL Google identity provider ID for the shared sign-in page")),
+			fields.New("zitadel-github-idp-id", fields.TypeString, fields.WithHelp("ZITADEL GitHub identity provider ID for the shared sign-in page")),
 			fields.New("signup-allowed", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Offer the identity provider's registration form; leave off for invite-only deployments")),
 			fields.New("stripe-secret-key-file", fields.TypeString, fields.WithHelp("Stripe secret key file; billing is disabled when empty")),
 			fields.New("stripe-webhook-secret-files", fields.TypeStringList, fields.WithHelp("Current and previous webhook signing secret files")),

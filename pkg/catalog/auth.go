@@ -189,6 +189,22 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "login_unavailable", "Sign-in is not configured")
 		return
 	}
+	provider := r.URL.Query().Get("provider")
+	idpID := ""
+	switch provider {
+	case "":
+	case "google":
+		idpID = s.Config.GoogleIDP
+	case "github":
+		idpID = s.Config.GitHubIDP
+	default:
+		httpx.Fail(w, 400, "invalid_provider", "Choose an available sign-in method")
+		return
+	}
+	if provider != "" && idpID == "" {
+		httpx.Fail(w, 503, "login_unavailable", "This sign-in method is not configured")
+		return
+	}
 	state, nonce, verifier, binding := store.RandomHex(24), store.RandomHex(16), store.RandomHex(32), store.RandomHex(24)
 	ret := safeReturn(r.URL.Query().Get("return"))
 	if err := s.Store.SaveLoginFlow(r.Context(), state, store.LoginFlow{BindingHash: store.Hash(binding), Nonce: nonce, Verifier: verifier, ReturnPath: ret}, 10*time.Minute); err != nil {
@@ -199,7 +215,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("signup") == "1" && s.Config.SignupAllowed {
 		prompt = "create"
 	}
-	target, err := oidc.AuthURL(r.Context(), state, nonce, verifier, prompt)
+	target, err := oidc.AuthURL(r.Context(), state, nonce, verifier, prompt, idpID)
 	if err != nil {
 		log.Warn().Err(err).Msg("OIDC discovery failed")
 		http.Redirect(w, r, "/?login_error=provider_unavailable", http.StatusSeeOther)

@@ -26,7 +26,7 @@ ExternalSources:
     - https://zitadel.com/docs/guides/integrate/login-ui/login-app
     - https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
     - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-Summary: ZITADEL Session API email challenges authenticate existing supporters into ordinary portal sessions.
+Summary: Shared social sign-in/signup and ZITADEL Session API email challenges authenticate accounts without role-specific login pages.
 LastUpdated: 2026-10-17T14:27:28-04:00
 WhatFor: Teach a new contributor the current authentication system and a small complete email sign in implementation.
 WhenToUse: Implementing the working Send link form from Ramon Final.
@@ -37,7 +37,7 @@ WhenToUse: Implementing the working Send link form from Ramon Final.
 
 A supporter enters an email address, receives a link, opens it in the same browser and presses Continue. No password or passkey is required. ZITADEL generates, sends and verifies the email code. Francois creates its normal local session only after ZITADEL confirms the email check for the expected existing identity.
 
-Use the Session API directly inside the existing Go service. This is a custom login screen for our own application, not a separately deployed login service. The existing staff OIDC login remains available. There is no new identity provider, mail queue, local SMTP implementation, token-exchange impersonation or custom OIDC proxy.
+Use the Session API directly inside the existing Go service. This is a custom login screen for our own application, not a separately deployed login service. The existing OIDC login remains available to all roles. There is no new identity provider, mail queue, local SMTP implementation, token-exchange impersonation or custom OIDC proxy.
 
 This revises the original guide, preserved in `../archive/01-superseded-first-party-email-guide.md`. That guide selected locally generated email tokens because the hosted-login documentation describes email OTP as MFA. Further investigation found ZITADEL's explicit custom-login recommendation and verified the relevant implementation in the deployed version. The choice is now **ZITADEL email authentication, followed by the existing Francois session**.
 
@@ -148,7 +148,7 @@ Keep the feature in the existing Go service:
 | `GET /auth/email/verify` | Validate flow/browser; render Continue; no provider mutation |
 | `POST /auth/email/verify` | Atomically claim flow; verify provider proof; create session |
 
-The form works without React. Unknown, ambiguous, disabled and privileged addresses all receive the same public acknowledgement. Mail service disablement can show a global unavailable message independent of a submitted address. Use the existing OIDC entry point for creator/admin sign-in.
+The form works without React. Unknown, ambiguous, disabled and guest addresses all receive the same public acknowledgement. Mail service disablement can show a global unavailable message independent of a submitted address. All roles use the same sign-in page; email proof is available to enabled verified accounts with an enrolled OTP email factor.
 
 One table holds pending state:
 
@@ -180,7 +180,7 @@ Claim the flow before contacting ZITADEL using an atomic delete conditioned on t
 request_email(form):
     require_valid_input_origin_and_csrf(form)
     admit_under_mail_limits()
-    user = unique_enabled_verified_subscriber(form.email)
+    user = unique_enabled_verified_non_guest_user(form.email)
     if user absent: return generic_acknowledgement()
     require user.issuer == configured_zitadel_issuer
     provider_user = zitadel.get_user(user.subject)
@@ -203,7 +203,8 @@ confirm_email(form):
     require active_verified_matching_user(current_provider_user, flow)
     transaction:
         lock local user row
-        require same issuer, subject, email, enabled, subscriber role
+        require same issuer, subject, email, enabled, non-guest role
+        require current role == role observed while claiming flow
         create ordinary portal session with empty OIDC id_token
     set existing portal cookie
     redirect to stored safe_return
@@ -255,7 +256,7 @@ The useful tests exercise trust boundaries, not each line of the client:
 
 - Fake provider returns a session with only a user factor: login must fail.
 - Wrong subject, wrong organization, stale/missing email factor, changed email and disabled provider user: login must fail.
-- Unknown/ambiguous/staff account requests: generic acknowledgement and no provider email.
+- Unknown/ambiguous/guest account requests: generic acknowledgement and no provider email.
 - GET link preview, including an automated mail scanner: no code verification or local session.
 - Parallel POST redemption: exactly one claimant and at most one local session.
 - Replacement while a send is in flight: late provider response cannot attach to the newer flow.
@@ -265,10 +266,23 @@ The useful tests exercise trust boundaries, not each line of the client:
 
 Then run a **real isolated** ZITADEL v4.16.1 email flow with a test user and a test mail sink. Enroll the factor, create the session without any password check, retrieve the delivered link from the mailbox, and complete the actual portal confirmation. Verify the same preexisting local user ID, existing instance ownership and entitlement behavior. Confirm provider challenge reuse fails and no temporary provider session remains active after completion. Never save service credentials, OTP codes or live links in ticket evidence; record redacted outcomes and screenshots.
 
-Run affected Go tests plus repository-required checks. The isolated round trip now passes. Production enablement still requires its dedicated credential, functioning SMTP and explicit supporter factor enrollment; no production configuration was changed.
+Run affected Go tests plus repository-required checks. The isolated round trip now passes. Production credential/SMTP configuration and the approved existing-supporter enrollment are recorded in doc/production.md. Shared social sign-in uses the same identity/session/access model; its exact rollout is recorded in the investigation diary and production receipts.
 
 ## 10. Why this is the smallest suitable integration
 
-OIDC completion through `POST /v2/oidc/auth_requests/{id}` is available if we build a login UI serving multiple applications. It would require provider application login-URL configuration and an OIDC authorization context in addition to the email flow. Our supporter sign-in only serves Francois, so none of that is required now. The existing staff OIDC path remains intact.
+OIDC completion through `POST /v2/oidc/auth_requests/{id}` is available if we build a login UI serving multiple applications. It would require provider application login-URL configuration and an OIDC authorization context in addition to the email flow. Our supporter sign-in only serves Francois, so none of that is required now. The existing role-neutral OIDC path remains intact.
 
 The result is a Final email screen, a short-lived browser-bound pending record and several server-side calls to the identity provider we already run. ZITADEL performs the actual email authentication; Francois keeps the account/session/access responsibilities it already has.
+
+
+## Unified Google/GitHub sign-in extension
+
+The public sign-in page now presents Google, GitHub and the existing email form together, without a separate creator/administrator link. Authentication selects an identity; the stored account determines its role and subscription access. A successful external login uses the existing callback and `UpsertIdentity`: new accounts get the schema's ordinary subscriber role, while existing roles and disabled status are preserved.
+
+The browser selects only `provider=google` or `provider=github` on `/auth/login`. `catalog.Config.GoogleIDP` and `.GitHubIDP` map those fixed names to server-configured ZITADEL provider IDs. Unknown names return 400; disabled providers return 503 and are omitted from the page. `identity.Provider.AuthURL` adds `urn:zitadel:iam:org:idp:id:<id>` to its existing scopes while retaining organization selection, state, nonce, S256 PKCE and the registered callback. It does not construct Google/GitHub OAuth requests or handle their client secrets.
+
+Configure `--zitadel-google-idp-id` and `--zitadel-github-idp-id` with the existing organization providers' nonsecret IDs. `--signup-allowed` enables the page's new-account explanation. The shared Terraform environment must permit registration and set account creation plus automatic creation on those two organization IdPs; its provider secrets remain ephemeral Vault reads. Terraform outputs `google_idp_id` and `github_idp_id` provide the matching runtime values.
+
+This extension does not create an account from an unproven email address. Email links still use the existing enrollment/proof machinery. The prior instruction to label an OIDC link as creator/admin sign-in is superseded by this unified page. The user subsequently approved one unified flow: enabled subscribers, creators and admins may use email links when their email OTP factor is enrolled. Guests remain ineligible. Before replacing a flow, compare the locked role to the lookup role; while atomically claiming the flow, also read its user’s role; compare that role again under the final user lock. Role changes still revoke pending flows and sessions. This retains the promotion-race protection without adding a database column.
+
+Tests in `pkg/catalog/social_signin_test.go` verify the page and server-owned selection, return-path encoding, disabled/unknown providers, bound state consumption, nonce and PKCE challenge. `pkg/catalog/identity/oidc_test.go` verifies provider selection preserves base/organization scopes and registration prompt behavior. The full Go suite with PostgreSQL, build, lint and logcopter checks passed for this extension. Local screenshot verification uses fixture provider IDs; it does not prove external Google/GitHub authentication. See sources/zitadel-social-login/README.md for the primary protocol references.

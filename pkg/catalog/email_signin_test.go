@@ -313,11 +313,13 @@ func TestEmailSignupEligibilityAndLimits(t *testing.T) {
 	e, up, u := setupEmail(t)
 	ctx := context.Background()
 	binding := store.RandomHex(24)
-	for _, mode := range []string{"unknown", "staff", "ambiguous"} {
+	for _, mode := range []string{"unknown", "guest", "ambiguous"} {
 		email := "unknown@example.test"
-		if mode == "staff" {
+		if mode == "guest" {
 			email = u.Email
-			_ = e.store.SetUserRole(ctx, u.ID, "creator")
+			if _, err := e.store.Pool.Exec(ctx, `UPDATE users SET role='guest' WHERE id=$1`, u.ID); err != nil {
+				t.Fatal(err)
+			}
 		}
 		if mode == "ambiguous" {
 			email = u.Email
@@ -419,7 +421,7 @@ func TestEmailFormNoReferrerNavigationOrigin(t *testing.T) {
 	}
 }
 
-func TestStaffSigninPreservesSafeReturn(t *testing.T) {
+func TestSigninPreservesSafeReturn(t *testing.T) {
 	e := setup(t, func(c *Config) {
 		for i := range c.Sites {
 			c.Sites[i].OIDC = identity.New(identity.Config{Issuer: "https://issuer.test", ClientID: "staff"})
@@ -436,12 +438,52 @@ func TestStaffSigninPreservesSafeReturn(t *testing.T) {
 			code, body, _ := emailHTTP(e, "GET", "/signin?return="+url.QueryEscape(tt.requested), "", nil)
 			match := link.FindSubmatch(body)
 			if code != 200 || len(match) != 2 {
-				t.Fatalf("missing staff link: %d %s", code, body)
+				t.Fatalf("missing account link: %d %s", code, body)
 			}
 			target, err := url.Parse(html.UnescapeString(string(match[1])))
 			if err != nil || target.Path != "/auth/login" || target.Query().Get("return") != tt.want {
-				t.Fatalf("staff link %s, err=%v; want return %q", match[1], err, tt.want)
+				t.Fatalf("account link %s, err=%v; want return %q", match[1], err, tt.want)
 			}
 		})
+	}
+}
+
+func TestEmailSigninUsesExistingRoleForEveryAccountType(t *testing.T) {
+	for _, role := range []string{"subscriber", "creator", "admin"} {
+		t.Run(role, func(t *testing.T) {
+			e, up, u := setupEmail(t)
+			ctx := context.Background()
+			if err := e.store.SetUserRole(ctx, u.ID, role); err != nil {
+				t.Fatal(err)
+			}
+			binding := store.RandomHex(24)
+			query := issueTestEmail(t, e, up, binding)
+			status, _, headers := emailHTTP(e, "POST", "/auth/email/verify", binding, url.Values{"flow": {query.Get("flow")}, "code": {query.Get("code")}, "csrf": {binding}})
+			if status != 303 {
+				t.Fatalf("%s verification status %d", role, status)
+			}
+			response := http.Response{Header: headers}
+			token := ""
+			for _, cookie := range response.Cookies() {
+				if cookie.Name == e.srv.sessionCookie() {
+					token = cookie.Value
+				}
+			}
+			_, got, err := e.store.ResolveSession(ctx, token)
+			if err != nil || got.Role != role {
+				t.Fatalf("session role %q, err=%v; want %s", got.Role, err, role)
+			}
+		})
+	}
+}
+
+func TestEmailSigninRejectsRoleChangeBeforeFlowReplacement(t *testing.T) {
+	e, _, u := setupEmail(t)
+	ctx := context.Background()
+	if err := e.store.SetUserRole(ctx, u.ID, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.store.ReplaceEmailSignin(ctx, store.RandomHex(32), store.Hash(store.RandomHex(24)), u, "http://portal.test", "/"); err == nil {
+		t.Fatal("stale subscriber lookup created a flow after promotion")
 	}
 }

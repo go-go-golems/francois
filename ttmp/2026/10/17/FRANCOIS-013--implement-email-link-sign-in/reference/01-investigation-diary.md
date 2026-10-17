@@ -560,3 +560,126 @@ Review production-enrollment.json and the updated production-runbook paragraph. 
 ### Technical details
 
 Used GET /v2/users/{id}/authentication_methods, POST /v2/users/{id}/otp_email with {}, then GET of the same methods endpoint. Asserted AUTHENTICATION_METHOD_TYPE_OTP_EMAIL was present and the prior method set remained a subset of the resulting set.
+
+## Step 9: Add Google/GitHub to the shared sign-in page
+
+Implemented direct Google and GitHub buttons alongside the existing email form and removed role-specific sign-in language. The two providers reuse the current ZITADEL OIDC flow; server configuration supplies their IDs, and the browser can select only the two known names. A separate Terraform plan prepares new-account creation through those existing providers without replacing clients or touching credentials.
+
+### Prompt Context
+
+**User prompt (verbatim):** "add github / google SSO too, there is no \"separate creator / admin\" sign in"
+
+**Assistant interpretation:** One shared sign-in page with social options usable across roles, including a working social signup path for new visitors.
+
+**Inferred user intent:** Eliminate the artificial role-specific login entry point and let people create ordinary accounts through Google or GitHub.
+
+### What I did
+
+- Added the two explicit nonsecret CLI flags and catalog configuration fields. Replaced the signin page's Staff data flag with OIDC/provider availability and ordinary signup presentation.
+- Added fixed-name provider selection to /auth/login and the documented ZITADEL IdP scope to identity.Provider.AuthURL. Return paths use the existing sanitizer; the normal browser binding, state, nonce, PKCE and token verification remain in place.
+- Reworked the template into readable branches, kept the no-script email form, and used existing visual tokens for the two buttons. Removed the stale role-specific CSS selector and labels.
+- Added integration tests covering direct links, nested return query strings, untrusted/disabled provider selection, and the saved state/nonce/verifier relationship. Extended OIDC tests for scopes and prompt preservation.
+- Added the unified-flow appendix to the intern guide, recorded official scope/provider sources, and prepared local visual-check scripts/screenshots.
+- Planned Terraform updates to the two provider creation flags and organization registration policy; the full plan contains exactly three in-place updates and no replacements or credential changes. It exposes the two existing provider IDs as nonsecret outputs.
+
+### Why
+
+ZITADEL already owns both external providers and their secrets. Selecting its existing IdP by scope avoids implementing separate OAuth clients or callbacks in Francois. New users still receive the ordinary local role; authentication does not grant paid access.
+
+### What worked
+
+- The complete PostgreSQL-backed Go suite passed; catalog package completed in 7.962s. go build ./... passed. make lint logcopter-check passed with zero lint issues.
+- Targeted social and safe-return tests passed before the broad gate. Local Chromium checks confirm the email form plus both social links, encoded destination preservation, no creator/admin link, and no horizontal overflow at desktop/mobile widths.
+- The Terraform plan changes only the Francois login policy and its two organization providers, all in place.
+
+### What didn't work
+
+No code validation failure occurred. The shared page's local fixture uses placeholder provider IDs and cannot complete an external social login; that is explicitly a visual test, with server routing covered by integration tests. Live provider entry points remain to be checked after rollout.
+
+### What I learned
+
+The providers already existed but allowed only linking invited users. Public social signup needs both identity-provider account-creation flags and organization registration policy; exposing buttons alone would retain the signup gap.
+
+### What was tricky to build
+
+The IdP scope must be added without dropping the organization and standard scopes or OIDC protections. Tests consume the actual saved browser-bound flow and reconstruct its PKCE challenge, rather than merely checking button text.
+
+### What warrants a second pair of eyes
+
+Review server-owned provider mapping and scope preservation. The email-role policy question is pending: the current change does not silently broaden email links to staff. Google/GitHub and the page are shared by all roles regardless.
+
+### What should be done in the future
+
+Publish/review the source PR, apply and merge the bounded identity changes, then deploy the new image with its provider-ID flags together. Verify real redirects reach each provider before claiming production SSO works. Actual third-party consent/completion requires a real user login.
+
+### Code review instructions
+
+Start with auth.go's provider switch, identity/oidc.go's scope option, signin.tmpl and social_signin_test.go. The later rollout receipt will record actual production revisions and provider-entry validation separately from this code checkpoint.
+
+### Technical details
+
+Runtime flags: --zitadel-google-idp-id, --zitadel-github-idp-id; optional existing --signup-allowed. No new dependency, environment read, database migration, service or callback endpoint is added. Email proof/role eligibility and human factors are unchanged in this checkpoint.
+
+## Step 10: Apply the approved signup policy and unify email eligibility across roles
+
+The user approved proceeding after the production registration boundary was called out. Applied the reviewed public-signup plan, merged Terraform PR #36, and extended email eligibility to enabled verified subscriber/creator/admin accounts without enrolling any additional human factors. Added explicit role comparisons at flow replacement and final session creation so role changes cannot reuse a stale authorization decision.
+
+The first code review also identified a native-account lockout if social buttons hid generic OIDC. Retained a neutral More sign-in options link on the same page. It is an authentication-method choice for everyone, not a separate creator/admin entry point.
+
+### Prompt Context
+
+**User prompt (verbatim):** "go ahead you have approval"
+
+**Assistant interpretation:** Approve the prepared public Google/GitHub account-creation policy and the shared sign-in flow, including the previously asked all-role email option.
+
+**Inferred user intent:** Complete the unified flow without further confirmation for those changes. New accounts receive ordinary roles; paid access and staff authorization remain separate.
+
+### What I did
+
+- Before approval, automatic review rejected the public-signup apply: "persistently change production ZITADEL policy to allow public account creation through Google/GitHub ... not explicitly authorized". No command in that rejected batch executed. Published the concrete proposal as draft Terraform PR #36 and continued unaffected sign-in work.
+- After approval, applied the exact saved plan: zero adds, three changes, zero destroys. Updated the policy documentation, marked PR #36 ready and merged as e41283c20bf605d84a5e972ee4a4a6dbd8ba4606. The provider IDs and existing secrets/linking rules were retained.
+- Allowed email for the three existing human roles while continuing to reject guests. Email still requires a unique enabled verified local address and a matching active organization identity with an enrolled provider email OTP factor.
+- Compare the locked role with the lookup role before replacing a flow. During atomic DELETE/RETURNING claim, read the current user role into the private EmailSignin result; compare it again under the final user lock. No schema change or migration is needed. SetUserRole continues deleting pending links and revoking sessions/grants.
+- Added successful verification tests for subscriber, creator and admin, guest rejection, and a stale lookup/promotion regression. Existing claimed-flow promotion/revocation tests continue passing.
+- Addressed the review's P1 native-account lockout with the common More sign-in options link. Updated the guide, production contract and local visual checks accordingly.
+
+### Why
+
+All roles should select authentication methods from the same page. Allowing staff email proof must not allow an old subscriber link to acquire a new privileged role during verification. The existing row locks and revocation path support that requirement with a private role snapshot instead of a new authentication subsystem.
+
+### What worked
+
+- Focused email/social regressions pass, including all three human roles, guest rejection and role-change checks.
+- Final complete PostgreSQL-backed Go suite passes; catalog package completed in 12.746s. Build, lint and logcopter checks pass.
+- The initial source PR CI passed all checks. Follow-up code is being pushed for renewed review; the original P1 has a concrete regression test and visible neutral fallback.
+- Terraform apply completed with exactly the reviewed three in-place policy/provider changes. No secrets, memberships, subscriptions or human authentication factors were changed.
+
+### What didn't work
+
+The first new role test assigned ResolveSession's first result to a user variable. That result is Session; the user is second. Compilation reported `got.Role undefined (type store.Session has no field or method Role)` at email_signin_test.go:467–468. Corrected the return order and reran the focused and complete gates successfully.
+
+The original UI omitted the native OIDC link whenever a social provider existed. Code review correctly identified that existing users without linked social identities or enrolled email OTP could lose the visible way to sign in. The neutral shared fallback fixes this without reintroducing role-specific presentation.
+
+### What I learned
+
+A common page and role-neutral email proof are separate changes. The provider checks already authenticate the identity independent of local roles; local role stability must still be enforced across network verification and the final transaction.
+
+### What was tricky to build
+
+Role updates delete pending links, but a claimed link has already left that table. Carrying the role observed during atomic claim lets the final locked transaction reject a role change that occurred afterward. The replacement-side comparison also rejects a lookup that went stale before the pending flow was written.
+
+### What warrants a second pair of eyes
+
+Review the claim subquery and final role comparison together with SetUserRole's existing transaction. Existing OTP enrollment remains required for each account; this change does not silently enroll staff or new social accounts in a human factor. The social path creates identities through ZITADEL, not browser-supplied email assertions.
+
+### What should be done in the future
+
+Complete renewed source review and CI, publish the supporting image, and roll it out together with both provider-ID flags and --signup-allowed. Verify the actual external provider entry pages before describing production social navigation as qualified.
+
+### Code review instructions
+
+Review store/email_signins.go, issueEmail's role gate, the all-role and stale-role regressions, and the template's neutral native-account fallback. The saved source references explain the IdP scope and creation settings; Terraform PR #36 owns the production policy change.
+
+### Technical details
+
+The public policy was initially blocked and then authorized explicitly; no rejection workaround was used. The application adds no migration, credential, environment read, callback, worker or queue. Provider-level human factor enrollment and actual external login-email delivery remain unchanged by this checkpoint.

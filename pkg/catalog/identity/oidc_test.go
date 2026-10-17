@@ -40,7 +40,7 @@ func TestAuthURLIncludesExtraScopes(t *testing.T) {
 	srv := discovery(t, true)
 	p := New(Config{Issuer: srv.URL, ClientID: "client-1", RedirectURL: "https://portal.example/auth/callback",
 		ExtraScopes: []string{"urn:zitadel:iam:org:id:123"}})
-	target, err := p.AuthURL(context.Background(), "state", "nonce", strings.Repeat("v", 43), "")
+	target, err := p.AuthURL(context.Background(), "state", "nonce", strings.Repeat("v", 43), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +58,27 @@ func TestAuthURLIncludesExtraScopes(t *testing.T) {
 	}
 	if u.Query().Get("code_challenge_method") != "S256" {
 		t.Fatalf("PKCE challenge missing: %s", target)
+	}
+}
+
+func TestAuthURLSelectsIdentityProviderWithoutDroppingSecurityParameters(t *testing.T) {
+	srv := discovery(t, true)
+	p := New(Config{Issuer: srv.URL, ClientID: "client-1", RedirectURL: "https://portal.example/auth/callback", ExtraScopes: []string{"urn:zitadel:iam:org:id:123"}})
+	for _, id := range []string{"google-id", "github-id"} {
+		target, err := p.AuthURL(context.Background(), "state", "nonce", strings.Repeat("v", 43), "create", id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		u, _ := url.Parse(target)
+		q := u.Query()
+		for _, scope := range []string{"openid", "profile", "email", "urn:zitadel:iam:org:id:123", "urn:zitadel:iam:org:idp:id:" + id} {
+			if !strings.Contains(" "+q.Get("scope")+" ", " "+scope+" ") {
+				t.Fatalf("missing scope %s: %s", scope, target)
+			}
+		}
+		if q.Get("state") != "state" || q.Get("nonce") != "nonce" || q.Get("prompt") != "create" || q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" || q.Get("redirect_uri") != "https://portal.example/auth/callback" {
+			t.Fatalf("lost auth parameters: %s", target)
+		}
 	}
 }
 

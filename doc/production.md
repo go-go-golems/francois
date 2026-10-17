@@ -760,9 +760,9 @@ Apply migration `011_operations.sql` before deploying this implementation. It tr
 
 Normal Open resumes a saved workspace through `POST /api/instances/open`. If its pinned release is withdrawn and current policy forbids running it, Open moves that same workspace to the requested published release, preserving its URL and saved data. Permitted pins stay unchanged. Tour start limits are charged only after successful creation; concurrent resumes and capacity failures spend no starts. Expired lease payloads are purged within the next writable storage transaction before quota measurement. The public stream subscribes through `/feed.xml`; usage remains in administrator analytics. See FRANCOIS-008's implementation receipt for the verified local rollout; it is not evidence of a production deployment.
 
-## Email-only supporter sign-in
+## Email and social sign-in
 
-The Final `/signin` page supports email magic links through ZITADEL's Session API. It is off by default. Creator/admin accounts continue to use `/auth/login` and the existing OIDC client. Email login selects only an existing enabled subscriber-role user with a unique verified address and the configured ZITADEL issuer. It never creates or links an account. Payment access is still checked separately.
+The shared `/signin` page offers email magic links and configured Google/GitHub options to all roles. Email links use ZITADEL’s Session API and select an existing enabled non-guest account with a unique verified address and enrolled OTP email factor. Email authentication does not create or link accounts. Social authentication reuses `/auth/login` and the existing OIDC callback; new identities receive the ordinary local role, and existing roles are preserved. Payment access is checked separately. Email support remains off by default in the binary and is explicitly enabled in production.
 
 Apply migration `012_email_signins.sql` through the ordinary catalog migration command before running the new binary. To enable the feature, provision a **dedicated** ZITADEL machine user with the built-in `IAM_LOGIN_CLIENT` role and write its short-lived/rotated PAT to a mounted secret file. This role is privileged; do not reuse the Terraform administrator credential. The application requires user read and session read/write/delete permissions. The default ORG_USER_MANAGER role does not include session.write on v4.16.1.
 
@@ -779,7 +779,7 @@ ZITADEL, not Francois, owns SMTP. A read-only check on 2026-10-17 confirmed an a
 
 The application uses `POST /v2/sessions` with `challenges.otpEmail.sendCode.urlTemplate`, pointing to its trusted portal confirmation page. The deployed v4.16.1 proto uses a sendCode/returnCode object oneof; do not copy the older boolean returnCode email example from the MFA guide. The user opens the link **in the same browser**, then confirms with a POST. GET requests from mail scanners cannot authenticate. Both the portal attempt and temporary ZITADEL session expire in five minutes, matching the provider's default email-code expiry.
 
-Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. Unknown, ambiguous, disabled and privileged addresses receive the same generic acknowledgement. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
+Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. Unknown, ambiguous, disabled and guest addresses receive the same generic acknowledgement. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
 
 Email sessions use the existing local idle/absolute expiry and have no OIDC ID token. Logout stays local. Temporary provider proof sessions are deleted after redemption and expire automatically if cleanup fails. Changing a user's role revokes all portal sessions and runtime grants, and invalidates pending email attempts; promotion cannot turn an email session into an admin session.
 
@@ -798,3 +798,22 @@ The public email form and staff fallback were verified on both hostnames. With e
 The public site is artifact-only by default. In **Admin → Settings → Storefront**, enable **Show the blog publicly** to expose journal pages, creator-page posts and blog entries in RSS. The setting is `storefront.journalEnabled` in the existing versioned settings document; missing/false means hidden, including previously saved documents. No migration is needed.
 
 While hidden, `/journal`, public post URLs and `/journal/feed.xml` return 404 to visitors. `/feed.xml` continues serving artifact releases. Authorized editors can still manage posts in Studio and open individual previews with private/no-store caching and noindex; publishing a post does not override the global setting. Turning the blog off does not delete or unpublish any content. This controls public presentation rather than making previously published media URLs secret.
+
+
+### Unified social sign-in configuration
+
+Configure the existing Google/GitHub organization IdPs using nonsecret
+`--zitadel-google-idp-id` and `--zitadel-github-idp-id` flags. Browser values
+select only the fixed names `google` or `github`; the backend adds ZITADEL’s
+provider-selection scope without dropping organization scope, state, nonce or
+S256 PKCE. The neutral More sign-in options link keeps native ZITADEL accounts
+usable without a separate staff flow. All roles may use email links if their
+email OTP factor is enrolled; no human factor is enrolled implicitly by this
+code change. Role changes revoke sessions/pending links, and a claimed link
+cannot create a session after its account changes role.
+
+The explicitly approved Terraform PR #36 permits public creation through the
+two existing external providers and the organization registration policy.
+`--signup-allowed` controls the page’s signup explanation; it does not grant
+provider registration permission itself. Deploy these flags with the supporting
+image, and retain the separate subscription and administrator authorization.

@@ -79,6 +79,9 @@ type Config struct {
 	Sites []Site
 	// EmailLogin is nil while email-only supporter sign-in is disabled.
 	EmailLogin *identity.EmailLogin
+	// Provider IDs are server-configured ZITADEL identities, never browser input.
+	GoogleIDP string
+	GitHubIDP string
 	// TrialAllowed enables access while a subscription is trialing. Prices
 	// come from the plans in the settings document.
 	TrialAllowed bool
@@ -104,6 +107,11 @@ type Config struct {
 // Validate rejects site lists the host dispatcher cannot route
 // unambiguously.
 func (c Config) Validate() error {
+	for _, id := range []string{c.GoogleIDP, c.GitHubIDP} {
+		if strings.ContainsAny(id, " \t\r\n") {
+			return errors.New("ZITADEL identity provider IDs must not contain whitespace")
+		}
+	}
 	if len(c.Sites) == 0 {
 		return errors.New("at least one site is required")
 	}
