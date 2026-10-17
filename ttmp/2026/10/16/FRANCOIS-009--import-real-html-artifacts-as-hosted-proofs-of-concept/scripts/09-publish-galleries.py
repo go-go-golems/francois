@@ -11,9 +11,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--token-file', required=True)
 parser.add_argument('--admin-token-file', help='Also enable bounded tours; requires explicit administrative approval')
 parser.add_argument('--artifact', help='Update only this artifact when refining a gallery')
+parser.add_argument('--plan', default='sources/showcase.json', help='Ticket-relative image selection manifest')
 args = parser.parse_args()
 BASE = 'https://slop.boutique'
-plan = json.loads((TICKET / 'sources/showcase.json').read_text())
+plan = json.loads((TICKET / args.plan).read_text())
 receipt_file = TICKET / 'various/gallery-publication-receipt.json'
 receipt = json.loads(receipt_file.read_text()) if receipt_file.exists() else {'base': BASE, 'artifacts': {}}
 

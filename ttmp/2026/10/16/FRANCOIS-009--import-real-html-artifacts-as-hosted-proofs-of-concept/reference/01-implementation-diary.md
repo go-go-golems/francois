@@ -383,3 +383,60 @@ The normal main-branch image workflow 38985147906 published ghcr.io/go-go-golems
 Ran node scripts/11-verify-portal-rollout.mjs (from the ticket directory) against production in a fresh unauthenticated Chromium context; exit 0. All five pages return 200, each exposes exactly one Download HTML and no Manifest link, and all seventeen cover/gallery images load. New anonymous Deck and RAG tours have document titles exactly equal to their corresponding public page titles: Lattice Deck · slop.boutique and RAG Workbench · slop.boutique. Both retain the exact twenty-minute expiry, and Close restores a non-instance page title. These two checks make no model calls. Existing open instance tabs need a refresh to load the updated portal JavaScript; the user's existing tab was left untouched.
 
 Evidence is various/portal-rollout-verification.json and various/portal-deployment-receipt.json. Refreshed the illustrated catalog and Deck-gallery captures, and added the two instance captures. The evidence index links the final receipts and figures for the later vault report. No new failure occurred during this checkpoint. Source implementation is deployed from PR #8; the separate import branch retains the reproducible source archive and report evidence. No requested implementation or deployment work remains for this ticket's follow-ups.
+
+## Step 6: Measure slow requests and correct public asset caching
+
+Investigated live headers and cold/warm Chromium loads after the user reported slowness. Public uploaded images were already cached correctly, but embedded assets lacked validators and compression. Added a bounded asset handler and content-versioned references, and published smaller screenshot delivery copies without changing the original report PNGs or application HTML.
+
+### Prompt Context
+
+**User prompt (verbatim):** “do we properly handle cache headers and stuff? I saw quite a bit of slowness”
+
+**Assistant interpretation:** Measure live caching and transfer costs, explain the observed gaps and fix straightforward causes. **Inferred user intent:** Make opening and revisiting the minimal public site faster without adding infrastructure. **Commit (code):** c2aacec on the import branch; cherry-picked as 1ec0d89 onto fix/francois-asset-cache for a focused service PR.
+
+### What I did
+
+- Read portal/hosted routes, embedded asset allowlists, storefront media templates, fonts, analytics wrapping and the production ingress. The ingress has no compression middleware; live responses confirm no Content-Encoding for text assets.
+- Added scripts/12-measure-cache.mjs: read-only fresh browser contexts for /apps, /apps/lattice-deck and /account, each cold then warm. Captures only an allowlist of response headers, paths, timing and byte counts, never cookie/grant values. No tours or model calls.
+- curl --compressed of /static/catalog.js transferred 413644 bytes in 3.869698 seconds. No ETag, Last-Modified or Content-Encoding was present, and Cache-Control was no-cache. Chromium independently downloaded the entire bundle on both cold and warm account visits; see various/cache-before.json.
+- Added pkg/catalog/web/assets.go: compress/hash the fixed embedded allowlists once at startup, serve selected gzip/identity bytes with distinct strong ETags and ServeContent, and use immutable year-long caching only when the URL's content hash matches. Bare or mismatched asset URLs require revalidation.
+- Updated storefront templates, the SPA shell, launch shell and injected runtime script to use those content-versioned URLs. The launch document, grant-bearing /page response and private APIs retain uncached policies. No generic response wrapper touches SSE, model calls, media ranges or authenticated HTML.
+- Added tests for content changes/URL changes, conditional responses and variants, compressed byte identity, HEAD, compression negotiation, allowlists and the launch-document/static-asset boundary. Full PostgreSQL-backed go test ./... -count=1 passes.
+- Added scripts/13-optimize-web-media.py and sources/showcase-web.json. cwebp -q 85 creates delivery copies at the original dimensions: 10605879 bytes of PNG become 1983916 bytes of WebP, an 81.3% reduction across all seventeen images. Originals and their hashes are untouched. The CLI publisher's --plan option selects this alternate manifest and preserves the published Markdown and release HTML.
+- Published all seventeen WebP copies with the existing Studio-only token and CLI. No administrative settings changes, new token, new application version or model calls were needed.
+
+### Why
+
+no-cache permits storage but requires revalidation; without a validator the existing handler returned a full 200 body each time. Content-versioned references make a long freshness lifetime safe and avoid a validation round trip on normal repeat visits. Precompression costs a small bounded amount of process memory and startup work, with no per-request compression and no additional service. Public media IDs already identify immutable bytes; smaller delivery copies address first-visit costs rather than changing a correct image cache policy.
+
+### What worked
+
+The live measurements distinguish a warm transfer defect from an initial media-size cost. The cold catalog fetched roughly 4.49 MB including a 3.21 MB Rift cover; warm media responses transferred zero bytes. The account page's JavaScript was still 413644 bytes on its warm request. All local integration tests pass with actual PostgreSQL. The publisher reused the current free-sample releases and successfully verified each cover/gallery selection.
+
+### What didn't work
+
+The first un-escalated full test command failed because the sandbox made the Go build cache read-only (open /home/manuel/.cache/go-build/...: read-only file system) and disallowed httptest/PostgreSQL sockets (socket: operation not permitted). Reran the identical TEST_DATABASE_URL=local go test ./... -count=1 command with the required sandbox permission; the entire suite passed. Early guessed source/ingress paths did not exist; rg --files located the actual templates and gitops/kustomize/francois/ingress.yaml.
+
+### What I learned
+
+The catalog's original screenshot optimization gap dominated initial image bytes; cache headers alone cannot reduce that first download. Instance origins each have a separate browser cache, so immutable runtime caching primarily helps reloads within the same instance. The portal bundle benefits across account/instance/studio routes on the shared portal origin. Headless-browser probes skip traffic tracking, so these timing samples are not an end-user latency guarantee.
+
+### What was tricky to build
+
+The hosted router sets no-store by default. Only fixed public static files override it. /page includes a bearer grant in its bootstrap JSON and must retain its uncached policy; compression here was deliberately scoped to non-secret embedded assets. Strong validators differ for compressed and uncompressed representations, and Vary: Accept-Encoding preserves cache variant selection. Updated asset bytes change the URL emitted by fresh HTML rather than waiting for cache expiry.
+
+### What warrants a second pair of eyes
+
+Review asset allowlists, hash query matching and the grant-bearing page boundary. Verify that first-load responses negotiate gzip, warm browser requests transfer no asset bodies and a new binary emits new asset URLs. Screenshot compression is lossy WebP at quality 85; use original PNGs for the technical report and inspect actual public rendering for text legibility.
+
+### What should be done in the future
+
+Complete service PR checks and production rollout, then repeat the same browser measurement and retain the final receipt. Remaining app-specific startup work includes the authenticated launch handshake, intentionally uncached application HTML and any third-party scripts retained by the imported export. This patch does not claim to eliminate all of those costs.
+
+### Code review instructions
+
+Start with pkg/catalog/web/assets.go and its tests, then the two static routes and the emitted URLs in web/templates/layout.tmpl, web.PortalIndex and hosted/routes.go. Run the full Go suite with local TEST_DATABASE_URL, and run scripts/12-measure-cache.mjs against the deployed site with an after label. Do not rerun publication scripts as tests; they mutate the live catalog.
+
+### Technical details
+
+The implementation uses standard net/http ServeContent and compress/gzip with no new dependency. Matching asset URL: /static/catalog.js?v=<SHA256> → public, max-age=31536000, immutable; unversioned: public, no-cache. ETag is the source hash for identity and source hash plus -gzip for gzip, with quoted syntax. Existing media URLs remain public, max-age=31536000, immutable with SHA256 ETags. The WebP publication receipt keeps the original media entries as history and points the current covers/galleries at the new media IDs.

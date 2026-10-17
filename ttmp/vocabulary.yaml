@@ -19,6 +19,8 @@ topics:
       description: Command-line clients and operator tooling
     - slug: mcp
       description: Model Context Protocol servers and agent tool surfaces
+    - slug: performance
+      description: Measured browser and service latency, transfer size and cache behavior
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

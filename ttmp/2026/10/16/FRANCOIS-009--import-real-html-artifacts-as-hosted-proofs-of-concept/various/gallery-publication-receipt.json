@@ -17,12 +17,27 @@
           "id": "med_cb3840438c2204d790b5af63",
           "sha256": "200cc9ebabccd791b8f148cc92c6c6b06282265b3bd21a3a10b74c15d474549f",
           "alt": "Branching dialogue: YES and NO rendered as an interactive recursive scene."
+        },
+        "web/rift-title.webp": {
+          "id": "med_a93813775391fac82a060968",
+          "sha256": "d8d68ce2a34be4b878fa4d19d65855f6a347c09f412e4a2289bdb107f3fa03b5",
+          "alt": "Recursive title screen and dual-screen WebGL console in Lattice Rift."
+        },
+        "web/rift-arcade.webp": {
+          "id": "med_5c705b6863e7bb021d7b7b7f",
+          "sha256": "b0c2ee13227e520aada0bf531593b28020e2f8a6d0ca271d1b2c8f43de32a673",
+          "alt": "Infinite inventory: a hyperbolic item grid and recursive console screens."
+        },
+        "web/rift-world.webp": {
+          "id": "med_7e370e880ef56edef642ecf0",
+          "sha256": "c0e90fc8c7ae80dd5db9ea8a4aa3bcdcdf08deb4d089dede2903974f6980c703",
+          "alt": "Branching dialogue: YES and NO rendered as an interactive recursive scene."
         }
       },
-      "cover": "med_7bf9cbccb51b0d129784fd49",
+      "cover": "med_a93813775391fac82a060968",
       "gallery": [
-        "med_dbc4c6901232c58077adadba",
-        "med_cb3840438c2204d790b5af63"
+        "med_5c705b6863e7bb021d7b7b7f",
+        "med_7e370e880ef56edef642ecf0"
       ],
       "releaseId": "rel_c73f4e37a2013bf7f93ae5cc",
       "version": "0.1.2",
@@ -46,12 +61,27 @@
           "id": "med_4dea332501c09fba44b2e7f0",
           "sha256": "252682be5596df1d78e510c35fcc28ef536d333c065ee0baeeece91f2a6b9e9c",
           "alt": "Kipple cartridge: inventory grid, selected item and interactive console controls."
+        },
+        "web/phantasmagoria-menu.webp": {
+          "id": "med_5376078b623d69643a81ae87",
+          "sha256": "f39c18289f11adaa694e904581cfa5e09bcb4bc33009d0c0bcd75f3f02f64a0a",
+          "alt": "Phantasmagoria cartridge menu on the dual-screen console."
+        },
+        "web/phantasmagoria-cartridge.webp": {
+          "id": "med_648975d8d2dee0ddc3708f87",
+          "sha256": "ded9f2a5bfa01ca386afef646c6690d06a5501a508d6e11079364aa014fadb30",
+          "alt": "Half-life cartridge: fractal visuals on the two console screens."
+        },
+        "web/phantasmagoria-kipple.webp": {
+          "id": "med_8d116ddc14a32fd34142968f",
+          "sha256": "e1a267614407d211e1000de6766ce63db9b808549cb5692b162403a23e627cd3",
+          "alt": "Kipple cartridge: inventory grid, selected item and interactive console controls."
         }
       },
-      "cover": "med_9c74bb15b797f038268e649f",
+      "cover": "med_5376078b623d69643a81ae87",
       "gallery": [
-        "med_a072aa442a32aad5b9daeed4",
-        "med_4dea332501c09fba44b2e7f0"
+        "med_648975d8d2dee0ddc3708f87",
+        "med_8d116ddc14a32fd34142968f"
       ],
       "releaseId": "rel_6d251311c237610e2efdaff8",
       "version": "0.1.2",
@@ -80,13 +110,33 @@
           "id": "med_dec3bb5c72a6f349a43846c3",
           "sha256": "b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3",
           "alt": "A procedural colored heightfield and orange parametric shell rendered in Lattice Deck."
+        },
+        "web/lattice-deck-cover.webp": {
+          "id": "med_d51e0ae1337286fb0a039163",
+          "sha256": "0ab0b278d8e9efe87d8d231688f29c1d83e0a3f78276e32107e9e4c120d38a8d",
+          "alt": "A procedural colored heightfield and orange parametric shell rendered in Lattice Deck."
+        },
+        "web/lattice-deck-procedural.webp": {
+          "id": "med_40c444d4addb912cd20c41fe",
+          "sha256": "914b52d8f84245c3d8e834cf196318366265154505eecdc85817a1d9d1564e35",
+          "alt": "Procedural 3D: a colored heightfield and parametric shell generated from JavaScript."
+        },
+        "web/lattice-deck-motion.webp": {
+          "id": "med_d7aef35af76a761d85354449",
+          "sha256": "1d6e4706d0a8fb94ea93a9643999f9614cf20624fde09814db8ed4f7e8c32863",
+          "alt": "Animated 3D: a rotating knot, shader-driven blob and live surface with controls."
+        },
+        "web/lattice-deck-charts.webp": {
+          "id": "med_61c4b54d6114231fb8d1e1f5",
+          "sha256": "98a3c2d66caa6630fed2d949d94bc2f36a60f45c92df896846ff831d5348345b",
+          "alt": "Sample revenue by region displayed as stacked bars in a presentation slide."
         }
       },
-      "cover": "med_dec3bb5c72a6f349a43846c3",
+      "cover": "med_d51e0ae1337286fb0a039163",
       "gallery": [
-        "med_a76bf7a0ea98de958c37724e",
-        "med_f24485f4350d7bcb6d761929",
-        "med_349a8a412895e7e2ebab3527"
+        "med_40c444d4addb912cd20c41fe",
+        "med_d7aef35af76a761d85354449",
+        "med_61c4b54d6114231fb8d1e1f5"
       ],
       "releaseId": "rel_b60d73cb6e23dae43cacf683",
       "version": "0.1.2",
@@ -115,13 +165,33 @@
           "id": "med_b8d2254ce6ff30433c7231e7",
           "sha256": "a18b99f553380aaa7564b73004aba3c1035c08123af0bb792af139cf7a150f9c",
           "alt": "A 3D unit-economics landscape with simulated samples over the sensitivity surface."
+        },
+        "web/tabula-overview.webp": {
+          "id": "med_8467b1ee822aba5cfeb27a8c",
+          "sha256": "fccb5662e4c0499842fbc242cd6775db9205de0216fb1561461bca8a779615bd",
+          "alt": "Tabula workbook overview with live inputs, distribution, sensitivity chart and 3D landscape."
+        },
+        "web/tabula-story.webp": {
+          "id": "med_c7822cf2b1cdec3584733695",
+          "sha256": "27e1eccae8205c5808fc771598ef18567abf70df7ae33d8c1364c7cabd7838f1",
+          "alt": "A workbook-backed presentation showing the simulated unit-economics distribution."
+        },
+        "web/tabula-sensitivity.webp": {
+          "id": "med_9d6bab1eccd5008422429901",
+          "sha256": "f43f5939153305bf9931b123ce7a0186ec9b586cd709c8b2ef8f39ae473ac64b",
+          "alt": "Sensitivity analysis presented as a tornado chart in a generated slide."
+        },
+        "web/tabula-landscape.webp": {
+          "id": "med_70263ef6056df2a6756cce93",
+          "sha256": "a36e0a8147ab9fe1aaf45fe8da3e6f0c7b617e017d8adc6391c1fc3e0acad9a6",
+          "alt": "A 3D unit-economics landscape with simulated samples over the sensitivity surface."
         }
       },
-      "cover": "med_e0bbbef9c655652f113581b6",
+      "cover": "med_8467b1ee822aba5cfeb27a8c",
       "gallery": [
-        "med_f52e250fe6f1ede20c11b13d",
-        "med_4b3fcb7b2a1fcd38692aca17",
-        "med_b8d2254ce6ff30433c7231e7"
+        "med_c7822cf2b1cdec3584733695",
+        "med_9d6bab1eccd5008422429901",
+        "med_70263ef6056df2a6756cce93"
       ],
       "releaseId": "rel_708cecd90e56907ea987a987",
       "version": "0.1.2",
@@ -145,12 +215,27 @@
           "id": "med_ba8f02a673eb4c908171ff29",
           "sha256": "4885d6104b9cd23a81bf821688a9c3446ab41d58f3b496226352df5698d84199",
           "alt": "RAG corpus files and indexed document metadata alongside search results."
+        },
+        "web/rag-search.webp": {
+          "id": "med_f26ba2aee012a344dd15fbcf",
+          "sha256": "e8d52fa9ae4012329376c508b4edf52bdf571fd86370ed4b4042749ebdfc2b15",
+          "alt": "RAG pipeline editor, ranked results, selected source section and execution graph."
+        },
+        "web/rag-trace.webp": {
+          "id": "med_5e2c288593897b033a1fc380",
+          "sha256": "13e5bfa343bb2a263226c5c786bebf65a55d38b549ecb341448b27e33d1e6720",
+          "alt": "RAG query execution trace and ranked source explanations for model concurrency."
+        },
+        "web/rag-corpus.webp": {
+          "id": "med_0485b96ea20ae25463621a5e",
+          "sha256": "9b8a1978a09e6b8cd719c5e30c777db81f854de2da0386756a97d4750f21b8ae",
+          "alt": "RAG corpus files and indexed document metadata alongside search results."
         }
       },
-      "cover": "med_7c2972fa011114c4741147bd",
+      "cover": "med_f26ba2aee012a344dd15fbcf",
       "gallery": [
-        "med_424740bf2207b19709c9953e",
-        "med_ba8f02a673eb4c908171ff29"
+        "med_5e2c288593897b033a1fc380",
+        "med_0485b96ea20ae25463621a5e"
       ],
       "releaseId": "rel_fefc379a622251ad5c4cbbe0",
       "version": "0.1.2",

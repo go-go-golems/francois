@@ -35,3 +35,11 @@ Deployed PR #8 via image sha-0440798 and GitOps PR #360; verified matching publi
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/portal-rollout-verification.json — Final live browser verification
+
+## 2026-10-16
+
+Published quality-85 WebP delivery copies for all seventeen screenshots (10.6 MB to 1.98 MB), preserving the original report PNGs and all HTML release hashes. Ongoing cache measurement, implementation and vault report are tracked in FRANCOIS-010.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/web-media-verification.json — Actual public WebP bytes and conditional-response verification

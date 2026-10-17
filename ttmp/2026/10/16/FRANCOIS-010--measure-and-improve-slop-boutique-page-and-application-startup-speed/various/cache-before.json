@@ -1,0 +1,1224 @@
+{
+  "at": "2026-10-17T00:30:05.468Z",
+  "base": "https://slop.boutique",
+  "visits": [
+    {
+      "route": "/apps",
+      "pass": "cold",
+      "navigation": [
+        {
+          "ttfbMs": 132.80000007152557,
+          "loadMs": 1141.2000000476837,
+          "startMs": 0,
+          "transferBytes": 7352
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 808
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 808
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 240,
+          "transferBytes": 1026,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/public.js",
+          "ms": 238.79999995231628,
+          "transferBytes": 3598,
+          "decodedBytes": 3298
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 240,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 432.8000000715256,
+          "transferBytes": 60636,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/fonts/ABCArealMono-Regular.woff2",
+          "ms": 432.39999997615814,
+          "transferBytes": 40060,
+          "decodedBytes": 39760
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 432.7999999523163,
+          "transferBytes": 66028,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/media/med_7c2972fa011114c4741147bd",
+          "ms": 722.6000000238419,
+          "transferBytes": 309147,
+          "decodedBytes": 308847
+        },
+        {
+          "path": "/media/med_e0bbbef9c655652f113581b6",
+          "ms": 724.6999999284744,
+          "transferBytes": 162191,
+          "decodedBytes": 161891
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "ms": 720,
+          "transferBytes": 280488,
+          "decodedBytes": 280188
+        },
+        {
+          "path": "/media/med_9c74bb15b797f038268e649f",
+          "ms": 728.4000000953674,
+          "transferBytes": 312540,
+          "decodedBytes": 312240
+        },
+        {
+          "path": "/media/med_7bf9cbccb51b0d129784fd49",
+          "ms": 1477.8000000715256,
+          "transferBytes": 3213922,
+          "decodedBytes": 3213622
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 628.8999999761581,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/apps",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "vary": "Cookie"
+          },
+          "wireBytes": 7388
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36027
+        },
+        {
+          "path": "/static/public.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 3345
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 821
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3\"",
+            "content-length": "280188",
+            "last-modified": "Sat, 17 Oct 2026 00:10:06 GMT"
+          },
+          "wireBytes": 280524
+        },
+        {
+          "path": "/media/med_7c2972fa011114c4741147bd",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"f626bd3498459aba35a0cf063f4fe3458f9f52198de7760b6347da38c032de4d\"",
+            "content-length": "308847",
+            "last-modified": "Sat, 17 Oct 2026 00:00:05 GMT"
+          },
+          "wireBytes": 309154
+        },
+        {
+          "path": "/fonts/ABCArealMono-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "39760",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 39847
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 60406
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 65798
+        },
+        {
+          "path": "/media/med_e0bbbef9c655652f113581b6",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"a54e5368f42b7715e5512c905ebcb0dab837e64e3540bc7b91ff49592243eef5\"",
+            "content-length": "161891",
+            "last-modified": "Fri, 16 Oct 2026 23:59:58 GMT"
+          },
+          "wireBytes": 162107
+        },
+        {
+          "path": "/media/med_9c74bb15b797f038268e649f",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"c02fdc87baf505923c69caafbbf70598096b056a303aa52d851f3ca75dd44311\"",
+            "content-length": "312240",
+            "last-modified": "Fri, 16 Oct 2026 23:59:44 GMT"
+          },
+          "wireBytes": 312545
+        },
+        {
+          "path": "/media/med_7bf9cbccb51b0d129784fd49",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"e2327606ec508719c44bb02c577ec3c5a98c04304562038a9b4b6d9116b71906\"",
+            "content-length": "3213622",
+            "last-modified": "Fri, 16 Oct 2026 23:59:36 GMT"
+          },
+          "wireBytes": 3215575
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 335
+        }
+      ]
+    },
+    {
+      "route": "/apps",
+      "pass": "warm",
+      "navigation": [
+        {
+          "ttfbMs": 125.90000009536743,
+          "loadMs": 250.89999997615814,
+          "startMs": 0,
+          "transferBytes": 7352
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 276
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 276
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 113.79999995231628,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/static/public.js",
+          "ms": 118.5,
+          "transferBytes": 3598,
+          "decodedBytes": 3298
+        },
+        {
+          "path": "/media/med_7c2972fa011114c4741147bd",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 308847
+        },
+        {
+          "path": "/media/med_e0bbbef9c655652f113581b6",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 161891
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 280188
+        },
+        {
+          "path": "/media/med_9c74bb15b797f038268e649f",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 312240
+        },
+        {
+          "path": "/media/med_7bf9cbccb51b0d129784fd49",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 3213622
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/fonts/ABCArealMono-Regular.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 39760
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 119.70000004768372,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/apps",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "vary": "Cookie"
+          },
+          "wireBytes": 7111
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_7c2972fa011114c4741147bd",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"f626bd3498459aba35a0cf063f4fe3458f9f52198de7760b6347da38c032de4d\"",
+            "content-length": "308847",
+            "last-modified": "Sat, 17 Oct 2026 00:00:05 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_e0bbbef9c655652f113581b6",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"a54e5368f42b7715e5512c905ebcb0dab837e64e3540bc7b91ff49592243eef5\"",
+            "content-length": "161891",
+            "last-modified": "Fri, 16 Oct 2026 23:59:58 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3\"",
+            "content-length": "280188",
+            "last-modified": "Sat, 17 Oct 2026 00:10:06 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_9c74bb15b797f038268e649f",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"c02fdc87baf505923c69caafbbf70598096b056a303aa52d851f3ca75dd44311\"",
+            "content-length": "312240",
+            "last-modified": "Fri, 16 Oct 2026 23:59:44 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_7bf9cbccb51b0d129784fd49",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"e2327606ec508719c44bb02c577ec3c5a98c04304562038a9b4b6d9116b71906\"",
+            "content-length": "3213622",
+            "last-modified": "Fri, 16 Oct 2026 23:59:36 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36020
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/fonts/ABCArealMono-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "39760",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/public.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 3333
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 296
+        }
+      ]
+    },
+    {
+      "route": "/apps/lattice-deck",
+      "pass": "cold",
+      "navigation": [
+        {
+          "ttfbMs": 123,
+          "loadMs": 1221,
+          "startMs": 0,
+          "transferBytes": 4871
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 728
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 728
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 236.60000002384186,
+          "transferBytes": 1026,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 236.39999997615814,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/static/public.js",
+          "ms": 238.79999995231628,
+          "transferBytes": 3598,
+          "decodedBytes": 3298
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 407.2000000476837,
+          "transferBytes": 60636,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 408.60000002384186,
+          "transferBytes": 66028,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "ms": 501.2999999523163,
+          "transferBytes": 280488,
+          "decodedBytes": 280188
+        },
+        {
+          "path": "/media/med_a76bf7a0ea98de958c37724e",
+          "ms": 506,
+          "transferBytes": 326107,
+          "decodedBytes": 325807
+        },
+        {
+          "path": "/media/med_f24485f4350d7bcb6d761929",
+          "ms": 633.1000000238419,
+          "transferBytes": 198943,
+          "decodedBytes": 198643
+        },
+        {
+          "path": "/media/med_349a8a412895e7e2ebab3527",
+          "ms": 632.3999999761581,
+          "transferBytes": 68564,
+          "decodedBytes": 68264
+        },
+        {
+          "path": "/api/session",
+          "ms": 630.9000000953674,
+          "transferBytes": 462,
+          "decodedBytes": 162
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 130.30000007152557,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "vary": "Cookie"
+          },
+          "wireBytes": 4907
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36027
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 821
+        },
+        {
+          "path": "/static/public.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 3345
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3\"",
+            "content-length": "280188",
+            "last-modified": "Sat, 17 Oct 2026 00:10:06 GMT"
+          },
+          "wireBytes": 280533
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 60415
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 65842
+        },
+        {
+          "path": "/media/med_a76bf7a0ea98de958c37724e",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"c72b4fd0f999be3dff702fdb7790ea59a3a237e2cc1b6fc6746a544850fb9be3\"",
+            "content-length": "325807",
+            "last-modified": "Fri, 16 Oct 2026 23:59:51 GMT"
+          },
+          "wireBytes": 326113
+        },
+        {
+          "path": "/media/med_349a8a412895e7e2ebab3527",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"9ec9af0e0a1317677b136990557ec832f4ca7803e3865aae44cce0586fab79e9\"",
+            "content-length": "68264",
+            "last-modified": "Fri, 16 Oct 2026 23:59:52 GMT"
+          },
+          "wireBytes": 68425
+        },
+        {
+          "path": "/media/med_f24485f4350d7bcb6d761929",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"77bb0c21e36cb43617cac1b1c60b060df27adad46d32f8741220a7cd6017ebb5\"",
+            "content-length": "198643",
+            "last-modified": "Fri, 16 Oct 2026 23:59:52 GMT"
+          },
+          "wireBytes": 198853
+        },
+        {
+          "path": "/api/session",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-store",
+            "content-length": "162"
+          },
+          "wireBytes": 211
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 335
+        }
+      ]
+    },
+    {
+      "route": "/apps/lattice-deck",
+      "pass": "warm",
+      "navigation": [
+        {
+          "ttfbMs": 132.39999997615814,
+          "loadMs": 261.89999997615814,
+          "startMs": 0,
+          "transferBytes": 4871
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 276
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 276
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 121.60000002384186,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/static/public.js",
+          "ms": 121,
+          "transferBytes": 3598,
+          "decodedBytes": 3298
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 280188
+        },
+        {
+          "path": "/media/med_a76bf7a0ea98de958c37724e",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 325807
+        },
+        {
+          "path": "/media/med_f24485f4350d7bcb6d761929",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 198643
+        },
+        {
+          "path": "/media/med_349a8a412895e7e2ebab3527",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 68264
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/api/session",
+          "ms": 118.70000004768372,
+          "transferBytes": 462,
+          "decodedBytes": 162
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 116.60000002384186,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "vary": "Cookie"
+          },
+          "wireBytes": 4630
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_dec3bb5c72a6f349a43846c3",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3\"",
+            "content-length": "280188",
+            "last-modified": "Sat, 17 Oct 2026 00:10:06 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_a76bf7a0ea98de958c37724e",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"c72b4fd0f999be3dff702fdb7790ea59a3a237e2cc1b6fc6746a544850fb9be3\"",
+            "content-length": "325807",
+            "last-modified": "Fri, 16 Oct 2026 23:59:51 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_f24485f4350d7bcb6d761929",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"77bb0c21e36cb43617cac1b1c60b060df27adad46d32f8741220a7cd6017ebb5\"",
+            "content-length": "198643",
+            "last-modified": "Fri, 16 Oct 2026 23:59:52 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/media/med_349a8a412895e7e2ebab3527",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=31536000, immutable",
+            "etag": "\"9ec9af0e0a1317677b136990557ec832f4ca7803e3865aae44cce0586fab79e9\"",
+            "content-length": "68264",
+            "last-modified": "Fri, 16 Oct 2026 23:59:52 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36020
+        },
+        {
+          "path": "/static/public.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 3333
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 296
+        },
+        {
+          "path": "/api/session",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-store",
+            "content-length": "162"
+          },
+          "wireBytes": 189
+        }
+      ]
+    },
+    {
+      "route": "/account",
+      "pass": "cold",
+      "navigation": [
+        {
+          "ttfbMs": 119.39999997615814,
+          "loadMs": 1490.1999999284744,
+          "startMs": 0,
+          "transferBytes": 908
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 1368
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 1368
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 122,
+          "transferBytes": 1026,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 564.2999999523163,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/static/catalog.js",
+          "ms": 800.6999999284744,
+          "transferBytes": 413944,
+          "decodedBytes": 413644
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 133.39999997615814,
+          "transferBytes": 60636,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/api/session",
+          "ms": 120.19999992847443,
+          "transferBytes": 462,
+          "decodedBytes": 162
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 126.30000007152557,
+          "transferBytes": 66028,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 117.80000007152557,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/account",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "content-length": "608"
+          },
+          "wireBytes": 925
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 821
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36027
+        },
+        {
+          "path": "/static/catalog.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 413923
+        },
+        {
+          "path": "/api/session",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-store",
+            "content-length": "162"
+          },
+          "wireBytes": 211
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 60464
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 312
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 65807
+        }
+      ]
+    },
+    {
+      "route": "/account",
+      "pass": "warm",
+      "navigation": [
+        {
+          "ttfbMs": 116.5,
+          "loadMs": 626.8999999761581,
+          "startMs": 0,
+          "transferBytes": 908
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 636
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 636
+        }
+      ],
+      "resources": [
+        {
+          "path": "/fonts/fonts.css",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 726
+        },
+        {
+          "path": "/static/catalog.css",
+          "ms": 463.1999999284744,
+          "transferBytes": 36267,
+          "decodedBytes": 35967
+        },
+        {
+          "path": "/static/catalog.js",
+          "ms": 497.1999999284744,
+          "transferBytes": 413944,
+          "decodedBytes": 413644
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 65728
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "ms": 0,
+          "transferBytes": 0,
+          "decodedBytes": 60336
+        },
+        {
+          "path": "/api/session",
+          "ms": 123.19999992847443,
+          "transferBytes": 462,
+          "decodedBytes": 162
+        },
+        {
+          "path": "/static/icon.svg",
+          "ms": 118,
+          "transferBytes": 569,
+          "decodedBytes": 269
+        }
+      ],
+      "responses": [
+        {
+          "path": "/account",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "content-length": "608"
+          },
+          "wireBytes": 657
+        },
+        {
+          "path": "/fonts/fonts.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=3600",
+            "content-length": "726",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/catalog.css",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 36020
+        },
+        {
+          "path": "/fonts/ABCAreal-Medium.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "65728",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/fonts/ABCAreal-Regular.woff2",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "public, max-age=604800",
+            "content-length": "60336",
+            "last-modified": "Sat, 17 Oct 2026 00:15:08 GMT"
+          },
+          "wireBytes": 0
+        },
+        {
+          "path": "/static/catalog.js",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache"
+          },
+          "wireBytes": 413904
+        },
+        {
+          "path": "/static/icon.svg",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-cache",
+            "content-length": "269"
+          },
+          "wireBytes": 319
+        },
+        {
+          "path": "/api/session",
+          "status": 200,
+          "diskCache": false,
+          "headers": {
+            "cache-control": "no-store",
+            "content-length": "162"
+          },
+          "wireBytes": 189
+        }
+      ]
+    }
+  ]
+}
