@@ -43,3 +43,7 @@ Implemented shared Google/GitHub/email sign-in presentation and allowlisted ZITA
 ## 2026-10-17
 
 User approved public signup; applied/merged Terraform #36 (three in-place changes). Enabled role-neutral email eligibility with role-change race checks and fixed review P1 with a shared native-account fallback. Final Go suite/build/lint pass.
+
+## 2026-10-17
+
+Deployed reviewed shared sign-in source #12 (5721ee8) via k3s #366. Public social signup approved/applied through Terraform #36. Both real provider login forms, scopes/PKCE, shared page, signup availability and hidden-blog default verified; no real-user consent, account creation or email request submitted.

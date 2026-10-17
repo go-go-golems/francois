@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-17T22:45:30.395774+00:00",
+  "sourcePR": 12,
+  "sourceRevision": "5721ee85681f36d1f03024d494f0b51470255465",
+  "reviewedCommit": "b68d55e589eed4c4ada4851f74686288ad12629d",
+  "renewedReviewFindings": 0,
+  "terraformPR": 36,
+  "terraformRevision": "e41283c20bf605d84a5e972ee4a4a6dbd8ba4606",
+  "terraformApply": {
+    "created": 0,
+    "changed": 3,
+    "destroyed": 0
+  },
+  "terraformPostApplyPlan": "no changes",
+  "gitopsPR": 366,
+  "gitopsRevision": "ed322cfb80c2a7df3d0b39b84e375672b304477d",
+  "image": "ghcr.io/go-go-golems/francois:sha-5721ee8",
+  "readyReplicas": 1,
+  "updatedReplicas": 1,
+  "argoSync": "Synced",
+  "argoHealth": "Healthy",
+  "argoOperation": "Succeeded",
+  "publicChecks": [
+    {
+      "base": "https://slop.boutique",
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "ready": true
+    },
+    {
+      "base": "https://francois.yolo.scapegoat.dev",
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "ready": true
+    }
+  ],
+  "emailRoles": [
+    "subscriber",
+    "creator",
+    "admin"
+  ],
+  "emailOTPEnrollmentStillRequired": true,
+  "newHumanFactorsEnrolled": 0,
+  "loginEmailsRequested": 0,
+  "externalConsentCompleted": false
+}

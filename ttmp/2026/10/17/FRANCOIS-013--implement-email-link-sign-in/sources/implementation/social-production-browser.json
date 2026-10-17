@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-17T22:44:11.853Z",
+  "checks": [
+    {
+      "base": "https://slop.boutique",
+      "google": true,
+      "github": true,
+      "email": true,
+      "nativeFallback": true,
+      "roleSpecificLink": false,
+      "signupGuidance": true
+    },
+    {
+      "base": "https://francois.yolo.scapegoat.dev",
+      "google": true,
+      "github": true,
+      "email": true,
+      "nativeFallback": true,
+      "roleSpecificLink": false,
+      "signupGuidance": true
+    }
+  ],
+  "entries": [
+    {
+      "provider": "google",
+      "origin": "https://accounts.google.com",
+      "path": "/v3/signin/identifier",
+      "loginFormVisible": true,
+      "organizationScope": true,
+      "providerScope": true,
+      "stateNoncePKCE": true
+    },
+    {
+      "provider": "github",
+      "origin": "https://github.com",
+      "path": "/login",
+      "loginFormVisible": true,
+      "organizationScope": true,
+      "providerScope": true,
+      "stateNoncePKCE": true
+    }
+  ],
+  "credentialsSubmitted": false,
+  "emailsRequested": 0,
+  "externalConsentCompleted": false
+}

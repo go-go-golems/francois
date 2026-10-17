@@ -10,8 +10,16 @@ Owners: []
 RelatedFiles:
     - Path: repo://doc/production.md
       Note: Credential rotation and production enablement contract
+    - Path: repo://pkg/catalog/auth.go
+      Note: Allowlisted shared OIDC provider selection
+    - Path: repo://pkg/catalog/store/email_signins.go
+      Note: Role-neutral email proof with role-change protection
+    - Path: repo://pkg/catalog/web/templates/signin.tmpl
+      Note: One public sign-in page for all roles
     - Path: repo://ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/sources/implementation/production-enablement.json
       Note: Redacted identity and rollout receipt
+    - Path: repo://ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/sources/implementation/social-production-rollout.json
+      Note: Verified source policy and live rollout revisions
 ExternalSources: []
 Summary: Guide authorship, source investigation, design choices and delivery evidence.
 LastUpdated: 2026-10-17T14:27:28-04:00
@@ -683,3 +691,64 @@ Review store/email_signins.go, issueEmail's role gate, the all-role and stale-ro
 ### Technical details
 
 The public policy was initially blocked and then authorized explicitly; no rejection workaround was used. The application adds no migration, credential, environment read, callback, worker or queue. Provider-level human factor enrollment and actual external login-email delivery remain unchanged by this checkpoint.
+
+## Step 11: Deploy and verify shared production sign-in and social signup
+
+Merged source PR #12 as 5721ee8 after all CI checks passed. Renewed Codex review of b68d55e completed with no findings; the reviewed and merged source trees match. The official release workflow published the image, and the coordinated GitOps PR #366 deployed it together with both provider IDs and the signup flag. Production is Synced/Healthy/Succeeded.
+
+Both public hostnames now show Google, GitHub, email and the neutral native-account option without creator/admin wording. Real browser navigation reaches Google and GitHub login forms through the selected ZITADEL providers. No credentials, third-party consent, test-account creation or login-email request was submitted during verification.
+
+### Prompt Context
+
+See Steps 9 and 10 for the exact implementation request and explicit approval. This step completes the approved rollout.
+
+**Commit (code):** 5721ee85681f36d1f03024d494f0b51470255465 — Add Google and GitHub to the shared sign-in page (#12).
+
+### What I did
+
+- Waited for the final source revision's tests, lint, secret/security/dependency checks and image qualification to pass. Source review found no remaining issues after the native fallback fix and all-role email change.
+- Official main release run 39075828955 succeeded. Prepared one GitOps change containing image sha-5721ee8, both nonsecret provider-ID flags and --signup-allowed; validated all 54 packages with zero violations and waited for its CI validate check.
+- Merged infrastructure PR #366 as ed322cfb80c2a7df3d0b39b84e375672b304477d. Closed duplicate image-only PR #367 because its pin was already included in the coordinated rollout. Refreshed only Argo's francois application.
+- Confirmed the actual image, updated/ready replica count, successful rollout and healthy pod. Captured a bounded, credential-free social-production-rollout.json receipt.
+- Verified both hostnames report signupAvailable=true, journalEnabled=false and ready status. Confirmed all sign-in methods, signup guidance and absence of role-specific link text at the actual public page.
+- Captured desktop/mobile screenshots without horizontal overflow. Followed each social button's production authentication path to its actual upstream login form, preserving only query-free origin/path and scope/security booleans in the receipt.
+
+### Why
+
+The old binary does not implement the new provider-ID flags, so image and runtime configuration must deploy atomically. Real provider-entry checks catch errors that mock discovery and link-text tests cannot find. Stopping before credentials/consent avoids using a person's identity or creating test users as a side effect of a smoke test.
+
+### What worked
+
+- Terraform PR #36 is applied and merged; its post-apply plan reports no changes. Exactly three resources changed in place, with zero adds/destroys and no credential/role/subscription changes.
+- Final source CI passed, and renewed code review reported zero findings for b68d55e. Direct tree comparison to merged source 5721ee8 produced no differences.
+- Argo reached Synced/Healthy/Succeeded at ed322cfb. Deployment uses ghcr.io/go-go-golems/francois:sha-5721ee8 with one updated/ready replica; observed pod francois-6878d5f9c-ml48b had zero restarts.
+- The final browser check reached accounts.google.com/v3/signin/identifier and github.com/login with visible login fields. It verified organization and provider scopes, state, nonce and S256 PKCE from the live authorization redirect, without saving their temporary values.
+- Both aliases show all methods, role-neutral wording and public-social signup guidance. The artifact-only default remains active.
+
+### What didn't work
+
+The first production browser harness reported `Production social verification failed at google entry (TimeoutError); no credentials were submitted.` Query-redacted navigation diagnostics subsequently reached HTTP 200 Google and GitHub login pages and showed their expected sign-in content. Replaced the assumed input[type=email] selector with Google's accessible Email or phone textbox locator; the complete rerun passed. The diagnostic does not prove an application/provider outage: both redirect chains worked, and the corrected browser check verifies the actual field.
+
+### What I learned
+
+Testing the upstream entry form is distinct from testing a provider hostname or a server redirect. An accessible-field selector provides a better observable contract than assuming Google's current input type.
+
+### What was tricky to build
+
+The coordinated release had two configuration control planes: Terraform authorizes account creation at the identity provider, while GitOps supplies public IDs and enables the corresponding page guidance in the new application binary. Provider credentials remain in their existing Vault-owned integration; Francois receives no Google/GitHub client secret.
+
+### What warrants a second pair of eyes
+
+The receipts confirm provider entry and configuration, not a completed real-user OAuth consent/token exchange or actual email delivery. Email OTP remains an enrollment prerequisite for every role, and no additional human factor was enrolled automatically. New users may create ordinary identities through Google/GitHub; staff access and payment entitlement remain separate.
+
+### What should be done in the future
+
+No code/configuration rollout work remains for this request. A real user can now exercise social signup/sign-in through /signin. The existing login-PAT rotation deadline remains 2027-01-15. No new implementation queue or service is required.
+
+### Code review instructions
+
+Review social-production-rollout.json and social-production-browser.json for exact revisions and tested boundaries. Reproduce scripts/10-verify-production-social.cjs without entering credentials. Desktop/mobile and upstream entry screenshots are saved under sources/implementation/social-*.png. Script 11 preserves the query-redacted diagnostic used for the initial harness timeout.
+
+### Technical details
+
+Source PR #12; Terraform PR #36 (e41283c2); k3s PR #366 (ed322cfb). Google IDP 395005753389219858; GitHub IDP 395005753372442642. These IDs are public configuration, not credentials. All authorization query values, cookies, codes and PATs are excluded from the saved browser/rollout receipts.

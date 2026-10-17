@@ -817,3 +817,14 @@ two existing external providers and the organization registration policy.
 `--signup-allowed` controls the page’s signup explanation; it does not grant
 provider registration permission itself. Deploy these flags with the supporting
 image, and retain the separate subscription and administrator authorization.
+
+
+The unified flow is live from source PR #12, image `sha-5721ee8`, through
+infrastructure PR #366. Runtime flags select Google provider
+`395005753389219858` and GitHub provider `395005753372442642`, with
+`--signup-allowed` enabled. Both public hostnames report signup available and
+keep the blog hidden. Browser verification reached the real Google and GitHub
+login forms with the intended scopes and OIDC protections. No credentials,
+external consent or test-account creation were submitted during that check.
+The exact rollout and browser receipts are in FRANCOIS-013's
+`sources/implementation/social-production-*.json` files.

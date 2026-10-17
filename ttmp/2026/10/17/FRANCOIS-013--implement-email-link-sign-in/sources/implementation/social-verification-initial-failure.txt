@@ -1,0 +1,2 @@
+Initial browser check: Production social verification failed at google entry (TimeoutError); no credentials were submitted.
+Subsequent query-redacted navigation diagnostics reached HTTP 200 Google and GitHub login pages. Replaced the assumed input[type=email] locator with the accessible Email or phone textbox locator and reran the complete check successfully.
