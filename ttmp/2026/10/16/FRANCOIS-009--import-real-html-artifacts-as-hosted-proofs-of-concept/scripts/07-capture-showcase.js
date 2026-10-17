@@ -51,6 +51,7 @@ async (page) => {
         await f.locator('.preset-menu button').filter({hasText:preset}).first().click();
         await p.waitForTimeout(800);await f.getByTitle('Present: hide the panels',{exact:true}).click();await p.waitForTimeout(1300);
         await shot(p,name,f.locator('.ls-slide'));
+        if(preset==='Procedural 3D')await shot(p,'lattice-deck-cover',f.locator('.ls-slide canvas'));
       }
     }finally{await p.close();}
   }

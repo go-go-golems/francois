@@ -368,3 +368,18 @@ Start with pkg/catalog/pages.go, pkg/catalog/instances.go, ui/catalog/instances.
 ### Technical details
 
 Source PR: https://github.com/go-go-golems/francois/pull/8. Final browser title format is artifact.Title + " · " + session.brand. No additional settings fields, migrations, queue or service were introduced. Current public HTML/media and tour policy were already verified independently of this service-code rollout.
+
+
+#### Release and cover refinement checkpoint
+
+All source checks passed on final head 0ac2190, including the image build, GoSec, CodeQL, tests and lint. The P1 review thread is resolved after the publication-time fix. PR #8 merged as 0440798cc622b214a74136f10344e058895eddd1; the normal main-branch image/GitOps release is in progress. gh pr edit encountered the installed client's deprecated Projects (classic) GraphQL field; a REST PATCH updated the PR title/description successfully. No required checks were bypassed.
+
+The catalog's fixed-aspect thumbnail cropped the heading in Deck's full-slide cover. Added a direct canvas screenshot as its cover and retained the complete procedural slide in the gallery. There are now seventeen curated images: five covers and twelve gallery entries. The Studio-token CLI updated only Deck's images; all free-sample release HTML hashes and tour settings remain unchanged. The earlier sixteen-image checkpoint remains the historical first publication.
+
+#### Production rollout and final verification checkpoint
+
+The normal main-branch image workflow 38985147906 published ghcr.io/go-go-golems/francois:sha-0440798. GitOps PR https://github.com/wesen/2026-03-27--hetzner-k3s/pull/360 passed validation and merged as 083adeaccd3dc3247b7d5f7eef05151ebd5f154d. Its sole deployment change pins the image from sha-fda5382 to sha-0440798. The deployment reports one desired, updated, ready and available replica; Argo CD reports that GitOps revision Synced and Healthy. No settings or schema changes were made by this release.
+
+Ran node scripts/11-verify-portal-rollout.mjs (from the ticket directory) against production in a fresh unauthenticated Chromium context; exit 0. All five pages return 200, each exposes exactly one Download HTML and no Manifest link, and all seventeen cover/gallery images load. New anonymous Deck and RAG tours have document titles exactly equal to their corresponding public page titles: Lattice Deck · slop.boutique and RAG Workbench · slop.boutique. Both retain the exact twenty-minute expiry, and Close restores a non-instance page title. These two checks make no model calls. Existing open instance tabs need a refresh to load the updated portal JavaScript; the user's existing tab was left untouched.
+
+Evidence is various/portal-rollout-verification.json and various/portal-deployment-receipt.json. Refreshed the illustrated catalog and Deck-gallery captures, and added the two instance captures. The evidence index links the final receipts and figures for the later vault report. No new failure occurred during this checkpoint. Source implementation is deployed from PR #8; the separate import branch retains the reproducible source archive and report evidence. No requested implementation or deployment work remains for this ticket's follow-ups.

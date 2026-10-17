@@ -70,6 +70,14 @@
       "releaseHTMLSHA256": "686cfc2aa431c7395ddecef41a28390f266d876cacc2b7d56c24db9b5a0d9f3a",
       "images": [
         {
+          "file": "lattice-deck-cover.png",
+          "alt": "A procedural colored heightfield and orange parametric shell rendered in Lattice Deck.",
+          "sha256": "b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3",
+          "width": 1574,
+          "height": 662,
+          "bytes": 280188
+        },
+        {
           "file": "lattice-deck-procedural.png",
           "alt": "Procedural 3D: a colored heightfield and parametric shell generated from JavaScript.",
           "sha256": "c72b4fd0f999be3dff702fdb7790ea59a3a237e2cc1b6fc6746a544850fb9be3",

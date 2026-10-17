@@ -27,3 +27,11 @@ Published sixteen curated screenshots as five covers and eleven gallery images u
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/gallery-publication-receipt.json — CLI-publication-and-policy-evidence
+
+## 2026-10-16
+
+Deployed PR #8 via image sha-0440798 and GitOps PR #360; verified matching public/instance titles, one current HTML download per app, seventeen loaded gallery images and bounded anonymous tours. Refined Deck cover and retained final screenshots/receipts for the later vault report.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/portal-rollout-verification.json — Final live browser verification

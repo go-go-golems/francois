@@ -1,0 +1,59 @@
+{
+  "base": "https://slop.boutique",
+  "at": "2026-10-17T00:17:00.522Z",
+  "pages": [
+    {
+      "id": "lattice-rift",
+      "title": "Lattice Rift · slop.boutique",
+      "htmlDownloads": 1,
+      "manifestLinks": 0,
+      "imageCount": 3
+    },
+    {
+      "id": "lattice-phantasmagoria",
+      "title": "Lattice Phantasmagoria · slop.boutique",
+      "htmlDownloads": 1,
+      "manifestLinks": 0,
+      "imageCount": 3
+    },
+    {
+      "id": "lattice-deck",
+      "title": "Lattice Deck · slop.boutique",
+      "htmlDownloads": 1,
+      "manifestLinks": 0,
+      "imageCount": 4
+    },
+    {
+      "id": "tabula-workbench",
+      "title": "Tabula Workbench · slop.boutique",
+      "htmlDownloads": 1,
+      "manifestLinks": 0,
+      "imageCount": 4
+    },
+    {
+      "id": "rag-workbench",
+      "title": "RAG Workbench · slop.boutique",
+      "htmlDownloads": 1,
+      "manifestLinks": 0,
+      "imageCount": 3
+    }
+  ],
+  "instances": [
+    {
+      "artifact": "lattice-deck",
+      "path": "/instances/ins_b46f1bdd5526b54557ff",
+      "pageTitle": "Lattice Deck · slop.boutique",
+      "instanceTitle": "Lattice Deck · slop.boutique",
+      "artifactTitle": "Lattice Deck",
+      "lifetimeMs": 1200000
+    },
+    {
+      "artifact": "rag-workbench",
+      "path": "/instances/ins_39477d43222c5517ce9b",
+      "pageTitle": "RAG Workbench · slop.boutique",
+      "instanceTitle": "RAG Workbench · slop.boutique",
+      "artifactTitle": "RAG Workbench",
+      "lifetimeMs": 1200000
+    }
+  ]
+}

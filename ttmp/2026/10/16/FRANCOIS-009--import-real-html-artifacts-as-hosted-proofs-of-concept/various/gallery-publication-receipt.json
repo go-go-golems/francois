@@ -75,10 +75,16 @@
           "id": "med_349a8a412895e7e2ebab3527",
           "sha256": "9ec9af0e0a1317677b136990557ec832f4ca7803e3865aae44cce0586fab79e9",
           "alt": "Sample revenue by region displayed as stacked bars in a presentation slide."
+        },
+        "lattice-deck-cover.png": {
+          "id": "med_dec3bb5c72a6f349a43846c3",
+          "sha256": "b1347feb90266ae122cde95e1ac8d4a7a6e1a27b40bdfa02f172a33b384735f3",
+          "alt": "A procedural colored heightfield and orange parametric shell rendered in Lattice Deck."
         }
       },
-      "cover": "med_a76bf7a0ea98de958c37724e",
+      "cover": "med_dec3bb5c72a6f349a43846c3",
       "gallery": [
+        "med_a76bf7a0ea98de958c37724e",
         "med_f24485f4350d7bcb6d761929",
         "med_349a8a412895e7e2ebab3527"
       ],

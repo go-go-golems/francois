@@ -1,0 +1,20 @@
+{
+  "verifiedAt": "2026-10-17T00:18:00Z",
+  "sourcePR": "https://github.com/go-go-golems/francois/pull/8",
+  "sourceCommit": "0440798cc622b214a74136f10344e058895eddd1",
+  "imageWorkflow": 38985147906,
+  "image": "ghcr.io/go-go-golems/francois:sha-0440798",
+  "gitOpsPR": "https://github.com/wesen/2026-03-27--hetzner-k3s/pull/360",
+  "gitOpsCommit": "083adeaccd3dc3247b7d5f7eef05151ebd5f154d",
+  "argo": {"sync": "Synced", "health": "Healthy"},
+  "deployment": {
+    "namespace": "francois",
+    "name": "francois",
+    "generation": 12,
+    "desiredReplicas": 1,
+    "updatedReplicas": 1,
+    "readyReplicas": 1,
+    "availableReplicas": 1
+  },
+  "browserVerification": "portal-rollout-verification.json"
+}

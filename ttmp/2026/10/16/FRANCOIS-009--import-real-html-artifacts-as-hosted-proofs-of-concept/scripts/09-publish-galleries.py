@@ -9,7 +9,8 @@ TICKET = Path(__file__).resolve().parents[1]
 REPO = next(p for p in TICKET.parents if (p / 'go.mod').is_file())
 parser = argparse.ArgumentParser()
 parser.add_argument('--token-file', required=True)
-parser.add_argument('--admin-token-file', required=True)
+parser.add_argument('--admin-token-file', help='Also enable bounded tours; requires explicit administrative approval')
+parser.add_argument('--artifact', help='Update only this artifact when refining a gallery')
 args = parser.parse_args()
 BASE = 'https://slop.boutique'
 plan = json.loads((TICKET / 'sources/showcase.json').read_text())
@@ -34,6 +35,8 @@ def cli(*command, admin=False):
 
 for app in plan['artifacts']:
     slug = app['id']
+    if args.artifact and slug != args.artifact:
+        continue
     current = cli('artifacts', 'show', slug)[0]
     if current['artifact'].get('pageDraft'):
         raise RuntimeError(slug + ' has an existing unpublished page draft; preserve it')
@@ -83,22 +86,23 @@ for app in plan['artifacts']:
     save()
     print('Published gallery/public release', slug, len(media_ids), flush=True)
 
-# The user explicitly approved the separate admin token for this one setting.
-current = cli('settings', 'show', admin=True)[0]
-doc = current['document']
-before = json.loads(json.dumps(doc))
-if not doc['demo']['enabled']:
-    doc['demo']['enabled'] = True
-    settings_file = Path('/tmp/francois-009-private/tours-settings.json')
-    settings_file.write_text(json.dumps(doc))
-    settings_file.chmod(0o600)
-    cli('settings', 'apply', '--file', str(settings_file), '--base', str(current['revision']), '--yes', admin=True)
-after = cli('settings', 'show', admin=True)[0]
-expected = json.loads(json.dumps(before))
-expected['demo']['enabled'] = True
-assert after['document'] == expected, 'Only demo.enabled may change'
-receipt['tours'] = {'beforeRevision': current['revision'], 'revision': after['revision'],
-                    'before': before['demo'], 'after': after['document']['demo'],
-                    'onlyDemoEnabledChanged': True}
-save()
-print('Enabled bounded public tours, revision', after['revision'], flush=True)
+if args.admin_token_file:
+    # The user explicitly approved the separate admin token for this setting.
+    current = cli('settings', 'show', admin=True)[0]
+    doc = current['document']
+    before = json.loads(json.dumps(doc))
+    if not doc['demo']['enabled']:
+        doc['demo']['enabled'] = True
+        settings_file = Path('/tmp/francois-009-private/tours-settings.json')
+        settings_file.write_text(json.dumps(doc))
+        settings_file.chmod(0o600)
+        cli('settings', 'apply', '--file', str(settings_file), '--base', str(current['revision']), '--yes', admin=True)
+    after = cli('settings', 'show', admin=True)[0]
+    expected = json.loads(json.dumps(before))
+    expected['demo']['enabled'] = True
+    assert after['document'] == expected, 'Only demo.enabled may change'
+    receipt.setdefault('tours', {'beforeRevision': current['revision'], 'revision': after['revision'],
+                                'before': before['demo'], 'after': after['document']['demo'],
+                                'onlyDemoEnabledChanged': True})
+    save()
+    print('Enabled bounded public tours, revision', after['revision'], flush=True)
