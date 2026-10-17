@@ -21,4 +21,3 @@ The elapsed-time observations remain a separate result:
 | `/account` | 1490 ms → 1933 ms | 627 ms → 140 ms |
 
 The warm samples improved on all three routes. Cold elapsed times did not improve uniformly: the account load took longer in the later sample, even with substantially fewer bytes. These single observations cannot separate network variation, connection setup, browser scheduling and execution. The verified result is the lower transfer requirement and correct reuse; this report does not turn that into an unsupported latency guarantee. An end-to-end application-start speedup remains unmeasured because the baseline tour probe was declined by the existing network limit. Smaller catalog thumbnails, route-specific bundles and app dependency packaging remain conditional follow-ups after a permitted startup profile.
-

@@ -127,6 +127,8 @@ Final documentation validation initially reported frontmatter delimiters missing
 
 The first journal archival guard looked for a top-level state and stopped with AssertionError without moving anything. Inspected the journal keys, verified receipt.state is committed and then archived it. Final docmgr doctor and git diff --check pass; every copied vault asset link resolves.
 
+Deployment/report evidence is committed as ae31435. The staged check also caught a trailing blank line in the newly tracked plain-text append fragment, which the earlier working-tree check did not include. Normalized that generated excerpt in a final documentation-only cleanup; no service code or measured result changed.
+
 ### What I learned
 
 The expected transfer improvement is deterministic for these bytes, but elapsed time also contains network setup, scheduling and execution. The strongest completion evidence combines byte identity, browser reuse, explicit HTTP semantics and rollout identity. Existing workspace origins allow a read-only check of public runtime assets and unauthorized-page policy without consuming a public tour start.
