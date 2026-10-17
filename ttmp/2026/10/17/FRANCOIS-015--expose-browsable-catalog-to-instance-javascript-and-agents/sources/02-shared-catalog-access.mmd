@@ -1,0 +1,11 @@
+flowchart TD
+    HTML[Hosted HTML JavaScript] --> Facade[window.slop_boutique]
+    Eval[Browser agent eval] --> Facade
+    Facade --> RPC[Authenticated view RPC]
+    Model[Any hosted model call] --> Tools[Reserved server catalog tools]
+    RPC --> Auth[Current principal and membership checks]
+    Tools --> Auth
+    Auth --> Read[Shared catalog read service]
+    Read --> Published[Published public projections]
+    Read --> Policy[Current download entitlement]
+    Policy --> Source[Bounded source text]

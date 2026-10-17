@@ -1,0 +1,6 @@
+page   num  type   width height color comp bpc  enc interp  object ID x-ppi y-ppi size ratio
+--------------------------------------------------------------------------------------------
+   4     0 image     885  1118  rgb     3   8  image  no        37  0   136   136  104K 3.6%
+   4     1 smask     885  1118  gray    1   8  image  no        37  0   136   136 2258B 0.2%
+   8     2 image     996  1038  rgb     3   8  image  no        51  0   153   153  104K 3.4%
+   8     3 smask     996  1038  gray    1   8  image  no        51  0   153   153 2223B 0.2%
