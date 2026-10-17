@@ -656,3 +656,5 @@ select.btn { appearance: none; cursor: pointer; }
 .signin-social .site-button { justify-content: center; border: 1px solid var(--color-line); background: transparent; }
 .signin-divider { margin: 32px 0 16px; }
 @media (max-width: 600px) { .signin-social { grid-template-columns: 1fr; } }
+
+.signin-other { margin-top: 32px; font-size: 15px; line-height: 22px; }

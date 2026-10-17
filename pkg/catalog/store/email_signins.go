@@ -11,8 +11,8 @@ import (
 const EmailSigninTTL = 5 * time.Minute
 
 type EmailSignin struct {
-	UserID, Issuer, Subject, Email, Origin, ReturnPath, ProviderSession string
-	CreatedAt, ExpiresAt                                                time.Time
+	UserID, Issuer, Subject, Email, Origin, ReturnPath, ProviderSession, Role string
+	CreatedAt, ExpiresAt                                                      time.Time
 }
 
 // ReplaceEmailSignin holds the user lock only while replacing local state.
@@ -27,7 +27,7 @@ func (s *Store) ReplaceEmailSignin(ctx context.Context, token string, binding []
 	if err != nil {
 		return EmailSignin{}, "", err
 	}
-	if !sameEmailUser(current, u.Issuer, u.Subject, u.Email) {
+	if current.Role != u.Role || !sameEmailUser(current, u.Issuer, u.Subject, u.Email) {
 		return EmailSignin{}, "", ErrNotFound
 	}
 	var old *string
@@ -35,7 +35,7 @@ func (s *Store) ReplaceEmailSignin(ctx context.Context, token string, binding []
 	if err != nil && err != pgx.ErrNoRows {
 		return EmailSignin{}, "", err
 	}
-	f := EmailSignin{UserID: u.ID, Issuer: u.Issuer, Subject: u.Subject, Email: u.Email, Origin: origin, ReturnPath: ret}
+	f := EmailSignin{UserID: u.ID, Issuer: u.Issuer, Subject: u.Subject, Email: u.Email, Origin: origin, ReturnPath: ret, Role: current.Role}
 	err = tx.QueryRow(ctx, `INSERT INTO email_signins(flow_hash,user_id,binding_hash,issuer,subject,email_snapshot,portal_origin,return_path,expires_at)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval '5 minutes') RETURNING created_at,expires_at`, Hash(token), u.ID, binding, u.Issuer, u.Subject, u.Email, origin, ret).Scan(&f.CreatedAt, &f.ExpiresAt)
 	if err != nil {
@@ -51,7 +51,7 @@ func (s *Store) ReplaceEmailSignin(ctx context.Context, token string, binding []
 }
 
 func sameEmailUser(u User, issuer, subject, email string) bool {
-	return !u.Disabled && u.Role == "subscriber" && u.EmailVerified && u.Issuer == issuer && u.Subject == subject && strings.EqualFold(u.Email, email)
+	return !u.Disabled && (u.Role == "subscriber" || u.Role == "creator" || u.Role == "admin") && u.EmailVerified && u.Issuer == issuer && u.Subject == subject && strings.EqualFold(u.Email, email)
 }
 
 func (s *Store) AttachEmailSession(ctx context.Context, token, provider string) (bool, error) {
@@ -70,7 +70,7 @@ func (s *Store) EmailSigninReady(ctx context.Context, token string, binding []by
 func (s *Store) ClaimEmailSignin(ctx context.Context, token string, binding []byte, origin string) (EmailSignin, error) {
 	var f EmailSignin
 	err := s.Pool.QueryRow(ctx, `DELETE FROM email_signins WHERE flow_hash=$1 AND binding_hash=$2 AND portal_origin=$3 AND expires_at>now() AND provider_session_id IS NOT NULL
- RETURNING user_id,issuer,subject,email_snapshot,portal_origin,return_path,provider_session_id,created_at,expires_at`, Hash(token), binding, origin).Scan(&f.UserID, &f.Issuer, &f.Subject, &f.Email, &f.Origin, &f.ReturnPath, &f.ProviderSession, &f.CreatedAt, &f.ExpiresAt)
+ RETURNING user_id,issuer,subject,email_snapshot,portal_origin,return_path,provider_session_id,created_at,expires_at,(SELECT role FROM users WHERE id=email_signins.user_id)`, Hash(token), binding, origin).Scan(&f.UserID, &f.Issuer, &f.Subject, &f.Email, &f.Origin, &f.ReturnPath, &f.ProviderSession, &f.CreatedAt, &f.ExpiresAt, &f.Role)
 	return f, notFound(err)
 }
 
@@ -86,7 +86,7 @@ func (s *Store) CreateEmailSession(ctx context.Context, f EmailSignin) (string, 
 	if err != nil {
 		return "", err
 	}
-	if !sameEmailUser(u, f.Issuer, f.Subject, f.Email) || !f.ExpiresAt.After(time.Now()) {
+	if u.Role != f.Role || !sameEmailUser(u, f.Issuer, f.Subject, f.Email) || !f.ExpiresAt.After(time.Now()) {
 		return "", ErrNotFound
 	}
 	token, _, err := insertSession(ctx, tx, u.ID, "")

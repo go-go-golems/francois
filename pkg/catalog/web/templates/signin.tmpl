@@ -16,12 +16,13 @@
 </div>
 {{if .Signup}}<p class="small muted">New here? Continue above to create an account.</p>{{end}}
 {{if .Available}}<p class="signin-divider small muted">Or use your email</p>{{end}}
-{{else if .OIDC}}<p><a class="u" href="/auth/login?return={{.Return}}">Continue with your account →</a></p>{{end}}
+{{end}}
 {{if .Available}}
 <p class="signin-intro">Enter your email and we’ll send you a sign-in link. No password needed.</p>
 <form method="post" action="/auth/email/request" class="signin-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return" value="{{.Return}}"><label for="signin-email">Email</label><input id="signin-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required>{{if .Message}}<p role="alert">{{.Message}}</p>{{end}}<button class="site-button" type="submit">Send link →</button></form>
 <p class="small muted">Use the email on your account. Open the link in the same browser within five minutes.</p>
 {{else}}<p>Email sign-in is temporarily unavailable.</p>{{end}}
+{{if .OIDC}}<p class="signin-other"><a class="u" href="/auth/login?return={{.Return}}">More sign-in options →</a></p>{{end}}
 {{end}}
 </div></section></main>
 {{end}}{{end}}

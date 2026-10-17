@@ -37,7 +37,7 @@ func TestSharedSocialSignin(t *testing.T) {
 	})
 	_, body, _ := emailHTTP(e, "GET", "/signin?return=%2Fstudio%3Ftab%3Dposts%26sort%3Dnew", "", nil)
 	page := string(body)
-	for _, want := range []string{"Continue with Google", "Continue with GitHub", "to create an account"} {
+	for _, want := range []string{"Continue with Google", "Continue with GitHub", "More sign-in options", "to create an account"} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("missing %s", want)
 		}
@@ -46,8 +46,8 @@ func TestSharedSocialSignin(t *testing.T) {
 		t.Fatal("role-specific sign-in remains")
 	}
 	links := regexp.MustCompile(`href="(/auth/login[^" ]*)"`).FindAllSubmatch(body, -1)
-	if len(links) != 2 {
-		t.Fatalf("expected two SSO links, got %d", len(links))
+	if len(links) != 3 {
+		t.Fatalf("expected two SSO links and the shared fallback, got %d", len(links))
 	}
 	for _, link := range links {
 		target, err := url.Parse(html.UnescapeString(string(link[1])))

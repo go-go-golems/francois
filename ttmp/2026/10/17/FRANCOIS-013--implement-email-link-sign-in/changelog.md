@@ -39,3 +39,7 @@ With explicit user approval, enrolled the single existing verified supporter in 
 ## 2026-10-17
 
 Implemented shared Google/GitHub/email sign-in presentation and allowlisted ZITADEL provider routing; full Go tests/build/lint pass. Prepared bounded social-signup Terraform plan; production rollout pending.
+
+## 2026-10-17
+
+User approved public signup; applied/merged Terraform #36 (three in-place changes). Enabled role-neutral email eligibility with role-change race checks and fixed review P1 with a shared native-account fallback. Final Go suite/build/lint pass.

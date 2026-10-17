@@ -146,7 +146,7 @@ func (s *Server) issueEmail(ctx context.Context, r *http.Request, email, binding
 	if err != nil {
 		return err
 	}
-	if u.Role != "subscriber" || u.Issuer != provider.Issuer() {
+	if u.Role == "guest" || u.Issuer != provider.Issuer() {
 		return store.ErrNotFound
 	}
 	if err = provider.CheckUser(ctx, u.Subject, u.Email); err != nil {

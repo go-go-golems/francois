@@ -619,3 +619,67 @@ Start with auth.go's provider switch, identity/oidc.go's scope option, signin.tm
 ### Technical details
 
 Runtime flags: --zitadel-google-idp-id, --zitadel-github-idp-id; optional existing --signup-allowed. No new dependency, environment read, database migration, service or callback endpoint is added. Email proof/role eligibility and human factors are unchanged in this checkpoint.
+
+## Step 10: Apply the approved signup policy and unify email eligibility across roles
+
+The user approved proceeding after the production registration boundary was called out. Applied the reviewed public-signup plan, merged Terraform PR #36, and extended email eligibility to enabled verified subscriber/creator/admin accounts without enrolling any additional human factors. Added explicit role comparisons at flow replacement and final session creation so role changes cannot reuse a stale authorization decision.
+
+The first code review also identified a native-account lockout if social buttons hid generic OIDC. Retained a neutral More sign-in options link on the same page. It is an authentication-method choice for everyone, not a separate creator/admin entry point.
+
+### Prompt Context
+
+**User prompt (verbatim):** "go ahead you have approval"
+
+**Assistant interpretation:** Approve the prepared public Google/GitHub account-creation policy and the shared sign-in flow, including the previously asked all-role email option.
+
+**Inferred user intent:** Complete the unified flow without further confirmation for those changes. New accounts receive ordinary roles; paid access and staff authorization remain separate.
+
+### What I did
+
+- Before approval, automatic review rejected the public-signup apply: "persistently change production ZITADEL policy to allow public account creation through Google/GitHub ... not explicitly authorized". No command in that rejected batch executed. Published the concrete proposal as draft Terraform PR #36 and continued unaffected sign-in work.
+- After approval, applied the exact saved plan: zero adds, three changes, zero destroys. Updated the policy documentation, marked PR #36 ready and merged as e41283c20bf605d84a5e972ee4a4a6dbd8ba4606. The provider IDs and existing secrets/linking rules were retained.
+- Allowed email for the three existing human roles while continuing to reject guests. Email still requires a unique enabled verified local address and a matching active organization identity with an enrolled provider email OTP factor.
+- Compare the locked role with the lookup role before replacing a flow. During atomic DELETE/RETURNING claim, read the current user role into the private EmailSignin result; compare it again under the final user lock. No schema change or migration is needed. SetUserRole continues deleting pending links and revoking sessions/grants.
+- Added successful verification tests for subscriber, creator and admin, guest rejection, and a stale lookup/promotion regression. Existing claimed-flow promotion/revocation tests continue passing.
+- Addressed the review's P1 native-account lockout with the common More sign-in options link. Updated the guide, production contract and local visual checks accordingly.
+
+### Why
+
+All roles should select authentication methods from the same page. Allowing staff email proof must not allow an old subscriber link to acquire a new privileged role during verification. The existing row locks and revocation path support that requirement with a private role snapshot instead of a new authentication subsystem.
+
+### What worked
+
+- Focused email/social regressions pass, including all three human roles, guest rejection and role-change checks.
+- Final complete PostgreSQL-backed Go suite passes; catalog package completed in 12.746s. Build, lint and logcopter checks pass.
+- The initial source PR CI passed all checks. Follow-up code is being pushed for renewed review; the original P1 has a concrete regression test and visible neutral fallback.
+- Terraform apply completed with exactly the reviewed three in-place policy/provider changes. No secrets, memberships, subscriptions or human authentication factors were changed.
+
+### What didn't work
+
+The first new role test assigned ResolveSession's first result to a user variable. That result is Session; the user is second. Compilation reported `got.Role undefined (type store.Session has no field or method Role)` at email_signin_test.go:467–468. Corrected the return order and reran the focused and complete gates successfully.
+
+The original UI omitted the native OIDC link whenever a social provider existed. Code review correctly identified that existing users without linked social identities or enrolled email OTP could lose the visible way to sign in. The neutral shared fallback fixes this without reintroducing role-specific presentation.
+
+### What I learned
+
+A common page and role-neutral email proof are separate changes. The provider checks already authenticate the identity independent of local roles; local role stability must still be enforced across network verification and the final transaction.
+
+### What was tricky to build
+
+Role updates delete pending links, but a claimed link has already left that table. Carrying the role observed during atomic claim lets the final locked transaction reject a role change that occurred afterward. The replacement-side comparison also rejects a lookup that went stale before the pending flow was written.
+
+### What warrants a second pair of eyes
+
+Review the claim subquery and final role comparison together with SetUserRole's existing transaction. Existing OTP enrollment remains required for each account; this change does not silently enroll staff or new social accounts in a human factor. The social path creates identities through ZITADEL, not browser-supplied email assertions.
+
+### What should be done in the future
+
+Complete renewed source review and CI, publish the supporting image, and roll it out together with both provider-ID flags and --signup-allowed. Verify the actual external provider entry pages before describing production social navigation as qualified.
+
+### Code review instructions
+
+Review store/email_signins.go, issueEmail's role gate, the all-role and stale-role regressions, and the template's neutral native-account fallback. The saved source references explain the IdP scope and creation settings; Terraform PR #36 owns the production policy change.
+
+### Technical details
+
+The public policy was initially blocked and then authorized explicitly; no rejection workaround was used. The application adds no migration, credential, environment read, callback, worker or queue. Provider-level human factor enrollment and actual external login-email delivery remain unchanged by this checkpoint.

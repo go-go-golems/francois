@@ -17,6 +17,7 @@ const fs=require('node:fs/promises');
     assert.equal(target.searchParams.get('return'),'/studio?tab=posts&sort=new');
    }
    assert.equal(await page.locator('form[action="/auth/email/request"]').count(),1);
+   assert.equal(await page.getByRole('link',{name:'More sign-in options',exact:false}).count(),1);
    assert.equal(await page.getByText(/creator.*administrator/i).count(),0);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.screenshot({path:process.argv[2]+`/social-local-${width}.png`,fullPage:true});
