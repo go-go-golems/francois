@@ -15,7 +15,7 @@ import (
 
 type emailPage struct {
 	State, CSRF, Return, Flow, Code, Message string
-	Available, Staff                         bool
+	Available, OIDC, Google, GitHub, Signup  bool
 }
 
 func (s *Server) emailCookie() string {
@@ -49,7 +49,10 @@ func validEmailSecret(v string) bool {
 
 func (s *Server) renderEmail(w http.ResponseWriter, r *http.Request, status int, d emailPage) {
 	d.Available = s.Config.EmailLogin != nil
-	d.Staff = s.site(r).OIDC.Configured()
+	d.OIDC = s.site(r).OIDC.Configured()
+	d.Google = d.OIDC && s.Config.GoogleIDP != ""
+	d.GitHub = d.OIDC && s.Config.GitHubIDP != ""
+	d.Signup = s.Config.SignupAllowed && (d.Google || d.GitHub)
 	s.render(w, r, status, "signin", pageData{Title: "Sign in", Sensitive: true, Body: d})
 }
 

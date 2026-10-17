@@ -560,3 +560,62 @@ Review production-enrollment.json and the updated production-runbook paragraph. 
 ### Technical details
 
 Used GET /v2/users/{id}/authentication_methods, POST /v2/users/{id}/otp_email with {}, then GET of the same methods endpoint. Asserted AUTHENTICATION_METHOD_TYPE_OTP_EMAIL was present and the prior method set remained a subset of the resulting set.
+
+## Step 9: Add Google/GitHub to the shared sign-in page
+
+Implemented direct Google and GitHub buttons alongside the existing email form and removed role-specific sign-in language. The two providers reuse the current ZITADEL OIDC flow; server configuration supplies their IDs, and the browser can select only the two known names. A separate Terraform plan prepares new-account creation through those existing providers without replacing clients or touching credentials.
+
+### Prompt Context
+
+**User prompt (verbatim):** "add github / google SSO too, there is no \"separate creator / admin\" sign in"
+
+**Assistant interpretation:** One shared sign-in page with social options usable across roles, including a working social signup path for new visitors.
+
+**Inferred user intent:** Eliminate the artificial role-specific login entry point and let people create ordinary accounts through Google or GitHub.
+
+### What I did
+
+- Added the two explicit nonsecret CLI flags and catalog configuration fields. Replaced the signin page's Staff data flag with OIDC/provider availability and ordinary signup presentation.
+- Added fixed-name provider selection to /auth/login and the documented ZITADEL IdP scope to identity.Provider.AuthURL. Return paths use the existing sanitizer; the normal browser binding, state, nonce, PKCE and token verification remain in place.
+- Reworked the template into readable branches, kept the no-script email form, and used existing visual tokens for the two buttons. Removed the stale role-specific CSS selector and labels.
+- Added integration tests covering direct links, nested return query strings, untrusted/disabled provider selection, and the saved state/nonce/verifier relationship. Extended OIDC tests for scopes and prompt preservation.
+- Added the unified-flow appendix to the intern guide, recorded official scope/provider sources, and prepared local visual-check scripts/screenshots.
+- Planned Terraform updates to the two provider creation flags and organization registration policy; the full plan contains exactly three in-place updates and no replacements or credential changes. It exposes the two existing provider IDs as nonsecret outputs.
+
+### Why
+
+ZITADEL already owns both external providers and their secrets. Selecting its existing IdP by scope avoids implementing separate OAuth clients or callbacks in Francois. New users still receive the ordinary local role; authentication does not grant paid access.
+
+### What worked
+
+- The complete PostgreSQL-backed Go suite passed; catalog package completed in 7.962s. go build ./... passed. make lint logcopter-check passed with zero lint issues.
+- Targeted social and safe-return tests passed before the broad gate. Local Chromium checks confirm the email form plus both social links, encoded destination preservation, no creator/admin link, and no horizontal overflow at desktop/mobile widths.
+- The Terraform plan changes only the Francois login policy and its two organization providers, all in place.
+
+### What didn't work
+
+No code validation failure occurred. The shared page's local fixture uses placeholder provider IDs and cannot complete an external social login; that is explicitly a visual test, with server routing covered by integration tests. Live provider entry points remain to be checked after rollout.
+
+### What I learned
+
+The providers already existed but allowed only linking invited users. Public social signup needs both identity-provider account-creation flags and organization registration policy; exposing buttons alone would retain the signup gap.
+
+### What was tricky to build
+
+The IdP scope must be added without dropping the organization and standard scopes or OIDC protections. Tests consume the actual saved browser-bound flow and reconstruct its PKCE challenge, rather than merely checking button text.
+
+### What warrants a second pair of eyes
+
+Review server-owned provider mapping and scope preservation. The email-role policy question is pending: the current change does not silently broaden email links to staff. Google/GitHub and the page are shared by all roles regardless.
+
+### What should be done in the future
+
+Publish/review the source PR, apply and merge the bounded identity changes, then deploy the new image with its provider-ID flags together. Verify real redirects reach each provider before claiming production SSO works. Actual third-party consent/completion requires a real user login.
+
+### Code review instructions
+
+Start with auth.go's provider switch, identity/oidc.go's scope option, signin.tmpl and social_signin_test.go. The later rollout receipt will record actual production revisions and provider-entry validation separately from this code checkpoint.
+
+### Technical details
+
+Runtime flags: --zitadel-google-idp-id, --zitadel-github-idp-id; optional existing --signup-allowed. No new dependency, environment read, database migration, service or callback endpoint is added. Email proof/role eligibility and human factors are unchanged in this checkpoint.

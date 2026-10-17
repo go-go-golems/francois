@@ -1,0 +1,25 @@
+{
+  "base": "http://localhost:18794",
+  "checks": [
+    {
+      "width": 1440,
+      "google": true,
+      "github": true,
+      "email": true,
+      "roleSpecificLink": false,
+      "returnPreserved": true,
+      "horizontalOverflow": false
+    },
+    {
+      "width": 390,
+      "google": true,
+      "github": true,
+      "email": true,
+      "roleSpecificLink": false,
+      "returnPreserved": true,
+      "horizontalOverflow": false
+    }
+  ],
+  "externalAuthenticationAttempted": false,
+  "mailSent": false
+}

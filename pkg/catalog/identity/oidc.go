@@ -65,7 +65,7 @@ func (p *Provider) party(ctx context.Context) (rp.RelyingParty, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	party, err := rp.NewRelyingPartyOIDC(ctx, p.cfg.Issuer, p.cfg.ClientID, p.cfg.ClientSecret, p.cfg.RedirectURL,
-		append([]string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail}, p.cfg.ExtraScopes...),
+		p.scopes(),
 		rp.WithVerifierOpts(rp.WithNonce(func(ctx context.Context) string {
 			n, _ := ctx.Value(nonceKey{}).(string)
 			return n
@@ -79,13 +79,20 @@ func (p *Provider) party(ctx context.Context) (rp.RelyingParty, error) {
 	return party, nil
 }
 
+func (p *Provider) scopes() []string {
+	return append([]string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail}, p.cfg.ExtraScopes...)
+}
+
 // AuthURL builds the authorization redirect with S256 PKCE and a nonce.
-func (p *Provider) AuthURL(ctx context.Context, state, nonce, verifier string, prompt string) (string, error) {
+func (p *Provider) AuthURL(ctx context.Context, state, nonce, verifier string, prompt, idpID string) (string, error) {
 	party, err := p.party(ctx)
 	if err != nil {
 		return "", err
 	}
 	opts := []rp.AuthURLOpt{rp.WithCodeChallenge(oidc.NewSHACodeChallenge(verifier)), withParam("nonce", nonce)}
+	if idpID != "" {
+		opts = append(opts, withParam("scope", strings.Join(p.scopes(), " ")+" urn:zitadel:iam:org:idp:id:"+idpID))
+	}
 	if prompt != "" {
 		opts = append(opts, rp.WithPrompt(prompt))
 	}

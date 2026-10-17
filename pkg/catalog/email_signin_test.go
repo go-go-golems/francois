@@ -419,7 +419,7 @@ func TestEmailFormNoReferrerNavigationOrigin(t *testing.T) {
 	}
 }
 
-func TestStaffSigninPreservesSafeReturn(t *testing.T) {
+func TestSigninPreservesSafeReturn(t *testing.T) {
 	e := setup(t, func(c *Config) {
 		for i := range c.Sites {
 			c.Sites[i].OIDC = identity.New(identity.Config{Issuer: "https://issuer.test", ClientID: "staff"})
@@ -436,11 +436,11 @@ func TestStaffSigninPreservesSafeReturn(t *testing.T) {
 			code, body, _ := emailHTTP(e, "GET", "/signin?return="+url.QueryEscape(tt.requested), "", nil)
 			match := link.FindSubmatch(body)
 			if code != 200 || len(match) != 2 {
-				t.Fatalf("missing staff link: %d %s", code, body)
+				t.Fatalf("missing account link: %d %s", code, body)
 			}
 			target, err := url.Parse(html.UnescapeString(string(match[1])))
 			if err != nil || target.Path != "/auth/login" || target.Query().Get("return") != tt.want {
-				t.Fatalf("staff link %s, err=%v; want return %q", match[1], err, tt.want)
+				t.Fatalf("account link %s, err=%v; want return %q", match[1], err, tt.want)
 			}
 		})
 	}

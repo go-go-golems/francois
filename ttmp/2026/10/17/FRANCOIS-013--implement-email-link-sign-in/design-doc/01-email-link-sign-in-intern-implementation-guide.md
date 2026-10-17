@@ -272,3 +272,16 @@ Run affected Go tests plus repository-required checks. The isolated round trip n
 OIDC completion through `POST /v2/oidc/auth_requests/{id}` is available if we build a login UI serving multiple applications. It would require provider application login-URL configuration and an OIDC authorization context in addition to the email flow. Our supporter sign-in only serves Francois, so none of that is required now. The existing staff OIDC path remains intact.
 
 The result is a Final email screen, a short-lived browser-bound pending record and several server-side calls to the identity provider we already run. ZITADEL performs the actual email authentication; Francois keeps the account/session/access responsibilities it already has.
+
+
+## Unified Google/GitHub sign-in extension
+
+The public sign-in page now presents Google, GitHub and the existing email form together, without a separate creator/administrator link. Authentication selects an identity; the stored account determines its role and subscription access. A successful external login uses the existing callback and `UpsertIdentity`: new accounts get the schema's ordinary subscriber role, while existing roles and disabled status are preserved.
+
+The browser selects only `provider=google` or `provider=github` on `/auth/login`. `catalog.Config.GoogleIDP` and `.GitHubIDP` map those fixed names to server-configured ZITADEL provider IDs. Unknown names return 400; disabled providers return 503 and are omitted from the page. `identity.Provider.AuthURL` adds `urn:zitadel:iam:org:idp:id:<id>` to its existing scopes while retaining organization selection, state, nonce, S256 PKCE and the registered callback. It does not construct Google/GitHub OAuth requests or handle their client secrets.
+
+Configure `--zitadel-google-idp-id` and `--zitadel-github-idp-id` with the existing organization providers' nonsecret IDs. `--signup-allowed` enables the page's new-account explanation. The shared Terraform environment must permit registration and set account creation plus automatic creation on those two organization IdPs; its provider secrets remain ephemeral Vault reads. Terraform outputs `google_idp_id` and `github_idp_id` provide the matching runtime values.
+
+This extension does not create an account from an unproven email address. Email links still use the existing enrollment/proof machinery. The prior instruction to label an OIDC link as creator/admin sign-in is superseded by this unified page. Any broadening of email-role eligibility is a separate pending user choice, not an implicit effect of adding social buttons.
+
+Tests in `pkg/catalog/social_signin_test.go` verify the page and server-owned selection, return-path encoding, disabled/unknown providers, bound state consumption, nonce and PKCE challenge. `pkg/catalog/identity/oidc_test.go` verifies provider selection preserves base/organization scopes and registration prompt behavior. The full Go suite with PostgreSQL, build, lint and logcopter checks passed for this extension. Local screenshot verification uses fixture provider IDs; it does not prove external Google/GitHub authentication. See sources/zitadel-social-login/README.md for the primary protocol references.
