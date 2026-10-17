@@ -39,10 +39,22 @@ type Identity struct {
 // UpsertIdentity provisions or refreshes a local user keyed by issuer and
 // subject. Role and disabled flags are never changed by a login.
 func (s *Store) UpsertIdentity(ctx context.Context, id Identity) (User, error) {
-	return scanUser(s.Pool.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1),0))`, id.Email); err != nil {
+		return User{}, err
+	}
+	u, err := scanUser(tx.QueryRow(ctx, `INSERT INTO users(id,issuer,subject,email,email_verified,display_name,last_login_at)
 VALUES($1,$2,$3,$4,$5,$6,now())
 ON CONFLICT(issuer,subject) DO UPDATE SET email=EXCLUDED.email,email_verified=EXCLUDED.email_verified,display_name=EXCLUDED.display_name,last_login_at=now()
 RETURNING `+userColumns, NewID("usr_"), id.Issuer, id.Subject, id.Email, id.EmailVerified, id.Name))
+	if err != nil {
+		return User{}, err
+	}
+	return u, tx.Commit(ctx)
 }
 
 func (s *Store) User(ctx context.Context, id string) (User, error) {

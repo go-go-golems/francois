@@ -762,9 +762,9 @@ Normal Open resumes a saved workspace through `POST /api/instances/open`. If its
 
 ## Email and social sign-in
 
-The shared `/signin` page offers email magic links and configured Google/GitHub options to all roles. Email links use ZITADEL’s Session API and select an existing enabled non-guest account with a unique verified address and enrolled OTP email factor. Email authentication does not create or link accounts. Social authentication reuses `/auth/login` and the existing OIDC callback; new identities receive the ordinary local role, and existing roles are preserved. Payment access is checked separately. Email support remains off by default in the binary and is explicitly enabled in production.
+The shared `/signin` page offers email magic links and configured Google/GitHub options to all roles. Email links use ZITADEL’s Session API and select an existing enabled non-guest account with a unique verified address and enrolled OTP email factor. With `--signup-allowed`, new addresses can create an account through the same form: ZITADEL verifies the address before Francois creates the local user/session, then email OTP is enrolled for future sign-ins. No account is linked by email. Existing unrelated identities are never enrolled by the registration path. Social authentication reuses `/auth/login` and the existing OIDC callback; new identities receive the ordinary local role, and existing roles are preserved. Payment access is checked separately. Email support remains off by default in the binary and is explicitly enabled in production.
 
-Apply migration `012_email_signins.sql` through the ordinary catalog migration command before running the new binary. To enable the feature, provision a **dedicated** ZITADEL machine user with the built-in `IAM_LOGIN_CLIENT` role and write its short-lived/rotated PAT to a mounted secret file. This role is privileged; do not reuse the Terraform administrator credential. The application requires user read and session read/write/delete permissions. The default ORG_USER_MANAGER role does not include session.write on v4.16.1.
+Apply migrations `012_email_signins.sql` and `013_email_registrations.sql` through the ordinary catalog migration command before running the new binary. To enable the feature, provision a **dedicated** ZITADEL machine user with the built-in `IAM_LOGIN_CLIENT` role and write its short-lived/rotated PAT to a mounted secret file. This role is privileged; do not reuse the Terraform administrator credential. The application requires user read/write and session read/write/delete permissions. Email signup uses the same dedicated IAM_LOGIN_CLIENT; it additionally creates unverified humans and verifies/enrolls email only for registration-owned identities. The default ORG_USER_MANAGER role does not include session.write on v4.16.1.
 
 Configure the existing serve command with:
 
@@ -779,7 +779,7 @@ ZITADEL, not Francois, owns SMTP. A read-only check on 2026-10-17 confirmed an a
 
 The application uses `POST /v2/sessions` with `challenges.otpEmail.sendCode.urlTemplate`, pointing to its trusted portal confirmation page. The deployed v4.16.1 proto uses a sendCode/returnCode object oneof; do not copy the older boolean returnCode email example from the MFA guide. The user opens the link **in the same browser**, then confirms with a POST. GET requests from mail scanners cannot authenticate. Both the portal attempt and temporary ZITADEL session expire in five minutes, matching the provider's default email-code expiry.
 
-Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. Unknown, ambiguous, disabled and guest addresses receive the same generic acknowledgement. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
+Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. New, existing, ambiguous, disabled and guest addresses receive the same generic acknowledgement. Signup is attempted only when no local record exists and `--signup-allowed` is enabled; disabling that flag also rejects pending signup confirmations. Unknown addresses otherwise receive no message. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
 
 Email sessions use the existing local idle/absolute expiry and have no OIDC ID token. Logout stays local. Temporary provider proof sessions are deleted after redemption and expire automatically if cleanup fails. Changing a user's role revokes all portal sessions and runtime grants, and invalidates pending email attempts; promotion cannot turn an email session into an admin session.
 
@@ -814,7 +814,7 @@ cannot create a session after its account changes role.
 
 The explicitly approved Terraform PR #36 permits public creation through the
 two existing external providers and the organization registration policy.
-`--signup-allowed` controls the page’s signup explanation; it does not grant
+`--signup-allowed` controls email registration and its confirmation as well as the page’s signup explanation; it does not grant
 provider registration permission itself. Deploy these flags with the supporting
 image, and retain the separate subscription and administrator authorization.
 
@@ -828,3 +828,11 @@ login forms with the intended scopes and OIDC protections. No credentials,
 external consent or test-account creation were submitted during that check.
 The exact rollout and browser receipts are in FRANCOIS-013's
 `sources/implementation/social-production-*.json` files.
+
+### Email-only registration implementation
+
+The new-email path uses ZITADEL v4.16.1 `POST /v2/users/human` with an explicitly unverified email and custom verification URL. `email_registrations` reserves the random subject before provider I/O and stores the current five-minute browser-bound attempt as digests. Local account/session creation happens only after the confirmation POST verifies the code and rechecks the provider identity. The subsequent `otp_email` enrollment applies only to this registration-owned identity. A verified provider account left behind by an interrupted completion can recover through a fresh OTP proof. Existing provider-email collisions fail closed rather than linking accounts.
+
+The first email is a verification message, and subsequent emails use the existing temporary-session OTP message. Both links use `/auth/email/verify` and require Continue in the requesting browser; scanner GETs remain read-only. Provider errors are acknowledged generically and logged without codes or upstream bodies. The form accepts at most 200 characters to match the provider API. Reservations persist so retries reuse a provider identity; no background cleanup service is introduced.
+
+Use ticket scripts `12-run-email-signup-preview.sh` and `13-verify-email-signup.mjs` for the isolated signup journey on localhost:18795, with a dedicated preview database. These scripts cannot send production mail. Production still runs its previous release until a separate merge/deployment occurs.

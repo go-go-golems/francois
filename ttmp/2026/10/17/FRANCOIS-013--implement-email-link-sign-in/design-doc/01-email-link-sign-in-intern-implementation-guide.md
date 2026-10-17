@@ -33,6 +33,11 @@ WhenToUse: Implementing the working Send link form from Ramon Final.
 ---
 # Email-only magic links backed by ZITADEL
 
+## Email-only registration extension
+
+The new-account path is specified in [Email-only signup implementation guide](02-email-only-signup-implementation-guide.md). That guide supersedes the existing-account-only scope below: when signup is enabled, an address with no local record can register through a ZITADEL verification link before local account/session creation. Existing-account email OTP sign-in and role checks remain unchanged.
+
+
 ## 1. Outcome and selected design
 
 A supporter enters an email address, receives a link, opens it in the same browser and presses Continue. No password or passkey is required. ZITADEL generates, sends and verifies the email code. Francois creates its normal local session only after ZITADEL confirms the email check for the expected existing identity.

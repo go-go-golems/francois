@@ -41,7 +41,7 @@ New email addresses cannot use that OTP mechanism immediately: ZITADEL requires 
 
 Add migration `013_email_registrations.sql` with one `email_registrations` table. A row reserves a random provider subject for a normalized address and issuer. Its unique `(issuer,email)` key makes retries reuse the same subject instead of creating an identity per click. This row is not a local authenticated user and has no permissions or entitlements.
 
-The same row holds the current pending attempt: flow digest, browser-binding digest, origin, return path, creation/expiry timestamps, proof kind (`verification` or `otp`), optional provider session ID and a ready flag. Replacing the attempt invalidates the old link. Claiming it atomically clears its flow digest, permitting one verification attempt. The row remains as the provider-identity reservation so a failed or expired attempt can be retried safely.
+The same row holds the current pending attempt: flow digest, browser-binding digest, origin, return path, creation/expiry timestamps, optional provider session ID (empty for verification, populated for OTP) and a ready flag. Replacing the attempt invalidates the old link. Claiming it atomically clears its flow digest, permitting one verification attempt. The row remains as the provider-identity reservation so a failed or expired attempt can be retried safely.
 
 - No raw link token, provider bearer token or email code is stored.
 - The expiry is five minutes, checked locally even if the provider's verification code lasts longer.
@@ -72,7 +72,7 @@ else:
         check active matching verified identity
         ensure email OTP is enrolled on this owned registration identity
         send the existing temporary-session OTP challenge
-    attach proof kind/session only if the flow is still current
+    attach the session ID (or empty verification marker) only if the flow is still current
 acknowledge identically for unknown, existing, blocked and failed requests
 ```
 
@@ -94,14 +94,13 @@ re-read provider user: active, same subject, organization and verified email
 ensure email OTP is enrolled for this registration-owned identity
 transaction:
     serialize local identity provisioning for the normalized email
-    reject another local identity using that email
-    insert ordinary verified local user by issuer+subject (or preserve existing role)
-    reject disabled/guest accounts
+    reject any local account now using that email or issuer+subject
+    insert ordinary verified local user by issuer+subject
     insert portal session and update last-login time
 commit, clear browser-binding cookie, set portal-session cookie, redirect safely
 ```
 
-The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. It does not introduce email-based identity merging. A matching issuer/subject preserves the existing role, and the user row is locked while the session is issued.
+The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
 
 ```mermaid
 sequenceDiagram
@@ -151,7 +150,7 @@ Primary references: [custom registration](https://zitadel.com/docs/guides/integr
 2. Add the reservation/flow migration and store methods; share a normalized-email lock with ordinary identity provisioning.
 3. Branch the existing request and verification handlers into signup only when no local address exists and signup is enabled. Reuse rendering, cookie handling, limits, expiry and redirects.
 4. Update the form guidance to explain that email can create an account, with identical acknowledgement for all outcomes.
-5. Test real PostgreSQL claims, replacement, expiry, disabled/collision behavior, concurrent completion and role preservation. Mock-provider tests cover proof ordering, wrong organization/address, failed codes and recovery after partial completion.
+5. Test real PostgreSQL claims, replacement, expiry, disabled/collision behavior, concurrent completion and rejection when a local identity appears concurrently. Existing sign-in tests cover role preservation. Mock-provider tests cover proof ordering, wrong organization/address, failed codes and recovery after partial completion.
 6. Exercise the full first-signup and second-login sequence against the isolated pinned ZITADEL and Mailpit stack. Assert that no local user exists before confirmation and one ordinary user/session exists afterward. Confirm scanner GETs send/verify nothing and replay fails.
 7. Run the full database-backed Go suite, build and required lint. Record exact failures and repairs in the ticket diary. Commit design and implementation at meaningful boundaries.
 

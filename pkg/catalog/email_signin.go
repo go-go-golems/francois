@@ -52,7 +52,7 @@ func (s *Server) renderEmail(w http.ResponseWriter, r *http.Request, status int,
 	d.OIDC = s.site(r).OIDC.Configured()
 	d.Google = d.OIDC && s.Config.GoogleIDP != ""
 	d.GitHub = d.OIDC && s.Config.GitHubIDP != ""
-	d.Signup = s.Config.SignupAllowed && (d.Google || d.GitHub)
+	d.Signup = s.Config.SignupAllowed && (d.Available || d.Google || d.GitHub)
 	s.render(w, r, status, "signin", pageData{Title: "Sign in", Sensitive: true, Body: d})
 }
 
@@ -116,7 +116,7 @@ func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.ToLower(strings.TrimSpace(r.PostForm.Get("email")))
 	addr, err := mail.ParseAddress(email)
-	if err != nil || addr.Address != email || len(email) > 254 || strings.ContainsAny(email, "\r\n") {
+	if err != nil || addr.Address != email || len(email) > 200 || strings.ContainsAny(email, "\r\n") {
 		s.renderEmail(w, r, 400, emailPage{CSRF: binding, Return: safeReturn(r.PostForm.Get("return")), Message: "Enter a valid email address."})
 		return
 	}
@@ -142,11 +142,18 @@ func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) issueEmail(ctx context.Context, r *http.Request, email, binding string) error {
 	provider := s.Config.EmailLogin
-	u, err := s.Store.UserByVerifiedEmail(ctx, email)
+	users, err := s.Store.UsersByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
-	if u.Role == "guest" || u.Issuer != provider.Issuer() {
+	if len(users) == 0 && s.Config.SignupAllowed {
+		return s.issueEmailRegistration(ctx, r, email, binding)
+	}
+	if len(users) != 1 {
+		return store.ErrNotFound
+	}
+	u := users[0]
+	if u.Disabled || !u.EmailVerified || u.Role == "guest" || u.Issuer != provider.Issuer() {
 		return store.ErrNotFound
 	}
 	if err = provider.CheckUser(ctx, u.Subject, u.Email); err != nil {
@@ -191,6 +198,9 @@ func (s *Server) inspectEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ready, err := s.Store.EmailSigninReady(r.Context(), flow, store.Hash(c.Value), s.site(r).PortalOrigin())
+	if err == nil && !ready && s.Config.SignupAllowed {
+		ready, err = s.Store.EmailRegistrationReady(r.Context(), flow, store.Hash(c.Value), s.site(r).PortalOrigin())
+	}
 	if err != nil || !ready {
 		s.invalidEmail(w, r)
 		return
@@ -215,6 +225,11 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	f, err := s.Store.ClaimEmailSignin(ctx, flow, store.Hash(binding), s.site(r).PortalOrigin())
+	registration := false
+	if errors.Is(err, store.ErrNotFound) && s.Config.SignupAllowed {
+		f, err = s.Store.ClaimEmailRegistration(ctx, flow, store.Hash(binding), s.site(r).PortalOrigin())
+		registration = err == nil
+	}
 	if err != nil {
 		s.invalidEmail(w, r)
 		return
@@ -224,7 +239,12 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		s.invalidEmail(w, r)
 		return
 	}
-	if err = s.Config.EmailLogin.Verify(ctx, f.ProviderSession, f.Subject, code, f.CreatedAt); err != nil {
+	if registration && f.ProviderSession == "" {
+		err = s.Config.EmailLogin.VerifyRegistration(ctx, f.Subject, code)
+	} else {
+		err = s.Config.EmailLogin.Verify(ctx, f.ProviderSession, f.Subject, code, f.CreatedAt)
+	}
+	if err != nil {
 		log.Warn().Err(err).Msg("Email sign-in proof rejected")
 		s.invalidEmail(w, r)
 		return
@@ -233,7 +253,15 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		s.invalidEmail(w, r)
 		return
 	}
-	token, err := s.Store.CreateEmailSession(ctx, f)
+	var token string
+	if registration {
+		err = s.Config.EmailLogin.EnsureEmailOTP(ctx, f.Subject)
+		if err == nil {
+			token, err = s.Store.CompleteEmailRegistration(ctx, f)
+		}
+	} else {
+		token, err = s.Store.CreateEmailSession(ctx, f)
+	}
 	if err != nil {
 		s.invalidEmail(w, r)
 		return

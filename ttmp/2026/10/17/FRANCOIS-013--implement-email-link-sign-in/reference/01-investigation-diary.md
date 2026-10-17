@@ -794,3 +794,52 @@ Start with the new design document and existing email_signin.go, identity/email.
 
 ### Technical details
 The new table stores digests and provider identifiers only; mailbox codes and service credentials are never persisted. Existing human factor enrollment is outside the new-identity scope.
+
+
+## Step 13: Implement the registration path and prepare one validation gate
+
+Implemented email-only signup in the existing form and request/confirmation routes. A single new table reserves the provider subject and holds its current browser-bound attempt. The provider creates an unverified human, and a successful confirmation verifies the address, enrolls email OTP and creates a local ordinary user plus session transactionally. No production changes or mail requests were made.
+
+The user clarified the validation cadence while this work was underway. The remaining work is implemented first, followed by one combined qualification gate rather than repeatedly testing every edit. This checkpoint records implementation, not a claim of complete validation.
+
+### Prompt Context
+See Step 12 for the implementation request.
+**User prompt (verbatim):** "no need to overtest at every step. Implement the design doc, and then test"
+**Assistant interpretation:** Finish the feature before running its combined final validation.
+**Inferred user intent:** Keep the work focused on shipping rather than repeated intermediate checks.
+**Commit (design):** 2464600 — docs: design email-only registration and verification flow.
+
+### What I did
+- Added identity/email_signup.go for reserved-subject creation, collision checks, resend, verification and idempotent OTP enrollment.
+- Added migration 013 and store/email_registrations.go for stable reservations, hashed flow replacement, one-time claims and atomic local user/session creation.
+- Branched email_signin.go only for a genuinely absent local address when SignupAllowed is true. Disabled, unverified, ambiguous and guest local records cannot fall through into signup.
+- Shared a short normalized-email transaction lock with ordinary OIDC provisioning. Registration rejects any local account that appeared while confirmation was pending; it never updates or promotes an existing account.
+- Updated the form guidance and 200-character input limit, production operator docs and both design guides.
+- Added database-backed regression cases and a real local browser/mail-sink journey, ready for the combined gate.
+
+### Why
+The durable reservation is necessary to recover provider-side success without creating a second identity or assuming mailbox ownership. Reusing the current confirmation page preserves scanner safety and the existing CSRF/browser-cookie contract. Rejecting all newly present local accounts is simpler than preserving roles across two concurrent provisioning paths; the next request can use normal sign-in.
+
+### What worked
+An early existing-authentication check passed after allowing the required loopback network access: `go test ./pkg/catalog/identity` and the database-backed `go test ./pkg/catalog -run 'TestEmail|TestSharedSocial' -count=1`. These checks preceded the new signup tests and do not qualify the completed feature.
+
+### What didn't work
+The first sandboxed `go test ./pkg/catalog/identity` failed before executing assertions: `httptest: failed to listen on a port: listen tcp6 [::1]:0: socket: operation not permitted`. The same existing tests passed with the permitted network-enabled execution. While preparing the local-preview script, a mechanical filename replacement also changed the CLI flag to `--signup-database-url-file`; corrected it back to `--database-url-file` before the final validation run.
+
+### What I learned
+A pending registration must remain recoverable after the provider has verified the address but OTP enrollment or local commit fails. An empty provider-session ID identifies initial email verification; a nonempty ID selects the existing fresh-OTP session proof, so no separate purpose column is necessary.
+
+### What was tricky to build
+Local account creation must remain atomic with session creation and reject concurrent social provisioning. The email advisory lock is held only for local SQL operations, never provider/network I/O. Confirmation rechecks expiry after acquiring that lock. Pending links are replaced/claimed atomically and stale provider sessions are cleaned up outside transactions.
+
+### What warrants a second pair of eyes
+Review the provider-state checks, collision rejection, superseded-flow attachment condition, signup-disable behavior and retry following provider verification. The new tests are authored but not yet qualified at this checkpoint.
+
+### What should be done in the future
+Run the full Go/database/build/lint gate and real pinned-provider first-signup/second-login journey, repair material failures and record the result.
+
+### Code review instructions
+Start with email_signup.go, identity/email_signup.go and store/email_registrations.go; then read the small existing-handler/provisioning changes and migration 013. Use scripts 12 and 13 for the isolated provider integration.
+
+### Technical details
+New registrations reuse the existing process/global/client/recipient limits and five-minute browser-bound links. No password, bearer credential, plaintext flow secret or mailbox code is stored in PostgreSQL or ticket evidence. Existing unrelated human OTP factors and subscriptions are unchanged.
