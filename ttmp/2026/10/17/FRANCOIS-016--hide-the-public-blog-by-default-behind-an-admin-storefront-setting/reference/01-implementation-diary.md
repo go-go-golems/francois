@@ -174,3 +174,25 @@ Kept the branch's completed features together as requested. The PR description e
 ### Remaining requirements and next action
 
 Wait for GitHub checks and Codex review. No merge or deployment is authorized by this request.
+
+## Step 4: Receive the requested code review
+
+Codex completed review of e27cfe5 and returned two P2 findings: the shared React shell lacks a sign-out action, and Account's title effect does not restore the prior document title on route departure. These are recorded for the next implementation step; this request was to open the PR and wait for review.
+
+### Prompt Context
+
+See Step 3 for the verbatim request.
+
+### Evidence and commits
+
+- `gh api repos/go-go-golems/francois/pulls/10/comments` returned findings in ui/catalog/ui.tsx:115 and ui/catalog/account.tsx:12.
+- GitHub CI passed tests, frontend checks, lint, CodeQL, dependency review, Go vulnerability checks, GoSec and image publication. The GitOps deployment step was skipped.
+- TruffleHog failed with one unverified URI and zero verified secrets. Its annotation points to pkg/catalog/identity/email_test.go:126, the deliberately invalid issuer containing dummy user/password userinfo. This remains an outstanding CI finding, not a leaked production credential.
+
+### Noteworthy decisions or failures
+
+No merge or deployment occurred. Review findings are not marked resolved, and CI is not represented as fully passing.
+
+### Remaining requirements and next action
+
+Address the two P2 comments and the scanner's test-fixture finding before considering merge. PR #10 remains open.
