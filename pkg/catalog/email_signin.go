@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-go-golems/francois/pkg/catalog/identity"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 	"github.com/pkg/errors"
 )
@@ -27,11 +28,11 @@ func (s *Server) emailCookie() string {
 
 func (s *Server) emailBinding(w http.ResponseWriter, r *http.Request) string {
 	if c, err := r.Cookie(s.emailCookie()); err == nil && validEmailSecret(c.Value) {
-		s.setCookie(w, s.emailCookie(), c.Value, int(store.EmailSigninTTL.Seconds()))
+		s.setCookie(w, s.emailCookie(), c.Value, int(store.EmailLinkTTL.Seconds()))
 		return c.Value
 	}
 	binding := store.RandomHex(24)
-	s.setCookie(w, s.emailCookie(), binding, int(store.EmailSigninTTL.Seconds()))
+	s.setCookie(w, s.emailCookie(), binding, int(store.EmailLinkTTL.Seconds()))
 	return binding
 }
 
@@ -85,24 +86,39 @@ func (s *Server) emailForm(w http.ResponseWriter, r *http.Request) (string, bool
 	return c.Value, true
 }
 
-// admitEmail spends limits before lookup and never holds its lock during I/O.
-func (s *Server) admitEmail(r *http.Request, email string) (bool, bool) {
+// reserveEmail counts attempts globally/by client and reserves recipient capacity.
+// A failed issuance refunds only its own recipient slot, not the abuse limits.
+func (s *Server) reserveEmail(r *http.Request, email string) func(bool) {
 	l := s.emailLimiter
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	now := time.Now()
 	ip := "ip:" + s.clientAddress(r)
 	recipient := "mail:" + string(store.Hash(email))
 	if !l.available("global", 100, time.Hour, now) || !l.available(ip, 20, time.Hour, now) {
-		return false, true
+		l.mu.Unlock()
+		return nil
 	}
 	l.hits["global"] = append(l.hits["global"], now)
 	l.hits[ip] = append(l.hits[ip], now)
-	if !l.available(recipient, 3, time.Hour, now) {
-		return false, false
+	if !l.available(recipient, 10, time.Hour, now) {
+		l.mu.Unlock()
+		return nil
 	}
 	l.hits[recipient] = append(l.hits[recipient], now)
-	return true, false
+	l.mu.Unlock()
+	return func(sent bool) {
+		if sent {
+			return
+		}
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		for i, t := range l.hits[recipient] {
+			if t.Equal(now) {
+				l.hits[recipient] = append(l.hits[recipient][:i], l.hits[recipient][i+1:]...)
+				break
+			}
+		}
+	}
 }
 
 func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
@@ -120,23 +136,22 @@ func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
 		s.renderEmail(w, r, 400, emailPage{CSRF: binding, Return: safeReturn(r.PostForm.Get("return")), Message: "Enter a valid email address."})
 		return
 	}
-	s.setCookie(w, s.emailCookie(), binding, int(store.EmailSigninTTL.Seconds()))
-	allowed, limited := s.admitEmail(r, email)
-	if limited {
+	s.setCookie(w, s.emailCookie(), binding, int(store.EmailLinkTTL.Seconds()))
+	finish := s.reserveEmail(r, email)
+	if finish == nil {
 		w.Header().Set("Retry-After", "3600")
 		s.renderEmail(w, r, 429, emailPage{State: "error", Message: "Too many sign-in requests. Please try again later."})
 		return
 	}
-	// A shared deadline also provides a consistent acknowledgement boundary
-	// for unknown accounts and provider failures. Cancellation ends it early.
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	if allowed {
-		if err = s.issueEmail(ctx, r, email, binding); err != nil && !errors.Is(err, store.ErrNotFound) {
-			log.Warn().Err(err).Msg("Email sign-in request unavailable")
-		}
+	err = s.issueEmail(ctx, r, email, binding)
+	finish(err == nil)
+	if err != nil && !errors.Is(err, store.ErrNotFound) && !errors.Is(err, identity.ErrEmailUnavailable) {
+		log.Warn().Err(err).Msg("Email sign-in request unavailable")
+		s.renderEmail(w, r, 503, emailPage{State: "error", Message: "We couldn’t send your link. Please try again."})
+		return
 	}
-	<-ctx.Done()
 	s.renderEmail(w, r, 200, emailPage{State: "sent"})
 }
 
@@ -146,48 +161,28 @@ func (s *Server) issueEmail(ctx context.Context, r *http.Request, email, binding
 	if err != nil {
 		return err
 	}
-	if len(users) == 0 && s.Config.SignupAllowed {
-		return s.issueEmailRegistration(ctx, r, email, binding)
-	}
-	if len(users) != 1 {
+	if len(users) > 1 || len(users) == 1 && (users[0].Disabled || users[0].Role == "guest" || users[0].Issuer != provider.Issuer()) {
 		return store.ErrNotFound
 	}
-	u := users[0]
-	if u.Disabled || !u.EmailVerified || u.Role == "guest" || u.Issuer != provider.Issuer() {
-		return store.ErrNotFound
-	}
-	if err = provider.CheckUser(ctx, u.Subject, u.Email); err != nil {
-		return err
-	}
-	token := store.RandomHex(32)
-	_, old, err := s.Store.ReplaceEmailSignin(ctx, token, store.Hash(binding), u, s.site(r).PortalOrigin(), safeReturn(r.PostForm.Get("return")))
+	who, err := provider.ResolveEmail(ctx, email, store.NewID("email_"), s.Config.SignupAllowed)
 	if err != nil {
 		return err
 	}
-	if old != "" {
-		_ = provider.DeleteSession(ctx, old)
+	id := store.Identity{Issuer: provider.Issuer(), Subject: who.Subject, Email: who.Email, Name: who.Name}
+	token := store.RandomHex(32)
+	if err = s.Store.PrepareEmailLink(ctx, token, store.Hash(binding), id, s.Config.SignupAllowed, s.site(r).PortalOrigin(), safeReturn(r.PostForm.Get("return"))); err != nil {
+		return err
 	}
 	template := s.site(r).PortalOrigin() + "/auth/email/verify?flow=" + token + "&code={{.Code}}"
-	id, err := provider.SendLink(ctx, u.Subject, template)
-	if err != nil {
-		return err
+	if err = provider.SendEmailLink(ctx, who.Subject, template); err == nil {
+		err = s.Store.SetEmailLinkReady(ctx, token)
 	}
-	attached, err := s.Store.AttachEmailSession(ctx, token, id)
-	if err != nil || !attached {
-		_ = provider.DeleteSession(ctx, id)
+	if err != nil {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer cancel()
+		_ = s.Store.DiscardEmailLink(cleanup, token)
 	}
 	return err
-}
-
-func (s *Server) cleanupEmailSession(id string) {
-	if id == "" || s.Config.EmailLogin == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := s.Config.EmailLogin.DeleteSession(ctx, id); err != nil {
-		log.Warn().Err(err).Msg("Temporary email sign-in session cleanup failed; it expires automatically")
-	}
 }
 
 func (s *Server) inspectEmail(w http.ResponseWriter, r *http.Request) {
@@ -197,10 +192,7 @@ func (s *Server) inspectEmail(w http.ResponseWriter, r *http.Request) {
 		s.invalidEmail(w, r)
 		return
 	}
-	ready, err := s.Store.EmailSigninReady(r.Context(), flow, store.Hash(c.Value), s.site(r).PortalOrigin())
-	if err == nil && !ready && s.Config.SignupAllowed {
-		ready, err = s.Store.EmailRegistrationReady(r.Context(), flow, store.Hash(c.Value), s.site(r).PortalOrigin())
-	}
+	ready, err := s.Store.EmailLinkReady(r.Context(), flow, store.Hash(c.Value), s.site(r).PortalOrigin())
 	if err != nil || !ready {
 		s.invalidEmail(w, r)
 		return
@@ -209,7 +201,7 @@ func (s *Server) inspectEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) invalidEmail(w http.ResponseWriter, r *http.Request) {
-	s.renderEmail(w, r, 400, emailPage{State: "error", Message: "This link is expired, already used, or open in a different browser. Request a new link in the browser where you want to sign in."})
+	s.renderEmail(w, r, 400, emailPage{State: "error", Message: "This link is expired, already used, or open in another browser. Request a new link here and open it in this browser."})
 }
 
 func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
@@ -222,46 +214,20 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 		s.invalidEmail(w, r)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	f, err := s.Store.ClaimEmailSignin(ctx, flow, store.Hash(binding), s.site(r).PortalOrigin())
-	registration := false
-	if errors.Is(err, store.ErrNotFound) && s.Config.SignupAllowed {
-		f, err = s.Store.ClaimEmailRegistration(ctx, flow, store.Hash(binding), s.site(r).PortalOrigin())
-		registration = err == nil
-	}
-	if err != nil {
+	f, err := s.Store.ClaimEmailLink(ctx, flow, store.Hash(binding), s.site(r).PortalOrigin())
+	if err != nil || f.Issuer != s.Config.EmailLogin.Issuer() {
 		s.invalidEmail(w, r)
 		return
 	}
-	defer s.cleanupEmailSession(f.ProviderSession)
-	if f.Issuer != s.Config.EmailLogin.Issuer() {
-		s.invalidEmail(w, r)
-		return
-	}
-	if registration && f.ProviderSession == "" {
-		err = s.Config.EmailLogin.VerifyRegistration(ctx, f.Subject, code)
-	} else {
-		err = s.Config.EmailLogin.Verify(ctx, f.ProviderSession, f.Subject, code, f.CreatedAt)
-	}
+	who, err := s.Config.EmailLogin.VerifyEmailLink(ctx, f.Subject, f.Email, code)
 	if err != nil {
 		log.Warn().Err(err).Msg("Email sign-in proof rejected")
 		s.invalidEmail(w, r)
 		return
 	}
-	if err = s.Config.EmailLogin.CheckUser(ctx, f.Subject, f.Email); err != nil {
-		s.invalidEmail(w, r)
-		return
-	}
-	var token string
-	if registration {
-		err = s.Config.EmailLogin.EnsureEmailOTP(ctx, f.Subject)
-		if err == nil {
-			token, err = s.Store.CompleteEmailRegistration(ctx, f)
-		}
-	} else {
-		token, err = s.Store.CreateEmailSession(ctx, f)
-	}
+	token, err := s.Store.CompleteEmailLink(ctx, f, store.Identity{Issuer: f.Issuer, Subject: who.Subject, Email: who.Email, Name: who.Name, EmailVerified: true}, s.Config.SignupAllowed)
 	if err != nil {
 		s.invalidEmail(w, r)
 		return
@@ -271,6 +237,5 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, safeReturn(f.ReturnPath), http.StatusSeeOther)
 }
 
-// signinURL preserves an intended local destination without leaking codes
-// from authentication pages into navigation links.
+// signinURL preserves a local destination without copying authentication codes.
 func signinURL(ret string) string { return "/signin?return=" + url.QueryEscape(safeReturn(ret)) }

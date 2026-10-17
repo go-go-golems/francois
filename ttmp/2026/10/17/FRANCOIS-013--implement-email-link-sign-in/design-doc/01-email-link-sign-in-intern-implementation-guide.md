@@ -33,6 +33,8 @@ WhenToUse: Implementing the working Send link form from Ramon Final.
 ---
 # Email-only magic links backed by ZITADEL
 
+> Current launch design: [One email onboarding and sign-in flow](02-email-only-signup-implementation-guide.md) replaces the historical split OTP/registration implementation below. Google and GitHub SSO remain unchanged.
+
 ## Email-only registration extension
 
 The new-account path is specified in [Email-only signup implementation guide](02-email-only-signup-implementation-guide.md). That guide supersedes the existing-account-only scope below: when signup is enabled, an address with no local record can register through a ZITADEL verification link before local account/session creation. Existing-account email OTP sign-in and role checks remain unchanged.

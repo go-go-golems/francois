@@ -10,12 +10,12 @@ Owners: []
 RelatedFiles:
     - Path: repo://pkg/catalog/email_signin.go
       Note: Browser request and confirmation state transitions
-    - Path: repo://pkg/catalog/email_signup_test.go
-      Note: Database-backed identity and concurrency regression evidence
-    - Path: repo://pkg/catalog/identity/email_signup.go
-      Note: Pinned-provider creation and safe conflict recovery
-    - Path: repo://pkg/catalog/store/email_registrations.go
-      Note: Durable reservation and atomic completion
+    - Path: repo://pkg/catalog/email_signin_test.go
+      Note: Current regression successor; report describes original code at 5068ad1
+    - Path: repo://pkg/catalog/identity/email_link.go
+      Note: Current provider successor; original report code remains at 5068ad1
+    - Path: repo://pkg/catalog/store/email_links.go
+      Note: Current store successor; original report code remains at 5068ad1
     - Path: repo://pkg/catalog/store/users.go
       Note: Symmetric address ownership guard shared with OIDC
 ExternalSources: []

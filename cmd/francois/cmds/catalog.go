@@ -494,7 +494,7 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),
-			fields.New("email-signin-enabled", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Enable ZITADEL email-only sign-in for existing supporter accounts")),
+			fields.New("email-signin-enabled", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Enable ZITADEL email-link sign-in and optional public signup")),
 			fields.New("zitadel-login-token-file", fields.TypeString, fields.WithHelp("Secret file containing the dedicated ZITADEL login service token")),
 			fields.New("zitadel-organization", fields.TypeString, fields.WithHelp("ZITADEL organization whose users may sign in by email")),
 			fields.New("oidc-issuer", fields.TypeString, fields.WithHelp("OIDC issuer URL (ZITADEL)")),

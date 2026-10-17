@@ -1,0 +1,23 @@
+GOWORK=off golangci-lint run -v
+level=info msg="golangci-lint has version 2.4.0 built with go1.26.1 from (unknown, modified: ?, mod sum: \"h1:qz6O6vr7kVzXJqyvHjHSz5fA3D+PM8v96QU5gxZCNWM=\") on (unknown)"
+level=info msg="[config_reader] Config search paths: [./ /home/manuel/code/wesen/go-go-golems/francois /home/manuel/code/wesen/go-go-golems /home/manuel/code/wesen /home/manuel/code /home/manuel /home /]"
+level=info msg="[config_reader] Used config file .golangci.yml"
+level=info msg="[config_reader] Module name \"github.com/go-go-golems/francois\""
+level=info msg="maxprocs: Leaving GOMAXPROCS=8: CPU quota undefined"
+level=info msg="[goenv] Read go env for 8.742308ms: map[string]string{\"GOCACHE\":\"/home/manuel/.cache/go-build\", \"GOROOT\":\"/home/manuel/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.9.linux-amd64\"}"
+level=info msg="[lintersdb] Active 9 linters: [errcheck exhaustive gofmt govet ineffassign nonamedreturns predeclared staticcheck unused]"
+level=info msg="[loader] Go packages loading at mode 8767 (compiled_files|deps|exports_file|files|imports|name|types_sizes) took 630.832341ms"
+level=info msg="[runner/filename_unadjuster] Pre-built 0 adjustments in 48.420222ms"
+level=info msg="[linters_context/goanalysis] analyzers took 15.294197819s with top 10 stages: buildir: 3.555830015s, QF1004: 706.484608ms, S1038: 697.527385ms, gofmt: 607.35998ms, unused: 474.176754ms, SA1012: 345.130436ms, QF1010: 337.13578ms, QF1012: 256.106931ms, S1039: 238.405367ms, exhaustive: 203.090427ms"
+level=info msg="[runner] Processors filtering stat (in/out): invalid_issue: 1/1, nolint_filter: 1/1, source_code: 1/1, path_relativity: 1/1, exclusion_rules: 1/1, diff: 1/1, max_from_linter: 1/1, sort_results: 1/1, exclusion_paths: 1/1, generated_file_filter: 1/1, fixer: 1/1, uniq_by_line: 1/1, path_prettifier: 1/1, path_absoluter: 1/1, max_same_issues: 1/1, path_shortener: 1/1, severity-rules: 1/1, max_per_file_from_linter: 1/1, cgo: 1/1, filename_unadjuster: 1/1"
+level=info msg="[runner] processing took 700.077µs with stages: nolint_filter: 598.206µs, source_code: 42.148µs, generated_file_filter: 37.648µs, path_relativity: 4.71µs, uniq_by_line: 2.294µs, sort_results: 2.187µs, max_same_issues: 2.056µs, path_shortener: 1.296µs, invalid_issue: 1.201µs, max_from_linter: 1.023µs, cgo: 987ns, path_absoluter: 873ns, exclusion_paths: 849ns, diff: 788ns, exclusion_rules: 770ns, filename_unadjuster: 761ns, fixer: 676ns, path_prettifier: 672ns, max_per_file_from_linter: 643ns, severity-rules: 289ns"
+level=info msg="[runner] linters took 2.28283252s with stages: goanalysis_metalinter: 2.281999409s"
+pkg/catalog/store/email_links.go:117:2: QF1003: could use tagged switch on err (staticcheck)
+	if err == ErrNotFound {
+	^
+1 issues:
+* staticcheck: 1
+level=info msg="File cache stats: 1 entries of total size 5.4KiB"
+level=info msg="Memory: 31 samples, avg is 255.0MB, max is 483.3MB"
+level=info msg="Execution took 2.971759192s"
+make: *** [Makefile:23: lint] Error 1

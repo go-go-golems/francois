@@ -147,7 +147,7 @@ func (s *Store) SetUserRole(ctx context.Context, id, role string) error {
 	if _, err = tx.Exec(ctx, `UPDATE runtime_grants SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, id); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM email_signins WHERE user_id=$1`, id); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM email_links WHERE (issuer,subject)=(SELECT issuer,subject FROM users WHERE id=$1)`, id); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -170,6 +170,9 @@ func (s *Store) SetUserDisabled(ctx context.Context, id string, disabled bool) e
 	}
 	if disabled {
 		if _, err = tx.Exec(ctx, `UPDATE runtime_grants SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, id); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `DELETE FROM email_links WHERE (issuer,subject)=(SELECT issuer,subject FROM users WHERE id=$1)`, id); err != nil {
 			return err
 		}
 	}

@@ -1,7 +1,7 @@
 ---
 Title: Email-only signup implementation guide
 Ticket: FRANCOIS-013
-Status: active
+Status: complete
 Topics:
     - backend
 DocType: design-doc
@@ -10,19 +10,21 @@ Owners: []
 RelatedFiles:
     - Path: repo://pkg/catalog/email_signin.go
       Note: Shared request and confirmation flow
-    - Path: repo://pkg/catalog/email_signup_test.go
-      Note: Signup, recovery, collision and concurrency regression coverage
+    - Path: repo://pkg/catalog/email_signin_test.go
+      Note: Unified onboarding, provider-only, stale local state and session guards
     - Path: repo://pkg/catalog/identity/email.go
-      Note: ZITADEL verification and OTP client
-    - Path: repo://pkg/catalog/identity/email_signup.go
-      Note: Registration-owned provider identity and mailbox verification
-    - Path: repo://pkg/catalog/store/email_registrations.go
-      Note: Reservations, one-time claims and atomic account/session provisioning
+      Note: |-
+        ZITADEL verification and OTP client
+        Bounded authenticated provider transport without OTP/session machinery
+    - Path: repo://pkg/catalog/identity/email_link.go
+      Note: One provider identity resolution and email proof client
+    - Path: repo://pkg/catalog/store/email_links.go
+      Note: One pending-link table and local account/session reconciliation
     - Path: repo://pkg/catalog/store/users.go
       Note: Identity provisioning and email collision checks
 ExternalSources: []
 Summary: Passwordless email signup through the existing sign-in form, using ZITADEL email verification before local account creation.
-LastUpdated: 2026-10-17T19:05:11.836226869-04:00
+LastUpdated: 2026-10-17T19:52:24.724251894-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -157,3 +159,7 @@ Remove the old registration handler, separate registration store, email-session 
 Implement the design as one coherent replacement, then validate it. Retain focused regressions for new address, existing provider-only identity, stale local verification, existing account without OTP, same-identity OIDC completion, role/disabled/collision guards, scanner GET, browser/CSRF/origin checks, expiry/replay and failed-send quota refund. Preserve Google/GitHub sign-in tests.
 
 Run the database-backed Go suite, required lint/build checks and one real isolated-provider browser journey after implementation. The browser journey must demonstrate both a new address and an already-verified provider-only account without OTP. Do not repeatedly run broad tests after each edit. Production mail is not sent as part of local qualification.
+
+## Qualification result
+
+The replacement is implemented and locally qualified. The complete database-backed Go suite and build passed, including existing Google/GitHub tests. Final lint/logger checks passed after one mechanical switch cleanup. Script 17 delivered and confirmed four real local emails: onboarding and returning login for a new address, then onboarding and returning login for an already-verified provider-only identity without email OTP. The existing provider identity remained unenrolled in email OTP afterward. The receipt is `sources/implementation/unified-email-browser.json`. This result does not claim a production deployment of the replacement.

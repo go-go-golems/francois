@@ -12,8 +12,8 @@ RelatedFiles:
       Note: Browser form flow and proof orchestration
     - Path: repo://pkg/catalog/identity/email.go
       Note: ZITADEL email challenge client
-    - Path: repo://pkg/catalog/store/email_signins.go
-      Note: Single-use pending flow and locked session creation
+    - Path: repo://pkg/catalog/store/email_links.go
+      Note: Unified pending links and role-preserving local sessions
 ExternalSources: []
 Summary: Detailed intern guide for a small concrete implementation; runtime work remains open.
 LastUpdated: 2026-10-17T16:44:52.803167379-04:00
