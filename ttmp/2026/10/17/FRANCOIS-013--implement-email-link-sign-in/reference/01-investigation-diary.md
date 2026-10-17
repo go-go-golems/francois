@@ -150,3 +150,75 @@ Read the guide, sources/validation.json and the successful receipt. Check that t
 - Remote destination: /ai/2026/10/17/FRANCOIS-013/.
 - Source guide revision: 84da5b6.
 - Evidence level: successful cloud upload; no physical device synchronization verification.
+
+## Step 3: Establish the ZITADEL-backed magic-link implementation
+
+The user asked whether ZITADEL could support the exact email-only journey, then requested saved sources and a concrete implementation path. The first answer was too conservative: hosted-login documentation alone did not establish whether the custom Session API could do this. Searching the upstream discussion and tracing the deployed release establishes a supported API path without requiring a password check.
+
+The revised guide selects direct Session API authentication inside Francois, followed by the existing local portal session. ZITADEL generates, delivers and validates the email code. This keeps the same application/account model and avoids a custom OIDC proxy or independent SMTP/token implementation. Runtime qualification is still open; no real login is claimed from a source audit.
+
+### Prompt Context
+
+**User prompts (verbatim):**
+- "how woul you implement the sign-in given zitadel"
+- "can you search for email-only magic-link with zitadel?"
+- "save relevant sources in the sources/ folder of the ticket"
+- "ok, figure out how to build it, we do want magic link"
+
+**Assistant interpretation:** Research email-only authentication in ZITADEL, retain primary sources and replace the ticket's unsupported first-party default with a concrete provider-backed design.
+**Inferred user intent:** Deliver the Final magic-link experience with a simple implementation using the existing identity infrastructure.
+**Starting revision:** 3ae52c7; clean working tree before this investigation.
+
+### What I did
+
+- Searched official docs and upstream GitHub discussion #2075. Found a November 2025 custom Session API recommendation and a March 2026 report of success.
+- Saved five primary pages as raw HTML with timestamps, URLs, sizes and SHA-256 digests; used Defuddle for readable Markdown companions.
+- Ran a read-only image query using `kubectl get deployments,statefulsets -A -o json`, filtering names and image references. Both deployed ZITADEL components report v4.16.1.
+- Cloned upstream sparsely in /tmp, fetched v4.16.1 and checked it out detached at cc3812a940d629984802fd1246f84fd91d07f6e8. Saved relevant proto/command/API files and permission defaults under ticket sources.
+- Traced createOTPEmailChallenge, CheckOTPEmail, session factor reduction, auth-request linking and code-exchange compliance. Verified that an enrolled email challenge requires a checked user but no password check, and that successful email checks become authentication factors.
+- Noted the current MFA guide's obsolete boolean returnCode example; the deployed proto uses the sendCode/returnCode object oneof.
+- Archived the earlier local-token design and rewrote the primary intern guide around four routes, one pending-flow table and a bounded provider client. Added a source-trace analysis and an explicit runtime qualification gate.
+- Kept production users, factors, login policies, SMTP configuration and credentials untouched. No secret values were read or saved.
+
+### Why
+
+The user explicitly requires magic links. The relevant implementation boundary is custom Session API authentication, rather than the hosted login screen's available controls. For an own-application login, the official guide says additional OIDC plumbing is unnecessary. Direct provider verification followed by the existing local session is smaller than changing provider application routing and implementing custom OIDC request completion.
+
+### What worked
+
+Public source downloads succeeded with network-enabled execution. The pinned source resolves the password prerequisite and wire-format questions. Saved readable extracts and provenance manifests make those findings reviewable without relying on search snippets. The deployment query returned only public component identifiers/images, with no configuration export.
+
+### What didn't work
+
+The initial Python urllib download in the restricted sandbox failed with `urllib.error.URLError: <urlopen error [Errno -2] Name or service not known>`. Retrying the tracked download script with network-enabled execution succeeded. Initial source probes guessed nonexistent flat filenames (`internal/command/oidc_auth_request.go` and `proto/zitadel/session_service.proto`); rg reported file-not-found. Searching the actual tree found `internal/command/auth_request.go` and `proto/zitadel/session/v2/session_service.proto`.
+
+### What I learned
+
+Email OTP's placement under MFA in hosted-login documentation does not restrict a custom session to password-plus-email. Conversely, the low-level session-linking API does not automatically apply all hosted-login authentication decisions. Our handler must explicitly require the fresh successful email factor and intended identity. Merely selecting a user is never sufficient authentication.
+
+### What was tricky to build
+
+The design must preserve scanner-safe GET handling, same-browser binding, single use and local role safety while provider verification occurs outside a database transaction. The guide resolves this with atomic flow claiming before network calls and a locked user recheck before local session creation. One-time consumption deliberately sacrifices retrying the same link after a transient failure; the user requests another email instead.
+
+Late provider responses are another boundary: a conditional provider-session attachment must fail if the pending flow was replaced, and then clean up the newly created provider session. No database transaction remains open across provider calls.
+
+### What warrants a second pair of eyes
+
+Review the trusted Session API credential's permissions, required successful otpEmail factor, issuer/subject/organization checks, provider email freshness and transaction ordering for promotion versus session creation. Email-authenticated sessions must never acquire admin access through later role promotion. Confirm the temporary provider session's expiry and cleanup semantics in the actual round trip.
+
+### What should be done in the future
+
+Implement the revised ticket tasks and run a real isolated v4.16.1 test-mail flow before enabling the feature. No extra authentication-service roadmap is implied. The earlier reMarkable PDF remains a historical snapshot of the superseded guide, explicitly identified in the ticket index.
+
+### Code review instructions
+
+Start with the source-trace analysis, then read the revised guide and inspect the pinned proto/command files. Validate saved-source digests and docmgr metadata. Validated all 19 saved raw page/source/license SHA-256 digests, checked balanced guide/analysis fences, ran docmgr doctor (passed). The pre-staging diff check passed for authored changes. Once raw source snapshots were staged, the full check reported upstream whitespace (for example `01-magic-links-discussion.html:6: trailing whitespace`). These are byte-preserved evidence, so they were not reformatted. A scoped diff check excluding the snapshot folder passed. No application test suite is claimed because application code was not changed; end-to-end verification remains an explicit implementation gate.
+
+### Technical details
+
+- Provider calls: GET /v2/users/{subject}, POST /v2/sessions, PATCH /v2/sessions/{id}, GET /v2/sessions/{id}, DELETE /v2/sessions/{id}.
+- Enrollment: POST /v2/users/{subject}/otp_email during controlled supporter provisioning.
+- Email URL: trusted origin, opaque flow and Code placeholder; maximum template length 200 characters.
+- Provider session lifetime: 600s; no token returned to browser or retained in the pending table.
+- Login credential: dedicated service account; IAM_LOGIN_CLIENT includes the needed permissions in v4.16.1, while ORG_USER_MANAGER lacks session.write.
+- Main evidence: sources/zitadel-email-login/{manifest.json,source-manifest.json,deployment-version.json}.

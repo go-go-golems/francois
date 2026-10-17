@@ -11,3 +11,7 @@ Wrote a standalone intern guide for four email sign-in routes, one pending-link 
 ## 2026-10-17
 
 Validated guide and diagrams; uploaded Email Sign In Intern Guide PDF to /ai/2026/10/17/FRANCOIS-013 with OK uploaded receipt after network-enabled retry. Guide revision 84da5b6; runtime tasks remain open.
+
+## 2026-10-17
+
+Confirmed ZITADEL v4.16.1 email-only Session API path; saved primary sources and replaced local-token design with provider-verified magic links. Runtime email qualification remains open.

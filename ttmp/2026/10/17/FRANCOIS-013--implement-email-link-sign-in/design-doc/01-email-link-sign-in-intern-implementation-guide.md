@@ -26,238 +26,247 @@ ExternalSources:
     - https://zitadel.com/docs/guides/integrate/login-ui/login-app
     - https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
     - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-Summary: A bounded first party email link flow for existing subscriber accounts using the current database and portal sessions.
+Summary: ZITADEL Session API email challenges authenticate existing supporters into ordinary portal sessions.
 LastUpdated: 2026-10-17T14:27:28-04:00
 WhatFor: Teach a new contributor the current authentication system and a small complete email sign in implementation.
 WhenToUse: Implementing the working Send link form from Ramon Final.
 ---
+# Email-only magic links backed by ZITADEL
 
-# Email-link sign-in for Slop Boutique
+## 1. Outcome and selected design
 
-## 1. What the feature does
+A supporter enters an email address, receives a link, opens it in the same browser and presses Continue. No password or passkey is required. ZITADEL generates, sends and verifies the email code. Francois creates its normal local session only after ZITADEL confirms the email check for the expected existing identity.
 
-An email sign-in link proves that a visitor can receive mail at the address associated with an account. The website creates a random, short-lived **token**, sends it to that address, and accepts it once to create a normal signed-in **session**. A session is the server’s record that subsequent browser requests belong to a particular user. The browser carries a session cookie; application code uses the corresponding database record rather than trusting a user ID supplied by the browser.
+Use the Session API directly inside the existing Go service. This is a custom login screen for our own application, not a separately deployed login service. The existing staff OIDC login remains available. There is no new identity provider, mail queue, local SMTP implementation, token-exchange impersonation or custom OIDC proxy.
 
-Slop Boutique already has users, sessions, verified email addresses, cookies, request guards and a database. Its current interactive login delegates authentication to ZITADEL, an identity provider, using OpenID Connect (OIDC). OIDC returns a signed identity with an issuer and subject; that pair identifies the existing Francois user. Adding email login must reuse that same user ID so subscriptions, saved instances and permissions remain attached to the account.
+This revises the original guide, preserved in `../archive/01-superseded-first-party-email-guide.md`. That guide selected locally generated email tokens because the hosted-login documentation describes email OTP as MFA. Further investigation found ZITADEL's explicit custom-login recommendation and verified the relevant implementation in the deployed version. The choice is now **ZITADEL email authentication, followed by the existing Francois session**.
 
-The concrete feature in this ticket is an email form for **existing, enabled subscriber-role accounts with one unambiguous verified email**. It creates no account, links no identities and changes no role or entitlement. Production documentation describes invite-only identity registration, so email sign-in must not silently become public signup. A subscriber-role user can sign in regardless of current payment status; account access and paid/hosted entitlement are separate decisions.
+The scope remains existing enabled subscriber-role accounts with one unambiguous verified email. A subscriber role is not proof of current payment: signing in restores account access; existing entitlement checks still control hosted functionality. Do not create users or attach accounts merely because two email strings match. The durable identity remains the existing configured issuer plus ZITADEL user ID.
 
-For example, Ana already has a Francois user and verified address. She requests a link, receives it, opens it in the browser where she started, and presses Continue. The token is consumed and the website creates a fresh session for Ana’s existing user ID. The account page and instance APIs continue using the same session guards as before. A random unknown address gets the same public acknowledgement but no account or sign-in email.
+## 2. Evidence and qualification
 
-![Email sign-in responsibilities](../sources/01-system.png)
+The cluster reports both ZITADEL and its login application at **v4.16.1**. The source snapshot is pinned to `cc3812a940d629984802fd1246f84fd91d07f6e8`, not today's main branch. Evidence is under `../sources/zitadel-email-login/`, including raw HTML, readable Markdown, provenance manifests, deployment image names and selected upstream source files.
 
-The implementation is four HTTP routes, one database table and one direct mail sender inside the existing Go service. No background queue, new identity provider, authentication framework or additional deployment service is required.
+The important findings are:
 
-## 2. Existing authentication, explained from a request
+- `proto/zitadel/session/v2/challenge.proto` supports `otpEmail.sendCode.urlTemplate`, including a `{{.Code}}` placeholder. ZITADEL can send a link to our confirmation page.
+- `internal/command/session_otp.go:createOTPEmailChallenge` requires a checked user and an enrolled email factor. It does not require a successful password check.
+- `CheckOTPEmail` validates the session's challenge through ZITADEL's code checking and records `OTPEmailChecked`. The session model clears the challenge after success.
+- `session_model.go:AuthenticationTime` includes the email check. `AuthMethodTypes` records email OTP. This is an authenticated factor, not merely an email-address verification request.
+- The official custom-login OIDC guide explicitly says OIDC plumbing is unnecessary for a login UI used only by its own application. Use that smaller integration here.
 
-`pkg/catalog/routes.go` registers `/auth/login`, `/auth/callback`, `/auth/logout` and `/api/session`. `auth.go:186` starts an OIDC authorization request. It stores a short-lived login flow containing a browser binding, nonce, return path and PKCE verifier, and redirects the browser to ZITADEL. A **browser binding** is a random value in an HTTP-only cookie that ties a login flow to the browser that started it. PKCE binds the returned authorization code to the verifier held by the service; a nonce binds the returned identity assertion to this flow.
+This is source-backed feasibility, **not a claim of a completed end-to-end login**. No production identity, policy, SMTP configuration or session was mutated during investigation. A local or isolated staging email round trip is still a required implementation gate.
 
-On callback, `auth.go:212` consumes the matching flow and exchanges the code through `identity.Provider.Exchange`. That method verifies the issuer, subject and token claims, then returns `store.Identity`. `Store.UpsertIdentity` in `store/users.go:41` creates or updates the user keyed by issuer/subject while preserving local role and disabled flags. Finally `Store.CreateSession` stores a digest of a fresh session secret, and the portal sets its HTTP-only cookie.
+Sources: [ZITADEL magic-link discussion](https://github.com/zitadel/zitadel/discussions/2075), [custom-login integration](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard), and the pinned source manifest. The discussion recommends Session API glue; it is not itself a complete recipe.
 
-Requests to protected APIs resolve the cookie through `Store.ResolveSession`. The route guard creates a `Principal`, containing the current user and session, and applies the required role/access checks. State-changing browser requests also need same-origin and CSRF checks. **CSRF** means an attacker’s site attempting to make the browser send authenticated mutations; the existing CSRF token is separate from a session secret.
+## 3. Current system and responsibility boundaries
 
-The email flow starts at a different proof of identity, but ends at the same local session representation. Do not invent a second account table, return a JWT to browser storage, or create an issuer named email. `UserByVerifiedEmail` already performs a case-insensitive lookup and returns a user only when exactly one enabled verified account matches. Use that function rather than write looser matching logic.
+`pkg/catalog/auth.go` implements the current OIDC entry point, callback, cookie settings, session resolution, CSRF checks and logout. `pkg/catalog/identity/oidc.go` discovers the issuer, builds Authorization Code + PKCE requests and validates returned identity tokens. `pkg/catalog/store/users.go` stores users keyed by issuer and subject, and provides `UserByVerifiedEmail`, which refuses ambiguous enabled verified-email matches. `pkg/catalog/store/sessions.go` creates opaque portal sessions, stores only the digest of the cookie secret and applies idle and absolute expiration.
 
-| Source reference | Existing responsibility |
-| --- | --- |
-| `pkg/catalog/auth.go:26` | Cookie names, secure settings and principal resolution |
-| `pkg/catalog/auth.go:102` | Route access, browser-origin and CSRF checks |
-| `pkg/catalog/auth.go:175` | `safeReturn` local redirect validation |
-| `pkg/catalog/identity/oidc.go:83` | Existing authorization request and verified code exchange |
-| `pkg/catalog/store/users.go:57` | Unique enabled verified-email lookup |
-| `pkg/catalog/store/sessions.go:49` | Creating portal sessions with random secrets and CSRF values |
-| `pkg/catalog/store/sessions.go` | Idle/absolute expiry, resolution and revocation |
-| `pkg/catalog/store/instances.go` | Runtime grants tied to portal sessions |
-| `cmd/francois/cmds/catalog.go` | Glazed configuration and secret-file loading |
-| `pkg/catalog/analytics.go:17` | `/auth/` paths excluded from traffic analytics |
+The email flow reuses the existing local user and session store. It must not call `UpsertIdentity` with browser-supplied values, invent an email issuer or treat an email OTP session as an OIDC ID token. Our server authenticates its Session API calls with a dedicated ZITADEL service credential. A successful Session API check is the authentication proof; the known existing issuer/subject selects the local user.
 
-Line numbers refer to the source inspected at `dbef98e`. Follow symbols if edits move them.
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant F as Francois Go service
+    participant D as Francois database
+    participant Z as ZITADEL Session API
+    participant M as Supporter mailbox
+    B->>F: POST /auth/email/request (email, CSRF)
+    F->>D: Find eligible existing identity; save browser-bound flow
+    F->>Z: Read user; create session with email challenge
+    Z->>M: Email link to Francois confirmation page
+    F-->>B: Generic check-your-email response
+    M-->>B: Open link
+    B->>F: GET /auth/email/verify (flow, code)
+    F-->>B: Continue form; no code verification yet
+    B->>F: POST /auth/email/verify (flow, code, CSRF)
+    F->>D: Atomically claim unexpired, browser-bound flow
+    F->>Z: PATCH session with checks.otpEmail.code
+    F->>Z: GET session; require expected user + fresh email factor
+    F->>D: Revalidate identity; create normal session transactionally
+    F->>Z: Delete temporary provider session
+    F-->>B: Set portal cookie; redirect to saved local path
+```
 
-## 3. The selected design and its limits
+The provider session exists only to verify this login. It has a ten-minute lifetime and is deleted after the attempt. Portal sessions retain the existing seven-day idle / thirty-day absolute bounds. Email login does not establish ZITADEL hosted-login SSO, and later ZITADEL logout does not automatically revoke this portal cookie. Local session revocation remains authoritative, just as for the application's existing session store.
 
-Use a first-party opaque link token for subscriber sign-in, then create an ordinary portal session. Retain the existing OIDC entry point for creator/admin login; email sign-in must not reduce authentication requirements for privileged accounts. Both are intentional entry points for different account roles, not fallback adapters. The existing user record, role checks, billing integration and hosted access remain authoritative.
+## 4. Provider configuration and exact API requests
 
-ZITADEL’s documented login application lists email OTP among multifactor methods and passkeys among passwordless methods. That is not evidence that enabling email OTP alone produces Ramon’s passwordless Send link journey. This guide therefore selects the small local flow rather than making the implementation depend on an unverified provider UI configuration. It also avoids building an entire custom ZITADEL login application. [ZITADEL Login App documentation](https://zitadel.com/docs/guides/integrate/login-ui/login-app).
+Provision one dedicated service account and mount its credential as a secret file. In v4.16.1 the built-in `IAM_LOGIN_CLIENT` role includes the required session read/write/delete and user-read permissions. It is a powerful login credential, not the public OIDC client ID. Do not reuse the Terraform administrator PAT in the application. The default org user-manager role lacks session.write. Validate permissions on the test deployment before shipping; do not invent an organization-scoped login role that is absent from this release.
 
-These parameters define the implementation:
+Email OTP must be enrolled on each eligible ZITADEL user and ZITADEL must have working SMTP. Enroll explicitly during supporter provisioning using `POST /v2/users/{subject}/otp_email` with `{}` after a verified primary email exists. Do not silently enroll arbitrary browser-supplied identities, change provider policies or ignore all enrollment errors on every sign-in request. An already-enrolled factor is an idempotent provisioning case to classify deliberately.
 
-| Parameter | Value and behavior |
-| --- | --- |
-| Eligible account | Existing enabled `subscriber` role, uniquely verified address |
-| Link lifetime | 10 minutes |
-| Link secret | 32 cryptographically random bytes, encoded as hex |
-| Database secret representation | SHA-256 digest via existing `store.Hash` |
-| Browser binding | Separate 24-byte random cookie, also stored as a digest |
-| Origin | Configured `Site.PortalOrigin()`, never untrusted Host input |
-| Return path | `safeReturn`, stored when issuing the link |
-| Pending links | One per user; a new request replaces the pending link |
-| Mail rate | Three per normalized address per hour; twenty per client address per hour; one hundred globally per hour |
-| Send behavior | One synchronous, deadline-bounded SMTP submission; no queue/retries |
-| Session | Existing idle/absolute lifetime and CSRF behavior |
-| New identity creation | None |
+All example API requests below are **server-to-server**, authenticated with `Authorization: Bearer <dedicated-service-token>` over HTTPS. The credential never enters the HTML or client JavaScript.
 
-The mail and request deadline is three seconds. Complete syntactically valid, rate-admitted request acknowledgements at the same three-second boundary, whether or not the address is eligible. This avoids the obvious instant unknown-user response versus a slow SMTP response. It is a bounded response policy, not a claim of cryptographic constant-time network behavior. Database or mail failures are logged without secrets and the visitor can retry with the same form. Global mail disablement is a visible service-unavailable state independent of the submitted address.
+First read `GET /v2/users/{subject}`. Require the expected organization, an active human user, and `human.email.isVerified == true`. Its current primary address must match the eligible local account's verified address. Repeat this validation before final session creation so a local stale email cannot redirect proof to a changed account. Reject a local identity whose issuer differs from the configured ZITADEL issuer.
 
-The rate limiter can reuse the existing small limiter implementation from `demos.go`, with its own instance and key prefixes. Reserve counters under the mutex and release it before database or SMTP work. Count rejected lookup attempts against address/global admission too. Do not hold a shared demo limiter lock while sending mail. A recipient quota that is exhausted produces the same generic acknowledgement without sending; client-address/global exhaustion can produce a general 429 with Retry-After. In the current single-service process, no distributed limiter is required.
-
-## 4. Browser flow and scanner-safe confirmation
-
-The sign-in page has an email field, Send link action, short supporter explanation and the Final shared shell. It renders with Go templates and submits an ordinary form, so the feature works without loading the React Admin application. Validate bounded form input server-side. Use a proper mailbox parser, reject display-name lists/header characters, trim the address and normalize lookup casing; do not apply provider-specific Gmail-style address rewriting.
-
-The email should contain the site name, a single trusted HTTPS link, the ten-minute expiry, and a short statement that unsolicited messages can be ignored. Keep it plain text initially. Do not put roles, user IDs, session secrets or arbitrary redirects into the link. The link carries only its random token; the server already holds the target user, origin and safe return path.
-
-Opening the link performs **no authentication mutation**. Email products often fetch links to inspect them. The GET response displays Continue, and only the form’s POST consumes the token. Require the original binding cookie in both the inspection and redemption paths. Explain that the visitor should open or paste the link in the browser where they requested it. Supporting a different browser without this binding is not part of this small flow.
-
-![Request, email and confirmation sequence](../sources/02-flow.png)
-
-All entry and confirmation pages set `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and a noindex directive. They load no third-party resources. `/auth/` is already excluded from internal traffic recording; keep raw query strings out of application and ingress logs because the link token is a credential. Apply the no-store header after generic template rendering if `render` would otherwise replace it with `no-cache`.
-
-The browser binding, explicit confirmation and same-origin POST protect against login requests being completed in a different browser, accidental link inspection, and cross-origin form submission. Use the same generic invalid/expired page for missing, expired, consumed or wrong-browser links. These token lifecycle choices are consistent with OWASP’s treatment of short-lived emailed tokens and session secrets; the exact schema, limits and route design here are project decisions. [OWASP emailed-token guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html), [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
-
-## 5. Route reference: current and proposed contracts
-
-The following routes are **proposed**, not presently installed:
-
-| Route | Input | Result |
-| --- | --- | --- |
-| `GET /signin` | Optional local `return` | 200 email form and short-lived browser binding cookie |
-| `POST /auth/email/request` | Form `email`, `return`, request nonce | 200 generic acknowledgement after admitted processing; 400 malformed form; 429 general rate limit; 503 mail disabled |
-| `GET /auth/email/verify` | Query `token` and binding cookie | 200 confirmation; generic invalid page for unusable link; no consumption |
-| `POST /auth/email/verify` | Form `token`, binding cookie | Atomic consumption/session creation, session cookie and 303 to stored local return path |
-
-Use `application/x-www-form-urlencoded`, a 2KiB body limit and Go’s standard form parsing. The request form’s nonce is a copy of the random binding value also held in the HTTP-only cookie; require an exact constant-time match and same origin on POST. The nonce is not the mailed token. A GET to `/signin` creates it if absent; a request without the cookie returns the sign-in form rather than sending mail.
-
-For verification POST, require the binding cookie and exact site origin; token lookup also checks its stored origin. The random token plus browser-bound pending row is the proof being submitted. Read the return path from that row rather than accepting a new one at verification. Use the normal portal session cookie after commit and clear the short-lived email-flow cookie.
-
-Example browser request, with invented values rather than an actual credential:
+Create a temporary authentication session:
 
 ```http
-POST /auth/email/request HTTP/1.1
-Content-Type: application/x-www-form-urlencoded
-Origin: https://slop.boutique
-Cookie: __Host-francois_email_flow=EXAMPLE_BINDING
+POST /v2/sessions
+Content-Type: application/json
 
-email=ana%40example.com&return=%2Faccount&nonce=EXAMPLE_BINDING
+{
+  "checks": {"user": {"userId": "EXISTING_ZITADEL_SUBJECT"}},
+  "lifetime": "600s",
+  "challenges": {
+    "otpEmail": {
+      "sendCode": {
+        "urlTemplate": "https://slop.boutique/auth/email/verify?flow=RANDOM_FLOW&code={{.Code}}"
+      }
+    }
+  }
+}
 ```
 
-Every eligible and ineligible syntactically valid address gets the same response text: “If this address belongs to an eligible account, a sign-in link will arrive shortly.” The wording avoids claiming delivery before the user receives mail. Never put the submitted email into a subsequent redirect query string.
+Construct the URL from `Site.PortalOrigin()` and a cryptographically random flow value. Do not accept a callback URL from the browser or use an untrusted Host header. The template has a 200-character limit in the proto; validate the finished template, including configured origin and random flow. Do not embed a provider session token, user ID or arbitrary return URL. The response contains `sessionId` and `sessionToken`; save the ID in the private flow record and discard the token, because privileged server calls authenticate with the dedicated service credential.
 
-Existing `GET /auth/login` and `/auth/callback` continue to implement staff OIDC. Existing `POST /auth/logout` revokes the local session and derived runtime grants. For an email-created session, `IDToken` is empty: finish logout locally without attempting provider end-session. A real OIDC session with an ID token retains the existing provider logout behavior.
+The currently indexed MFA guide still shows a boolean `returnCode`. The actual v4.16.1 email challenge uses the `sendCode` / `returnCode` object oneof above. Follow the pinned proto, not that outdated example.
 
-Update public sign-in links in `pages.go`, `ui/catalog/ui.tsx` and `public.ts` to `/signin?return=...` once the new route is working. Provide an unobtrusive Staff sign-in link to the existing OIDC path. `LoginAvailable` currently means OIDC configured; split the displayed email availability from staff OIDC availability rather than making a mail outage look like total authentication failure.
+After scanner-safe browser confirmation, check the code:
 
-## 6. Minimal persistence and transaction boundaries
+```http
+PATCH /v2/sessions/PROVIDER_SESSION_ID
+Content-Type: application/json
 
-Add the next unused migration under `pkg/catalog/store/migrations/`; at the inspected revision the latest number is 011. Never edit an applied migration: `Store.Migrate` checks its checksum. A proposed schema is:
-
-```sql
-CREATE TABLE email_signins (
-    user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    token_hash bytea NOT NULL UNIQUE,
-    binding_hash bytea NOT NULL,
-    email_snapshot text NOT NULL,
-    portal_origin text NOT NULL,
-    return_path text NOT NULL,
-    expires_at timestamptz NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
-);
+{"checks": {"otpEmail": {"code": "CODE_FROM_EMAIL"}}}
 ```
 
-One pending row per user is sufficient. Insertion replaces the earlier pending token. Generate token and binding with the existing random helpers; store only their hashes. Use normalized `email_snapshot` to reject a link if the account’s verified address changes before redemption. Include portal origin because this service supports more than one public site with distinct browser cookies.
+Then `GET /v2/sessions/{id}`. Require `session.factors.user.id` to equal the flow's saved subject, the factor's organization to match, `factors.otpEmail.verifiedAt` to be present and fresh for this flow, and the session not expired. A session with only `factors.user` identifies the selected account; **it is not proof of mailbox possession**. Never create a portal session from that state.
 
-Issuance is straightforward:
+Delete the short-lived provider session using `DELETE /v2/sessions/{id}` after completing or abandoning redemption. Cleanup failure must not undo a committed local session; log the provider session ID at an appropriate private operational level and rely on its explicit ten-minute expiry. Never log codes, cookies, service tokens or whole request URLs.
 
-```text
-requestLink(form, bindingCookie, configuredSite):
-    validate origin, body size, mailbox, nonce and safe return
-    reserve address/global/recipient limits
-    resolve exactly one enabled verified-email account
-    if found and role == subscriber:
-        token = random 32 bytes
-        upsert pending row for existing user ID
-        send trusted-origin link with a three-second deadline
-        if send fails: delete row only if token_hash still matches
-    return the generic acknowledgement at the response boundary
-```
+## 5. Four routes, one small flow table
 
-Do not create a user if lookup fails. Recheck uniqueness at redemption as well as issuance: another verified account could acquire the same address during the ten-minute interval. Staff accounts, guests, disabled accounts and ambiguous addresses are all ineligible, without revealing which condition failed to the requester.
+Keep the feature in the existing Go service:
 
-Consumption and session insertion belong in **one PostgreSQL transaction**. Calling the current standalone `CreateSession` after consuming the token would lose the link if session insertion fails. Implement one focused store operation, `RedeemEmailSignIn`, which deletes the matching row with `DELETE ... RETURNING`, checks and locks its current user, and inserts a normal session before committing. The token is gone only if the transaction succeeds. Concurrent redemption of the same row yields one successful session at most.
-
-```text
-redeem(token, binding, origin):
-    begin transaction
-    delete pending row where hashes match,
-        origin matches and expires_at > now(), returning row
-    lock user row; require enabled subscriber and current verified email
-    repeat unique verified-email lookup for email_snapshot
-    require that lookup resolves to this same user ID
-    generate fresh session secret and CSRF token
-    insert session using existing idle/absolute expiry rules, id_token = ''
-    update user's last_login_at
-    commit
-    return session secret and stored safe return path
-```
-
-Refactor the existing session insertion into a private helper accepting the transaction/query executor if needed to share SQL and lifetime rules. This is a small internal refactor, not a second session format. Handle the transaction commit result before setting a cookie. If an older anonymous demo cookie exists, replace it with the new session; do not transfer another account’s state as part of login.
-
-Role changes need one related correctness fix. An email session issued to a subscriber must not become an admin session merely because an operator later promotes that same user. Make `SetUserRole` revoke that user’s current sessions and runtime grants in its existing database operation, using a transaction. After a role change the user signs in through the appropriate entry point. This avoids adding authentication-method policy fields to every request. Check all production role-write paths, including the bootstrap/operator command, use this operation.
-
-Delete expired pending rows opportunistically when issuing a link. No sweeper goroutine is needed for this small table. Expiration is enforced by the redemption predicate even when expired rows have not yet been removed.
-
-## 7. Mail configuration and code organization
-
-Introduce one narrow mail sender with a method such as `SendSignIn(ctx, address, url) error`. A real implementation and a recording test fake are enough. Put SMTP handling in one file or small package; do not build provider selection or a plugin registry. Establish a context deadline and connection deadlines, require encrypted authenticated submission in production, and never log the SMTP password or link URL.
-
-Add Glazed fields in `cmd/francois/cmds/catalog.go` for `smtp-address`, `smtp-user`, `smtp-password-file` and `signin-from`. Read the password with the existing secret-file mechanism. Use no new environment-variable discovery. The operator supplies a working relay and sender address; those credentials were not inspected or changed for this guide. Missing mail configuration disables the email form with a concise service message while staff OIDC remains available.
-
-| Proposed addition/change | Responsibility |
+| Route | Contract |
 | --- | --- |
-| `pkg/catalog/email_signin.go` | Four handlers, validation, acknowledgement and cookies |
-| `pkg/catalog/store/email_signins.go` | Pending row issuance and transactional redemption |
-| Next store SQL migration | Only the pending-link table |
-| `pkg/catalog/signin_mail.go` | One bounded SMTP sender and message composition |
-| `pkg/catalog/web/templates/signin.tmpl` | Form, acknowledgement, confirmation and invalid-link states |
-| `pkg/catalog/routes.go`, `pages.go` | Registration, page template selection and login availability |
-| `pkg/catalog/server.go` | Sender/configuration and separate limiter ownership |
-| `pkg/catalog/store/users.go` | Revoke sessions/grants on role change |
-| `pkg/catalog/auth.go` | Local-only logout when no OIDC ID token exists |
-| `cmd/francois/cmds/catalog.go` | Glazed fields and secret-file loading |
-| Existing UI sign-in link helpers | Send ordinary visitors to the working `/signin` route |
+| `GET /signin` | Render Final email form, browser binding and CSRF value |
+| `POST /auth/email/request` | Validate form, rate limit, select eligible identity, request provider email |
+| `GET /auth/email/verify` | Validate flow/browser; render Continue; no provider mutation |
+| `POST /auth/email/verify` | Atomically claim flow; verify provider proof; create session |
 
-FRANCOIS-012 supplies the Final visual classes and shell. This ticket owns functioning email/confirmation markup. The two can share those CSS classes without sharing identity logic.
+The form works without React. Unknown, ambiguous, disabled and privileged addresses all receive the same public acknowledgement. Mail service disablement can show a global unavailable message independent of a submitted address. Use the existing OIDC entry point for creator/admin sign-in.
 
-## 8. Implementation and test sequence
+One table holds pending state:
 
-First add the table and store redemption tests. Next add the recording mail sender and handlers with server-rendered form states. Wire real SMTP configuration only after request/verification tests pass, then update the sign-in links and logout. Finish by verifying the role-change revocation behavior and testing the actual email journey locally. Commit at these coherent milestones and keep exact failure diagnostics in the diary.
-
-Use the existing Go test harness, which creates an isolated database when `TEST_DATABASE_URL` is supplied. Tests skip without that setting, so confirm the integration cases actually execute. This guide reads the harness source but does not load environment variables or start an implementation test run.
-
-```sh
-pnpm check
-pnpm build
-go test ./pkg/catalog/... -count=1
-go build ./...
+```text
+email_signins
+    flow_hash             text primary key
+    user_id               text unique references users
+    binding_hash          text not null
+    email_snapshot        text not null
+    provider_session_id   text null
+    created_at            timestamptz not null
+    expires_at            timestamptz not null
+    return_path           text not null
 ```
 
-Use a local recording SMTP sink for the manual test. Its messages are development evidence, not production delivery. Keep any long-running server or sink in tmux. Read its output with capture-pane and use `lsof-who -p PORT -k` when replacing a server. Do not print a real production token into shared logs or screenshots.
+A flow contains 32 CSPRNG bytes encoded as hex; only its SHA-256 digest is stored. The HTTP-only binding cookie contains a separate random value. Apply the existing secure-cookie conventions: Secure on HTTPS, SameSite=Lax, Path=/ and no Domain. Use a separate cookie name from the OIDC flow cookie so the two journeys do not overwrite each other's browser binding. A new request replaces the user's old pending flow; delete its old provider session best-effort outside the transaction.
 
-The necessary tests cover behavior rather than mirror helper functions:
+Insert the pending record before asking ZITADEL to send the link. Save the returned provider session ID with a conditional update against that exact flow hash. Until this update succeeds, verification reports that the request is not ready. A replaced or expired row must not be resurrected by a late API response. Delete the newly created provider session if its conditional update loses the race. Do not keep database locks open during network calls.
 
-- A verified enabled subscriber requests a link and redeems it into a session for the **same user ID**, preserving existing subscriptions/instances.
-- Unknown, disabled, duplicate-address, guest and staff lookups return the generic response without sending a sign-in link.
-- Wrong origin, mismatched nonce, oversized form and mail-disabled state produce the specified responses.
-- GET inspection does not consume a token or set a login session, including repeated scanner-like GETs.
-- Missing/wrong browser binding, wrong portal, expiry, changed email, changed role and duplicate redemption fail safely.
-- Two concurrent redemption POSTs create exactly one usable session. An insertion failure rolls back token consumption.
-- A new request invalidates the old pending link; a failed SMTP send removes only its own matching pending row.
-- Mail quotas are applied before sending, and no mutex is held across network I/O.
-- The new session has the normal secure cookie, fresh CSRF token and existing lifetime limits; logout revokes it and its runtime grants locally.
-- Role promotion revokes all earlier sessions/grants, requiring staff OIDC login before privileged use.
-- Private token pages use no-store/no-referrer, and logs/traffic recording contain no full verification URL.
+GET verification returns a no-store, no-referrer confirmation page without third-party resources or analytics. Codes are escaped into a hidden POST field; they are never used as HTML. Require the original binding cookie and same-origin CSRF validation on POST. This intentionally requires the same browser; explain that in the email/form. Email scanners opening GET must not authenticate or consume the challenge.
 
-## 9. Completion and source references
+## 6. Single use, failures and transaction boundaries
 
-The feature is complete when the Final Send link form sends a real bounded email, the confirmation creates the correct existing-user session once, and all listed failure cases behave as specified. Registration, arbitrary donations, identity migration, MFA policy editing and a custom ZITADEL login application are outside this ticket. No later roadmap is required to make this existing-account feature useful.
+Claim the flow before contacting ZITADEL using an atomic delete conditioned on the digest, browser binding, expiry and non-null provider session ID. `DELETE ... RETURNING` gives one caller the complete saved row. A replay or concurrent request cannot reach provider verification through this portal route. A wrong code or temporary provider failure burns this attempt; the user requests another email. This is a deliberate simple failure contract, not a retry queue.
 
-The current behavior is anchored in `auth.go`, `identity/oidc.go`, `store/users.go`, `store/sessions.go`, `store/instances.go`, `demos.go`, `server.go`, `routes.go`, `pages.go`, `analytics.go` and `cmd/francois/cmds/catalog.go`. `doc/production.md:155` records the current ZITADEL organization/client setup and invite-only policy; it is repository deployment documentation, not an independently queried live configuration. External API documentation was checked on 17 October 2026. The small opaque-token/session design above is the selected implementation, not a claim that email login already exists.
+```text
+request_email(form):
+    require_valid_input_origin_and_csrf(form)
+    admit_under_mail_limits()
+    user = unique_enabled_verified_subscriber(form.email)
+    if user absent: return generic_acknowledgement()
+    require user.issuer == configured_zitadel_issuer
+    provider_user = zitadel.get_user(user.subject)
+    require active_verified_matching_user(provider_user, user)
+    flow = replace_pending_flow(user, browser_binding, safe_return)
+    provider = zitadel.create_session(user.subject, link_template(flow))
+    if not attach_provider_session_if_flow_still_current(flow, provider.id):
+        zitadel.delete_session_best_effort(provider.id)
+    return generic_acknowledgement()
+
+confirm_email(form):
+    require_same_origin_csrf_and_browser_cookie()
+    flow = delete_ready_unexpired_flow_returning_row(form.flow, cookie)
+    if absent: return invalid_or_used_link()
+    defer delete_provider_session_best_effort(flow.provider_session_id)
+    zitadel.check_email_code(flow.provider_session_id, form.code)
+    proof = zitadel.get_session(flow.provider_session_id)
+    require proof matches subject, organization, fresh otpEmail factor
+    current_provider_user = zitadel.get_user(flow.subject)
+    require active_verified_matching_user(current_provider_user, flow)
+    transaction:
+        lock local user row
+        require same issuer, subject, email, enabled, subscriber role
+        create ordinary portal session with empty OIDC id_token
+    set existing portal cookie
+    redirect to stored safe_return
+```
+
+The table can store user ID only; load its issuer/subject before the provider request and compare the current identity again in the transaction. The pseudocode's `flow.subject` denotes that trusted server-loaded value, not a new browser input. If identities ever become mutable, save and compare an identity snapshot in the flow too.
+
+Provider proof and the database cannot share an atomic transaction. After proof succeeds but before local commit, a crash means the user requests a new email. That is acceptable. A local role/disable change during the network calls is caught by locking and revalidating the local user in the final transaction. The provider can change immediately after its read; this is the same general external-identity revocation boundary as OIDC, not a claim of a distributed lock.
+
+SetUserRole must revoke existing portal sessions and derived runtime grants transactionally on role changes. Otherwise an email-authenticated subscriber session could become an admin session after promotion. Session creation and role changes must lock the same user row so concurrent promotion cannot skip revocation. Tests must exercise both lock orders.
+
+Logout revokes the local session as usual. When its ID token is empty, clear the cookie and return locally instead of attempting provider OIDC end-session. The temporary ZITADEL proof session has already been deleted; there is no provider session to keep alive for this login method.
+
+## 7. Limits and configuration
+
+Reuse the small rate-limiter utility with a separate email instance: three requests per normalized recipient per hour, twenty per client address per hour, one hundred globally per hour. Reserve counters before lookup or network work. Bound submitted code length and all request bodies; each consumed flow permits one code attempt. These application limits complement ZITADEL's code verification protections. Do not trust forwarded client addresses except through the existing trusted-proxy policy.
+
+Use Glazed fields and secret-file configuration, not new environment lookups:
+
+- `--email-signin-enabled`: explicit feature switch, false until the real round trip passes.
+- `--zitadel-login-token-file`: mounted dedicated service credential, never printed.
+- Existing issuer URL and organization selection: reuse the configured ZITADEL identity settings; make organization ID explicit if presently only embedded in the OIDC scope.
+
+One small HTTP client uses the configured issuer as its fixed base URL, bearer authentication, bounded response bodies, request contexts and timeouts. It only needs get-user, create-session, check-email, get-session and delete-session methods. It must not follow arbitrary redirects carrying the credential. Use a shared request deadline for issuance rather than allowing every upstream call to consume a full independent timeout. Preserve a uniform generic response policy for admitted valid addresses; record provider failure privately and let the user request again.
+
+ZITADEL owns SMTP and code generation. Francois has no SMTP username/password flags and generates no independent mailbox-authentication token. The random flow value binds and locates our login attempt; it cannot authenticate without a successful provider email check and browser binding.
+
+## 8. File-level implementation plan
+
+| File | Concrete change |
+| --- | --- |
+| `pkg/catalog/identity/email.go` (new) | Typed bounded Session API client and response validation |
+| `pkg/catalog/email_signin.go` (new) | Four handlers, browser binding, limits and provider orchestration |
+| `pkg/catalog/routes.go` | Register email handlers and explicit availability |
+| `pkg/catalog/auth.go` | Empty-ID-token logout branch; reuse existing cookies and sessions |
+| `pkg/catalog/store/email_signins.go` (new) | Replace pending flow, conditional attach, atomic claim, locked final session transaction |
+| `pkg/catalog/store` existing migration registration | Add one pending-flow table through existing migration mechanism |
+| `pkg/catalog/store/users.go` | Lock user and revoke sessions/grants on role change |
+| `pkg/catalog/store/sessions.go` | Reuse session insertion from the locked final transaction |
+| `cmd/francois/cmds/catalog.go` | Glazed switch, organization and credential-file wiring |
+| Existing public templates/CSS | Final form, sent, confirmation, unavailable and expired states |
+| `doc/production.md` | Dedicated service credential, supporter factor enrollment, SMTP ownership and release checks |
+
+Before editing, inspect current migration and template registration rather than inventing parallel mechanisms. No production changes are authorized by this investigation. Implement and test locally before adjusting deployment secrets or enrolling real supporters.
+
+## 9. Validation and shipping criteria
+
+The useful tests exercise trust boundaries, not each line of the client:
+
+- Fake provider returns a session with only a user factor: login must fail.
+- Wrong subject, wrong organization, stale/missing email factor, changed email and disabled provider user: login must fail.
+- Unknown/ambiguous/staff account requests: generic acknowledgement and no provider email.
+- GET link preview, including an automated mail scanner: no code verification or local session.
+- Parallel POST redemption: exactly one claimant and at most one local session.
+- Replacement while a send is in flight: late provider response cannot attach to the newer flow.
+- Provider timeout/incorrect code: attempt consumed, safe retry by requesting a new link, no session.
+- Promotion/disable racing finalization: no privileged email session survives.
+- Empty-ID-token logout: local cookie and derived grants revoked, no hosted provider logout redirect.
+
+Then run a **real isolated** ZITADEL v4.16.1 email flow with a test user and a test mail sink. Enroll the factor, create the session without any password check, retrieve the delivered link from the mailbox, and complete the actual portal confirmation. Verify the same preexisting local user ID, existing instance ownership and entitlement behavior. Confirm provider challenge reuse fails and no temporary provider session remains active after completion. Never save service credentials, OTP codes or live links in ticket evidence; record redacted outcomes and screenshots.
+
+Run affected Go tests plus repository-required checks. Application deployment remains gated on that real round trip; source inspection establishes the route through the APIs, not operational SMTP correctness.
+
+## 10. Why this is the smallest suitable integration
+
+OIDC completion through `POST /v2/oidc/auth_requests/{id}` is available if we build a login UI serving multiple applications. It would require provider application login-URL configuration and an OIDC authorization context in addition to the email flow. Our supporter sign-in only serves Francois, so none of that is required now. The existing staff OIDC path remains intact.
+
+The result is a Final email screen, a short-lived browser-bound pending record and several server-side calls to the identity provider we already run. ZITADEL performs the actual email authentication; Francois keeps the account/session/access responsibilities it already has.

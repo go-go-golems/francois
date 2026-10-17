@@ -1,0 +1,42 @@
+[
+  {
+    "file": "01-magic-links-discussion.html",
+    "url": "https://github.com/zitadel/zitadel/discussions/2075",
+    "resolved_url": "https://github.com/zitadel/zitadel/discussions/2075",
+    "retrieved_at": "2026-10-17T20:14:43.308641+00:00",
+    "bytes": 605524,
+    "sha256": "aa72c8a7f726a3fae7c9c525e01734355d003b38105a245c6d826fb41bba43c8"
+  },
+  {
+    "file": "02-custom-login-oidc.html",
+    "url": "https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard",
+    "resolved_url": "https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard",
+    "retrieved_at": "2026-10-17T20:14:43.901966+00:00",
+    "bytes": 695686,
+    "sha256": "a5e3295addd1382f9dd591762b4ef532d7d675aa733a50d7a43fc16e73e64b5a"
+  },
+  {
+    "file": "03-email-otp-and-mfa.html",
+    "url": "https://zitadel.com/docs/guides/integrate/login-ui/mfa",
+    "resolved_url": "https://zitadel.com/docs/guides/integrate/login-ui/mfa",
+    "retrieved_at": "2026-10-17T20:14:44.477357+00:00",
+    "bytes": 1031705,
+    "sha256": "5eafb1c59b9c058ef74757dbdaab03d84265fac491b78c3380ef18e19da1a3d4"
+  },
+  {
+    "file": "04-create-session.html",
+    "url": "https://zitadel.com/docs/reference/api/session/zitadel.session.v2.SessionService.CreateSession",
+    "resolved_url": "https://zitadel.com/docs/reference/api/session/zitadel.session.v2.SessionService.CreateSession",
+    "retrieved_at": "2026-10-17T20:14:44.777254+00:00",
+    "bytes": 816949,
+    "sha256": "e79bf7fc00dcc62940cc96804043423ecf0c67a7a15a1cbf1f5e650d0bd71303"
+  },
+  {
+    "file": "05-hosted-login.html",
+    "url": "https://zitadel.com/docs/guides/integrate/login/hosted-login",
+    "resolved_url": "https://zitadel.com/docs/guides/integrate/login/hosted-login",
+    "retrieved_at": "2026-10-17T20:14:45.032633+00:00",
+    "bytes": 701457,
+    "sha256": "ac3683c2d775d7be093345277a6d1367879d339864c6e5e3a0d59c84d256e8e4"
+  }
+]

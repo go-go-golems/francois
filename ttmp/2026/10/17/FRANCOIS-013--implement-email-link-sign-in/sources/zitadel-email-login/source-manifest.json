@@ -1,0 +1,76 @@
+{
+  "tag": "v4.16.1",
+  "revision": "cc3812a940d629984802fd1246f84fd91d07f6e8",
+  "files": [
+    {
+      "file": "v4.16.1/internal/command/session_otp.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/command/session_otp.go",
+      "sha256": "53dbfbfa536820f999c080b8847cd7e1b98d544920e6d05856527bf4d9dc83f3"
+    },
+    {
+      "file": "v4.16.1/internal/command/session_model.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/command/session_model.go",
+      "sha256": "17703bf13220a8831a8d1c20352ef8d5e5d66261debbb27eb56b7946ef097000"
+    },
+    {
+      "file": "v4.16.1/internal/command/auth_request.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/command/auth_request.go",
+      "sha256": "6211915f645788b4ad0820e0164ff69940b89d494a1dbf9e720c9a3696d10f56"
+    },
+    {
+      "file": "v4.16.1/internal/command/auth_request_model.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/command/auth_request_model.go",
+      "sha256": "5f2190706c847c48b10a9caeaf07f2d35c01a80ff75dfe5715f44bf94da6d00f"
+    },
+    {
+      "file": "v4.16.1/internal/api/oidc/token_code.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/api/oidc/token_code.go",
+      "sha256": "6e00cff90ec43c999f432cd9d2f344f18b841078069785a3b432a66227089638"
+    },
+    {
+      "file": "v4.16.1/internal/api/oidc/amr.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/api/oidc/amr.go",
+      "sha256": "2d6a2227b80b16e089ad1b00a50f43067f6ce275dcc182056c0d59bb6cf80e69"
+    },
+    {
+      "file": "v4.16.1/internal/api/grpc/session/v2/session.go",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/internal/api/grpc/session/v2/session.go",
+      "sha256": "bc6f4e8ed67fac43436110e5aa5bc15c973f24dfc186f9675094359828057db7"
+    },
+    {
+      "file": "v4.16.1/proto/zitadel/session/v2/challenge.proto",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/proto/zitadel/session/v2/challenge.proto",
+      "sha256": "e85f5d8037f82800d4c837eae2d0566fb81bd785a1e4a88cf3daeda7e78f67dc"
+    },
+    {
+      "file": "v4.16.1/proto/zitadel/session/v2/session.proto",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/proto/zitadel/session/v2/session.proto",
+      "sha256": "3f76cfaf63c4bb694778fb6e4a262fc8baa091909c255ccdfae95674cd94d968"
+    },
+    {
+      "file": "v4.16.1/proto/zitadel/session/v2/session_service.proto",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/proto/zitadel/session/v2/session_service.proto",
+      "sha256": "f40f4215aec7cab3b47e89f77828f82997a2eea2ee5ab09fd26fe596f9c0b8a4"
+    },
+    {
+      "file": "v4.16.1/proto/zitadel/user/v2/user_service.proto",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/proto/zitadel/user/v2/user_service.proto",
+      "sha256": "e280de11fdb0b67af726cc25b290b70fe739dcb3271e98f3a28fb03267344355"
+    },
+    {
+      "file": "v4.16.1/proto/zitadel/application/v2/login.proto",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/proto/zitadel/application/v2/login.proto",
+      "sha256": "024c278e049c4ef73b2154dab50dc47647bb7f90560081be6316e02a10c6b907"
+    },
+    {
+      "file": "v4.16.1/defaults.yaml",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/cmd/defaults.yaml",
+      "sha256": "e435be4d8020080eadddf740878949d90a99467cad8e1a377c73173f14aa04bc"
+    },
+    {
+      "file": "v4.16.1/LICENSE",
+      "url": "https://github.com/zitadel/zitadel/blob/cc3812a940d629984802fd1246f84fd91d07f6e8/LICENSE",
+      "sha256": "4df3c306dddaaf4baffdff5ca820cc679ac8cd6dc263c6a74517783e42fa7a3b"
+    }
+  ]
+}
