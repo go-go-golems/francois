@@ -148,6 +148,54 @@ func uploadOf(artifact, title, version string) releases.Upload {
 	return releases.Upload{ArtifactID: artifact, Title: title, Version: version, HTML: []byte(testHTML), Manifest: []byte(`{"sample":{}}`), MaxHTML: 1 << 20}
 }
 
+func TestArtifactPageLatestDownload(t *testing.T) {
+	e := setup(t)
+	admin := e.user("ada", "admin", false)
+	sub := e.user("sam", "subscriber", true)
+	var releases []map[string]any
+	for _, version := range []string{"1.0.0", "1.1.0"} {
+		freeSample := "false"
+		if version == "1.1.0" {
+			freeSample = "true"
+		}
+		code, rel := e.multipartTo(admin, "/api/studio/releases", map[string]string{
+			"artifactId": "board", "title": "Board", "version": version,
+			"manifestJson": `{}`, "freeSample": freeSample,
+		}, "html", "board.html", []byte(testHTML))
+		if code != 201 {
+			t.Fatalf("upload %s: %d %v", version, code, rel)
+		}
+		releases = append(releases, rel)
+	}
+	// Publish the earlier-created draft last: public pages follow publication time.
+	for _, rel := range []map[string]any{releases[1], releases[0]} {
+		if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
+			t.Fatalf("publish: %d %v", code, out)
+		}
+	}
+	oldID, latestID := releases[1]["id"].(string), releases[0]["id"].(string)
+	for _, who := range []*tactor{&admin, &sub} {
+		code, body, _ := e.do(who, "portal.test", "GET", "/apps/board", nil, nil)
+		s := string(body)
+		if code != 200 || strings.Count(s, ">Download HTML</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
+			strings.Contains(s, "/api/releases/"+oldID+"/") || strings.Contains(s, ">Manifest</a>") {
+			t.Fatalf("expected one current HTML download: %d %s", code, body)
+		}
+	}
+	// A historical free sample must not surface as the current paid download.
+	if code, body, _ := e.do(nil, "portal.test", "GET", "/apps/board", nil, nil); code != 200 || bytes.Contains(body, []byte("Download HTML")) {
+		t.Fatalf("anonymous download: %d %s", code, body)
+	}
+	// History remains downloadable through its authorized API, including manifests.
+	for _, raw := range releases[1]["files"].([]any) {
+		file := raw.(map[string]any)
+		url := "/api/releases/" + oldID + "/files/" + file["id"].(string) + "/download"
+		if code, _, _ := e.do(&sub, "portal.test", "GET", url, nil, nil); code != 200 {
+			t.Fatalf("historical %s download: %d", file["role"], code)
+		}
+	}
+}
+
 // TestStorefrontPages covers the server-rendered public pages and media.
 func TestStorefrontPages(t *testing.T) {
 	e := setup(t)

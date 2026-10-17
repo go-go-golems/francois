@@ -112,6 +112,7 @@ export type Member = {
 export type Instance = {
   id: string;
   title: string;
+  artifactTitle?: string;
   kind: "workspace" | "preview" | "demo";
   state: "active" | "suspended";
   role?: "owner" | "editor" | "viewer";
