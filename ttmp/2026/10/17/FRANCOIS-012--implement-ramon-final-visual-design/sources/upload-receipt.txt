@@ -1,0 +1,4 @@
+Cached tree found; checking for remote changes (a full resync may still be needed).
+Synchronizing cloud tree… 0s | 0 HTTP responses, 0 active requests
+Cloud tree synchronized. 3s | 17 HTTP responses
+OK: uploaded FRANCOIS 012 Final Visual Intern Guide.pdf -> /ai/2026/10/17/FRANCOIS-012

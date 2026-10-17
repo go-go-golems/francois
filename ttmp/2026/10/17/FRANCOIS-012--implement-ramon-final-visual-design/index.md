@@ -26,3 +26,7 @@ The analysis and design guide is complete. Implementation is not included in thi
 - [Original measured comparison](../FRANCOIS-011--align-slop-boutique-with-ramon-final-design/index.md).
 
 The guide includes system orientation, prose explanations, file/API references, pseudocode, rendered diagrams and observable acceptance checks. Requested reMarkable delivery is recorded separately in sources/upload-receipt.txt after upload.
+
+## Delivery
+
+Uploaded to `/ai/2026/10/17/FRANCOIS-012/`. [Upload receipt](sources/upload-receipt.txt) and [delivery summary](sources/delivery-summary.json) confirm cloud delivery; device sync was not verified. The guides were committed in `84da5b6`. Implementation remains open.

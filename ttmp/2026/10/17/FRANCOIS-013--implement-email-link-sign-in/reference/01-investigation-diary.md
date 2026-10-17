@@ -93,3 +93,60 @@ Start with the guide introduction and its architecture diagram; a new reader sho
 - Diagram generator: Python standard library calling installed dot; no dependency installation.
 - reMarkable destination: /ai/2026/10/17/FRANCOIS-013/.
 - Final command/output evidence belongs in sources/upload-receipt.txt and the delivery diary checkpoint.
+
+## Step 2: Validate the guide and deliver it to reMarkable
+
+The completed guide was uploaded as its own PDF with a depth-two table of contents. The successful CLI receipt confirms cloud delivery. Physical device synchronization was not independently checked, and no routine cloud listing or extra PDF render was added.
+
+### Prompt Context
+
+**User prompt:** See Step 1, including the explicit request for one upload per ticket.
+**Assistant interpretation:** Deliver the finished, validated guide and retain a reviewable receipt.
+**Inferred user intent:** Make the technical guide available for reading and annotation on reMarkable.
+**Commit (documentation):** `84da5b6` — Split Final redesign into visual and email sign in intern guides.
+
+### What I did
+
+- Confirmed docmgr metadata, local image/document links, balanced code fences and the rendered diagrams before delivery.
+- Used the remarkable-upload skill’s bounded finalization handoff for the frozen guide; no content changes were made during upload.
+- Ran the normal bundle upload with a unique document name, ticket-specific destination, toc-depth 2 and non-interactive mode, without force.
+- Retained command output in sources/upload-receipt.txt and the compact result in sources/delivery-summary.json.
+- Marked only the design/validation/delivery tasks complete; runtime implementation remains open.
+
+### Why
+
+The requested deliverable includes both a repository guide and reMarkable delivery. A clear successful upload is sufficient cloud evidence under the delivery skill; it is not a claim about the physical device.
+
+### What worked
+
+`OK: uploaded FRANCOIS 013 Email Sign In Intern Guide.pdf -> /ai/2026/10/17/FRANCOIS-013`
+
+### What did not work
+
+The first attempt hit restricted-network DNS resolution (`lookup webapp-prod.cloud.remarkable.engineering: no such host`). The network-enabled retry succeeded. The CLI also reported transient remote-tree refresh warnings before its successful upload; the full sequence is retained in the receipt.
+
+### What I learned
+
+The guide’s local PNG diagrams and Markdown references were accepted by the normal bundle pipeline. No extra renderer or upload mechanism was necessary.
+
+### What was tricky to build
+
+Delivery needed to preserve the final guide and its evidence while avoiding overwriting an annotated document. A unique ticket folder and document name allowed an ordinary upload with no replacement.
+
+### What warrants a second pair of eyes
+
+Implementation should follow the current scoped guide rather than broader preliminary suggestions in FRANCOIS-011. The successful receipt does not qualify any unimplemented feature.
+
+### What should be done in the future
+
+Implement the existing open tasks. There is no additional design roadmap in this delivery.
+
+### Code review instructions
+
+Read the guide, sources/validation.json and the successful receipt. Check that the remaining tasks still describe implementation rather than delivery. No application test result is claimed.
+
+### Technical details
+
+- Remote destination: /ai/2026/10/17/FRANCOIS-013/.
+- Source guide revision: 84da5b6.
+- Evidence level: successful cloud upload; no physical device synchronization verification.
