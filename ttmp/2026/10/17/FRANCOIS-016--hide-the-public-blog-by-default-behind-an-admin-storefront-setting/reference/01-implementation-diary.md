@@ -255,3 +255,60 @@ Review ui/catalog/ui.tsx SignOut and Footer, and Account's title effect. Reprodu
 ### Technical details
 
 The fixture browser session lasts at most 15 minutes and is revoked on exit. Error-path simulation returns HTTP 500 once; the subsequent logout request reaches the real server. No new endpoint, dependency or environment-variable read is introduced.
+
+## Step 6: Merge integration and catch the late staff return-path finding
+
+Merged PR #10 as 84a8c46 under the user's deployment authorization. Its image pipeline passed and opened infrastructure PR #362. Before deploying, the second Codex review completed with a new P2 finding: the staff link on Sign in dropped the sanitized return destination. Prepared a focused follow-up rather than knowingly deploying that navigation regression.
+
+### Prompt Context
+
+**User prompt (verbatim):** "merge and deploy"
+
+**Assistant interpretation:** Merge the completed implementation, publish through the existing GitOps pipeline and verify the real production rollout.
+
+**Inferred user intent:** Ship the artifact-focused site with the reviewed fixes.
+
+### What I did
+
+- Merged PR #10, keeping the known historical dummy-credential scan failure explicit; no verified credential was reported.
+- Inspected live Deployment and Argo health: production was sha-393bf35, Synced/Healthy, and already runs --migrate. Migration 012 is additive; email magic links remain disabled without production service credentials.
+- Read the infrastructure repository's AGENTS.md and required deployment/architecture/runtime-secret/troubleshooting guides.
+- Forwarded .Return in signin.tmpl's /auth/login URL. It is sanitized by existing safeReturn and escaped by html/template in query context.
+- Added TestStaffSigninPreservesSafeReturn for Studio/Admin, nested query parameters, absent return, external/protocol-relative URLs and auth callback destinations.
+
+### Why
+
+Preserving the requested internal route makes existing staff sign-in usable from the new page. The existing sanitizer is sufficient; no new redirect mechanism is needed.
+
+### What worked
+
+- The targeted regression passes against disposable local PostgreSQL: TestStaffSigninPreservesSafeReturn, 0.112s.
+- Official image publication for 84a8c46 passed; infrastructure PR #362 exists but has not been merged, keeping the old healthy production image live while the correction is built.
+
+### What didn't work
+
+The follow-up review was still running at the initial merge and returned its new finding afterward. Read that result before merging the deployment manifest. No failed production rollout occurred.
+
+### What I learned
+
+The sign-in template already receives a safe Return value. The omission was only the staff anchor's query parameter.
+
+### What was tricky to build
+
+The local checkout and infrastructure checkout had stale main references. Used GitHub's merged source and live image as authority; did not trust the stale local manifest's image pin.
+
+### What warrants a second pair of eyes
+
+Confirm query-context escaping and safeReturn are both preserved, especially for internal destinations containing ampersands or rejected external destinations.
+
+### What should be done in the future
+
+Merge the focused correction, deploy its generated image pin and run the production smoke script. Keep email-login enablement separate from code rollout until its dedicated production credential is provisioned.
+
+### Code review instructions
+
+Review the single signin.tmpl anchor change and the table-driven regression. The late finding is https://github.com/go-go-golems/francois/pull/10#discussion_r4304655865.
+
+### Technical details
+
+Initial source merge: 84a8c463f46b8490cd223dc36bd66c83bd23f4fd. Initial release run: 39072464372. Initial GitOps PR: wesen/2026-03-27--hetzner-k3s#362, intentionally not deployed pending the correction.
