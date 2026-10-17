@@ -312,3 +312,63 @@ Review the single signin.tmpl anchor change and the table-driven regression. The
 ### Technical details
 
 Initial source merge: 84a8c463f46b8490cd223dc36bd66c83bd23f4fd. Initial release run: 39072464372. Initial GitOps PR: wesen/2026-03-27--hetzner-k3s#362, intentionally not deployed pending the correction.
+
+## Step 7: Deploy the corrected release to production k3s
+
+Merged the focused staff-return correction as PR #11 (8805b43), waited for official image publication, then merged the validated image-only GitOps PR #363. Argo replaced the old pod and reported Synced/Healthy/Succeeded at infrastructure revision 4f1fbedd. Public smoke checks and responsive browser captures confirm the new artifact-focused site is live.
+
+### Prompt Context
+
+See Step 6 for the verbatim deployment request. This step completes that authorization.
+
+**Commit (code):** 8805b4346f9d76278ffdd0b5bc095b9a3aa5e410 — Preserve staff sign-in return destinations (#11).
+
+### What I did
+
+- Follow-up PR #11 CI passed tests, frontend checks, lint, CodeQL, dependency review, GoSec, vulnerability and secret scans. Historical PR #10's dummy-URI failure is preserved in prior entries; the follow-up scan passes without disabling detection or excluding files.
+- Official source workflow run 39072784063 published ghcr.io/go-go-golems/francois:sha-8805b43 and opened infrastructure PR #363.
+- Reviewed the one-line manifest diff (sha-393bf35 → sha-8805b43), confirmed its validate check passed, and merged as infrastructure revision 4f1fbedd261f9ea8ed1b8c1bbd218ea32188fcaa.
+- Closed superseded infrastructure PR #362 without deploying its image. No other open infrastructure PR was changed.
+- Refreshed only Argo Application francois, waited for the expected image, then verified rollout status and pod readiness.
+- Saved credential-free production-rollout.json and production-validation.json receipts; added reproducible read-only HTTP and screenshot scripts.
+- Captured archive and Lattice Deck at 1440px and 390px. Visually inspected the mobile archive: compact rows, readable navigation, support section and footer, with no Journal link.
+
+### Why
+
+The official build → GitOps → Argo path keeps the deployed image auditable. Waiting for the image before checking rollout avoids confusing the old healthy deployment with the new revision.
+
+### What worked
+
+- Live deployment: sha-8805b43, one updated/ready replica. Replacement pod francois-7fb9dfbcf5-9zl5q was ready with zero restarts at inspection.
+- Argo: Synced, Healthy, operation Succeeded at 4f1fbedd.
+- Startup log: `Applied migration migration=012_email_signins.sql` at 2026-10-17T21:58:16Z, followed by readiness for both portal hostnames.
+- scripts/03-verify-production.py passed against https://slop.boutique and https://francois.yolo.scapegoat.dev: health/readiness; archive; all six artifact detail pages; five available public HTML downloads per site; artifact RSS; anonymous journalEnabled=false; 404 for journal index/feed; and staff login return values for Studio and Admin.
+- Four Chromium screenshots passed horizontal-overflow and absent-Journal-link assertions. No demo/model execution, email delivery or authentication mutation was used in production verification.
+
+### What didn't work
+
+No production rollout or smoke-check failure occurred. The initial 84a8c46 image was intentionally superseded before deployment after the late review finding; its pipeline succeeded but its GitOps PR was closed.
+
+### What I learned
+
+Production's existing --migrate startup path handled additive migration 012. The blog's default false behavior applied to existing saved settings without a migration or production setting mutation.
+
+### What was tricky to build
+
+Source merge, registry publication, infrastructure merge and actual running pod are separate observable milestones. The saved receipt records all relevant revisions instead of treating a successful image build as evidence of deployment.
+
+### What warrants a second pair of eyes
+
+Email magic links remain disabled: the code is deployed, but dedicated ZITADEL login credentials/flags are not provisioned in this release. Public smoke checks validate the staff link destination, not a new external interactive OIDC sign-in. Existing staff OIDC configuration was preserved.
+
+### What should be done in the future
+
+No deployment work remains for this request. Production email magic-link enablement still requires the documented dedicated identity credential and controlled provider enrollment. FRANCOIS-014 and FRANCOIS-015 remain design-only.
+
+### Code review instructions
+
+Review production-rollout.json for exact source/infrastructure/image state and production-validation.json for public outcomes. Re-run the read-only scripts if needed. Screenshots are sources/production-{archive,lattice-deck}-{1440,390}.png.
+
+### Technical details
+
+Source PRs: go-go-golems/francois#10 and #11. Deployment PR: wesen/2026-03-27--hetzner-k3s#363. The local checkout is on main at the deployed source revision before this documentation checkpoint. No secret values or authenticated production sessions were archived.

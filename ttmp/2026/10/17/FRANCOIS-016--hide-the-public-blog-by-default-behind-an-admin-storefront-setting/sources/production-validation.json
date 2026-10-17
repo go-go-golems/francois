@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-17T21:58:57.525159+00:00",
+  "checks": [
+    {
+      "base": "https://slop.boutique",
+      "ready": true,
+      "journalEnabled": false,
+      "artifactPages": [
+        "/apps/lattice-deck",
+        "/apps/lattice-phantasmagoria",
+        "/apps/lattice-rift",
+        "/apps/polis",
+        "/apps/rag-workbench",
+        "/apps/tabula-workbench"
+      ],
+      "artifactRSS": true,
+      "publicHTMLDownloads": 5,
+      "staffReturnPaths": true
+    },
+    {
+      "base": "https://francois.yolo.scapegoat.dev",
+      "ready": true,
+      "journalEnabled": false,
+      "artifactPages": [
+        "/apps/lattice-deck",
+        "/apps/lattice-phantasmagoria",
+        "/apps/lattice-rift",
+        "/apps/polis",
+        "/apps/rag-workbench",
+        "/apps/tabula-workbench"
+      ],
+      "artifactRSS": true,
+      "publicHTMLDownloads": 5,
+      "staffReturnPaths": true
+    }
+  ],
+  "mutations": false
+}

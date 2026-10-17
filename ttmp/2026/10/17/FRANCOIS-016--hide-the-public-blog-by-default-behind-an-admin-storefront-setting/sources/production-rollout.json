@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-17T21:59:11.561200+00:00",
+  "sourcePRs": [
+    10,
+    11
+  ],
+  "sourceRevision": "8805b4346f9d76278ffdd0b5bc095b9a3aa5e410",
+  "gitopsPR": 363,
+  "image": "ghcr.io/go-go-golems/francois:sha-8805b43",
+  "readyReplicas": 1,
+  "updatedReplicas": 1,
+  "argoRevision": "4f1fbedd261f9ea8ed1b8c1bbd218ea32188fcaa",
+  "argoSync": "Synced",
+  "argoHealth": "Healthy",
+  "argoOperation": "Succeeded",
+  "emailSigninEnabled": false
+}
