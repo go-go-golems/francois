@@ -107,6 +107,24 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at,updated_at`,
 	return a, tx.Commit(ctx)
 }
 
+// ArchivePosition returns the display ordinal and first publication date
+// without loading all archive covers, credits and release files for a detail page.
+func (s *Store) ArchivePosition(ctx context.Context, id string) (int, *time.Time, error) {
+	var number int
+	var first time.Time
+	err := s.Pool.QueryRow(ctx, `SELECT ordinal,first_published FROM (
+ SELECT a.id,min(r.published_at) AS first_published,
+ row_number() OVER (ORDER BY min(r.published_at),a.id) AS ordinal
+ FROM catalog_artifacts a JOIN releases r ON r.artifact_id=a.id
+ WHERE a.visibility='listed' AND r.state='published' AND r.published_at IS NOT NULL
+ GROUP BY a.id
+) archive WHERE id=$1`, id).Scan(&number, &first)
+	if err != nil {
+		return 0, nil, notFound(err)
+	}
+	return number, &first, nil
+}
+
 // UpdateArtifact writes the settings that apply immediately. It never
 // touches the page document or releases.
 func (s *Store) UpdateArtifact(ctx context.Context, a Artifact) (Artifact, error) {

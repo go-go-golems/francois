@@ -63,6 +63,12 @@ func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 	if len(cards) != 2 || cards[0].ID != "alpha" || cards[0].Number != 1 || !cards[0].FirstPublished.Equal(*first.PublishedAt) || cards[1].Number != 2 {
 		t.Fatalf("archive %+v", cards)
 	}
+	for _, c := range cards {
+		number, published, err := e.store.ArchivePosition(ctx, c.ID)
+		if err != nil || number != c.Number || !published.Equal(*c.FirstPublished) {
+			t.Fatalf("detail/archive mismatch for %s: %d %v %v", c.ID, number, published, err)
+		}
+	}
 	_, all, _ := e.do(nil, "portal.test", "GET", "/", nil, nil)
 	if bytes.Index(all, []byte(`href="/apps/beta"`)) > bytes.Index(all, []byte(`href="/apps/alpha"`)) || bytes.Contains(all, []byte("Journal entry")) || bytes.Contains(all, []byte("Never show this")) || bytes.Contains(all, []byte("Not published")) {
 		t.Fatalf("archive order/visibility: %s", all)

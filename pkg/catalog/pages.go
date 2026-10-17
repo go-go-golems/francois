@@ -440,17 +440,10 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		rels = []store.Release{latest}
 	}
 	c := cardOf(a, latest, credits[a.ID])
-	archive, err := s.cards(ctx, listed)
-	if err != nil {
+	c.Number, c.FirstPublished, err = s.Store.ArchivePosition(ctx, a.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.pageFailed(w, r, err)
 		return
-	}
-	for _, item := range archive {
-		if item.ID == a.ID {
-			c.Number = item.Number
-			c.FirstPublished = item.FirstPublished
-			break
-		}
 	}
 	ids := append([]string{page.Cover}, page.Gallery...)
 	media, err := s.Store.MediaByIDs(ctx, ids)

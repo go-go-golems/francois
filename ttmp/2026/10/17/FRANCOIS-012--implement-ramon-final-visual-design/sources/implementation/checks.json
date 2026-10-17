@@ -1,0 +1,52 @@
+{
+  "code_milestones": [
+    "06a1219",
+    "576764b"
+  ],
+  "go_tests": {
+    "command": "TEST_DATABASE_URL=<local disposable database harness> go test ./... -count=1",
+    "result": "passed",
+    "packages": [
+      "ok  \tgithub.com/go-go-golems/francois/cmd/francois/cmds\t0.242s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog\t13.873s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/billing\t0.008s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/client\t0.778s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/content\t0.026s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/hosted\t0.112s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/identity\t0.015s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/mcpserver\t0.014s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/payments\t1.795s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/releases\t0.243s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/settings\t0.020s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/catalog/web\t0.225s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/host\t0.269s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/piworker\t0.186s",
+      "ok  \tgithub.com/go-go-golems/francois/pkg/store\t0.084s"
+    ]
+  },
+  "final_query_check": {
+    "command": "go test ./pkg/catalog -run TestFinal|TestStorefrontPages|TestArtifactPageLatestDownload -count=1",
+    "result": "passed",
+    "note": "After replacing full archive hydration on detail pages with a single ArchivePosition query"
+  },
+  "frontend": {
+    "node": "v24.18.0",
+    "commands": [
+      "pnpm check",
+      "pnpm test",
+      "pnpm build"
+    ],
+    "result": "passed",
+    "tests": 9,
+    "skipped": 0
+  },
+  "build": {
+    "command": "go build ./...",
+    "result": "passed"
+  },
+  "browser_receipt": "browser-validation.json",
+  "screenshots": 20,
+  "preview": "http://localhost:18792",
+  "production_deployed": false,
+  "runtime_backend": "fake"
+}
