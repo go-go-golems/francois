@@ -91,6 +91,14 @@ export function Launcher({ id }: { id: string }) {
   const [denied, setDenied] = useState("");
   const origin = inst?.origin;
   useEffect(() => {
+    if (!inst?.artifactTitle || !session?.brand) return;
+    const previous = document.title;
+    document.title = `${inst.artifactTitle} · ${session.brand}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [inst?.artifactTitle, session?.brand]);
+  useEffect(() => {
     if (!origin) return;
     const receive = async (e: MessageEvent) => {
       if (e.origin !== origin || e.source !== frame.current?.contentWindow) return;

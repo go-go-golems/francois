@@ -399,8 +399,13 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	var latest store.Release
 	if len(rels) > 0 {
 		latest = rels[0]
+		for _, rel := range rels[1:] {
+			if rel.PublishedAt.After(*latest.PublishedAt) {
+				latest = rel
+			}
+		}
 		// The public page offers the current release; history stays in Studio.
-		rels = rels[:1]
+		rels = []store.Release{latest}
 	}
 	c := cardOf(a, latest, credits[a.ID])
 	ids := append([]string{page.Cover}, page.Gallery...)

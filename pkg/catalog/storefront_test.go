@@ -155,7 +155,7 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 	var releases []map[string]any
 	for _, version := range []string{"1.0.0", "1.1.0"} {
 		freeSample := "false"
-		if version == "1.0.0" {
+		if version == "1.1.0" {
 			freeSample = "true"
 		}
 		code, rel := e.multipartTo(admin, "/api/studio/releases", map[string]string{
@@ -165,12 +165,15 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 		if code != 201 {
 			t.Fatalf("upload %s: %d %v", version, code, rel)
 		}
-		if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
-			t.Fatalf("publish %s: %d %v", version, code, out)
-		}
 		releases = append(releases, rel)
 	}
-	oldID, latestID := releases[0]["id"].(string), releases[1]["id"].(string)
+	// Publish the earlier-created draft last: public pages follow publication time.
+	for _, rel := range []map[string]any{releases[1], releases[0]} {
+		if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
+			t.Fatalf("publish: %d %v", code, out)
+		}
+	}
+	oldID, latestID := releases[1]["id"].(string), releases[0]["id"].(string)
 	for _, who := range []*tactor{&admin, &sub} {
 		code, body, _ := e.do(who, "portal.test", "GET", "/apps/board", nil, nil)
 		s := string(body)
@@ -184,7 +187,7 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 		t.Fatalf("anonymous download: %d %s", code, body)
 	}
 	// History remains downloadable through its authorized API, including manifests.
-	for _, raw := range releases[0]["files"].([]any) {
+	for _, raw := range releases[1]["files"].([]any) {
 		file := raw.(map[string]any)
 		url := "/api/releases/" + oldID + "/files/" + file["id"].(string) + "/download"
 		if code, _, _ := e.do(&sub, "portal.test", "GET", url, nil, nil); code != 200 {

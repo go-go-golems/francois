@@ -302,6 +302,7 @@ type Instance struct {
 	UpdatedAt   time.Time  `json:"updatedAt"`
 	ExpiresAt   *time.Time `json:"expiresAt,omitempty"`
 
+	ArtifactTitle  string          `json:"artifactTitle,omitempty"`
 	ActiveViews    int             `json:"activeViews,omitempty"`
 	MembersList    []Member        `json:"membersList,omitempty"`
 	Usage          json.RawMessage `json:"usage,omitempty"`
