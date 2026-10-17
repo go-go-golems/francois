@@ -86,3 +86,7 @@ The final [portal rollout verification](../various/portal-rollout-verification.j
 ## Web delivery optimization
 
 The published gallery now uses quality-85 WebP copies with the same dimensions and captions; all original PNGs above remain intact for report figures. [Delivery manifest](../sources/showcase-web.json) and [byte comparison](../various/web-media-optimization.json) record the transformation: 10.6 MB becomes 1.98 MB across seventeen images. The current CLI publication receipt identifies the active WebP media IDs. The cache baseline and ongoing optimization now belong to the dedicated sibling ticket FRANCOIS-010; its analysis and diary explain the public static asset correction and its intentionally narrow boundary. This ticket's Step 6 preserves the earlier chronology.
+
+## Final vault report publication
+
+The final combined report is [From HTML exports to public applications on k3s](../analysis/01-from-html-exports-to-public-applications-on-k3s-final-technical-project-report.md). Its vault copy is Projects/2026/10/16/PROJ - Francois - From HTML Exports to Public Applications on k3s - A Technical Deep Dive.md, published in go-go-parc commit 5b0216c. It includes all seventeen original screenshots, two performance figures and fifteen JSON receipts under a colocated asset directory. [Copied-asset inventory](../various/final-project-report-assets.json) records source paths and exact hashes. Earlier vault reports remain intact.

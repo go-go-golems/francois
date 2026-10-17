@@ -440,3 +440,62 @@ Start with pkg/catalog/web/assets.go and its tests, then the two static routes a
 ### Technical details
 
 The implementation uses standard net/http ServeContent and compress/gzip with no new dependency. Matching asset URL: /static/catalog.js?v=<SHA256> → public, max-age=31536000, immutable; unversioned: public, no-cache. ETag is the source hash for identity and source hash plus -gzip for gzip, with quoted syntax. Existing media URLs remain public, max-age=31536000, immutable with SHA256 ETags. The WebP publication receipt keeps the original media entries as history and points the current covers/galleries at the new media IDs.
+
+## Step 7: Publish the final combined project report in go-go-parc
+
+Wrote a new final report that synthesizes the completed imports and delivery-speed work. It preserves the earlier vault notes and explains the shipped system in one continuous technical narrative: source packaging, public access, application launch, evidence, cache correction and the production k3s revision.
+
+### Prompt Context
+
+**User prompt (verbatim):**
+
+> write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).
+> Commit and push the bsidian vault when done (go-go-parc vault).
+
+**Assistant interpretation:** Produce a final standalone report covering FRANCOIS-009 and FRANCOIS-010, with preserved earlier notes and self-contained evidence, and commit/push the vault. **Inferred user intent:** A durable technical explanation of the now-shipped project. **Vault commit:** 5b0216c — Write final Francois HTML import and k3s delivery engineering report.
+
+### What I did
+
+- Read the vault/textbook-writing skills, the vault's ZK Tool exemplar, the import guide, packaging script, cache implementation/tests, public-policy and deployment receipts, and the evidence index. Both repositories were clean at the start.
+- Added analysis/01-from-html-exports-to-public-applications-on-k3s-final-technical-project-report.md. The 6100-word vault version introduces artifact/release/instance/capability/origin concepts before the implementation and follows RAG through exact build identity, publication and launch.
+- Covered all five imports, private-corpus exclusion, explicit script/resource substitutions, model concurrency, release/public-page semantics, title ownership, screenshot capture, WebP delivery, gzip/ETag policy, measured transfer/timing results, review failures, k3s rollout and remaining qualification limits. Added diagrams, representative code, pseudocode and file/API maps without analogies.
+- Added scripts/15-publish-final-vault-report.py. It refuses to overwrite an existing note or asset directory, verifies original screenshot SHA256 values, copies seventeen PNGs/two performance figures/fifteen JSON receipts and records a source/hash inventory.
+- Published Projects/2026/10/16/PROJ - Francois - From HTML Exports to Public Applications on k3s - A Technical Deep Dive.md with colocated _assets/francois-public-html. Five application figures and two performance plots are embedded; the full original seventeen-image set remains linked for reuse.
+- Verified all 40 local vault links resolve and all 34 copied files match inventory sizes/hashes. Scanned copied JSON field names for credential-bearing keys; none found. Verified all five tracked release HTML hashes agree with their build and public-publication receipts.
+- Staged only the new report and its evidence directory, checked the staged diff, committed as 5b0216c and pushed go-go-parc main. Application code, production settings and runtime data were not changed by this report-writing step.
+
+### Why
+
+The earlier speed report preserves its original design/review checkpoint and a later appended production result. A new final report can present the completed import and production-delivery work coherently while preserving that earlier history. Separating catalog publication from service-image deployment also explains why screenshots/releases can change without rebuilding the Go service.
+
+### What worked
+
+The new report contains its own figures and exact-byte receipts, so it remains readable and auditable outside the source checkout. It explains why a screenshot with six RAG files does not contradict the fresh tour's five bundled/zero uploaded files, why a scripted Deck action is distinct from a model completion, and why lower transfer is not a universal cold-latency claim.
+
+### What didn't work
+
+The initial apply_patch for the publisher script omitted the patch-line prefix on one literal YAML line and was rejected with invalid hunk at line 67. Corrected the patch and added the script successfully; the failed operation did not create a partial script. docmgr doctor has no new error; its existing warning is the intentional poc-note.md upload-fixture name without a numeric prefix.
+
+### What I learned
+
+The final report benefits from two explicit provenance identities: source archive snapshot 17645c6 and deployed service 393bf35. A complete source archive and a production runtime image have different contents and publication paths. The narrative can describe both precisely without implying that content publication alone deployed new service code.
+
+### What was tricky to build
+
+Keeping the report self-contained requires copying original figures rather than linking across repositories. Canonical ticket links remain repository-relative; the publisher rewrites those references to the colocated vault asset directory. The evidence table distinguishes the earlier sixteen-image anonymous-tour receipt from current seventeen-image media publication and byte verification.
+
+### What warrants a second pair of eyes
+
+Review the report's claims against the copied receipts, especially historical release versions, model-vs-scripted actions, runtime authorization, source/GitOps commits and mixed cold timings. The final rollout is described as the recorded 00:47 UTC observation, not a new capacity or startup benchmark.
+
+### What should be done in the future
+
+The requested report publication is complete. The existing implementation's conditional performance and qualification follow-ups remain in the report; no new product work is implied by this documentation step.
+
+### Code review instructions
+
+Read the new analysis and the vault report, inspect scripts/15 and various/final-project-report-assets.json, and verify the new note's local figure/evidence references. Existing source tests and live receipts are cited as prior validation; no application test rerun is needed for this report-only change.
+
+### Technical details
+
+The vault report is 6132 whitespace-delimited words, with 34 copied files totaling 10838972 bytes plus its inventory. It uses type: project metadata, tickets FRANCOIS-009/010, the source/archive and deployed service hashes, and the recorded production timestamp. No existing vault note, application release or screenshot original was overwritten.

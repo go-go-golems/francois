@@ -43,3 +43,11 @@ Published quality-85 WebP delivery copies for all seventeen screenshots (10.6 MB
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/various/web-media-verification.json — Actual public WebP bytes and conditional-response verification
+
+## 2026-10-16
+
+Published the final 6100-word combined import/delivery project report to go-go-parc (5b0216c), with seventeen original screenshots, two performance figures, fifteen JSON receipts and verified local links/hashes. Preserved earlier vault notes and the recorded production evidence boundary.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ttmp/2026/10/16/FRANCOIS-009--import-real-html-artifacts-as-hosted-proofs-of-concept/analysis/01-from-html-exports-to-public-applications-on-k3s-final-technical-project-report.md — Final textbook-style project report
