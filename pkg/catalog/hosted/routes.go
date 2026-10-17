@@ -27,21 +27,19 @@ import (
 func (rt *Runtime) Handler(inst store.Instance, portal, origin string) http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /static/{name}", func(w http.ResponseWriter, r *http.Request) {
-		data, mime, ok := catalogweb.AppAsset(r.PathValue("name"))
+		asset, ok := catalogweb.AppAsset(r.PathValue("name"))
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", mime)
-		// #nosec G705 -- embedded build asset with a fixed type, not request data.
-		_, _ = w.Write(data)
+		asset.ServeHTTP(w, r)
 	})
 	m.HandleFunc("GET /launch", func(w http.ResponseWriter, r *http.Request) {
 		// Trusted bootstrap: no paid bytes, frameable only by the portal.
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Security-Policy", "frame-ancestors "+portal)
-		_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en" data-portal="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title><link rel="stylesheet" href="/static/launch.css"></head><body><p id="francois-launch">Connecting…</p><script src="/static/launch.js"></script></body></html>`,
-			html.EscapeString(portal), html.EscapeString(inst.Title))
+		_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en" data-portal="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title><link rel="stylesheet" href="%s"></head><body><p id="francois-launch">Connecting…</p><script src="%s"></script></body></html>`,
+			html.EscapeString(portal), html.EscapeString(inst.Title), catalogweb.AppURL("launch.css"), catalogweb.AppURL("launch.js"))
 	})
 	m.HandleFunc("POST /api/launch/exchange", func(w http.ResponseWriter, r *http.Request) { rt.exchange(w, r, inst, origin) })
 	m.HandleFunc("GET /page", func(w http.ResponseWriter, r *http.Request) { rt.page(w, r, inst, portal, origin) })
@@ -188,7 +186,7 @@ func (rt *Runtime) page(w http.ResponseWriter, r *http.Request, inst store.Insta
 	})
 	// Escape "<" so JSON cannot terminate the script element.
 	boot = bytes.ReplaceAll(boot, []byte("<"), []byte(`<`))
-	injected := []byte(`<script type="application/json" id="francois-view">` + string(boot) + `</script><script src="/static/runtime.js"></script>`)
+	injected := []byte(`<script type="application/json" id="francois-view">` + string(boot) + `</script><script src="` + catalogweb.AppURL("runtime.js") + `"></script>`)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(inject(source, injected))
 }

@@ -42,35 +42,27 @@ var Templates embed.FS
 //go:embed legal.tmpl
 var LegalTemplate string
 
-// PortalAsset serves only portal UI files, never subscriber HTML.
-func PortalAsset(name string) ([]byte, string, bool) {
-	switch name {
-	case "catalog.js":
-		return CatalogJS, "text/javascript", true
-	case "catalog.css":
-		return CatalogCSS, "text/css", true
-	case "icon.svg":
-		return Icon, "image/svg+xml", true
-	case "public.js":
-		return PublicJS, "text/javascript", true
-	}
-	return nil, "", false
+// Separate allowlists keep subscriber HTML out of the public asset routes.
+var portalAssets = map[string]*Asset{
+	"catalog.js":  newAsset("catalog.js", "text/javascript", CatalogJS),
+	"catalog.css": newAsset("catalog.css", "text/css", CatalogCSS),
+	"icon.svg":    newAsset("icon.svg", "image/svg+xml", Icon),
+	"public.js":   newAsset("public.js", "text/javascript", PublicJS),
 }
 
-// AppAsset serves the trusted bootstrap and runtime on instance origins.
-func AppAsset(name string) ([]byte, string, bool) {
-	switch name {
-	case "launch.js":
-		return LaunchJS, "text/javascript", true
-	case "launch.css":
-		return LaunchCSS, "text/css", true
-	case "runtime.js":
-		return RuntimeJS, "text/javascript", true
-	// Parity with local artifact origins, which applications may reference.
-	case "style.css":
-		return local.Style, "text/css", true
-	case "icon.svg":
-		return local.Icon, "image/svg+xml", true
-	}
-	return nil, "", false
+var appAssets = map[string]*Asset{
+	"launch.js":  newAsset("launch.js", "text/javascript", LaunchJS),
+	"launch.css": newAsset("launch.css", "text/css", LaunchCSS),
+	"runtime.js": newAsset("runtime.js", "text/javascript", RuntimeJS),
+	"style.css":  newAsset("style.css", "text/css", local.Style),
+	"icon.svg":   newAsset("icon.svg", "image/svg+xml", local.Icon),
 }
+
+func PortalAsset(name string) (*Asset, bool) { a, ok := portalAssets[name]; return a, ok }
+func AppAsset(name string) (*Asset, bool)    { a, ok := appAssets[name]; return a, ok }
+
+func PortalURL(name string) string { return portalAssets[name].URL() }
+func AppURL(name string) string    { return appAssets[name].URL() }
+
+// PortalIndex references the same content-versioned assets as the storefront.
+var PortalIndex = versionRefs(Index, portalAssets)

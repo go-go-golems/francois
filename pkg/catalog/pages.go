@@ -26,6 +26,7 @@ import (
 // CSRF-protected request are added by /static/public.js.
 
 var pageFuncs = template.FuncMap{
+	"asset":   web.PortalURL,
 	"join":    strings.Join,
 	"isVideo": content.IsVideo,
 	// period ends a title with a full stop unless it already ends in

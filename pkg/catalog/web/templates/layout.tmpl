@@ -11,11 +11,11 @@
 <meta property="og:url" content="{{.Canonical}}">
 {{if .Image}}<meta property="og:image" content="{{.Image}}"><meta name="twitter:card" content="summary_large_image">{{end}}
 <link rel="canonical" href="{{.Canonical}}">
-<link rel="icon" href="/static/icon.svg">
+<link rel="icon" href="{{asset "icon.svg"}}">
 <link rel="alternate" type="application/rss+xml" title="{{.Brand}}" href="/feed.xml">
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/static/catalog.css">
-<script src="/static/public.js" defer></script>
+<link rel="stylesheet" href="{{asset "catalog.css"}}">
+<script src="{{asset "public.js"}}" defer></script>
 </head>
 <body>
 <header class="bar"><div class="page bar-inner">

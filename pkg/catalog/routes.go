@@ -22,7 +22,8 @@ func (s *Server) routes() http.Handler {
 	m := http.NewServeMux()
 	spa := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(web.Index)
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write(web.PortalIndex)
 	}
 	for _, p := range []string{"GET /account", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
 		m.HandleFunc(p, spa)
@@ -43,14 +44,12 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /api/plans", s.publicPlans)
 	m.HandleFunc("POST /api/demos", s.guard(public, noToken, s.createDemo))
 	m.HandleFunc("GET /static/{name}", func(w http.ResponseWriter, r *http.Request) {
-		data, mime, ok := web.PortalAsset(r.PathValue("name"))
+		asset, ok := web.PortalAsset(r.PathValue("name"))
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-cache")
-		_, _ = w.Write(data)
+		asset.ServeHTTP(w, r)
 	})
 	m.HandleFunc("GET /privacy", s.legalPage("privacy", "Privacy policy"))
 	m.HandleFunc("GET /terms", s.legalPage("terms", "Terms of service"))
