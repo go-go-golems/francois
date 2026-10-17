@@ -55,7 +55,7 @@ The important findings are:
 - `session_model.go:AuthenticationTime` includes the email check. `AuthMethodTypes` records email OTP. This is an authenticated factor, not merely an email-address verification request.
 - The official custom-login OIDC guide explicitly says OIDC plumbing is unnecessary for a login UI used only by its own application. Use that smaller integration here.
 
-This is source-backed feasibility, **not a claim of a completed end-to-end login**. No production identity, policy, SMTP configuration or session was mutated during investigation. A local or isolated staging email round trip is still a required implementation gate.
+The implementation now passes a real isolated v4.16.1 SMTP round trip, scanner-safe confirmation, same-user session creation, provider replay rejection and logout. No production identity, policy, SMTP configuration or session was mutated. The detailed execution record is in diary Step 4.
 
 Sources: [ZITADEL magic-link discussion](https://github.com/zitadel/zitadel/discussions/2075), [custom-login integration](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard), and the pinned source manifest. The discussion recommends Session API glue; it is not itself a complete recipe.
 
@@ -89,7 +89,7 @@ sequenceDiagram
     F-->>B: Set portal cookie; redirect to saved local path
 ```
 
-The provider session exists only to verify this login. It has a ten-minute lifetime and is deleted after the attempt. Portal sessions retain the existing seven-day idle / thirty-day absolute bounds. Email login does not establish ZITADEL hosted-login SSO, and later ZITADEL logout does not automatically revoke this portal cookie. Local session revocation remains authoritative, just as for the application's existing session store.
+The provider session exists only to verify this login. It has a five-minute lifetime and is deleted after the attempt. Portal sessions retain the existing seven-day idle / thirty-day absolute bounds. Email login does not establish ZITADEL hosted-login SSO, and later ZITADEL logout does not automatically revoke this portal cookie. Local session revocation remains authoritative, just as for the application's existing session store.
 
 ## 4. Provider configuration and exact API requests
 
@@ -109,7 +109,7 @@ Content-Type: application/json
 
 {
   "checks": {"user": {"userId": "EXISTING_ZITADEL_SUBJECT"}},
-  "lifetime": "600s",
+  "lifetime": "300s",
   "challenges": {
     "otpEmail": {
       "sendCode": {
@@ -135,7 +135,7 @@ Content-Type: application/json
 
 Then `GET /v2/sessions/{id}`. Require `session.factors.user.id` to equal the flow's saved subject, the factor's organization to match, `factors.otpEmail.verifiedAt` to be present and fresh for this flow, and the session not expired. A session with only `factors.user` identifies the selected account; **it is not proof of mailbox possession**. Never create a portal session from that state.
 
-Delete the short-lived provider session using `DELETE /v2/sessions/{id}` after completing or abandoning redemption. Cleanup failure must not undo a committed local session; log the provider session ID at an appropriate private operational level and rely on its explicit ten-minute expiry. Never log codes, cookies, service tokens or whole request URLs.
+Delete the short-lived provider session using `DELETE /v2/sessions/{id}` after completing or abandoning redemption. Cleanup failure must not undo a committed local session; log the provider session ID at an appropriate private operational level and rely on its explicit five-minute expiry. Never log codes, cookies, service tokens or whole request URLs.
 
 ## 5. Four routes, one small flow table
 
@@ -156,6 +156,8 @@ One table holds pending state:
 email_signins
     flow_hash             text primary key
     user_id               text unique references users
+    issuer                text not null
+    subject               text not null
     binding_hash          text not null
     email_snapshot        text not null
     provider_session_id   text null
@@ -207,7 +209,7 @@ confirm_email(form):
     redirect to stored safe_return
 ```
 
-The table can store user ID only; load its issuer/subject before the provider request and compare the current identity again in the transaction. The pseudocode's `flow.subject` denotes that trusted server-loaded value, not a new browser input. If identities ever become mutable, save and compare an identity snapshot in the flow too.
+The implemented table also saves issuer and subject with the flow. The final transaction compares those snapshots to the locked local user, as well as checking the email and role. No browser-supplied identity can replace them.
 
 Provider proof and the database cannot share an atomic transaction. After proof succeeds but before local commit, a crash means the user requests a new email. That is acceptable. A local role/disable change during the network calls is caught by locking and revalidating the local user in the final transaction. The provider can change immediately after its read; this is the same general external-identity revocation boundary as OIDC, not a claim of a distributed lock.
 
@@ -217,7 +219,7 @@ Logout revokes the local session as usual. When its ID token is empty, clear the
 
 ## 7. Limits and configuration
 
-Reuse the small rate-limiter utility with a separate email instance: three requests per normalized recipient per hour, twenty per client address per hour, one hundred globally per hour. Reserve counters before lookup or network work. Bound submitted code length and all request bodies; each consumed flow permits one code attempt. These application limits complement ZITADEL's code verification protections. Do not trust forwarded client addresses except through the existing trusted-proxy policy.
+Reuse the small rate-limiter utility with a separate email instance: three requests per normalized recipient per hour, twenty per client address per hour, one hundred globally per hour. Reserve counters before lookup or network work. Bound submitted code length and all request bodies; each consumed flow permits one code attempt. The v4.16.1 default OTP email code expires after five minutes; the portal flow and provider session use that same bound. These application limits complement ZITADEL's code verification protections. Do not trust forwarded client addresses except through the existing trusted-proxy policy.
 
 Use Glazed fields and secret-file configuration, not new environment lookups:
 
@@ -245,7 +247,7 @@ ZITADEL owns SMTP and code generation. Francois has no SMTP username/password fl
 | Existing public templates/CSS | Final form, sent, confirmation, unavailable and expired states |
 | `doc/production.md` | Dedicated service credential, supporter factor enrollment, SMTP ownership and release checks |
 
-Before editing, inspect current migration and template registration rather than inventing parallel mechanisms. No production changes are authorized by this investigation. Implement and test locally before adjusting deployment secrets or enrolling real supporters.
+Before editing, inspect current migration and template registration rather than inventing parallel mechanisms. The user authorized implementation after the investigation. Production changes remain separate from the local implementation and validation.
 
 ## 9. Validation and shipping criteria
 
@@ -263,7 +265,7 @@ The useful tests exercise trust boundaries, not each line of the client:
 
 Then run a **real isolated** ZITADEL v4.16.1 email flow with a test user and a test mail sink. Enroll the factor, create the session without any password check, retrieve the delivered link from the mailbox, and complete the actual portal confirmation. Verify the same preexisting local user ID, existing instance ownership and entitlement behavior. Confirm provider challenge reuse fails and no temporary provider session remains active after completion. Never save service credentials, OTP codes or live links in ticket evidence; record redacted outcomes and screenshots.
 
-Run affected Go tests plus repository-required checks. Application deployment remains gated on that real round trip; source inspection establishes the route through the APIs, not operational SMTP correctness.
+Run affected Go tests plus repository-required checks. The isolated round trip now passes. Production enablement still requires its dedicated credential, functioning SMTP and explicit supporter factor enrollment; no production configuration was changed.
 
 ## 10. Why this is the smallest suitable integration
 

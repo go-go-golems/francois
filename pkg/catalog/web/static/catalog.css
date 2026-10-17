@@ -634,3 +634,12 @@ select.btn { appearance: none; cursor: pointer; }
  .archive-monogram { font-size:15px; }
 }
 .support-option .site-support { background:#cee5ff; }
+
+/* Final supporter email sign-in. */
+.final-signin { min-height: 48vh; }
+.signin-content { max-width: 560px; }
+.signin-content h1 { margin-top: 0; }
+.signin-form { display: grid; gap: 12px; margin: 28px 0 16px; }
+.signin-form input[type=email] { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid currentColor; border-radius: 0; background: transparent; padding: 12px; }
+.signin-form .site-button { justify-self: start; }
+.signin-staff { margin-top: 40px; font-size: 13px; }

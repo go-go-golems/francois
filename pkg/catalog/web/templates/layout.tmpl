@@ -15,7 +15,7 @@
 <link rel="alternate" type="application/rss+xml" title="{{.Brand}}" href="/feed.xml">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="{{asset "catalog.css"}}">
-<script src="{{asset "public.js"}}" defer></script>
+{{if not .Sensitive}}<script src="{{asset "public.js"}}" defer></script>{{end}}
 </head>
 <body class="final-site">
 <header class="site-header page">

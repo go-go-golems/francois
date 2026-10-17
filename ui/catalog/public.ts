@@ -70,7 +70,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const loginHref = () =>
-  "/auth/login?return=" +
+  "/signin?return=" +
   encodeURIComponent(location.pathname + location.search);
 
 function fail(box: HTMLElement, message: string) {

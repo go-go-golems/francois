@@ -42,7 +42,7 @@ export function useRoute() {
 }
 
 export const loginHref = (ret = location.pathname + location.search) =>
-  "/auth/login?return=" + encodeURIComponent(ret);
+  "/signin?return=" + encodeURIComponent(ret);
 
 export function Header() {
   const { data: session } = api.useSessionQuery();

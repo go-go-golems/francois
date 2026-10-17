@@ -112,6 +112,7 @@ type pageData struct {
 	Brand, Title, Description, Image, Canonical, Crumb string
 	Nav                                                []navItem
 	User                                               *store.User
+	Sensitive                                          bool
 	LoginAvailable                                     bool
 	LoginHref                                          string
 	Draft                                              bool
@@ -155,8 +156,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	d.Brand = s.brand(r, rev.Document)
 	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + r.URL.Path
-	d.LoginAvailable = site.OIDC.Configured()
-	d.LoginHref = "/auth/login?return=" + url.QueryEscape(r.URL.RequestURI())
+	d.LoginAvailable = site.OIDC.Configured() || s.Config.EmailLogin != nil
+	d.LoginHref = signinURL(r.URL.RequestURI())
 	nav := []navItem{{Href: "/", Label: "Feed"}}
 	// Demo guests browse like visitors: no account pages, and they may sign in.
 	if p != nil && p.User.Role != "guest" {
@@ -186,6 +187,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	// The header is personalised by the session cookie.
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Vary", "Cookie")
+	if d.Sensitive {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	}
 	w.WriteHeader(status)
 	_, _ = w.Write(buf.Bytes())
 }

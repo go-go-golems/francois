@@ -65,6 +65,10 @@ func (s *Server) routes() http.Handler {
 	})
 	m.HandleFunc("GET /fonts/fonts.css", s.fontCSS)
 	m.HandleFunc("GET /fonts/{name}", s.fontFile)
+	m.HandleFunc("GET /signin", s.guard(public, noToken, s.signinPage))
+	m.HandleFunc("POST /auth/email/request", s.requestEmail)
+	m.HandleFunc("GET /auth/email/verify", s.inspectEmail)
+	m.HandleFunc("POST /auth/email/verify", s.verifyEmail)
 	m.HandleFunc("GET /auth/login", s.login)
 	m.HandleFunc("GET /auth/callback", s.callback)
 	m.HandleFunc("POST /auth/logout", s.guard(session, noToken, s.logout))
@@ -137,7 +141,7 @@ func portSuffix(p string) string {
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	site := s.site(r)
-	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured(), "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
+	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured() || s.Config.EmailLogin != nil, "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
 		"typeCredit": s.fonts.present}
 	// The SPA shows the same brand in its crumb as the server-rendered pages.
 	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {

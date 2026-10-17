@@ -222,3 +222,72 @@ Start with the source-trace analysis, then read the revised guide and inspect th
 - Provider session lifetime: 600s; no token returned to browser or retained in the pending table.
 - Login credential: dedicated service account; IAM_LOGIN_CLIENT includes the needed permissions in v4.16.1, while ORG_USER_MANAGER lacks session.write.
 - Main evidence: sources/zitadel-email-login/{manifest.json,source-manifest.json,deployment-version.json}.
+
+## Step 4: Implement provider-backed magic links and prove the real email round trip
+
+The user authorized implementation after the source investigation. The feature now exists in the Go service: a Final sign-in form, browser-bound pending attempts, direct ZITADEL email challenges, scanner-safe confirmation, single-use redemption and normal same-user portal sessions. It remains disabled by default and has not been enabled in production.
+
+The decisive qualification succeeded against an isolated **ZITADEL v4.16.1**, a dedicated IAM_LOGIN_CLIENT credential, PostgreSQL and a Mailpit SMTP sink. A delivered email link completed sign-in without any password check, preserved the existing local identity and passed provider replay rejection and local logout. This replaces Step 3's source-only qualification with a real runtime result.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Oh no it's fine then. work on the new ticket, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Implement FRANCOIS-013 locally, test it, update ticket evidence and commit at useful boundaries.
+**Inferred user intent:** Ship the agreed simple ZITADEL-backed email-only journey with a detailed reviewable work history.
+**Starting revision:** f47ab19, the source-backed design checkpoint.
+
+### What I did
+
+- Added identity/email.go: a fixed-origin HTTP client with a dedicated server-only credential, bounded bodies/timeouts, redirect refusal, active-user/email checks and required matching fresh email factor.
+- Added migration 012 and store/email_signins.go: identity/origin/browser-bound pending rows, conditional late-send attachment, atomic one-time claim and user-locked final session creation.
+- Reused the session insertion code and made role changes revoke sessions, runtime grants and pending email attempts under the same user lock. Admin role updates also close active runtime views.
+- Added the four email routes and server-rendered Final form/sent/confirmation/error states. Sensitive responses are no-store/no-referrer/noindex and contain no public JavaScript. Authentication paths and /signin are excluded from traffic capture.
+- Routed normal sign-in links to /signin, while preserving /auth/login for staff and fallback when email login is disabled. Added Glazed enablement/organization/credential-file flags and empty-ID-token local logout.
+- Added security integration tests and an explicit opt-in real-provider test using a private fixture file rather than new environment lookup code.
+- Started test infrastructure in tmux session francois-email-013-infra. Used a dedicated local stack and provisioner; all credentials remain beneath /tmp/francois-013-private.
+- Updated the guide and production runbook to match implementation and the real observed expiry.
+
+### Why
+
+The direct Session API path verifies mailbox possession through the existing identity infrastructure and ends at our existing local sessions. It needs no custom OIDC proxy, independent SMTP client, local mailbox token scheme or new deployed application service. Browser and origin binding, a single atomic claim and a locked role recheck close the material trust boundaries.
+
+### What worked
+
+- `go test ./pkg/catalog/identity -count=1`: passed with network-enabled local listeners, including missing/wrong/stale factors, provider user eligibility, wire format and credential redirect prevention.
+- `TEST_DATABASE_URL=postgres://emailtest:emailtest@127.0.0.1:5437/postgres?sslmode=disable go test ./pkg/catalog -run TestEmail -count=1`: passed; the harness created/disposed its own databases.
+- `TEST_DATABASE_URL=... go test ./pkg/catalog -run '^TestEmailSigninRealZitadel$' -count=1 -v -args -email-login-fixture=/tmp/francois-013-private/fixture.json`: passed in 3.86s.
+- Real-provider checks: SMTP delivery, scanner-safe GET, password-free verification, same-user portal session, rejected terminated-provider/code replay and local logout.
+
+### What didn't work
+
+The first broad package check ran in the restricted sandbox: existing TestAPICommandsCallTheAPI failed with `httptest: failed to listen on a port: listen tcp6 [::1]:0: socket: operation not permitted`. This is a listener permission failure, not a feature diagnostic. Subsequent networked tests used escalation.
+
+The original source snapshots had .go extensions under ttmp, which would make Go's recursive package discovery compile research evidence. Renamed them to .go.txt and updated the manifest without changing file bytes. The source URLs and checksums remain intact.
+
+### What I learned
+
+ZITADEL v4.16.1's default email OTP expiry is **five minutes**, while the initial guide proposed ten. The application and copy now use five minutes so a link does not appear valid after the provider code expires. A code check plus explicit fresh factor validation works with the dedicated login service role; no password request is needed.
+
+### What was tricky to build
+
+The provider call occurs outside a database transaction. Pending state is inserted before sending, and a conditional attach prevents a late response from resurrecting a replaced flow. The final transaction locks the same user row as role updates: either sign-in occurs first and promotion revokes it, or promotion occurs first and sign-in refuses the privileged user. A verification failure consumes the attempt and requires a new email, keeping retries explicit and the flow small.
+
+### What warrants a second pair of eyes
+
+Review provider proof validation, identity snapshots, no-secret diagnostics, CSRF/browser/portal binding, role-change revocation and user-lock ordering. A provider account change after the final provider read retains the normal external-identity revocation boundary; this is not a distributed transaction.
+
+### What should be done in the future
+
+Finish full repository checks and inspect desktop/mobile forms. Production enablement requires a separately provisioned dedicated credential, SMTP and enrolled supporters; no production auth settings were changed here.
+
+### Code review instructions
+
+Start with identity/email.go and email_signin.go, then inspect store/email_signins.go and the role/session changes. Run the focused TestEmail suite with the isolated PostgreSQL DSN. The real-provider test is opt-in and the fixed-loopback provisioner never accepts a production issuer. No secrets or live codes are in this diary.
+
+### Technical details
+
+- Provider and pending flow lifetime: 300s; portal session lifetime unchanged.
+- Request acknowledgement/provider issuance deadline: 3s; verification deadline: 10s; cleanup bounded to 2s.
+- The provider token is only in an HTTP Authorization header, never a cookie or email link.
+- Local infrastructure ports: 18083, 18025, 5437; tmux session: francois-email-013-infra.
+- The real email account is a disposable supporter fixture, with no production access.

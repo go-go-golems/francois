@@ -3,7 +3,7 @@
 <h1>Support the lab.</h1><p class="final-lead">We work with computation and intelligence as material and medium. Supporting the lab lets us keep working the way we believe in.</p>
 <ol class="support-principles"><li>We prototype and explore. We don’t build products.</li><li>We work in public, unfinished work included.</li><li>We follow curiosity, not a roadmap.</li><li>We stay true to how we actually like to work.</li><li>We share the experiments and what we learn.</li></ol>
 <div class="support-options">{{if .Paid}}<p>Your subscription: {{.Current}}.</p><a class="u" href="/account">Manage subscription →</a>{{end}}
-{{range .Plans}}{{if .Prices}}<section class="support-option" data-checkout data-plan="{{.Key}}"><h2>{{.Name}}</h2>{{if .Current}}<p>Current support. Thank you for supporting the lab.</p>{{else}}{{range .Prices}}<a class="site-button site-support" href="/auth/login?return=/pricing" data-interval="{{.Interval}}">{{if .Label}}{{.Label}}{{else}}Support {{.Interval}}ly{{end}} →</a>{{end}}{{end}}</section>{{end}}{{end}}
+{{range .Plans}}{{if .Prices}}<section class="support-option" data-checkout data-plan="{{.Key}}"><h2>{{.Name}}</h2>{{if .Current}}<p>Current support. Thank you for supporting the lab.</p>{{else}}{{range .Prices}}<a class="site-button site-support" href="/signin?return=/pricing" data-interval="{{.Interval}}">{{if .Label}}{{.Label}}{{else}}Support {{.Interval}}ly{{end}} →</a>{{end}}{{end}}</section>{{end}}{{end}}
 </div>
 <section class="support-year"><p class="final-label">Or fund a whole year</p><h2>Make room for the work.</h2><p>A year of independent work for both of us, so the lab can be all we do.</p><a class="u" href="mailto:hej@slop.boutique?subject=Fund%20a%20year">Get in touch →</a></section>
 </div></section>

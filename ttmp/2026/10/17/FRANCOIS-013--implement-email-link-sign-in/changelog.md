@@ -15,3 +15,7 @@ Validated guide and diagrams; uploaded Email Sign In Intern Guide PDF to /ai/202
 ## 2026-10-17
 
 Confirmed ZITADEL v4.16.1 email-only Session API path; saved primary sources and replaced local-token design with provider-verified magic links. Runtime email qualification remains open.
+
+## 2026-10-17
+
+Implemented ZITADEL-backed magic links, Final forms, transactional flow/session controls and role revocation; real isolated v4.16.1 SMTP round trip passed. Full-suite and viewport validation follow.

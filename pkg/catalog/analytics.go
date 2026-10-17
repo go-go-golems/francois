@@ -20,7 +20,7 @@ func trafficPage(path string) bool {
 			return false
 		}
 	}
-	return path != "/healthz" && path != "/readyz" && !strings.HasSuffix(path, ".xml")
+	return path != "/signin" && path != "/healthz" && path != "/readyz" && !strings.HasSuffix(path, ".xml")
 }
 func trafficAgent(ua string) (string, string, bool) {
 	ua = strings.ToLower(ua)
