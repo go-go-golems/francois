@@ -10,3 +10,4 @@
 - [x] Implement and validate email-only signup through the shared sign-in form <!-- t:o86f -->
 - [x] Deploy email-only signup to production through source and GitOps release checks <!-- t:sksi -->
 - [x] Publish detailed textbook-style email-signup project report and figures to go-go-parc, commit and push <!-- t:vgrd -->
+- [ ] Streamline all email onboarding/sign-in into one verified-mailbox flow while preserving Google/GitHub SSO <!-- t:lsh2 -->

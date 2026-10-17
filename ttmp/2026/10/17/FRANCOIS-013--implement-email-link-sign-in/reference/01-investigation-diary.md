@@ -1166,3 +1166,46 @@ Read sources/implementation/email-signup-production.json and reference/02-email-
 
 ### Technical details
 The vault report is Projects/2026/10/17/PROJ - Francois - Passwordless Email Signup and Production Delivery - A Technical Deep Dive.md. Source-relative figures resolve inside the ticket; the vault copy uses _assets/francois-email-signup-*.png. Production observation time is 2026-10-17T23:28:12.448415+00:00. No source/runtime changes followed the merged image; remaining commits only preserve ticket/report evidence.
+
+
+## Step 21: Replace split email registration/login with one mailbox-proof design
+
+The deployed collision guard blocked an existing verified provider identity with no local account. The user requests a simple launch-ready onboarding workflow rather than more exceptions. Expanded the active design into one email-verification path for every email login and retained Google/GitHub SSO unchanged. The plan removes temporary provider sessions, OTP enrollment and separate registration handling instead of adding fallbacks around them.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, streamline, no backwards compatibility, no overnengineering, no overcautiousness we want to provide somoth, elegant, simple implementation of similarly simple onbaording workflow. Expand the design doc, then implement. No need to test all the time either, it's about getting this up so we can launch."
+**User prompt (verbatim):** "we do want to keep github / gmail sso"
+**Assistant interpretation:** Rewrite the active email design and implement one onboarding/sign-in path while preserving Google and GitHub SSO; qualify the completed implementation once.
+**Inferred user intent:** A visitor should receive and use a link regardless of which system already has their account, without manual factor setup or confusing rejection.
+
+### What I did
+- Reviewed current provider/session/registration paths and the pinned email send/verify implementation.
+- Replaced the active design with a concrete unified-flow specification, one pending table, fifteen-minute links, realistic request timeout, send failure feedback and quota refunds.
+- Specified same-identity reconciliation, role/disabled protections and removal of obsolete internal paths without compatibility adapters.
+
+### Why
+Provider email verification already supplies the needed mailbox proof. Separate OTP enrollment and provider-session machinery add states the visitor should never have to understand.
+
+### What worked
+The pinned `/email/send` and `/email/verify` contracts support the intended unified proof. Existing Google/GitHub routing and page controls can remain unchanged.
+
+### What didn't work
+The former split design rejected legitimate provider-only accounts and required OTP enrollment for returning local accounts. These are design restrictions being removed, not cases for another compatibility layer.
+
+### What I learned
+The correct primary decision is identity resolution followed by fresh proof and local reconciliation, rather than registration versus login based on local verification flags.
+
+### What was tricky to build
+Provider creation must suppress its automatic message so the unified send operation produces the one intended link. Local completion must accept a same-identity OIDC account created while confirmation was pending without authorizing a role change.
+
+### What warrants a second pair of eyes
+Validate already-verified provider-only mail delivery against the pinned real provider, and preserve the same browser/CSRF and role invariants in the replacement.
+
+### What should be done in the future
+Implement completely, then run the consolidated qualification boundary. No intermediate broad test loops or production mailbox requests are planned.
+
+### Code review instructions
+Read the rewritten design-doc/02-email-only-signup-implementation-guide.md. Google/GitHub controls and OIDC endpoints remain part of the existing shared page.
+
+### Technical details
+Migration 014 replaces only pending email tables. Existing user data, provider factors, ordinary sessions and artifact data are preserved. The email path no longer needs provider sessions or OTP enrollment.

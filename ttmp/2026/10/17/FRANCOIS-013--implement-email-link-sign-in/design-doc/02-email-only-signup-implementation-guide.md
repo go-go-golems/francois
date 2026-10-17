@@ -1,7 +1,7 @@
 ---
 Title: Email-only signup implementation guide
 Ticket: FRANCOIS-013
-Status: complete
+Status: active
 Topics:
     - backend
 DocType: design-doc
@@ -27,86 +27,92 @@ WhatFor: ""
 WhenToUse: ""
 ---
 
-# Email-only signup implementation guide
+# One email onboarding and sign-in flow
 
-## Behavior and scope
+## Product behavior
 
-The public email form must accept a new address as well as an existing account. A new visitor enters an address, receives a link, opens it in the requesting browser and presses Continue. Confirmation establishes mailbox ownership and creates an ordinary local account and session. There is no password, second signup screen, background worker or separate mail service. ZITADEL sends the message through its configured SMTP provider.
+The shared sign-in page offers Google, GitHub and email. Google (including Gmail accounts) and GitHub continue using the existing OIDC endpoints, provider routing, callback and sessions. Their buttons, native-provider fallback and role-neutral presentation remain. Only the email implementation changes.
 
-The existing `SignupAllowed` setting gates new email registrations and confirmation, just as it gates public social signup guidance. Existing email sign-in remains available when signup is disabled. New accounts have the database's ordinary `subscriber` role; that role alone grants neither payment entitlement nor staff privileges.
+Email has one workflow: enter an address, receive a link, open it in the requesting browser and press Continue. Confirmation signs into the matching local account or creates an ordinary account when signup is enabled. A person should not need to know whether ZITADEL already has their identity, Francois already has their account, or an email OTP factor exists.
 
-## Existing components
+This design replaces the previous split registration/session-OTP design. It introduces no compatibility adapter, queue, worker, mail service or alternate authentication UI. Existing provider factors remain untouched. Unconfirmed old links expire as part of the migration; account data and existing application sessions are preserved.
 
-`pkg/catalog/email_signin.go` owns the GET sign-in page, POST request and GET/POST verification endpoints. The GET verification handler only renders a confirmation form; it cannot consume a code. Double-submit CSRF and a host-only HttpOnly cookie bind both request and confirmation to the browser. Every page containing authentication material is served with no-store and no-referrer headers. The return destination is restricted by `safeReturn`.
+## Identity and proof
 
-`pkg/catalog/identity/email.go` encapsulates the privileged server credential and ZITADEL API calls. Existing users authenticate using an enrolled email OTP factor in a temporary ZITADEL session. `pkg/catalog/store/email_signins.go` stores only hashed local flow/browser secrets and an opaque provider session ID, and rechecks the account under a user lock before issuing a session. Those existing safeguards stay in force.
+The canonical identity is issuer plus subject. Email locates a candidate identity, but a fresh provider-validated mailbox code establishes the proof needed to sign in. A local record's stale verification flag does not block obtaining that proof. Disabled accounts and identities in another organization remain ineligible, and multiple matching provider identities remain ambiguous.
 
-New email addresses cannot use that OTP mechanism immediately: ZITADEL requires a verified email before email OTP can be enrolled. Registration therefore starts with ZITADEL's email-verification code. Successful verification is the mailbox proof for this first session. Only after it succeeds may the application enroll email OTP for subsequent sign-ins.
+ZITADEL v4.16.1 provides `POST /v2/users/{id}/email/send` to generate a fresh verification code and send the custom URL. Its command implementation does not require the address to be currently unverified or an OTP factor to be enrolled. `POST /v2/users/{id}/email/verify` checks that code. Use these two operations for every email login, including an already-verified provider account. Keep the existing server-side dedicated IAM_LOGIN_CLIENT credential and SMTP configuration.
 
-## Data model
+The full local integration must include a provider identity that is verified, has no email OTP factor and has no local account. That reproduces the actual blocked-user case. A returning local account and a completely new address use the same proof operations.
 
-Add migration `013_email_registrations.sql` with one `email_registrations` table. A row reserves a random provider subject for a normalized address and issuer. Its unique `(issuer,email)` key makes retries reuse the same subject instead of creating an identity per click. This row is not a local authenticated user and has no permissions or entitlements.
+## Resolve or create the provider identity
 
-The same row holds the current pending attempt: flow digest, browser-binding digest, origin, return path, creation/expiry timestamps, optional provider session ID (empty for verification, populated for OTP) and a ready flag. Replacing the attempt invalidates the old link. Claiming it atomically clears its flow digest, permitting one verification attempt. The row remains as the provider-identity reservation so a failed or expired attempt can be retried safely.
+Search the configured organization for the normalized email with a result limit of two. Validate the chosen identity by its returned ID, resource owner, human type, email and active/initial state. Fetch the exact subject before issuance to avoid relying only on search-index profile data.
 
-- No raw link token, provider bearer token or email code is stored.
-- The expiry is five minutes, checked locally even if the provider's verification code lasts longer.
-- A ready flag distinguishes a completed send operation from a reserved/incomplete attempt.
-- The provider subject is application-generated and never accepted from the request.
-- Durable reservations remain until deliberately removed; there is no cleanup worker. Global and per-address request limits bound creation, as with provider accounts themselves.
+- One match: use that subject, irrespective of whether this application created it.
+- Zero matches with signup enabled: create an unverified human whose username is the email. Request `returnCode:{}` to suppress the automatic creation message; discard the returned code. The normal `/email/send` operation sends the one actual login message.
+- Zero matches with signup disabled: acknowledge generically without creating an identity.
+- Multiple matches, inactive identity or a mismatching address/organization: fail closed.
+- Concurrent creation conflict: search again once and use the unique matching identity. Mailbox proof is still mandatory; no provider accounts are merged.
 
-## Request algorithm
+There is no durable random-subject reservation. If creation succeeds but the response is lost, a retry discovers the identity through the same organization-scoped lookup. Provider username uniqueness handles overlapping creations; bounded re-resolution handles a conflict without a retry scheduler.
 
 ```text
-normalize and validate address; check CSRF and existing request limits
-look up all local users with this address (including disabled/unverified)
-if any exist:
-    require exactly one enabled, verified, matching-issuer human account
-    use the existing email-OTP sign-in path
-else:
-    require SignupAllowed
-    reserve/reuse random provider subject for (issuer, address)
-    replace pending browser-bound attempt with new five-minute flow
-    inspect only the reserved provider subject
+resolve(email, signup_enabled):
+    matches = search_organization_by_exact_email(email, limit=2)
+    if exactly one: read and validate its subject; return identity
+    if multiple: reject ambiguity
+    if signup disabled: return unavailable
+    create unverified human, suppress automatic email
+    if creation conflicted: resolve once more without creating again
+    read and validate identity; return identity
+```
+
+## One pending-link table
+
+Migration 014 drops the obsolete pending `email_signins` and `email_registrations` tables and creates `email_links`. Keep historical migration files unchanged so existing migration checksums remain valid. These old tables hold only pending attempts/reservations; removing them does not remove users, sessions, artifacts or provider identities.
+
+Each `email_links` row contains a flow digest, browser-binding digest, issuer, subject, email snapshot, expected role, trusted portal origin, safe return path, creation/expiry timestamps and a ready flag. It contains no provider session ID, factor enrollment state or plaintext mailbox code.
+
+The lifetime is fifteen minutes. Insert an unready candidate after resolving the provider identity and checking local eligibility. Send the provider email, then mark that candidate ready. A failed send deletes only its own candidate and refunds its recipient quota reservation. It does not delete another local attempt before trying to send. ZITADEL itself controls replacement of verification codes; use the most recently received email.
+
+GET confirmation checks a ready, unexpired link with the matching origin and browser digest and renders Continue. It does not validate or consume the provider code. POST atomically deletes and returns that link, validates the provider code, rechecks the provider identity and completes the local session transaction. Incorrect or consumed links require a fresh request.
+
+## Local account reconciliation
+
+The issuance and completion operations coordinate with ordinary OIDC provisioning using the existing normalized-email transaction lock. Lookup the local account by issuer and subject, not solely by an email flag. Reject a different local identity that owns the requested email; no automatic merging is added.
+
+At issuance, record the current role for an existing enabled non-guest account, or the ordinary subscriber role if no local account exists. A new local account requires signup to be enabled. No local user is inserted before mailbox proof.
+
+At completion, lock the local account if one now exists. A concurrent Google/GitHub callback may have provisioned the same identity; that is a successful reconciliation case, not a collision. Preserve its role, require it to match the expected role and reject disabled/guest accounts. Refresh its email, verified flag and provider display name after the fresh proof. If it remains absent, require signup still enabled and create the ordinary account. Insert the application session in the same transaction and remove other pending links for that identity.
+
+Role changes invalidate pending links by issuer/subject, including links issued before local account creation. Existing user/session revocation semantics stay intact. Disabling an account also removes pending links. The account's privileges and paid access are never inferred from the email or changed by onboarding.
+
+```text
+complete(proven_identity, claimed_link, signup_enabled):
+    begin transaction; lock normalized email
+    reject different local identity owning this email
+    account = select issuer/subject for update
     if absent:
-        check organization-scoped provider email search for collisions
-        create an unverified human with the reserved ID and custom email URL
-    else if its email remains unverified:
-        check subject, organization, address and usable state
-        resend verification with the new URL
+        require signup enabled and expected ordinary role
+        insert ordinary verified account
     else:
-        check active matching verified identity
-        ensure email OTP is enrolled on this owned registration identity
-        send the existing temporary-session OTP challenge
-    attach the session ID (or empty verification marker) only if the flow is still current
-acknowledge identically for unknown, existing, blocked and failed requests
+        require enabled, non-guest and unchanged expected role
+        refresh email/name/verification without changing role
+    insert application session
+    delete remaining links for issuer/subject
+    commit; set session cookie; redirect safely
 ```
 
-An existing provider identity discovered by email is never adopted or linked. The lookup is a collision guard, not an authentication decision. Such users can use the existing Google/GitHub/native provider flow, which provisions the local user by issuer and subject. Disabled or ambiguous local records cannot fall through into signup. If a concurrent request wins creation, re-read only the reserved subject, validate it and resend the current flow; an unrelated collision still fails closed.
+## Timing, delivery feedback and limits
 
-A provider user can become verified before a local transaction finishes. On retry, its durable reservation permits using OTP for a fresh proof instead of attempting to verify an already verified email again. OTP enrollment is limited to the exact identity reserved by this signup flow, after the provider reports its email verified. Existing unrelated human accounts are not enrolled automatically.
+Remove the forced three-second acknowledgement wait. Provider work gets a bounded fifteen-second request context; individual HTTP calls remain bounded. Return as soon as issuance succeeds or fails. A provider failure displays a retryable send error, not an apparently successful check-email page. Ineligible/ambiguous addresses retain a generic acknowledgement so the form does not disclose account administration state.
 
-## Confirmation algorithm
+Keep the existing process/client attempt limits (100/hour and 20/hour). Allow ten successful messages per recipient/hour. Reserve the recipient slot during provider work and refund that exact reservation if no usable link was issued. This avoids both unbounded concurrent sends and charging provider failures against the user's message allowance. Limit exhaustion gets a clear retry response. No distributed limiter is introduced for the current single-replica site.
 
-```text
-validate CSRF, browser cookie, flow, origin and expiry
-try existing sign-in claim; otherwise claim a ready registration
-require signup still enabled
-if verification proof:
-    POST reserved subject/email/verify with supplied code
-else:
-    verify temporary session's fresh matching email factor
-re-read provider user: active, same subject, organization and verified email
-ensure email OTP is enrolled for this registration-owned identity
-transaction:
-    serialize local identity provisioning for the normalized email
-    reject any local account now using that email or issuer+subject
-    insert ordinary verified local user by issuer+subject
-    insert portal session and update last-login time
-commit, clear browser-binding cookie, set portal-session cookie, redirect safely
-```
+The browser-binding cookie and CSRF checks remain. The page clearly tells the user to open the link in the requesting browser within fifteen minutes. There is no extra code-entry screen in this launch implementation. Sensitive responses remain no-store/no-referrer, and the confirmation form remains free of scripts. Safe local return paths and exact site origins stay enforced.
 
-The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. After taking that lock, OIDC rejects any insertion or profile refresh whose requested email belongs to another issuer/subject; this protects both transaction orders and provider-email changes. A matching identity can refresh its profile when its email does not collide. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
+## Browser and data sequence
 
 ```mermaid
 sequenceDiagram
@@ -114,54 +120,40 @@ sequenceDiagram
     participant F as Francois
     participant D as PostgreSQL
     participant Z as ZITADEL
-    participant M as Mailbox
-    B->>F: POST email + CSRF
-    F->>D: Reserve subject; replace hashed pending flow
-    F->>Z: Create unverified human + custom verification URL
-    Z->>M: Verification email through existing SMTP
-    F->>D: Mark current flow ready
-    F-->>B: Generic check-email page
-    M-->>B: Open link in same browser
-    B->>F: GET link
-    F-->>B: Confirmation form (no code consumption)
+    B->>F: Email + CSRF
+    F->>Z: Find unique identity or create unverified human
+    F->>D: Check local identity; insert unready hashed link
+    F->>Z: email/send with current confirmation URL
+    F->>D: Mark link ready
+    F-->>B: Check your email
+    B->>F: GET mailed link in requesting browser
+    F-->>B: Continue form (read-only)
     B->>F: POST Continue + CSRF + code
-    F->>D: Atomically claim current flow
-    F->>Z: Verify email; check identity; enroll email OTP
-    F->>D: Transaction: create ordinary user + session
-    F-->>B: Session cookie + safe redirect
+    F->>D: Atomically claim link
+    F->>Z: Check identity; email/verify; re-read verified identity
+    F->>D: Reconcile issuer/subject + insert session transactionally
+    F-->>B: Session cookie and safe redirect
 ```
 
-## API contracts and source references
+## Code and API map
 
-These are the pinned ZITADEL v4.16.1 REST contracts, not assumptions based on a newer deployment. Existing service credentials stay server-side; no browser receives management access.
+| File | Final responsibility |
+| --- | --- |
+| `pkg/catalog/email_signin.go` | One request/inspect/confirm path; quota reservation/refund and honest send feedback. |
+| `pkg/catalog/identity/email.go` | Bounded authenticated transport and shared provider identity validation. |
+| `pkg/catalog/identity/email_link.go` | Organization-scoped resolve/create, `/email/send` and `/email/verify`. |
+| `pkg/catalog/store/email_links.go` | One pending link record, eligibility, claim and account/session reconciliation. |
+| `pkg/catalog/store/migrations/014_email_links.sql` | Replace obsolete pending state with the unified table. |
+| `pkg/catalog/store/users.go` | Existing OIDC ownership guard and role/disable invalidation against the new table. |
+| `pkg/catalog/web/templates/signin.tmpl` | Existing Google/GitHub/email presentation; fifteen-minute guidance. |
+| `pkg/catalog/auth.go` | Existing Google/GitHub routing and OIDC callback; unchanged by email simplification. |
 
-| Operation | Endpoint | Contract |
-| --- | --- | --- |
-| Read reserved identity | `GET /v2/users/{id}` | Check ID, state, resource owner and email |
-| Check collision | `POST /v2/users` | Organization ID and case-insensitive exact email; bounded results |
-| Create unverified human | `POST /v2/users/human` | Explicit reserved `userId`, organization, minimal profile and `email.sendCode.urlTemplate`; never `isVerified:true` |
-| Resend verification | `POST /v2/users/{id}/email/resend` | `sendCode.urlTemplate` points to existing application confirmation route |
-| Verify address | `POST /v2/users/{id}/email/verify` | `verificationCode` from the claimed browser-bound attempt |
-| Inspect factors | `GET /v2/users/{id}/authentication_methods` | Look for `AUTHENTICATION_METHOD_TYPE_OTP_EMAIL` |
-| Enroll email OTP | `POST /v2/users/{id}/otp_email` | Only after verified ownership, on the reserved identity |
-| Future sign-ins | `POST/PATCH/GET/DELETE /v2/sessions` | Existing fresh-email-factor proof and cleanup |
+Provider endpoints are `POST /v2/users` (search), `GET /v2/users/{id}`, `POST /v2/users/human`, `POST /v2/users/{id}/email/send` and `POST /v2/users/{id}/email/verify`. Payloads follow the retained v4.16.1 proto. The creation response's optional verification code is deliberately ignored and never stored/logged. No `/v2/sessions` or `/otp_email` call remains in this email-login flow.
 
-The human creation API requires given/family names, although the form collects only email. Use a neutral profile (`New`, `User`, display name `New user`) rather than inventing personal information. The API limits email to 200 characters; align form/server validation with that contract.
+Remove the old registration handler, separate registration store, email-session store and their OTP-specific clients/tests instead of maintaining adapters. Historical ticket diaries and production reports remain historical evidence; they are not the active design.
 
-Primary references: [custom registration](https://zitadel.com/docs/guides/integrate/login-ui/username-password), [email verification](https://zitadel.com/docs/reference/api/user/zitadel.user.v2.UserService.VerifyEmail), [email OTP prerequisite](https://zitadel.com/docs/reference/api/user/zitadel.user.v2.UserService.AddOTPEmail). Pinned proto and command sources are retained under this ticket's `sources/zitadel-email-login/v4.16.1` and signup-specific source folder.
+## Implementation and one final qualification boundary
 
-## Implementation and validation
+Implement the design as one coherent replacement, then validate it. Retain focused regressions for new address, existing provider-only identity, stale local verification, existing account without OTP, same-identity OIDC completion, role/disabled/collision guards, scanner GET, browser/CSRF/origin checks, expiry/replay and failed-send quota refund. Preserve Google/GitHub sign-in tests.
 
-1. Extend the bounded provider client with reserved-user creation, resend, verification and idempotent OTP enrollment. Preserve status-only error handling and redirect refusal.
-2. Add the reservation/flow migration and store methods; share a normalized-email lock with ordinary identity provisioning.
-3. Branch the existing request and verification handlers into signup only when no local address exists and signup is enabled. Reuse rendering, cookie handling, limits, expiry and redirects.
-4. Update the form guidance to explain that email can create an account, with identical acknowledgement for all outcomes.
-5. Test real PostgreSQL claims, replacement, expiry, disabled/collision behavior, concurrent completion and rejection when a local identity appears concurrently. Existing sign-in tests cover role preservation. Mock-provider tests cover proof ordering, wrong organization/address, failed codes and recovery after partial completion.
-6. Exercise the full first-signup and second-login sequence against the isolated pinned ZITADEL and Mailpit stack. Assert that no local user exists before confirmation and one ordinary user/session exists afterward. Confirm scanner GETs send/verify nothing and replay fails.
-7. Run the full database-backed Go suite, build and required lint. Record exact failures and repairs in the ticket diary. Commit design and implementation at meaningful boundaries.
-
-No production credentials, signup mail or deployment changes are required to implement and validate this locally. Production rollout must include the migration and the existing signup flag, and operator documentation must distinguish local proof from actual SMTP delivery.
-
-## Implemented and validated result
-
-Implementation merged in PR #13 as `5068ad1` and is deployed to production. The full database-backed Go suite and build passed; after correcting the user-search route to the pinned `POST /v2/users` annotation, the affected signup cases and lint/logger checks passed. The real pinned-provider browser test delivered both the first verification email and a subsequent OTP email, with one ordinary local account, read-only scanner GETs and rejected replay. See the diary Steps 12–15 and `sources/implementation/email-signup-browser.json` for evidence and limits. Production uses `ghcr.io/go-go-golems/francois:sha-5068ad1`; GitOps PR #369 merged as `18cdb9dee94d3c2c49ab5adba2f7f5b82138077c`. Argo is Synced/Healthy/Succeeded, migration 013 is applied and both public sites passed read-only rollout verification. No real-user mail was requested during deployment verification.
+Run the database-backed Go suite, required lint/build checks and one real isolated-provider browser journey after implementation. The browser journey must demonstrate both a new address and an already-verified provider-only account without OTP. Do not repeatedly run broad tests after each edit. Production mail is not sent as part of local qualification.
