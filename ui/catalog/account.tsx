@@ -3,12 +3,17 @@ import { useDispatch } from "react-redux";
 import { api, errorMessage } from "./api";
 import { navigate, show } from "./store";
 import { ApiTokens } from "./tokens";
-import { Empty, loginHref, Row } from "./ui";
+import { Empty, loginHref, Row, SignOut } from "./ui";
 
 export function Account() {
   const { data: session } = api.useSessionQuery();
   useEffect(() => {
-    if (session?.brand) document.title = `Account · ${session.brand}`;
+    if (!session?.brand) return;
+    const previous = document.title;
+    document.title = `Account · ${session.brand}`;
+    return () => {
+      document.title = previous;
+    };
   }, [session?.brand]);
   const params = new URLSearchParams(location.search);
   const returned = params.get("checkout");
@@ -19,7 +24,6 @@ export function Account() {
   });
   const [portal, { isLoading: opening }] = api.usePortalMutation();
   const [refresh] = api.useRefreshBillingMutation();
-  const [logout] = api.useLogoutMutation();
   const dispatch = useDispatch();
   // A Checkout return is advisory: ask for reconciliation and poll the
   // projection for a bounded time; never treat the URL as proof of payment.
@@ -107,19 +111,7 @@ export function Account() {
             </p>
           )}
           <p>
-            <button
-              className="tlink"
-              onClick={async () => {
-                try {
-                  const out = await logout().unwrap();
-                  location.assign(out.redirect || "/");
-                } catch (e) {
-                  dispatch(show({ text: errorMessage(e), bad: true }));
-                }
-              }}
-            >
-              Sign out
-            </button>
+            <SignOut />
           </p>
         </div>
       </section>

@@ -44,6 +44,27 @@ export function useRoute() {
 export const loginHref = (ret = location.pathname + location.search) =>
   "/signin?return=" + encodeURIComponent(ret);
 
+export function SignOut() {
+  const [logout, { isLoading }] = api.useLogoutMutation();
+  const dispatch = useDispatch();
+  return (
+    <button
+      className="tlink"
+      disabled={isLoading}
+      onClick={async () => {
+        try {
+          const out = await logout().unwrap();
+          location.assign(out.redirect || "/");
+        } catch (e) {
+          dispatch(show({ text: errorMessage(e), bad: true }));
+        }
+      }}
+    >
+      Sign out
+    </button>
+  );
+}
+
 export function Header() {
   const { data: session } = api.useSessionQuery();
   const signedIn = session?.authenticated && session.user?.role !== "guest";
@@ -113,6 +134,7 @@ export function Footer() {
         {signedIn && <Link to="/account">Account</Link>}
         {staff && <Link to="/studio">Studio</Link>}
         {session?.user?.role === "admin" && <Link to="/admin">Admin</Link>}
+        {signedIn && <SignOut />}
       </div>
       <div>
         <span>Information</span>

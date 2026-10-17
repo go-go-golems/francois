@@ -196,3 +196,62 @@ No merge or deployment occurred. Review findings are not marked resolved, and CI
 ### Remaining requirements and next action
 
 Address the two P2 comments and the scanner's test-fixture finding before considering merge. PR #10 remains open.
+
+## Step 5: Fix shared sign-out and Account title cleanup
+
+Addressed both P2 review findings with a shared SignOut component and effect cleanup. The shared footer now exposes logout on Instances, Studio and Admin; Account uses the same component instead of duplicating its mutation and error handling. Leaving Account restores the title captured on entry.
+
+### Prompt Context
+
+**User prompt (verbatim):** "address,"
+
+**Assistant interpretation:** Implement the review fixes, validate and push them for another review.
+
+**Inferred user intent:** Resolve the open review comments before merge.
+
+### What I did
+
+- Added SignOut in ui/catalog/ui.tsx, reused in the footer and Account. It posts to the existing /auth/logout endpoint, disables while pending, follows the existing optional provider redirect and displays failures through the existing notice.
+- Added cleanup to Account's title effect, matching the launcher's existing lifetime pattern.
+- Rebuilt the tracked catalog.js bundle.
+- Added scripts/02-verify-review.mjs and sources/review-browser-validation.json. Its temporary local administrator session is revoked in finally; no credential is persisted.
+
+### Why
+
+A single small component keeps the two logout entry points consistent. The title belongs to Account's mounted lifetime, so restoring the prior value requires no central router redesign.
+
+### What worked
+
+- Node 24/Corepack pnpm check, pnpm build and all nine pnpm tests passed.
+- Real Chromium checks passed for Account → Studio and Account → Admin title restoration, footer logout visibility, a simulated logout failure retaining the session, successful actual logout revoking the session and returning home, and anonymous shell hiding logout.
+- Restarted only the owned local port 18792 using lsof-who and tmux session francois-review-010.
+
+### What didn't work
+
+The first browser harness intercepted **/api/auth/logout, but the existing endpoint is /auth/logout. The actual logout therefore succeeded instead of receiving the simulated failure; getByRole('status').filter({hasText:'Temporary logout failure'}) timed out after 30000ms. Corrected the interception and reran all five checks successfully.
+
+TruffleHog's existing CI failure remains a known false positive in the historical test fixture from commit 2f2fe66: the deliberately invalid issuer uses dummy user/password userinfo. Inspected the complete file and its sole feature-branch history entry. The scanner reads historical additions; a current-line annotation would not suppress the old finding. Did not disable URI detection, exempt the whole test file or rewrite published commits. My initial progress message promised to clear that failure; the supported narrow inline suppression cannot clear historical bytes, so that part remains outstanding rather than weakening the check.
+
+### What I learned
+
+The frontend mutation uses the auth endpoint directly, outside /api. Testing the error branch must intercept that exact route while allowing the final success case to reach the real server.
+
+### What was tricky to build
+
+The shared footer stays mounted across SPA navigation, while Account unmounts. Cleanup must restore the captured title before another page's effects apply their own title.
+
+### What warrants a second pair of eyes
+
+Verify footer logout matches the Account behavior and title cleanup remains correct across repeated Account visits. Treat the historical scanner finding explicitly as unresolved CI rather than claiming a fully green PR.
+
+### What should be done in the future
+
+Receive another review of these fixes. Resolve or explicitly adjudicate the historical test-data scanner finding before merge. No production changes are part of this step.
+
+### Code review instructions
+
+Review ui/catalog/ui.tsx SignOut and Footer, and Account's title effect. Reproduce the local browser harness against the owned preview; its failure branch is simulated but session persistence and revocation are verified against the actual local backend.
+
+### Technical details
+
+The fixture browser session lasts at most 15 minutes and is revoked on exit. Error-path simulation returns HTTP 500 once; the subsequent logout request reaches the real server. No new endpoint, dependency or environment-variable read is introduced.
