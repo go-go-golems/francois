@@ -25,7 +25,9 @@ func NewEmailLogin(issuer, organization, token string) (*EmailLogin, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
 		return nil, errors.New("email sign-in requires a ZITADEL issuer origin")
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1")) {
+	loopback := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"
+	secureTransport := u.Scheme == "https" || u.Scheme == "http" && loopback
+	if !secureTransport {
 		return nil, errors.New("email sign-in requires HTTPS (HTTP is allowed only on loopback)")
 	}
 	if organization == "" || strings.TrimSpace(token) == "" || strings.ContainsAny(token, "\r\n") {

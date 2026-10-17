@@ -61,7 +61,11 @@ func (s *Server) signinPage(w http.ResponseWriter, r *http.Request) {
 // emailForm checks double-submit CSRF against a host-only HttpOnly cookie.
 // No authenticated session is required to initiate sign-in.
 func (s *Server) emailForm(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if !s.sameOrigin(r) {
+	// A no-referrer document makes Chromium serialize a form navigation's
+	// Origin as null. Accept only browser-declared same-origin navigations in
+	// that case; the independent cookie/form CSRF check below still applies.
+	sameOriginNavigation := r.Header.Get("Origin") == "null" && r.Header.Get("Sec-Fetch-Site") == "same-origin" && r.Header.Get("Sec-Fetch-Mode") == "navigate"
+	if !s.sameOrigin(r) && !sameOriginNavigation {
 		s.renderEmail(w, r, 403, emailPage{State: "error", Message: "Please start sign-in again on this site."})
 		return "", false
 	}
@@ -79,7 +83,7 @@ func (s *Server) emailForm(w http.ResponseWriter, r *http.Request) (string, bool
 }
 
 // admitEmail spends limits before lookup and never holds its lock during I/O.
-func (s *Server) admitEmail(r *http.Request, email string) (allowed, limited bool) {
+func (s *Server) admitEmail(r *http.Request, email string) (bool, bool) {
 	l := s.emailLimiter
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -113,6 +117,7 @@ func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
 		s.renderEmail(w, r, 400, emailPage{CSRF: binding, Return: safeReturn(r.PostForm.Get("return")), Message: "Enter a valid email address."})
 		return
 	}
+	s.setCookie(w, s.emailCookie(), binding, int(store.EmailSigninTTL.Seconds()))
 	allowed, limited := s.admitEmail(r, email)
 	if limited {
 		w.Header().Set("Retry-After", "3600")

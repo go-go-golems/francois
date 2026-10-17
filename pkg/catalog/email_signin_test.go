@@ -31,7 +31,7 @@ func (p *emailUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if r.Header.Get("Authorization") != "Bearer test-login-service" {
-		http.Error(w, "unauthorized", 401)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -64,7 +64,7 @@ func (p *emailUpstream) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		if in.Checks.Email.Code != "12345678" {
-			http.Error(w, "invalid", 400)
+			http.Error(w, "invalid", http.StatusBadRequest)
 			return
 		}
 		p.verified = true
@@ -295,11 +295,11 @@ func TestEmailFlowConcurrencyAndRoleRevocation(t *testing.T) {
 	}
 	// A send that finishes after replacement must not attach to the new flow.
 	_, _ = e.store.Pool.Exec(ctx, `UPDATE users SET role='subscriber' WHERE id=$1`, u.ID)
-	old, new := store.RandomHex(32), store.RandomHex(32)
+	old, replacement := store.RandomHex(32), store.RandomHex(32)
 	if _, _, err = e.store.ReplaceEmailSignin(ctx, old, store.Hash(binding), u, "http://portal.test", "/"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = e.store.ReplaceEmailSignin(ctx, new, store.Hash(binding), u, "http://portal.test", "/"); err != nil {
+	if _, _, err = e.store.ReplaceEmailSignin(ctx, replacement, store.Hash(binding), u, "http://portal.test", "/"); err != nil {
 		t.Fatal(err)
 	}
 	if attached, err := e.store.AttachEmailSession(ctx, old, "late-session"); err != nil || attached {
@@ -350,5 +350,69 @@ func TestEmailSignupEligibilityAndLimits(t *testing.T) {
 	}
 	if ok, limited := e.srv.admitEmail(req, "other@example.test"); ok || !limited {
 		t.Fatal("IP limit missing")
+	}
+}
+
+func TestEmailSessionPromotionRace(t *testing.T) {
+	e, _, u := setupEmail(t)
+	ctx := context.Background()
+	f := store.EmailSignin{UserID: u.ID, Issuer: u.Issuer, Subject: u.Subject, Email: u.Email, ExpiresAt: time.Now().Add(time.Minute)}
+	for range 16 {
+		if err := e.store.SetUserRole(ctx, u.ID, "subscriber"); err != nil {
+			t.Fatal(err)
+		}
+		start := make(chan struct{})
+		var token string
+		var group errgroup.Group
+		group.Go(func() error {
+			<-start
+			var err error
+			token, err = e.store.CreateEmailSession(ctx, f)
+			if err == store.ErrNotFound {
+				return nil
+			}
+			return err
+		})
+		group.Go(func() error { <-start; return e.store.SetUserRole(ctx, u.ID, "admin") })
+		close(start)
+		if err := group.Wait(); err != nil {
+			t.Fatal(err)
+		}
+		if token != "" {
+			if _, _, err := e.store.ResolveSession(ctx, token); err == nil {
+				t.Fatal("racing promotion left an email session active")
+			}
+		}
+	}
+}
+
+func TestEmailFormNoReferrerNavigationOrigin(t *testing.T) {
+	e, _, _ := setupEmail(t)
+	binding := store.RandomHex(24)
+	for _, tt := range []struct {
+		name, origin, site, mode, csrf string
+		status                         int
+	}{
+		{"no-referrer same origin", "null", "same-origin", "navigate", binding, 400},
+		{"cross site null origin", "null", "cross-site", "navigate", binding, 403},
+		{"same site is insufficient", "null", "same-site", "navigate", binding, 403},
+		{"missing metadata", "null", "", "", binding, 403},
+		{"cross site origin", "https://attacker.test", "cross-site", "navigate", binding, 403},
+		{"null fetch is not navigation", "null", "same-origin", "cors", binding, 403},
+		{"still requires CSRF", "null", "same-origin", "navigate", "wrong", 403},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "http://portal.test/auth/email/request", strings.NewReader(url.Values{"csrf": {tt.csrf}, "email": {"invalid"}}.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", tt.origin)
+			req.Header.Set("Sec-Fetch-Site", tt.site)
+			req.Header.Set("Sec-Fetch-Mode", tt.mode)
+			req.AddCookie(&http.Cookie{Name: "francois_email_dev", Value: binding})
+			w := httptest.NewRecorder()
+			e.srv.Handler().ServeHTTP(w, req)
+			if w.Code != tt.status {
+				t.Fatalf("form status=%d, want %d", w.Code, tt.status)
+			}
+		})
 	}
 }

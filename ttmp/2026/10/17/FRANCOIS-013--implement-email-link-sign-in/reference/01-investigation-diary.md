@@ -291,3 +291,73 @@ Start with identity/email.go and email_signin.go, then inspect store/email_signi
 - The provider token is only in an HTTP Authorization header, never a cookie or email link.
 - Local infrastructure ports: 18083, 18025, 5437; tmux session: francois-email-013-infra.
 - The real email account is a disposable supporter fixture, with no production access.
+
+## Step 5: Qualify real browser navigation, match Paper and finish verification
+
+The first implementation checkpoint was committed as **2f2fe66 — Implement ZITADEL email-only supporter sign-in**. The subsequent real-browser check found a material difference from synthetic HTTP tests: Chromium makes the Origin header null for form navigations from our no-referrer authentication pages. The normal origin check consequently rejected our own form. This was fixed narrowly and tested against cross-site/null-origin cases before completing browser evidence.
+
+The final browser journey now delivers real mail through isolated ZITADEL, opens a scanner-safe confirmation page, creates the same supporter's session, rejects replay and signs out locally. Ten screenshots cover five states at 1440px and 390px, without horizontal overflow. No credentials, codes or live sign-in URLs are saved in the evidence.
+
+### Prompt Context
+
+**User prompt:** See Step 4. During finalization the user additionally requested two subsequent tickets: a download-only watermark intro and a sandbox catalog API guide. Those requests do not replace finishing this authentication work.
+**Assistant interpretation:** Finish qualification and a focused commit before moving to the new implementation/research tasks.
+**Inferred user intent:** Complete working email login with an accurate diary and real browser evidence.
+**Commit (implementation):** 2f2fe66.
+
+### What I did
+
+- Compared the Final sign-in desktop/mobile Paper snapshots with the local form. Matched the Sign in heading, 640px form column, muted label, 48px field, restrained button, mobile full-width button and supporter link.
+- Refreshed the existing email binding cookie on admitted requests so an older open form does not shorten a newly issued link's usable lifetime.
+- Added concurrent promotion/session-creation tests and ran the email suite with the race detector.
+- Added the no-referrer navigation exception only for Origin null plus browser-declared same-origin/navigation Fetch Metadata; the separate host-cookie/form CSRF check still applies. Added rejection tests for cross-site, same-site-only, absent metadata, non-navigation requests and missing CSRF.
+- Rebuilt checked-in frontend assets. The direct pnpm standalone executable embeds Node 20 despite shell PATH; reran check/test/build through the installed Node v24.18.0 Corepack entry point without engine warnings.
+- Added repeatable local preview and browser verification scripts. Screenshots and redacted checks live under sources/implementation.
+- Kept the earlier reMarkable upload explicitly marked as the superseded first-party guide; this implementation did not silently replace that PDF.
+
+### Why
+
+A correct HTTP-level proof test does not establish browser navigation correctness. The no-referrer policy is needed to protect link codes, and removing CSRF/origin validation would weaken the implementation. Fetch Metadata permits the specific legitimate navigation while rejecting cross-site forms; the cookie/form token remains an independent requirement.
+
+### What worked
+
+- Full `go test ./... -count=1` with the isolated PostgreSQL DSN passed, including database integration packages.
+- `go build ./...` passed.
+- `make lint logcopter-check` passed after resolving the reported issues.
+- Node v24.18.0 Corepack `pnpm check`, `pnpm test` (9 passing tests) and `pnpm build` passed.
+- Race-enabled focused email tests passed, including sixteen simultaneous promotion/session-creation attempts.
+- Browser script returned six successful checks and ten screenshots: form, sent, confirm, account and used-link states at both viewport widths.
+- Saved raw upstream source checksums still match after .go.txt renaming.
+
+### What didn't work
+
+- The first lint pass reported nonamedreturns on admitEmail, predeclared on a test variable named new, ST1013 for a literal HTTP status and QF1001 for the transport condition. Replaced named returns, renamed the variable, used status constants and simplified transport validation. The next lint pass reported zero issues.
+- The first screenshot run began before go run had started listening: `page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:18793/signin?return=/account`. Added a bounded readiness probe.
+- The next real-browser submission reached the error page with `Please start sign-in again on this site.` Safe request diagnostics showed Origin null. The narrow Fetch Metadata handling fixed both send and confirmation POSTs; the full browser journey then passed.
+
+### What I learned
+
+Referrer-Policy affects the browser's serialized Origin on POST navigation, not just the Referer header. Synthetic requests setting the portal Origin do not exercise that behavior. The explicit browser journey now prevents this regression from being hidden by API-only tests.
+
+### What was tricky to build
+
+The origin check has to distinguish a privacy-protected same-origin form navigation from an opaque or cross-site origin. Requiring both same-origin Fetch Metadata and navigation mode, then checking the HTTP-only binding cookie against the submitted form token, keeps the exception narrow. A null Origin alone is never sufficient.
+
+### What warrants a second pair of eyes
+
+Review emailForm's origin condition beside the negative tests and browser evidence. Inspect SetUserRole and CreateEmailSession locking together. Confirm any production rollout mounts a dedicated login credential, enables SMTP and enrolls only intended existing supporters.
+
+### What should be done in the future
+
+Production enablement is a separate operational action. The feature is implemented and tested locally; there is no remaining authentication implementation task in this ticket. Continue with the user's subsequent tickets.
+
+### Code review instructions
+
+Read the implementation commit and subsequent browser fix, then sources/implementation/checks.json and browser-validation.json. Use scripts/03-local-stack.yaml, 04-provision-local.py, 05-run-preview.sh and 06-verify-browser.mjs to reproduce the isolated flow. Physical reMarkable synchronization or a production deployment is not claimed.
+
+### Technical details
+
+- Preview: http://localhost:18793/signin, tmux francois-email-013-preview.
+- Isolated provider/mail/DB stack: tmux francois-email-013-infra.
+- Supported browser exception: Origin null AND Sec-Fetch-Site same-origin AND Sec-Fetch-Mode navigate, plus valid independent CSRF/binding.
+- Test browser screenshots contain page content only; no address bar or live link/code/token captures.

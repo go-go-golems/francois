@@ -20,6 +20,8 @@ WhenToUse: ""
 ---
 # Finding: email-only magic links are feasible with the Session API
 
+Implementation follow-up: diary Steps 4–5 now record successful isolated real-provider and Chromium journeys. The source-only qualification below describes the original investigation checkpoint. Upstream Go snapshots now carry a .go.txt suffix so Go does not compile the research evidence.
+
 The hosted login screen does not provide the requested ready-made journey in the sources inspected. That does not mean ZITADEL cannot authenticate it. Its custom Session API can issue an email challenge without a password, verify the resulting code and record an email factor. The implementation guide now selects this API directly for Francois supporter authentication.
 
 ## Evidence hierarchy

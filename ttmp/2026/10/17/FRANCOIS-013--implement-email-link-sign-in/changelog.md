@@ -19,3 +19,7 @@ Confirmed ZITADEL v4.16.1 email-only Session API path; saved primary sources and
 ## 2026-10-17
 
 Implemented ZITADEL-backed magic links, Final forms, transactional flow/session controls and role revocation; real isolated v4.16.1 SMTP round trip passed. Full-suite and viewport validation follow.
+
+## 2026-10-17
+
+Implemented and qualified ZITADEL email-only sign-in with real isolated v4.16.1 SMTP, Chromium desktop/mobile flow, concurrency security tests and full checks; default disabled in production.

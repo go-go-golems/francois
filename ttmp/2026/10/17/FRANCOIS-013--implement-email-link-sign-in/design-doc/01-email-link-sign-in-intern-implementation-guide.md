@@ -170,7 +170,7 @@ A flow contains 32 CSPRNG bytes encoded as hex; only its SHA-256 digest is store
 
 Insert the pending record before asking ZITADEL to send the link. Save the returned provider session ID with a conditional update against that exact flow hash. Until this update succeeds, verification reports that the request is not ready. A replaced or expired row must not be resurrected by a late API response. Delete the newly created provider session if its conditional update loses the race. Do not keep database locks open during network calls.
 
-GET verification returns a no-store, no-referrer confirmation page without third-party resources or analytics. Codes are escaped into a hidden POST field; they are never used as HTML. Require the original binding cookie and same-origin CSRF validation on POST. This intentionally requires the same browser; explain that in the email/form. Email scanners opening GET must not authenticate or consume the challenge.
+GET verification returns a no-store, no-referrer confirmation page without third-party resources or analytics. Codes are escaped into a hidden POST field; they are never used as HTML. Require the original binding cookie and same-origin CSRF validation on POST. Chromium sends Origin: null for form navigation from a no-referrer document. The handler permits that only with Sec-Fetch-Site: same-origin and Sec-Fetch-Mode: navigate, and still requires the independent binding cookie and matching CSRF value. Cross-site, same-site-only and missing-metadata null origins are refused. This intentionally requires the same browser; explain that in the email/form. Email scanners opening GET must not authenticate or consume the challenge.
 
 ## 6. Single use, failures and transaction boundaries
 
