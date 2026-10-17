@@ -843,3 +843,93 @@ Start with email_signup.go, identity/email_signup.go and store/email_registratio
 
 ### Technical details
 New registrations reuse the existing process/global/client/recipient limits and five-minute browser-bound links. No password, bearer credential, plaintext flow secret or mailbox code is stored in PostgreSQL or ticket evidence. Existing unrelated human OTP factors and subscriptions are unchanged.
+
+
+## Step 14: Combined qualification exposed a real-provider route mismatch
+
+The full PostgreSQL-backed Go suite and build passed for implementation checkpoint 19dc040. The real-provider browser journey then failed to receive the first message, and the preview logged a status-only upstream HTTP 405. Compared the exact pinned REST annotation: ListUsers uses POST /v2/users, while the implementation and fake had incorrectly assumed /v2/users/_search. Corrected both and the design reference. This is why the actual pinned-provider journey is part of the feature's final qualification.
+
+### Prompt Context
+See Steps 12 and 13 for the implementation and validation-cadence requests.
+**Commit (code):** 19dc040 — feat: register new users through verified email links.
+
+### What I did
+- Ran `TEST_DATABASE_URL='postgres://emailtest:emailtest@127.0.0.1:5437/postgres?sslmode=disable' go test ./... -count=1`; all packages passed, including the new signup regression cases.
+- Ran `go build ./...` successfully, followed by `make lint logcopter-check`; lint identified three numeric HTTP status literals in the new fake.
+- Ran script 13 against the real isolated stack. It reported `Local email-signup verification failed at first email (Error); no code, token or link printed.` The server's diagnostic was `identity service returned HTTP 405`.
+- Corrected the collision-search REST route from the pinned proto and replaced the flagged test literals with net/http constants. No production operations were performed.
+
+### Why
+A mock can reproduce a mistaken contract. The pinned provider checks both its real routing and dedicated service-user permissions, while the browser/mail-sink journey checks that the confirmation link is usable.
+
+### What worked
+The full database-backed suite passed. The build passed. The error was safely bounded to HTTP status without leaking provider bodies, codes, links or credentials.
+
+### What didn't work
+`make lint logcopter-check` stopped at lint with ST1013 for HTTP 401, 409 and 412 literals. The first real signup attempt failed before email delivery because POST /v2/users/_search is not the pinned REST route. Both issues are repaired pending focused revalidation; logcopter-check had not yet run because make stopped at lint.
+
+### What I learned
+The older management API's _search naming must not be inferred for the v2 user service. Its REST annotation is authoritative.
+
+### What was tricky to build
+The generic acknowledgement intentionally hides provider details, so the mail-sink assertion and safe server diagnostic must be read together to identify delivery failures without weakening enumeration protection.
+
+### What warrants a second pair of eyes
+Confirm the remaining provider calls against their pinned annotations and retain the integration test as a boundary check.
+
+### What should be done in the future
+Rerun the failed integration and lint/logger gate, plus the narrowly affected signup tests; the already successful full suite/build need repetition only if subsequent functional repairs justify it.
+
+### Code review instructions
+See sources/zitadel-email-login/v4.16.1/proto/zitadel/user/v2/user_service.proto, ListUsers annotation, and identity/email_signup.go.
+
+### Technical details
+Full suite output is recorded separately from browser receipts; no raw notification content is checked into the ticket.
+
+
+## Step 15: Qualify first signup and repeat login against the actual provider
+
+The repaired implementation passed the final affected checks and the complete isolated browser journey against ZITADEL v4.16.1 and Mailpit. An actual first-use verification email was delivered, repeated confirmation GETs created no local account, the confirmation POST created exactly one ordinary account/session, replay failed, and a second actual email OTP signed into that same account. Desktop/mobile screenshots and a code-free receipt are saved in sources/implementation.
+
+This completes local implementation and qualification. Production remains on its prior release; neither real-user mail nor production configuration was changed during this work.
+
+### Prompt Context
+See Steps 12 and 13 for the exact implementation and test-cadence requests.
+
+### What I did
+- Reran the failed real-provider browser integration using script 13; all five recorded assertions passed.
+- Reran `make lint logcopter-check`: zero lint issues and logger-generation check passed.
+- Reran only the affected database-backed signup cases with `go test ./pkg/catalog -run 'TestEmailSignup|TestEmailRegistration' -count=1`: passed in 2.044 seconds.
+- Preserved the earlier full-suite success plus initial/final lint output, sanitized browser receipt and four desktop/mobile screenshots.
+- Updated docmgr task/changelog, related the new implementation files to the signup design and validated ticket metadata.
+
+### Why
+The full suite/build already passed before the provider-route and test-status corrections. Focused revalidation resolves those failures without repeating unrelated tests. Real mail-sink and browser checks establish behavior that mocks alone cannot demonstrate.
+
+### What worked
+- Full PostgreSQL-backed `go test ./... -count=1`: all packages passed at implementation checkpoint 19dc040; final affected signup tests passed after the route correction.
+- `go build ./...`: passed. The restarted local preview also compiled and ran the final route correction.
+- `make lint logcopter-check`: passed after the three status-constant fixes.
+- Real provider: first verification message delivered; no local user before proof; read-only/no-store confirmation GET; exactly one ordinary account/session after POST; replay rejected; subsequent real OTP mail signed into the same account.
+- Regression coverage includes wrong browser/code, replacement, interrupted enrollment recovery, signup disablement, disabled/unverified/ambiguous local accounts, provider-email collisions, changed provider identity, expiry, local collision and eight-way claim/completion races.
+
+### What didn't work
+The initial route/lint failures and their exact repairs are preserved in Step 14. No additional failure occurred during the final rerun.
+
+### What I learned
+The same dedicated IAM_LOGIN_CLIENT credential scope supports the required pinned-provider registration, verification and factor-enrollment operations in the isolated environment. A new account without a password becomes usable through email verification and the subsequent OTP path.
+
+### What was tricky to build
+Successful provider verification and local transaction commit are separate boundaries. Recovery preserves the reserved subject and requires a fresh OTP proof, while refusing to adopt a different provider or local identity by email.
+
+### What warrants a second pair of eyes
+Review the cross-provider/local collision boundary and five-minute one-shot flow. The provider test proves isolated delivery only, not acceptance or inbox placement by an external production mailbox.
+
+### What should be done in the future
+Merge/release and deploy separately when requested, including migration 013 and the existing signup flag. No additional worker, service or authentication page is needed.
+
+### Code review instructions
+Read design-doc/02-email-only-signup-implementation-guide.md, then the provider/store additions and small handler changes. sources/implementation/email-signup-browser.json describes the real journey without mailbox codes, tokens or links. The local preview remains available on http://localhost:18795/signin in tmux francois-email-signup-013.
+
+### Technical details
+The only provider-route repair was `/v2/users/_search` to `/v2/users`, matching the pinned ListUsers annotation. Session/proof APIs and existing sign-in role guards were unchanged by the repair. Test email addresses use the isolated slop.test domain and Mailpit sink. No production mailbox was contacted.

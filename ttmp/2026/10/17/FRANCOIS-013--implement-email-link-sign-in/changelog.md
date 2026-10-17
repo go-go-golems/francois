@@ -47,3 +47,7 @@ User approved public signup; applied/merged Terraform #36 (three in-place change
 ## 2026-10-17
 
 Deployed reviewed shared sign-in source #12 (5721ee8) via k3s #366. Public social signup approved/applied through Terraform #36. Both real provider login forms, scopes/PKCE, shared page, signup availability and hidden-blog default verified; no real-user consent, account creation or email request submitted.
+
+## 2026-10-17
+
+Implemented email-only signup through the shared form with unverified ZITADEL registration, mailbox confirmation, OTP enrollment, atomic ordinary-account/session provisioning and browser-bound one-shot links. Full Go/database suite and build passed; final affected tests, lint/logger and actual pinned-provider first-signup/repeat-login journey passed. Detailed design, diary and sanitized browser evidence retained; no production deployment.

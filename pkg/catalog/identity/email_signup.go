@@ -41,7 +41,7 @@ func (e *EmailLogin) SendRegistration(ctx context.Context, subject, email, templ
 			map[string]any{"organizationIdQuery": map[string]string{"organizationId": e.organization}},
 			map[string]any{"emailQuery": map[string]string{"emailAddress": email, "method": "TEXT_QUERY_METHOD_EQUALS_IGNORE_CASE"}},
 		}}
-		if err = e.call(ctx, http.MethodPost, "/v2/users/_search", body, &matches); err != nil {
+		if err = e.call(ctx, http.MethodPost, "/v2/users", body, &matches); err != nil {
 			return "", err
 		}
 		if len(matches.Result) != 0 {

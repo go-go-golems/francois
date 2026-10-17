@@ -7,4 +7,4 @@
 - [x] Implement browser-bound pending flows, atomic claiming and locked same-user portal-session creation. <!-- t:i9yg -->
 - [x] Implement the bounded ZITADEL Session API client, provider email-link delivery and Final form states. <!-- t:r445 -->
 - [x] Verify an isolated real ZITADEL v4.16.1 email-only flow, fresh-factor identity checks, replay/races and role revocation. <!-- t:060u -->
-- [ ] Implement and validate email-only signup through the shared sign-in form <!-- t:o86f -->
+- [x] Implement and validate email-only signup through the shared sign-in form <!-- t:o86f -->

@@ -1,7 +1,7 @@
 ---
 Title: Email-only signup implementation guide
 Ticket: FRANCOIS-013
-Status: active
+Status: complete
 Topics:
     - backend
 DocType: design-doc
@@ -10,13 +10,19 @@ Owners: []
 RelatedFiles:
     - Path: repo://pkg/catalog/email_signin.go
       Note: Shared request and confirmation flow
+    - Path: repo://pkg/catalog/email_signup_test.go
+      Note: Signup, recovery, collision and concurrency regression coverage
     - Path: repo://pkg/catalog/identity/email.go
       Note: ZITADEL verification and OTP client
+    - Path: repo://pkg/catalog/identity/email_signup.go
+      Note: Registration-owned provider identity and mailbox verification
+    - Path: repo://pkg/catalog/store/email_registrations.go
+      Note: Reservations, one-time claims and atomic account/session provisioning
     - Path: repo://pkg/catalog/store/users.go
       Note: Identity provisioning and email collision checks
 ExternalSources: []
 Summary: Passwordless email signup through the existing sign-in form, using ZITADEL email verification before local account creation.
-LastUpdated: 2026-10-17T18:56:54.620052047-04:00
+LastUpdated: 2026-10-17T19:05:11.836226869-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -132,7 +138,7 @@ These are the pinned ZITADEL v4.16.1 REST contracts, not assumptions based on a 
 | Operation | Endpoint | Contract |
 | --- | --- | --- |
 | Read reserved identity | `GET /v2/users/{id}` | Check ID, state, resource owner and email |
-| Check collision | `POST /v2/users/_search` | Organization ID and case-insensitive exact email; bounded results |
+| Check collision | `POST /v2/users` | Organization ID and case-insensitive exact email; bounded results |
 | Create unverified human | `POST /v2/users/human` | Explicit reserved `userId`, organization, minimal profile and `email.sendCode.urlTemplate`; never `isVerified:true` |
 | Resend verification | `POST /v2/users/{id}/email/resend` | `sendCode.urlTemplate` points to existing application confirmation route |
 | Verify address | `POST /v2/users/{id}/email/verify` | `verificationCode` from the claimed browser-bound attempt |
@@ -155,3 +161,7 @@ Primary references: [custom registration](https://zitadel.com/docs/guides/integr
 7. Run the full database-backed Go suite, build and required lint. Record exact failures and repairs in the ticket diary. Commit design and implementation at meaningful boundaries.
 
 No production credentials, signup mail or deployment changes are required to implement and validate this locally. Production rollout must include the migration and the existing signup flag, and operator documentation must distinguish local proof from actual SMTP delivery.
+
+## Implemented and validated result
+
+Implementation is complete on `feat/email-only-signup`. The full database-backed Go suite and build passed; after correcting the user-search route to the pinned `POST /v2/users` annotation, the affected signup cases and lint/logger checks passed. The real pinned-provider browser test delivered both the first verification email and a subsequent OTP email, with one ordinary local account, read-only scanner GETs and rejected replay. See the diary Steps 12–15 and `sources/implementation/email-signup-browser.json` for evidence and limits. This is a local implementation, not a production deployment.

@@ -30,7 +30,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if r.Header.Get("Authorization") != "Bearer test-login-service" {
-		http.Error(w, "unauthorized", 401)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	var in map[string]json.RawMessage
@@ -45,7 +45,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		p.link = strings.ReplaceAll(v.URL, "{{.Code}}", "registration-code")
 	}
 	switch {
-	case r.URL.Path == "/v2/users/_search":
+	case r.URL.Path == "/v2/users":
 		var query struct {
 			Limit int `json:"limit"`
 		}
@@ -53,7 +53,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		var filters []map[string]map[string]string
 		_ = json.Unmarshal(in["queries"], &filters)
 		if query.Limit != 1 || len(filters) != 2 || filters[0]["organizationIdQuery"]["organizationId"] != "org" || filters[1]["emailQuery"]["method"] != "TEXT_QUERY_METHOD_EQUALS_IGNORE_CASE" {
-			http.Error(w, "invalid scope", 400)
+			http.Error(w, "invalid scope", http.StatusBadRequest)
 			return
 		}
 		if p.collision {
@@ -63,7 +63,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		}
 	case r.URL.Path == "/v2/users/human":
 		if p.exists {
-			http.Error(w, "conflict", 409)
+			http.Error(w, "conflict", http.StatusConflict)
 			return
 		}
 		var email struct {
@@ -77,7 +77,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.Unmarshal(in["organization"], &org)
 		if email.Verified || org.ID != "org" || in["password"] != nil || len(email.Send) == 0 {
-			http.Error(w, "unsafe creation", 400)
+			http.Error(w, "unsafe creation", http.StatusBadRequest)
 			return
 		}
 		_ = json.Unmarshal(in["userId"], &p.user.Subject)
@@ -95,7 +95,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(in["verificationCode"], &code)
 		p.checks++
 		if code != "registration-code" {
-			http.Error(w, "bad code", 400)
+			http.Error(w, "bad code", http.StatusBadRequest)
 			return
 		}
 		p.emailVerified = true
@@ -108,7 +108,7 @@ func (p *signupUpstream) serveSignup(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"authMethodTypes": methods})
 	case strings.HasSuffix(r.URL.Path, "/otp_email"):
 		if !p.emailVerified || p.failEnrollment {
-			http.Error(w, "not ready", 412)
+			http.Error(w, "not ready", http.StatusPreconditionFailed)
 			return
 		}
 		p.enrollments++

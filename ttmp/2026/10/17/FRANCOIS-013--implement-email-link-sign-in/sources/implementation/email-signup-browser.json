@@ -1,0 +1,12 @@
+{
+  "base": "http://localhost:18795",
+  "at": "2026-10-17T23:04:23.612Z",
+  "checks": [
+    "real ZITADEL verification email delivered; no local account before proof",
+    "scanner GET is read-only and authentication material is not cached",
+    "verification creates exactly one ordinary local account and signs in",
+    "used signup link is rejected",
+    "subsequent real session-OTP email signs into the same account"
+  ],
+  "credentialsSaved": false
+}
