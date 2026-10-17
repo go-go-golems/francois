@@ -26,3 +26,10 @@ Ramon’s Final Paper page supersedes the older design reference. The comparison
 - [Final Paper page](https://app.paper.design/file/01M4XVT9C83GGYK57CMAAAEJJT/p-6-0).
 
 The sources directory contains ten Final PNGs, ten exact JSX exports, eight fresh production screenshots and browser/style receipts. The capture script is in scripts/. Outstanding choices concern embedded-runner startup, archive content policy, annual funding and actual email-login delivery.
+
+## Scoped implementation guides — 17 October 2026
+
+The user requested separate tickets and a concrete, streamlined implementation. Use these current guides for implementation; this earlier comparison remains the measured evidence record.
+
+- [FRANCOIS-012 — visual design](../FRANCOIS-012--implement-ramon-final-visual-design/index.md): computed display ordinals, existing Markdown and explicit-start reuse of the runner; no visual-ticket database migration or billing redesign.
+- [FRANCOIS-013 — email sign-in](../FRANCOIS-013--implement-email-link-sign-in/index.md): one pending-link table and direct mail submission for existing subscriber accounts, reusing current sessions.

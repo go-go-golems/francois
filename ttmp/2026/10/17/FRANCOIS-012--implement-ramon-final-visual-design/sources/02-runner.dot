@@ -1,0 +1,21 @@
+digraph G {
+      rankdir=TB;
+      node [shape=box, style=rounded, fontname="DejaVu Sans", fontsize=13];
+      edge [fontname="DejaVu Sans", fontsize=11];
+      preview [label="Preview: cover + Start
+No instance allocated"];
+      start [label="User presses Start
+Create or resume existing visit"];
+      session [label="Refresh session after guest creation
+Resolve instance origin"];
+      frame [label="Load isolated /launch iframe"];
+      proof [label="Validate exact frame + origin
+Exchange challenge for launch code"];
+      live [label="Live experiment
+Reload / Full screen"];
+      denied [label="Server denied / visit expired
+Show existing service message"];
+      preview -> start -> session -> frame -> proof -> live;
+      start -> denied; proof -> denied;
+      live -> frame [label="Reload reuses same instance"];
+    }

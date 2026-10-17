@@ -1,0 +1,19 @@
+digraph G {
+      rankdir=TB;
+      node [shape=box, style=rounded, fontname="DejaVu Sans", fontsize=13];
+      edge [fontname="DejaVu Sans", fontsize=11];
+      browser [label="Visitor browser"];
+      go [label="Go public pages
+Templates + small public script"];
+      react [label="React account / staff pages
+Separate shared shell"];
+      db [label="Existing PostgreSQL
+Artifacts, releases, sessions, instances"];
+      run [label="Isolated instance origin
+Existing iframe runtime"];
+      browser -> go [label="archive / experiment"];
+      browser -> react [label="account / staff"];
+      go -> db; react -> db;
+      go -> run;
+      react -> run;
+    }
