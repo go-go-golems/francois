@@ -45,20 +45,32 @@ func (e *EmailLogin) SendRegistration(ctx context.Context, subject, email, templ
 			return "", err
 		}
 		if len(matches.Result) != 0 {
-			return "", errors.New("registration conflicts with an existing identity")
+			if matches.Result[0].ID != subject {
+				return "", errors.New("registration conflicts with an existing identity")
+			}
+			// Another request created our reserved identity after the first
+			// GET. Re-read that exact subject; never adopt a search result.
+			err = e.call(ctx, http.MethodGet, path, nil, &response)
+		} else {
+			var created jsonUserID
+			body = map[string]any{"userId": subject, "username": email,
+				"organization": map[string]string{"orgId": e.organization},
+				"profile":      map[string]string{"givenName": "New", "familyName": "User", "displayName": "New user"},
+				"email":        map[string]any{"email": email, "sendCode": map[string]string{"urlTemplate": template}}}
+			err = e.call(ctx, http.MethodPost, "/v2/users/human", body, &created)
+			if err == nil {
+				if created.ID != subject {
+					return "", errors.New("registration response has mismatched identity")
+				}
+				return "", nil
+			}
+			if err != responseError(http.StatusConflict) {
+				return "", err
+			}
+			// The current flow must still get a usable link if an older
+			// concurrent flow won creation and sent an already-replaced URL.
+			err = e.call(ctx, http.MethodGet, path, nil, &response)
 		}
-		var created jsonUserID
-		body = map[string]any{"userId": subject, "username": email,
-			"organization": map[string]string{"orgId": e.organization},
-			"profile":      map[string]string{"givenName": "New", "familyName": "User", "displayName": "New user"},
-			"email":        map[string]any{"email": email, "sendCode": map[string]string{"urlTemplate": template}}}
-		if err = e.call(ctx, http.MethodPost, "/v2/users/human", body, &created); err != nil {
-			return "", err
-		}
-		if created.ID != subject {
-			return "", errors.New("registration response has mismatched identity")
-		}
-		return "", nil
 	}
 	if err != nil {
 		return "", err

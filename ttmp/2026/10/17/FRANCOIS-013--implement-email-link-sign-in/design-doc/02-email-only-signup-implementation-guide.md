@@ -82,7 +82,7 @@ else:
 acknowledge identically for unknown, existing, blocked and failed requests
 ```
 
-An existing provider identity discovered by email is never adopted or linked. The lookup is a collision guard, not an authentication decision. Such users can use the existing Google/GitHub/native provider flow, which provisions the local user by issuer and subject. Disabled or ambiguous local records cannot fall through into signup. Creation conflicts fail closed; the next request can retry the reserved identity.
+An existing provider identity discovered by email is never adopted or linked. The lookup is a collision guard, not an authentication decision. Such users can use the existing Google/GitHub/native provider flow, which provisions the local user by issuer and subject. Disabled or ambiguous local records cannot fall through into signup. If a concurrent request wins creation, re-read only the reserved subject, validate it and resend the current flow; an unrelated collision still fails closed.
 
 A provider user can become verified before a local transaction finishes. On retry, its durable reservation permits using OTP for a fresh proof instead of attempting to verify an already verified email again. OTP enrollment is limited to the exact identity reserved by this signup flow, after the provider reports its email verified. Existing unrelated human accounts are not enrolled automatically.
 
@@ -106,7 +106,7 @@ transaction:
 commit, clear browser-binding cookie, set portal-session cookie, redirect safely
 ```
 
-The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. After taking that lock, OIDC also rejects insertion of a new issuer/subject identity if the address is now owned locally; this protects either transaction order. Existing issuer/subject records may still refresh their mutable profile. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
+The local provisioning transaction shares an email advisory lock with `UpsertIdentity`, the ordinary OIDC provisioning method. This small common critical section prevents a concurrent social callback and email signup from creating two local identities for the same address during registration completion. After taking that lock, OIDC rejects any insertion or profile refresh whose requested email belongs to another issuer/subject; this protects both transaction orders and provider-email changes. A matching identity can refresh its profile when its email does not collide. It does not introduce email-based identity merging. If OIDC has already provisioned a local account, registration fails closed; the next request uses ordinary sign-in. Registration never updates an existing account or authenticates an account promoted while registration was pending.
 
 ```mermaid
 sequenceDiagram

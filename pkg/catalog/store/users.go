@@ -48,11 +48,10 @@ func (s *Store) UpsertIdentity(ctx context.Context, id Identity) (User, error) {
 		return User{}, err
 	}
 	// A signup may have committed while this OIDC callback waited for the
-	// email lock. Do not insert a second identity for its address. Existing
-	// issuer/subject accounts can still refresh their own mutable profile.
+	// email lock. Neither a new identity nor an existing identity's profile
+	// refresh may claim an address belonging to a different issuer/subject.
 	var collision bool
-	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))
-AND NOT EXISTS(SELECT 1 FROM users WHERE issuer=$2 AND subject=$3)`, id.Email, id.Issuer, id.Subject).Scan(&collision)
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1) AND (issuer<>$2 OR subject<>$3))`, id.Email, id.Issuer, id.Subject).Scan(&collision)
 	if err != nil {
 		return User{}, err
 	}

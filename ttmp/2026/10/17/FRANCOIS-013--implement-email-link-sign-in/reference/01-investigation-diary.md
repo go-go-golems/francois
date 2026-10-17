@@ -981,3 +981,47 @@ Start with store/users.go and TestEmailSignupAndOIDCRejectTheSecondIdentityInEit
 The runtime already supplies --migrate and --signup-allowed. Production rollout requires only an image pin; migration 013 adds a table and does not rewrite existing data. The source report remains a draft until the rollout result is known.
 
 Repair qualification: the full database-backed suite passed, including both transaction orders; lint reported zero issues and logcopter-check passed. No additional provider/browser rerun was needed for this SQL-only repair.
+
+
+## Step 17: Close refresh and concurrent-provider-creation edge cases
+
+Renewed review of 8d84420 completed with two additional P2 findings. The OIDC exception for an existing identity was too broad: a provider email change could still assign another account's address. A separate race could leave both overlapping first-signup requests with unusable links when the superseded request won provider creation. Repaired both decisions before merging or deploying.
+
+### Prompt Context
+See Step 16 for the production deployment and vault-report requests.
+**Commit (previous repair):** 8d84420 — fix: reject OIDC identities that lose the signup email race.
+
+### What I did
+- Replaced the OIDC collision predicate with an exact different-issuer/subject owner check on the requested normalized address. It now applies equally to new identities and existing profile refreshes.
+- On provider creation HTTP 409, re-read only the already reserved subject and reuse the ordinary identity/state/address checks before resending the current link. Also handle a collision search that sees our reserved subject created since the first GET.
+- Added a refresh-collision regression and provider tests for both successful recovery variants plus wrong organization, changed email, wrong subject, inactive identity and unrelated search collision.
+- Updated the design and project-report explanations to describe the actual final collision and recovery decisions.
+
+### Why
+An existing identity is not permission to take another local account's email. Concurrent creation must not leave only an obsolete link when the current request can safely recover its own reserved identity. Neither repair adopts a subject discovered by email or bypasses the required mailbox proof.
+
+### What worked
+The previous complete suite/lint gate established the initial repair. The renewed review then identified distinct missing cases rather than a failure of the earlier two-order tests.
+
+### What didn't work
+The initial OIDC repair's existing-identity exception still allowed colliding refreshes. The original provider create-conflict behavior required a manual retry even though a validated re-read could issue the current link. Both review findings are addressed in this checkpoint, pending its combined affected-code qualification.
+
+### What I learned
+Identity existence and address ownership must be checked independently. A scoped provider-email search may observe the reserved identity created between reads; this is recoverable only because the subject was persisted before provider I/O.
+
+### What was tricky to build
+Creation recovery must re-read and validate the reserved subject, not trust the identity returned by email search. A 409 caused by another username/account cannot be converted into adoption of that identity. The retry remains bounded by the existing request deadline and adds no worker or retry loop.
+
+### What warrants a second pair of eyes
+Review the post-lock different-owner predicate and both paths leading to provider re-read. Verify that all mismatching identity cases send no replacement message.
+
+### What should be done in the future
+Run one combined qualification gate for these repairs, push the final source revision, complete review/CI and resume the already authorized rollout.
+
+### Code review instructions
+Read store/users.go, TestOIDCRefreshCannotTakeAnotherAccountsEmail, identity/email_signup.go and TestRegistrationRecoversOnlyItsReservedIdentityAfterConcurrentCreation.
+
+### Technical details
+Provider creation recovery recognizes only HTTP 409 and an email-search result equal to the reserved subject; other errors and unrelated results remain failures. After a successful re-read, the same validated unverified resend or verified OTP path handles the current attempt.
+
+Final repair qualification: the complete PostgreSQL-backed Go suite passed, including the new refresh and concurrent-provider-creation cases; lint reported zero issues and logcopter-check passed. Receipts are retained as email-signup-final-review-{tests,lint}.txt.

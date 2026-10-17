@@ -396,3 +396,28 @@ func TestEmailSignupAndOIDCRejectTheSecondIdentityInEitherOrder(t *testing.T) {
 		})
 	}
 }
+
+func TestOIDCRefreshCannotTakeAnotherAccountsEmail(t *testing.T) {
+	e, _ := setupSignup(t)
+	ctx := context.Background()
+	owner, err := e.store.UpsertIdentity(ctx, store.Identity{Issuer: "issuer", Subject: "owner", Email: "owned@example.test", EmailVerified: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := e.store.UpsertIdentity(ctx, store.Identity{Issuer: "issuer", Subject: "other", Email: "other@example.test", EmailVerified: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = e.store.UpsertIdentity(ctx, store.Identity{Issuer: other.Issuer, Subject: other.Subject, Email: "OWNED@example.test", EmailVerified: true})
+	if err != store.ErrNotFound {
+		t.Fatalf("colliding refresh %v", err)
+	}
+	unchanged, err := e.store.User(ctx, other.ID)
+	if err != nil || unchanged.Email != other.Email {
+		t.Fatalf("profile changed despite collision: %+v %v", unchanged, err)
+	}
+	users, err := e.store.UsersByEmail(ctx, owner.Email)
+	if err != nil || len(users) != 1 {
+		t.Fatalf("email owners %d %v", len(users), err)
+	}
+}
