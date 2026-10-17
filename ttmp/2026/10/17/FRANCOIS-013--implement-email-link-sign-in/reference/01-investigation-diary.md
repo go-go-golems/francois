@@ -335,6 +335,9 @@ A correct HTTP-level proof test does not establish browser navigation correctnes
 - The first screenshot run began before go run had started listening: `page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:18793/signin?return=/account`. Added a bounded readiness probe.
 - The next real-browser submission reached the error page with `Please start sign-in again on this site.` Safe request diagnostics showed Origin null. The narrow Fetch Metadata handling fixed both send and confirmation POSTs; the full browser journey then passed.
 
+- Final staging initially named a repository-root `.docmgr-operations/close-1fd61387569ba7bad46a1105130a6b1d.json`, and Git reported `pathspec ... did not match any files`. The receipt is inside the ticket; staging that ticket directory corrected the path without changing application files.
+- A final sandboxed `go build ./...` tried to write module version metadata and reported `read-only file system` under the Go module download cache. The network/cache-enabled build succeeded. Final verification commit: **0b1c302 — Verify email magic links in Chromium and harden navigation checks**.
+
 ### What I learned
 
 Referrer-Policy affects the browser's serialized Origin on POST navigation, not just the Referer header. Synthetic requests setting the portal Origin do not exercise that behavior. The explicit browser journey now prevents this regression from being hidden by API-only tests.

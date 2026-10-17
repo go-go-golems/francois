@@ -21,6 +21,7 @@ Queue this after completed FRANCOIS-013 email sign-in. Show **“slop.boutique -
 The proposed implementation is one self-contained CSS intro fragment inserted at the authorized download boundary. It does not change immutable uploaded source, authored app startup, hosted runtime injection, attachments or access policy. This ticket contains the implementation design; the animation is not implemented yet.
 
 - [Design and implementation notes](design-doc/01-download-only-animated-intro-design-and-implementation-notes.md): request flow, animation behavior, pseudocode, file/API references and verification.
+- [Current source evidence](sources/current-byte-paths.md), with a repeatable capture script.
 - [Detailed investigation diary](reference/01-investigation-diary.md).
 - [Implementation tasks](tasks.md) and [changelog](changelog.md).
 - [Completed email sign-in prerequisite](../FRANCOIS-013--implement-email-link-sign-in/index.md).

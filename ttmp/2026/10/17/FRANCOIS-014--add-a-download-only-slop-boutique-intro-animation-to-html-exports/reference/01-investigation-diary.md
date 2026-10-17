@@ -37,6 +37,7 @@ Do it after the login email link, or if you think a subagent can do it earlier.â
 - Specified exact wording, a roughly 1.6-second self-contained CSS intro and immediate reduced-motion bypass.
 - Identified response checksum/length changes and GET/HEAD parity as required implementation details.
 - Queued meaningful helper, authorization, source-integrity, file:// and hosted-absence checks.
+- Saved read-only excerpts of the current download and hosted response paths in sources/current-byte-paths.md using scripts/01-capture-current-path.py; no blobs, runtime grants or user data were copied.
 
 ### Why
 
