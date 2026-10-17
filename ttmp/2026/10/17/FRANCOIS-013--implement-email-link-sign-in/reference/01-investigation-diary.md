@@ -752,3 +752,45 @@ Review social-production-rollout.json and social-production-browser.json for exa
 ### Technical details
 
 Source PR #12; Terraform PR #36 (e41283c2); k3s PR #366 (ed322cfb). Google IDP 395005753389219858; GitHub IDP 395005753372442642. These IDs are public configuration, not credentials. All authorization query values, cookies, codes and PATs are excluded from the saved browser/rollout receipts.
+
+
+## Step 12: Design email-only registration before implementation
+
+The requested email address had no local account, so the existing form acknowledged the request without sending mail. The user now explicitly requests email-only signup. Added a separate design document for the new-account path, reusing the existing form and confirmation endpoint while keeping unverified identities outside the local users table.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, add a new desiegn doc for that and implement it, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Implement passwordless registration for new email addresses, with a new ticket design and detailed implementation history.
+**Inferred user intent:** A visitor can create an ordinary account by confirming an emailed link without Google/GitHub or a password.
+
+### What I did
+- Read the current provider, store, handlers, tests and pinned v4.16.1 registration/email proto contracts.
+- Added design-doc/02-email-only-signup-implementation-guide.md through docmgr.
+- Chose one durable registration reservation/current-flow table, first-use email verification, subsequent email OTP and transactional local provisioning.
+
+### Why
+Email OTP requires a verified address. An unverified account cannot safely be passed directly into the existing session challenge. Persisting the reserved provider subject before calling the provider makes retries recoverable without adopting identities by email.
+
+### What worked
+The existing CSRF/browser binding, confirmation GET/POST separation, rate limits, safe return paths and no-store rendering can be reused.
+
+### What didn't work
+`cat pkg/catalog/templates/signin.tmpl` failed with `No such file or directory`; the actual template is pkg/catalog/web/templates/signin.tmpl. An attempted remote fetch of user_human_email_v2.go returned a cache miss; the existing local pinned source contains user_v2_email.go instead.
+
+### What I learned
+The provider API limits email to 200 characters. Signup must also distinguish blocked local records from a genuinely absent local account.
+
+### What was tricky to build
+The first verification can succeed before local provisioning completes. The design keeps the reserved identity and permits a fresh OTP proof on retry rather than inventing a verified-email flag or merging by email.
+
+### What warrants a second pair of eyes
+Review concurrency between social provisioning and signup completion, the signup flag at confirmation, and retry handling after provider-side success.
+
+### What should be done in the future
+Implement the design, validate against the isolated provider/mail sink, then qualify the code with database-backed tests and lint.
+
+### Code review instructions
+Start with the new design document and existing email_signin.go, identity/email.go and store/email_signins.go. No production behavior changes at this checkpoint.
+
+### Technical details
+The new table stores digests and provider identifiers only; mailbox codes and service credentials are never persisted. Existing human factor enrollment is outside the new-identity scope.
