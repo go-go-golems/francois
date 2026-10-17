@@ -399,6 +399,8 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	var latest store.Release
 	if len(rels) > 0 {
 		latest = rels[0]
+		// The public page offers the current release; history stays in Studio.
+		rels = rels[:1]
 	}
 	c := cardOf(a, latest, credits[a.ID])
 	ids := append([]string{page.Cover}, page.Gallery...)
@@ -434,11 +436,10 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 		if rel.FreeSample || mayDownload {
 			for _, f := range rel.Files {
-				label := "Download HTML"
-				if f.Role == "manifest" {
-					label = "Manifest"
+				if f.Role != "html" {
+					continue
 				}
-				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: label})
+				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Download HTML"})
 			}
 		}
 		lines = append(lines, l)
