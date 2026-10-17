@@ -6,9 +6,14 @@ import { clear, navigate, show, State } from "./store";
 // SPA routes; every other path (the storefront) is rendered by the server
 // and is reached with a normal navigation.
 const spaRoutes = ["/instances", "/account", "/studio", "/admin"];
-const inSPA = (to: string) => spaRoutes.some((p) => to === p || to.startsWith(p + "/") || to.startsWith(p + "?"));
+const inSPA = (to: string) =>
+  spaRoutes.some(
+    (p) => to === p || to.startsWith(p + "/") || to.startsWith(p + "?"),
+  );
 
-export function Link(props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) {
+export function Link(
+  props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string },
+) {
   const { to, onClick, ...rest } = props;
   return (
     <a
@@ -16,7 +21,15 @@ export function Link(props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to
       href={to}
       onClick={(e) => {
         onClick?.(e);
-        if (!inSPA(to) || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        if (
+          !inSPA(to) ||
+          e.defaultPrevented ||
+          e.metaKey ||
+          e.ctrlKey ||
+          e.shiftKey ||
+          e.button !== 0
+        )
+          return;
         e.preventDefault();
         navigate(to);
       }}
@@ -28,30 +41,34 @@ export function useRoute() {
   return useSelector((s: State) => s.route);
 }
 
-export const loginHref = (ret = location.pathname + location.search) => "/auth/login?return=" + encodeURIComponent(ret);
-
-export function Brand() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" fill="#111" />
-      <rect x="9" y="7" width="5" height="18" fill="#fff" />
-      <rect x="9" y="7" width="14" height="5" fill="#fff" />
-      <rect x="9" y="15" width="10" height="4" fill="#fff" />
-    </svg>
-  );
-}
+export const loginHref = (ret = location.pathname + location.search) =>
+  "/auth/login?return=" + encodeURIComponent(ret);
 
 export function Header() {
   const { data: session } = api.useSessionQuery();
   const signedIn = session?.authenticated && session.user?.role !== "guest";
-  return <header className="site-header page">
-    <Link className="site-wordmark" to="/">{session?.brand ?? "slop.boutique"}</Link>
-    <p className="site-statement">A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.</p>
-    <nav className="site-nav" aria-label="Main navigation">
-      {signedIn ? <Link to="/account">Account</Link> : session?.loginAvailable && <a href={loginHref()}>Sign in</a>}
-      <a className="site-support" href="/pricing"><span className="support-desktop">Support the lab</span><span className="support-mobile">Support</span></a>
-    </nav>
-  </header>;
+  return (
+    <header className="site-header page">
+      <Link className="site-wordmark" to="/">
+        {session?.brand ?? "slop.boutique"}
+      </Link>
+      <p className="site-statement">
+        A lab for computation and intelligence as material and medium. Run by
+        Manuel and Ramon.
+      </p>
+      <nav className="site-nav" aria-label="Main navigation">
+        {signedIn ? (
+          <Link to="/account">Account</Link>
+        ) : (
+          session?.loginAvailable && <a href={loginHref()}>Sign in</a>
+        )}
+        <a className="site-support" href="/pricing">
+          <span className="support-desktop">Support the lab</span>
+          <span className="support-mobile">Support</span>
+        </a>
+      </nav>
+    </header>
+  );
 }
 
 export function Notice() {
@@ -64,7 +81,11 @@ export function Notice() {
   }, [n.text]);
   if (!n.text) return null;
   return (
-    <div className={"toast" + (n.bad ? " bad" : "")} role="status" onClick={() => dispatch(clear())}>
+    <div
+      className={"toast" + (n.bad ? " bad" : "")}
+      role="status"
+      onClick={() => dispatch(clear())}
+    >
       {n.text}
     </div>
   );
@@ -74,17 +95,55 @@ export function Notice() {
 export function Footer() {
   const { data: session } = api.useSessionQuery();
   const signedIn = session?.authenticated && session.user?.role !== "guest";
-  const staff = session?.user?.role === "admin" || session?.user?.role === "creator";
-  return <footer className="site-footer">
-    <div className="footer-brand"><Link className="site-wordmark" to="/">{session?.brand ?? "slop.boutique"}</Link><a href="mailto:hej@slop.boutique">hej@slop.boutique</a></div>
-    <div><span>For humans</span><a href="/feed.xml">RSS</a><a href="/journal">Journal</a><a href="/pricing">Support the lab</a>{signedIn && <Link to="/account">Account</Link>}{staff && <Link to="/studio">Studio</Link>}{session?.user?.role === "admin" && <Link to="/admin">Admin</Link>}</div>
-    <div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
-    <div className="footer-type"><span>Type</span>{session?.typeCredit && <p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>}</div>
-  </footer>;
+  const staff =
+    session?.user?.role === "admin" || session?.user?.role === "creator";
+  return (
+    <footer className="site-footer">
+      <div className="footer-brand">
+        <Link className="site-wordmark" to="/">
+          {session?.brand ?? "slop.boutique"}
+        </Link>
+        <a href="mailto:hej@slop.boutique">hej@slop.boutique</a>
+      </div>
+      <div>
+        <span>For humans</span>
+        <a href="/feed.xml">RSS</a>
+        <a href="/journal">Journal</a>
+        <a href="/pricing">Support the lab</a>
+        {signedIn && <Link to="/account">Account</Link>}
+        {staff && <Link to="/studio">Studio</Link>}
+        {session?.user?.role === "admin" && <Link to="/admin">Admin</Link>}
+      </div>
+      <div>
+        <span>Information</span>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+      </div>
+      <div className="footer-type">
+        <span>Type</span>
+        {session?.typeCredit && (
+          <p>
+            Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by{" "}
+            <a href="https://abcdinamo.com">ABC Dinamo</a>
+          </p>
+        )}
+      </div>
+    </footer>
+  );
 }
 
 // Row renders the label-column layout: a grey label column, then content.
-export function Row({ label, sub, children, ruled = true }: { label: React.ReactNode; sub?: React.ReactNode; children: React.ReactNode; ruled?: boolean }) {
+export function Row({
+  label,
+  sub,
+  children,
+  ruled = true,
+}: {
+  label: React.ReactNode;
+  sub?: React.ReactNode;
+  children: React.ReactNode;
+  ruled?: boolean;
+}) {
   return (
     <section className={"row section" + (ruled ? " ruled" : "")}>
       <div className="row-label">
@@ -96,7 +155,15 @@ export function Row({ label, sub, children, ruled = true }: { label: React.React
   );
 }
 
-export function Line({ k, children, mono }: { k: React.ReactNode; children: React.ReactNode; mono?: boolean }) {
+export function Line({
+  k,
+  children,
+  mono,
+}: {
+  k: React.ReactNode;
+  children: React.ReactNode;
+  mono?: boolean;
+}) {
   return (
     <div className="kv">
       <span>{k}</span>
@@ -105,11 +172,40 @@ export function Line({ k, children, mono }: { k: React.ReactNode; children: Reac
   );
 }
 
-export const date = (s?: string) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—");
-export const dateUTC = (s?: string) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) + " UTC" : "—");
-export const datetime = (s?: string) => (s ? new Date(s).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
-export const bytes = (n: number) => (n < 1024 ? n + " B" : n < 1 << 20 ? (n / 1024).toFixed(1) + " KB" : (n / (1 << 20)).toFixed(1) + " MB");
-export const short = (s: string, n = 10) => (s.length > n ? s.slice(0, n) + "…" : s);
+export const date = (s?: string) =>
+  s
+    ? new Date(s).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
+export const dateUTC = (s?: string) =>
+  s
+    ? new Date(s).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      }) + " UTC"
+    : "—";
+export const datetime = (s?: string) =>
+  s
+    ? new Date(s).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+export const bytes = (n: number) =>
+  n < 1024
+    ? n + " B"
+    : n < 1 << 20
+      ? (n / 1024).toFixed(1) + " KB"
+      : (n / (1 << 20)).toFixed(1) + " MB";
+export const short = (s: string, n = 10) =>
+  s.length > n ? s.slice(0, n) + "…" : s;
 
 const reasons: Record<string, string> = {
   subscriber: "Active subscription",
@@ -122,7 +218,8 @@ const reasons: Record<string, string> = {
   subscription_required: "No subscription",
   subscription_expired: "Subscription expired",
 };
-export const reasonLabel = (r?: string) => (r ? (reasons[r] ?? r.replace(/_/g, " ")) : "—");
+export const reasonLabel = (r?: string) =>
+  r ? (reasons[r] ?? r.replace(/_/g, " ")) : "—";
 
 export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="empty">{children}</p>;
@@ -139,7 +236,9 @@ export function Monogram({ title, caps }: { title: string; caps: string[] }) {
   return (
     <div className="mono-thumb" aria-hidden="true">
       <span className="mono-letters">{letters}</span>
-      <span className="mono-caps">{caps.filter((c) => c !== "downloads").join(" · ")}</span>
+      <span className="mono-caps">
+        {caps.filter((c) => c !== "downloads").join(" · ")}
+      </span>
     </div>
   );
 }

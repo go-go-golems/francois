@@ -13,15 +13,22 @@ async function launch() {
   }
   try {
     const { grant } = await obtainGrant(portal, "launch");
-    const r = await fetch("/page", { headers: { Authorization: "Bearer " + grant } });
+    const r = await fetch("/page", {
+      headers: { Authorization: "Bearer " + grant },
+    });
     if (!r.ok) throw (await r.json()).error;
     const html = await r.text();
+    parent.postMessage({ type: "francois-launch-started" }, portal);
     document.open();
     document.write(html);
     document.close();
   } catch (e: any) {
     status.textContent = e?.message ?? "Could not start this application.";
     status.className = "failed";
+    parent.postMessage(
+      { type: "francois-launch-error", message: status.textContent },
+      portal,
+    );
   }
 }
 void launch();

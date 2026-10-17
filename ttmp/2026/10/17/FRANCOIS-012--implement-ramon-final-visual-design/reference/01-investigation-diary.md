@@ -216,3 +216,71 @@ Start with pages.go feedPage/cards, home.tmpl/layout.tmpl, ui.tsx, account.tsx a
 - Archive uses q/tag/sort GET parameters; unknown sort defaults to newest.
 - Numbers are presentation ordinals; no migration was added.
 - Local preview target is http://localhost:8092 with fake model backend and existing development data. No production deployment occurred.
+
+## Step 4: Implement editorial detail pages and reuse the isolated runner inline
+
+The detail page now follows Final’s title, download, runner and editorial layout. The runner starts explicitly and reuses the existing instance endpoints and isolation boundary. The same launch handler is shared with React; no new hosting API, content schema or database migration was added.
+
+### Prompt Context
+
+**User prompt:** See Step 3.
+**Assistant interpretation:** Complete the detail/runner milestone, then qualify the complete visual ticket locally.
+**Inferred user intent:** Run an experiment within its write-up while keeping the site minimal and the existing resource controls intact.
+**Previous commit:** `06a1219` — Implement Final public shell and compact searchable archive.
+
+### What I did
+
+- Moved the latest authorized HTML download and actual filename/size above the runner, preserving attachment access rules and the current-release-only guarantee.
+- Added a Goldmark AST section renderer for the four conventional labels, preserving unknown headings, video media and sanitized Markdown.
+- Wrote five tracked imported-experiment page.md files and published them to the local preview through existing Studio APIs.
+- Added shared exact-window/exact-origin launch handling; refreshed the cached guest session before requesting a CSRF-protected launch code.
+- Added non-secret started/error notifications from the existing bootstrap, so Live follows the fetched application HTML rather than merely minting a code.
+- Implemented same-instance Reload, browser fullscreen and a direct instance-page link. Page load, filtering and hover allocate no visit.
+- Added meaningful archive, sanitizer and launch-boundary tests; updated the old combined-home expectations while retaining the combined RSS feed.
+
+### Why
+
+Reusing the established session, demo, instance and launch contracts preserves limits and security without a second execution system. Markdown sections provide the editorial layout through the existing editor and draft workflow.
+
+### What worked
+
+- `pnpm check`, `pnpm build`, and all nine frontend tests passed, including the new frame-ownership and pending-reply cleanup test.
+- Final host validation used Node v24.18.0: pnpm check, pnpm test (nine tests), pnpm build and go build ./... all passed.
+- The complete `go test ./... -count=1` passed with TEST_DATABASE_URL pointing to the local disposable-database harness, including catalogue, hosted admission/cache, payment and client packages.
+- Browser verification at 1440, 900 and 390px passed layout/search/sort/ordinal checks with no document overflow and no implicit visit creation.
+- A real local guest start obtained the new guest CSRF token; Reload and fullscreen preserved the same single instance. Expiring that test visit caused a visible server denial without allocating another visit.
+- Signed-in account, Studio and Admin shells were captured and reviewed. No production data or deployment was changed.
+
+### What didn't work
+
+- The new archive fixture first used visibility='unlisted'; PostgreSQL rejected it with catalog_artifacts_visibility_check (SQLSTATE 23514). Corrected the fixture to the actual 'hidden' value.
+- Initial full catalogue checks found TestAttachments missing its plan-specific access message and TestPlans missing its current-support marker. Restored the message, current-support semantics and data-plan metadata; targeted checks and the full suite then passed.
+- The first browser detail check found zero anonymous downloads because the old local imports were private. Published new free-sample local preview releases through Studio, without changing download authorization code.
+- A later hover check timed out after 30000ms because local imported pages had no covers. Seeded their previously captured WebP media through Studio, preserving existing page media where present.
+- Corrected the verification helper to use the real admin settings contract: active.document plus PATCH with If-Match, rather than a speculative body revision field. The helper restores the previous local demo-enabled setting after its run and revokes its short-lived admin session.
+
+### What I learned
+
+A fetched app and a completed model call are unrelated states. The runner’s Live indicator comes from bootstrap delivery, while backend model admission stays unchanged. Browser evidence also needs to wait for actual authored DOM before capturing a live scene; a screenshot taken immediately on the delivery message can be blank while the app initializes.
+
+### What was tricky to build
+
+The formerly separate guest navigation refreshed session state implicitly. The inline controller must explicitly discard the anonymous cached promise, fetch /api/session again, and only then submit launch requests. Reload reuses that instance and handshake rather than calling the start endpoint again.
+
+### What warrants a second pair of eyes
+
+Review the shared launch handler and bootstrap messages, Markdown AST grouping, conditional download access, and the pending-reply cleanup test. Check that helper-only local fixture setup is not confused with production publication.
+
+### What should be done in the future
+
+Complete final visual review, build checks, evidence and ticket bookkeeping. No email sign-in work is included; FRANCOIS-013 remains separate.
+
+### Code review instructions
+
+Read instance-launch.ts, public.ts, instances.tsx and launch.ts together, followed by content/markdown.go and its sanitizer test. The local browser helper and browser-validation.json demonstrate both positive startup and expiration denial.
+
+### Technical details
+
+- Local-only browser helper: scripts/02-verify-local.mjs; repeatable tmux launcher: scripts/03-run-preview.sh.
+- Existing release files are unchanged by the page write-ups; preview releases use the tracked import HTML and existing free-sample publication path.
+- Browser credentials stay in memory; the temporary admin session is revoked in the helper’s finally block. SMTP/OIDC/email registration was not implemented.

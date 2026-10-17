@@ -1,6 +1,4 @@
-/* Francois catalog — type only. Black on white; hierarchy from size, weight
-   and grey. The hosted applications bring all the colour. Language after
-   html.moldandyeast.com. */
+/* Francois catalogue: Final public presentation and existing staff components. */
 :root {
   --color-wall: #ffffff;
   --color-plinth: #f4f4f4;
@@ -574,3 +572,65 @@ select.btn { appearance: none; cursor: pointer; }
  .support-contact { padding-top:80px; }
  .account-detail { grid-template-columns:1fr; gap:4px; }
 }
+
+.experiment-header { padding:96px 0 64px; }
+.experiment-meta { margin:0 0 20px; font-size:15px; line-height:22px; color:var(--color-muted); }
+.experiment-title-row { display:flex; align-items:flex-end; justify-content:space-between; gap:32px; }
+.experiment-title-row h1 { min-width:0; margin:0; font-size:96px; line-height:92px; font-weight:400; letter-spacing:-.045em; overflow-wrap:anywhere; }
+.experiment-download { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+.experiment-download .site-button { font-size:17px; line-height:24px; }
+.file-meta { font:13px/20px var(--font-mono); color:var(--color-muted); overflow-wrap:anywhere; }
+.experiment-description { max-width:1000px; margin:48px 0 0; font-size:28px; line-height:38px; }
+.experiment-header .byline { margin:20px 0 0; font-size:15px; }
+.runner-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; font-size:15px; line-height:22px; }
+.runner-toolbar > div { display:flex; align-items:center; gap:12px; }
+.runner-state::before { content:""; display:inline-block; width:8px; height:8px; margin-right:10px; border-radius:50%; background:var(--color-faint); }
+.is-live .runner-state::before { background:#ec9494; }
+.runner-caption { color:var(--color-muted); }
+.runner-tools { gap:20px !important; }
+.runner-surface { width:100%; aspect-ratio:8/5; overflow:hidden; background:var(--color-table); border-radius:3px; }
+.runner-surface > img,.runner-surface > video,.runner-surface > iframe { display:block; width:100%; height:100%; object-fit:cover; border:0; }
+.runner-surface:fullscreen { aspect-ratio:auto; background:var(--color-wall); }
+.runner-placeholder { display:flex; height:100%; align-items:center; justify-content:center; font-size:28px; color:var(--color-muted); }
+.runner-start { display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding-top:16px; }
+.runner-link { display:inline-block; font-size:14px; margin-top:12px; }
+.experiment-editorial { padding-top:120px; display:flex; flex-direction:column; gap:72px; }
+.editorial-row { display:grid; grid-template-columns:342px minmax(0,660px); gap:24px; }
+.editorial-label { font-size:15px; line-height:22px; font-weight:400; color:var(--color-muted); margin:0; padding-top:6px; }
+.editorial-body { max-width:660px; font-size:20px; line-height:30px; }
+.editorial-body > :first-child { margin-top:0; }
+.editorial-body > :last-child { margin-bottom:0; }
+.experiment-gallery { margin-top:96px; }
+.experiment-attachments { margin-top:72px; padding-top:20px; border-top:1px solid var(--color-line); }
+@media(max-width:1200px) and (min-width:901px) { .experiment-title-row h1 { font-size:76px; line-height:80px; } .editorial-row { grid-template-columns:240px minmax(0,660px); } }
+@media(max-width:900px) {
+ .experiment-header { padding:72px 0 56px; display:flex; flex-direction:column; gap:28px; }
+ .experiment-meta { margin:0; }
+ .experiment-title-row { display:contents; }
+ .experiment-title-row h1 { font-size:44px; line-height:44px; font-weight:500; letter-spacing:-.035em; }
+ .experiment-description { order:2; margin:-8px 0 0; font-size:22px; line-height:30px; }
+ .experiment-download { order:3; width:100%; align-items:center; min-width:0; }
+ .experiment-download:empty { display:none; }
+ .experiment-download .site-button { width:100%; font-size:15px; line-height:22px; }
+ .experiment-header .byline { order:4; margin:0; }
+ .runner-toolbar { padding:10px 14px; font-size:14px; line-height:20px; }
+ .runner-caption { font-size:13px; }
+ .runner-tools { gap:12px !important; }
+ .runner-tools button { font-size:13px; }
+ .runner-start .site-button { width:100%; }
+ .runner-link { display:block; padding:14px; border-radius:3px; background:var(--color-table); text-align:center; }
+ .experiment-editorial { padding-top:72px; gap:56px; }
+ .editorial-row { grid-template-columns:1fr; gap:12px; }
+ .editorial-label { padding:0; font-size:15px; }
+ .editorial-label:empty { display:none; }
+ .editorial-body { font-size:17px; line-height:26px; }
+ .experiment-gallery { margin-top:64px; }
+ .experiment-attachments { margin-top:64px; }
+}
+
+@media(max-width:900px) {
+ .archive-thumb { position:relative; }
+ .archive-thumb > img,.archive-thumb > video { position:absolute; inset:0; }
+ .archive-monogram { font-size:15px; }
+}
+.support-option .site-support { background:#cee5ff; }

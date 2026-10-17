@@ -228,7 +228,7 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 		if rel.PublishedAt == nil {
 			continue
 		}
-		if rel.PublishedAt != nil && (first[rel.ArtifactID] == nil || rel.PublishedAt.Before(*first[rel.ArtifactID])) {
+		if first[rel.ArtifactID] == nil || rel.PublishedAt.Before(*first[rel.ArtifactID]) {
 			first[rel.ArtifactID] = rel.PublishedAt
 		}
 		if cur, ok := latest[rel.ArtifactID]; !ok || rel.PublishedAt.After(*cur.PublishedAt) {
@@ -507,7 +507,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
-		Body: map[string]any{"Card": c, "Body": s.markdown(ctx, page.Body), "Gallery": gallery, "Releases": lines,
+		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
@@ -669,6 +669,10 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 // markdown renders author Markdown, embedding referenced portal videos as
 // players. If the media lookup fails, references render as images.
 func (s *Server) markdown(ctx context.Context, source string) template.HTML {
+	return s.md.Render(source, s.markdownEmbeds(ctx, source))
+}
+
+func (s *Server) markdownEmbeds(ctx context.Context, source string) map[string]content.Embed {
 	embeds := map[string]content.Embed{}
 	if ids := content.MediaRefs(source); len(ids) > 0 {
 		media, err := s.Store.MediaByIDs(ctx, ids)
@@ -679,7 +683,7 @@ func (s *Server) markdown(ctx context.Context, source string) template.HTML {
 			embeds[id] = content.Embed{Type: m.MediaType, Poster: m.Poster}
 		}
 	}
-	return s.md.Render(source, embeds)
+	return embeds
 }
 
 func (s *Server) media(w http.ResponseWriter, r *http.Request) {

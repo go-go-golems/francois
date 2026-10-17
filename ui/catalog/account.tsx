@@ -7,7 +7,9 @@ import { Empty, loginHref, Row } from "./ui";
 
 export function Account() {
   const { data: session } = api.useSessionQuery();
-  useEffect(() => { if (session?.brand) document.title = `Account · ${session.brand}`; }, [session?.brand]);
+  useEffect(() => {
+    if (session?.brand) document.title = `Account · ${session.brand}`;
+  }, [session?.brand]);
   const params = new URLSearchParams(location.search);
   const returned = params.get("checkout");
   const [polling, setPolling] = useState(!!returned);
@@ -65,40 +67,68 @@ export function Account() {
   };
   return (
     <main className="final-account">
-      <section className="final-section"><div className="final-label">Account<p>{a.user.email}</p></div><div className="final-content">
-      <h1>{a.entitlement.source === "subscription" || a.entitlement.source === "trial" ? `Thank you, ${a.user.name || "friend"}.` : "Your account."}</h1>
-      <div className="account-detail"><span>Email</span><p>{a.user.email}</p></div>
-      <div className="account-detail"><span>Support</span><p>{a.entitlement.plan.name}</p></div>
-      {polling && !a.access.allowed && <p role="status">Checking your subscription…</p>}
-      {a.user.disabled && <p>This account is disabled. You can still manage your subscription.</p>}
-      {a.billingEnabled && a.hasCustomer && (
-        <p>
-          <button className="tlink" onClick={manage} disabled={opening}>
-            Manage subscription
-          </button>
-        </p>
-      )}
-      <p>
-        <button
-          className="tlink"
-          onClick={async () => {
-            try {
-              const out = await logout().unwrap();
-              location.assign(out.redirect || "/");
-            } catch (e) {
-              dispatch(show({ text: errorMessage(e), bad: true }));
-            }
-          }}
-        >
-          Sign out
-        </button>
-      </p>
-      </div></section>
-      {session.user && (session.user.role === "admin" || session.user.role === "creator") && (
-        <Row label="API tokens">
-          <ApiTokens role={session.user.role} />
-        </Row>
-      )}
+      <section className="final-section">
+        <div className="final-label">
+          Account<p>{a.user.email}</p>
+        </div>
+        <div className="final-content">
+          <h1>
+            {a.entitlement.source === "subscription" ||
+            a.entitlement.source === "trial"
+              ? `Thank you, ${a.user.name || "friend"}.`
+              : "Your account."}
+          </h1>
+          <div className="account-detail">
+            <span>Email</span>
+            <p>{a.user.email}</p>
+          </div>
+          <div className="account-detail">
+            <span>
+              {a.entitlement.source === "subscription" ||
+              a.entitlement.source === "trial"
+                ? "Support"
+                : "Access"}
+            </span>
+            <p>{a.entitlement.plan.name}</p>
+          </div>
+          {polling && !a.access.allowed && (
+            <p role="status">Checking your subscription…</p>
+          )}
+          {a.user.disabled && (
+            <p>
+              This account is disabled. You can still manage your subscription.
+            </p>
+          )}
+          {a.billingEnabled && a.hasCustomer && (
+            <p>
+              <button className="tlink" onClick={manage} disabled={opening}>
+                Manage subscription
+              </button>
+            </p>
+          )}
+          <p>
+            <button
+              className="tlink"
+              onClick={async () => {
+                try {
+                  const out = await logout().unwrap();
+                  location.assign(out.redirect || "/");
+                } catch (e) {
+                  dispatch(show({ text: errorMessage(e), bad: true }));
+                }
+              }}
+            >
+              Sign out
+            </button>
+          </p>
+        </div>
+      </section>
+      {session.user &&
+        (session.user.role === "admin" || session.user.role === "creator") && (
+          <Row label="API tokens">
+            <ApiTokens role={session.user.role} />
+          </Row>
+        )}
     </main>
   );
 }
