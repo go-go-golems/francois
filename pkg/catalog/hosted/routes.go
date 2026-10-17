@@ -185,8 +185,9 @@ func (rt *Runtime) page(w http.ResponseWriter, r *http.Request, inst store.Insta
 		"instance": map[string]any{"id": inst.ID, "title": p.Instance.Title, "role": p.Role},
 	})
 	// Escape "<" so JSON cannot terminate the script element.
-	boot = bytes.ReplaceAll(boot, []byte("<"), []byte(`<`))
-	injected := []byte(`<script type="application/json" id="francois-view">` + string(boot) + `</script><script src="` + catalogweb.AppURL("runtime.js") + `"></script>`)
+	boot = bytes.ReplaceAll(boot, []byte("<"), []byte(`\u003c`))
+	injected := append([]byte(`<script type="application/json" id="francois-view">`), boot...)
+	injected = append(injected, []byte(`</script><script src="`+html.EscapeString(catalogweb.AppURL("runtime.js"))+`"></script>`)...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(inject(source, injected))
 }
