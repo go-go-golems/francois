@@ -31,3 +31,7 @@ Read-only remote verification found active SES SMTP and existing Vault credentia
 ## 2026-10-17
 
 Provisioned dedicated production ZITADEL login identity/PAT in Vault; enabled the deployed form via Terraform #35 and k3s #364. Session/VSO/form checks pass. Existing supporter OTP enrollment was rejected by automatic approval review and remains pending explicit authorization.
+
+## 2026-10-17
+
+With explicit user approval, enrolled the single existing verified supporter in email OTP and verified provider readback plus preservation of existing authentication methods. No staff/subscription changes or login-email requests.

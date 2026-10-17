@@ -791,7 +791,7 @@ Email-link sign-in is enabled by infrastructure PR #364. Terraform PR #35 owns t
 
 Rotate using `zitadel/francois/envs/prod/provision-email-login.py --service-user-id <id> --rotate` in the shared Terraform repository. It issues a 90-day PAT outside Terraform state, checks session create/read/delete without sending mail, and updates Vault with CAS read/merge/write. Wait for VSO delivery and a healthy application restart before revoking the previous PAT by ID. The bootstrap script preserves these fields. No SMTP configuration change is required.
 
-The public email form and staff fallback were verified on both hostnames. The existing supporter has a matching verified provider email but is not enrolled in email OTP; enrollment remains pending explicit authorization after automatic approval review rejected changing the human authentication factor. No login email was sent and no human factor was changed during this setup. Credential/session API checks do not constitute an end-to-end production mail-delivery test.
+The public email form and staff fallback were verified on both hostnames. With explicit user authorization, the single existing enabled supporter with a matching verified provider email was enrolled in email OTP on 2026-10-17; provider readback confirmed enrollment and preservation of existing authentication methods. Staff accounts and subscriptions were unchanged. No login email was requested. Credential/session API and enrollment checks do not constitute an end-to-end production mail-delivery test.
 
 ## Public blog visibility
 

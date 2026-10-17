@@ -504,3 +504,59 @@ Inspect Terraform PR #35's two identity resources and provisioning script, k3s P
 - Dedicated service user: 395571221485322384; credential metadata receipt contains the PAT ID and expiry, never its value.
 - Runtime file: /run/secrets/francois/zitadel-login-token. Existing FRANCOIS_ZITADEL_ORG_ID supplies --zitadel-organization.
 - No SMTP settings, subscriptions, staff users or human authentication factors were modified. No login email was requested.
+
+## Step 8: Enroll the existing supporter after explicit approval
+
+The user explicitly approved the previously blocked human email OTP enrollment. Rechecked the account and provider state, enrolled exactly the one eligible supporter, and verified the factor through ZITADEL readback. Existing authentication methods were preserved; no login email was requested.
+
+### Prompt Context
+
+**User prompt (verbatim):** "yes"
+
+**Assistant interpretation:** Approve the immediately preceding question, "May I also enroll the existing supporter in email OTP so they can use magic links?"
+
+**Inferred user intent:** Complete that supporter's enrollment without changing staff authentication or subscriptions.
+
+### What I did
+
+- Reused the credential-safe provisioning helper to read Vault credentials in memory.
+- Refetched local roles and checked issuer, enabled subscriber status, provider account activity, organization, verified email and exact email match.
+- Required exactly one eligible candidate, matching the previously identified scope; the command would refuse broader enrollment.
+- Read authentication methods, added OTP email only because it was absent, and read them again.
+- Saved production-enrollment.json with aggregate results and explicit-approval provenance; updated the current production runbook. Preserved Step 7's rejected attempt as historical evidence.
+
+### Why
+
+The previous automatic approval rejection required explicit authorization for the human factor change. That authorization is now present. A fresh scope check prevents stale discovery from enrolling an unintended account.
+
+### What worked
+
+At 2026-10-17T22:15:16Z, readback confirmed one new email OTP enrollment and that all previously listed methods remained present. Staff-account changes, subscription changes and login-email requests were all zero. No credentials, email addresses or human identifiers were saved in the receipt.
+
+### What didn't work
+
+No failure occurred in the authorized enrollment. The earlier rejection was not bypassed; this action followed the user's explicit approval.
+
+### What I learned
+
+The existing supporter was active and still matched the previously verified provider identity. Only the missing email OTP enrollment needed changing.
+
+### What was tricky to build
+
+The authorization applied to one existing supporter, so the command checked exact candidate count before any write and treated already-enrolled status as a no-op.
+
+### What warrants a second pair of eyes
+
+Enrollment and API readback verify provider configuration. Actual external email delivery and redemption still require a user-requested login attempt.
+
+### What should be done in the future
+
+No enrollment work remains for this request. The supporter may request a link through /signin. The existing PAT rotation deadline remains 2027-01-15.
+
+### Code review instructions
+
+Review production-enrollment.json and the updated production-runbook paragraph. No application code or deployment configuration changed in this step, so no rebuild or redeploy is required.
+
+### Technical details
+
+Used GET /v2/users/{id}/authentication_methods, POST /v2/users/{id}/otp_email with {}, then GET of the same methods endpoint. Asserted AUTHENTICATION_METHOD_TYPE_OTP_EMAIL was present and the prior method set remained a subset of the resulting set.
