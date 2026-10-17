@@ -150,3 +150,69 @@ Read the guide, sources/validation.json and the successful receipt. Check that t
 - Remote destination: /ai/2026/10/17/FRANCOIS-012/.
 - Source guide revision: 84da5b6.
 - Evidence level: successful cloud upload; no physical device synchronization verification.
+
+## Step 3: Implement the Final shell and compact experiment archive
+
+I started FRANCOIS-012 on a focused branch and replaced both public rendering shells. The archive now uses numbered compact rows, ordinary GET search/category/sort controls and first-publication ordering. Support and account use the same visual language while exposing their existing real actions. Runtime embedding is the next implementation slice.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Implement the first ticket, ccommit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Implement FRANCOIS-012 and qualify its behavior with local integration/browser checks, committing coherent milestones.
+**Inferred user intent:** Ship the concrete visual design already documented without expanding into email authentication or speculative architecture.
+**Starting revision:** `fc84c85`; branch `feat/francois-012-final-visual-design`.
+
+### What I did
+
+- Replaced the Go and React wordmark/navigation/footer and added Final-scoped public layout classes.
+- Implemented compact archive rows and retained numbering before filtering. Collected earliest publication dates while keeping latest-release metadata.
+- Separated the journal route from the experiment archive and preserved working RSS/legal destinations.
+- Restyled support and account around actual current subscription/account data; retained working checkout, portal and staff links.
+- Updated obsolete layout/download-label expectations and built embedded browser assets.
+
+### Why
+
+The two existing shells must change together. A normal GET form and computed ordinals satisfy the archive without a new database field, API, service or client framework.
+
+### What worked
+
+- `pnpm check` and `pnpm build` completed; the installed Node 20 emits the repository's Node >=24 engine warning but these commands succeeded.
+- Database-backed `TestFinalLayout`, `TestStorefrontPages` and matching public-page tests passed against local PostgreSQL on 5435 after the signed-in footer fix.
+- Confirmed showcase data exists on local 5435, whereas 5434's catalogue is empty. Local release blobs are in var/storefront/releases.
+- Browser-verified the new archive at localhost:18792: eight real public rows, the new shell, and no horizontal overflow at 1440px. Saved sources/implementation/01-archive-desktop.png.
+
+### What didn't work
+
+- A zsh read using unquoted doc/local* failed with `no matches found`; switched to explicit directories.
+- The first targeted compile used a TestFinal pattern before tests existed and reported no tests to run; it is compile evidence only.
+- The first populated integration run failed `subscriber page misses download or sign-out`; restored the functioning public signed-in sign-out control in the footer and the affected tests passed.
+- Initial tmux inspection inside the sandbox failed with Operation not permitted; repeated through the authorized host execution path.
+- lsof found no user-owned listener for the existing container-forwarded 8090 port, so I did not rely on its process arguments. The known local blob was found in var/storefront/releases, not var/catalog/releases.
+
+- The initial preview port 8092 was already occupied by an unrelated Agentforum app. The browser check identified its title and zero archive rows; no changes were made to that app. Started an isolated persistent tmux session on 18792 and verified the correct page.
+
+### What I learned
+
+The inline runner must discard public.ts's cached pre-guest session and fetch the new guest CSRF token. The existing standalone navigation implicitly did that; embedding must do it explicitly.
+
+### What was tricky to build
+
+Archive dates and current-release dates are different. The view model now retains both, and numbering is assigned on the complete publication-ordered set before the visible query is applied.
+
+### What warrants a second pair of eyes
+
+Check no draft/unlisted entries enter the archive, query state survives category changes, and staff navigation remains available without crowding the public header. Review scoped CSS against account, Studio and Admin.
+
+### What should be done in the future
+
+Complete the existing detail/inline-runner task and the ticket's browser and affected-behavior verification. Email sign-in remains FRANCOIS-013.
+
+### Code review instructions
+
+Start with pages.go feedPage/cards, home.tmpl/layout.tmpl, ui.tsx, account.tsx and the Final CSS block. Read the updated tests to distinguish changed presentation assertions from preserved visibility/download checks.
+
+### Technical details
+
+- Archive uses q/tag/sort GET parameters; unknown sort defaults to newest.
+- Numbers are presentation ordinals; no migration was added.
+- Local preview target is http://localhost:8092 with fake model backend and existing development data. No production deployment occurred.

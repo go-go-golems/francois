@@ -1,8 +1,19 @@
-{{define "content"}}<main aria-label="Applications and writing">
+{{define "content"}}<main class="archive" aria-label="{{if .Body.Journal}}Journal{{else}}Experiments{{end}}">
+{{if .Body.Journal}}<section class="final-section"><div class="final-label">Writing</div><div class="final-content"><h1>Journal.</h1>{{template "posts" .Body.Posts}}</div></section>
+{{else}}
 {{if .Body.LoginError}}<p class="notice bad login-error"><span>Sign-in did not complete. Please try again.</span>{{if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}</p>{{end}}
-<section class="controls">
-<div class="views"><a class="u" href="/feed.xml">RSS</a>{{if .Body.Tag}}<a class="u" href="/">Show all</a>{{end}}</div>
-{{if .Body.Tags}}<div class="tags" role="group" aria-label="Filter by tag">{{range .Body.Tags}}<a class="tag" href="/?tag={{.Name}}"{{if .Current}} aria-pressed="true"{{end}}>{{.Name}} <span class="tag-count">{{.Count}}</span></a>{{end}}</div>{{end}}
-</section>
-{{range .Body.Entries}}{{if .Cards}}{{template "cards" .Cards}}{{else}}{{template "posts" .Posts}}{{end}}{{else}}<p class="empty">Nothing published yet.</p>{{end}}
-</main>{{end}}
+<div class="archive-intro"><h1>A lab for computation and intelligence as material and medium.</h1><p>Run by Manuel and Ramon. {{.Body.Total}} experiments so far.</p></div>
+<form class="archive-controls" method="get" action="/" role="search">
+<div class="archive-search"><label class="visually-hidden" for="archive-query">Search experiments</label><input id="archive-query" name="q" value="{{.Body.Query}}" placeholder="Search {{.Body.Total}} experiments" type="search"><button type="submit" aria-label="Search and sort experiments"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor"/><path d="M9.5 9.5L13 13" stroke="currentColor"/></svg></button></div>
+{{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}
+<nav class="archive-categories" aria-label="Categories"><a href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}>All</a>{{range .Body.Tags}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}</nav>
+<div class="archive-sort"><label for="archive-sort">Sort</label><select id="archive-sort" name="sort" data-archive-sort><option value="newest"{{if eq .Body.Sort "newest"}} selected{{end}}>Newest first</option><option value="oldest"{{if eq .Body.Sort "oldest"}} selected{{end}}>Oldest first</option></select></div>
+</form>
+<div class="archive-list">
+{{range .Body.Rows}}<a class="archive-row" href="/apps/{{.ID}}" data-archive-row>
+<span class="archive-number">{{ordinal .Number}}</span><div class="archive-main"><h2>{{.Title}}</h2><p>{{join .Tags ", "}}{{if .Tags}} · {{end}}{{shortDate .FirstPublished}}</p></div><span class="archive-tags">{{join .Tags ", "}}</span><time class="archive-date">{{shortDate .FirstPublished}}</time><span class="archive-thumb">{{if .Cover}}{{template "thumb" .Cover}}{{else}}<span class="archive-monogram">{{monogram .Title}}</span>{{end}}</span>
+</a>{{else}}<div class="archive-empty"><p>No experiments match your search.</p><a class="u" href="/">Clear filters</a></div>{{end}}
+<div class="archive-preview" data-archive-preview hidden aria-hidden="true"></div>
+</div>
+{{template "support-callout" .}}
+{{end}}</main>{{end}}

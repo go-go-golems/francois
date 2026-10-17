@@ -17,21 +17,23 @@
 <link rel="stylesheet" href="{{asset "catalog.css"}}">
 <script src="{{asset "public.js"}}" defer></script>
 </head>
-<body>
-<header class="bar"><div class="page bar-inner">
-<a class="brand" href="/" title="{{.Brand}}"><svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" fill="#111"/><rect x="9" y="7" width="5" height="18" fill="#fff"/><rect x="9" y="7" width="14" height="5" fill="#fff"/><rect x="9" y="15" width="10" height="4" fill="#fff"/></svg></a>
-<div class="addr"><a class="addr-host" href="/">{{.Brand}}/</a><span class="addr-path">{{.Crumb}}</span></div>
-<nav class="nav">
-{{range .Nav}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>
-{{end}}{{if .User}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{else if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}
+<body class="final-site">
+<header class="site-header page">
+<a class="site-wordmark" href="/">{{.Brand}}</a>
+<p class="site-statement">A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.</p>
+<nav class="site-nav" aria-label="Main navigation">
+{{if .User}}<a href="/account">Account</a>{{else if .LoginAvailable}}<a href="{{.LoginHref}}">Sign in</a>{{end}}
+<a class="site-support" href="/pricing"><span class="support-desktop">Support the lab</span><span class="support-mobile">Support</span></a>
 </nav>
-</div></header>
+</header>
 <div class="page">
 {{if .Draft}}<p class="notice draft-banner">Draft preview — visitors see the published page.</p>{{end}}
 {{template "content" .}}
-<footer class="foot">
-<div class="foot-links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
-{{if .TypeCredit}}<p class="foot-credit">Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a> by <a href="https://abcdinamo.com">Dinamo</a>, made for <a href="https://www.are.na">Are.na</a></p>{{end}}
+<footer class="site-footer">
+<div class="footer-brand"><a class="site-wordmark" href="/">{{.Brand}}</a><a href="mailto:hej@slop.boutique">hej@slop.boutique</a></div>
+<div><span>For humans</span><a href="/feed.xml">RSS</a><a href="/journal">Journal</a><a href="/pricing">Support the lab</a>{{if .User}}{{range .Nav}}{{if ne .Href "/"}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{end}}</div>
+<div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+<div class="footer-type"><span>Type</span>{{if .TypeCredit}}<p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>{{end}}</div>
 </footer>
 </div>
 </body>
@@ -71,3 +73,7 @@
 
 {{/* A card thumbnail: a video shows its poster, or its first frame. */}}
 {{define "thumb"}}{{if and (isVideo .MediaType) .Poster}}<img src="/media/{{.Poster}}" alt="{{.Alt}}" loading="lazy">{{else if isVideo .MediaType}}<video src="/media/{{.ID}}" muted playsinline preload="metadata" aria-label="{{.Alt}}"></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy">{{end}}{{end}}
+
+{{define "support-callout"}}<aside class="support-callout" aria-labelledby="support-heading">
+<p class="callout-label">Support the lab</p><div><h2 id="support-heading">Keep the lab running.</h2><p>We prototype and explore, and share the work here. The lab is funded by people who want it to keep going. No ads, no clients, no investors.</p><a class="site-button callout-button" href="/pricing">Support the lab →</a><a class="u callout-contact" href="mailto:hej@slop.boutique">Or get in touch</a></div>
+</aside>{{end}}

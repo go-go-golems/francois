@@ -43,60 +43,15 @@ export function Brand() {
 
 export function Header() {
   const { data: session } = api.useSessionQuery();
-  const [logout] = api.useLogoutMutation();
-  const { path } = useRoute();
-  const nav: [string, string][] = [
-    ["/", "Feed"],
-  ];
-
-  const guest = session?.user?.role === "guest";
-  if (session?.authenticated && !guest) nav.push(["/account", "Account"]);
-  if (session?.user?.role === "creator" || session?.user?.role === "admin") nav.push(["/studio", "Studio"]);
-  if (session?.user?.role === "admin") nav.push(["/admin", "Admin"]);
-  const current = (to: string) => path.startsWith(to.replace(/\/$/, ""));
-  const crumb = path.split("/").filter(Boolean)[0] ?? "";
-  return (
-    <header className="bar">
-      <div className="page bar-inner">
-        <Link className="brand" to="/" title="Francois">
-          <Brand />
-        </Link>
-        <div className="addr">
-          <Link className="addr-host" to="/">
-            {session?.brand ?? "francois"}/
-          </Link>
-          <span className="addr-path">{crumb}</span>
-        </div>
-        <nav className="nav">
-          {nav.map(([to, label]) => (
-            <Link key={to} to={to} aria-current={current(to) ? "page" : undefined}>
-              {label}
-            </Link>
-          ))}
-          {session?.authenticated && !guest ? (
-            <button
-              className="tlink quiet"
-              onClick={async () => {
-                const out = await logout();
-                // Leave through the identity provider so its session ends too;
-                // it returns the browser to the portal afterwards.
-                if ("data" in out && out.data?.redirect) window.location.assign(out.data.redirect);
-                else location.assign("/");
-              }}
-            >
-              Sign out
-            </button>
-          ) : (
-            session?.loginAvailable && (
-              <a className="tlink" href={loginHref()}>
-                Sign in
-              </a>
-            )
-          )}
-        </nav>
-      </div>
-    </header>
-  );
+  const signedIn = session?.authenticated && session.user?.role !== "guest";
+  return <header className="site-header page">
+    <Link className="site-wordmark" to="/">{session?.brand ?? "slop.boutique"}</Link>
+    <p className="site-statement">A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.</p>
+    <nav className="site-nav" aria-label="Main navigation">
+      {signedIn ? <Link to="/account">Account</Link> : session?.loginAvailable && <a href={loginHref()}>Sign in</a>}
+      <a className="site-support" href="/pricing"><span className="support-desktop">Support the lab</span><span className="support-mobile">Support</span></a>
+    </nav>
+  </header>;
 }
 
 export function Notice() {
@@ -115,24 +70,17 @@ export function Notice() {
   );
 }
 
-// Footer is one line, like the server-rendered pages: legal links on the
-// left, the typeface credit on the right when the licensed fonts are served.
+// The React shell uses the same structure and classes as the public templates.
 export function Footer() {
   const { data: session } = api.useSessionQuery();
-  return (
-    <footer className="foot">
-      <div className="foot-links">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-      </div>
-      {session?.typeCredit && (
-        <p className="foot-credit">
-          Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a> by <a href="https://abcdinamo.com">Dinamo</a>, made for{" "}
-          <a href="https://www.are.na">Are.na</a>
-        </p>
-      )}
-    </footer>
-  );
+  const signedIn = session?.authenticated && session.user?.role !== "guest";
+  const staff = session?.user?.role === "admin" || session?.user?.role === "creator";
+  return <footer className="site-footer">
+    <div className="footer-brand"><Link className="site-wordmark" to="/">{session?.brand ?? "slop.boutique"}</Link><a href="mailto:hej@slop.boutique">hej@slop.boutique</a></div>
+    <div><span>For humans</span><a href="/feed.xml">RSS</a><a href="/journal">Journal</a><a href="/pricing">Support the lab</a>{signedIn && <Link to="/account">Account</Link>}{staff && <Link to="/studio">Studio</Link>}{session?.user?.role === "admin" && <Link to="/admin">Admin</Link>}</div>
+    <div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+    <div className="footer-type"><span>Type</span>{session?.typeCredit && <p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>}</div>
+  </footer>;
 }
 
 // Row renders the label-column layout: a grey label column, then content.
