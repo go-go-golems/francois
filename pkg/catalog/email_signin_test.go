@@ -372,14 +372,18 @@ func TestEmailDeliveryFailureAndQuotaRefund(t *testing.T) {
 	}
 	req := httptest.NewRequest("POST", "http://portal.test/auth/email/request", nil)
 	for range 10 {
-		finish := e.srv.reserveEmail(req, "new@example.test")
-		if finish == nil {
+		finish, allowed := e.srv.reserveEmail(req, "new@example.test")
+		if !allowed || finish == nil {
 			t.Fatal("failure consumed send budget")
 		}
 		finish(true)
 	}
-	if e.srv.reserveEmail(req, "new@example.test") != nil {
+	if finish, allowed := e.srv.reserveEmail(req, "new@example.test"); !allowed || finish != nil {
 		t.Fatal("recipient limit not enforced")
+	}
+	code, body, headers := emailHTTP(e, "POST", "/auth/email/request", binding, form)
+	if code != 200 || !strings.Contains(string(body), "Check your email") || headers.Get("Retry-After") != "" {
+		t.Fatalf("recipient limit exposed: %d", code)
 	}
 	p.failSend = false
 	if status, _ := continueMailbox(e, binding, q); status != 303 {

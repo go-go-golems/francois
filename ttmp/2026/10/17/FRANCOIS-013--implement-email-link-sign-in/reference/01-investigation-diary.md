@@ -1300,3 +1300,47 @@ Read the current design, identity/email_link.go, store/email_links.go and the mu
 Local preview: http://localhost:18795/signin, tmux francois-unified-email-013. The mailbox sink and provider are loopback only. No production email was sent or production data modified during this implementation.
 
 Metadata cleanup: docmgr doctor reported five missing RelatedFiles references after obsolete paths were deleted. Updated only the affected metadata to current successor files, keeping historical diary/report bodies and their source-commit evidence intact. Doctor then passed.
+
+## Step 24: Review the unified workflow before production deployment
+
+Opened PR #14 for the locally qualified unified flow. Automated review identified that recipient-only exhaustion returned an observable 429 while ineligible addresses returned the generic acknowledgement. Separated recipient exhaustion from client/global limits and added a focused HTTP regression before proceeding with deployment.
+
+### Prompt Context
+**User prompt (verbatim):** "deploy"
+**Assistant interpretation:** Release the unified onboarding implementation to production k3s.
+**Inferred user intent:** Make the streamlined flow available while retaining Google/GitHub SSO.
+**Commit (code):** 6a2be1e — implementation submitted for review; this checkpoint records its review correction.
+
+### What I did
+- Opened source PR #14 and inspected inline review comment 4305136282.
+- Made `reserveEmail` return reservation and client/global eligibility separately. Recipient exhaustion now renders generic HTTP 200 without sending mail; client/global limits retain HTTP 429.
+- Extended `TestEmailDeliveryFailureAndQuotaRefund` to check generic acknowledgement and absence of Retry-After.
+
+### Why
+- A recipient-specific response must not disclose account eligibility. This is a narrow correction to the existing limiter, without new services or compatibility code.
+
+### What worked
+- Database-backed `go test ./pkg/catalog -run TestEmailDeliveryFailureAndQuotaRefund -count=1` passed (0.117s).
+- The original PR Go suite, lint, browser/worker, CodeQL, dependency, vulnerability and secret checks passed; image/security jobs were still running at this checkpoint.
+
+### What didn't work
+- The first focused test failed to compile with `pkg/catalog/email_signin.go:221:5: undefined: finish`: a text replacement inserted the request-only guard into `verifyEmail` as well. Removed that misplaced block, reviewed the diff, and reran the focused test successfully.
+- Initial screenshot-script lookup used an incorrect filename; the existing helper is `16-capture-production-signup.mjs`.
+
+### What I learned
+- Recipient capacity and request abuse limits need separate response semantics even though both prevent delivery.
+
+### What was tricky to build
+- Reservation refunds must remain scoped to the failed send; the correction changes only exhaustion responses and retains existing quota accounting.
+
+### What warrants a second pair of eyes
+- Ensure recipient exhaustion returns the same sent page as an ineligible address and does not call the provider.
+
+### What should be done in the future
+- Finish required CI, merge, publish the official image, and verify the GitOps rollout (next checkpoint).
+
+### Code review instructions
+- Read the small diff in `pkg/catalog/email_signin.go` and its quota regression. Inspect PR #14 checks before merging.
+
+### Technical details
+- Recipient: ten successful sends/hour; client: twenty attempts/hour; global: one hundred attempts/hour. The generic response does not imply delivery.

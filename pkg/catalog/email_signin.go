@@ -88,7 +88,8 @@ func (s *Server) emailForm(w http.ResponseWriter, r *http.Request) (string, bool
 
 // reserveEmail counts attempts globally/by client and reserves recipient capacity.
 // A failed issuance refunds only its own recipient slot, not the abuse limits.
-func (s *Server) reserveEmail(r *http.Request, email string) func(bool) {
+// A nil callback with allowed=true means recipient exhaustion: acknowledge generically.
+func (s *Server) reserveEmail(r *http.Request, email string) (func(bool), bool) {
 	l := s.emailLimiter
 	l.mu.Lock()
 	now := time.Now()
@@ -96,13 +97,13 @@ func (s *Server) reserveEmail(r *http.Request, email string) func(bool) {
 	recipient := "mail:" + string(store.Hash(email))
 	if !l.available("global", 100, time.Hour, now) || !l.available(ip, 20, time.Hour, now) {
 		l.mu.Unlock()
-		return nil
+		return nil, false
 	}
 	l.hits["global"] = append(l.hits["global"], now)
 	l.hits[ip] = append(l.hits[ip], now)
 	if !l.available(recipient, 10, time.Hour, now) {
 		l.mu.Unlock()
-		return nil
+		return nil, true
 	}
 	l.hits[recipient] = append(l.hits[recipient], now)
 	l.mu.Unlock()
@@ -118,7 +119,7 @@ func (s *Server) reserveEmail(r *http.Request, email string) func(bool) {
 				break
 			}
 		}
-	}
+	}, true
 }
 
 func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
@@ -137,10 +138,14 @@ func (s *Server) requestEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setCookie(w, s.emailCookie(), binding, int(store.EmailLinkTTL.Seconds()))
-	finish := s.reserveEmail(r, email)
-	if finish == nil {
+	finish, allowed := s.reserveEmail(r, email)
+	if !allowed {
 		w.Header().Set("Retry-After", "3600")
 		s.renderEmail(w, r, 429, emailPage{State: "error", Message: "Too many sign-in requests. Please try again later."})
+		return
+	}
+	if finish == nil {
+		s.renderEmail(w, r, 200, emailPage{State: "sent"})
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
