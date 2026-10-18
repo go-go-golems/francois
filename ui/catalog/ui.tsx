@@ -83,10 +83,16 @@ export function Header() {
         ) : (
           session?.loginAvailable && <a href={loginHref()}>Sign in</a>
         )}
-        <a className="site-support" href="/pricing">
-          <span className="support-desktop">Support the lab</span>
-          <span className="support-mobile">Support</span>
-        </a>
+        {session?.supporter ? (
+          <span className="support-thanks">
+            Thank you for supporting the lab
+          </span>
+        ) : (
+          <a className="site-support" href="/pricing">
+            <span className="support-desktop">Support the lab</span>
+            <span className="support-mobile">Support</span>
+          </a>
+        )}
       </nav>
     </header>
   );
@@ -130,7 +136,7 @@ export function Footer() {
         <span>For humans</span>
         <a href="/feed.xml">RSS</a>
         {session?.journalEnabled && <a href="/journal">Journal</a>}
-        <a href="/pricing">Support the lab</a>
+        {!session?.supporter && <a href="/pricing">Support the lab</a>}
         {signedIn && <Link to="/account">Account</Link>}
         {staff && <Link to="/studio">Studio</Link>}
         {session?.user?.role === "admin" && <Link to="/admin">Admin</Link>}

@@ -1,0 +1,18 @@
+{
+  "base": "http://localhost:18796",
+  "at": "2026-10-18T00:55:02.114Z",
+  "checks": [
+    "42 USD input, working plus/minus, responsive pricing and free-account callout",
+    "Projected supporter sees thank-you and actual amount; no pricing/header/account support solicitations",
+    "Real sandbox hosted Checkout opened with selected 43 USD monthly contribution"
+  ],
+  "screenshots": [
+    "support-pricing-1440.png",
+    "support-free-account-1440.png",
+    "support-pricing-390.png",
+    "support-free-account-390.png",
+    "support-thank-you-1440.png",
+    "support-thank-you-390.png"
+  ],
+  "productionChanged": false
+}

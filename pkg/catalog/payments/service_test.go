@@ -15,6 +15,7 @@ import (
 )
 
 type fakeGateway struct {
+	requests  []CheckoutRequest
 	mu        sync.Mutex
 	customers map[string]string // idempotency key -> customer
 	sessions  map[string]CheckoutSession
@@ -65,6 +66,7 @@ func (f *fakeGateway) CreateCheckout(_ context.Context, r CheckoutRequest) (Chec
 		return s, nil
 	}
 	f.creates++
+	f.requests = append(f.requests, r)
 	s := CheckoutSession{ID: "cs_" + store.RandomHex(4), URL: "https://checkout.test/" + r.AttemptID, Status: "open", CustomerID: r.CustomerID, ExpiresAt: time.Now().Add(time.Hour)}
 	f.sessions[r.IdempotencyKey] = s
 	if f.failOnce {
@@ -483,5 +485,45 @@ func TestSetCancelAtPeriodEnd(t *testing.T) {
 	rows, err := s.AllSubscriptions(ctx, "active", 10)
 	if err != nil || len(rows) != 1 || rows[0].Email == "" {
 		t.Fatalf("all subscriptions %+v %v", rows, err)
+	}
+}
+
+func TestMonthlySupportCheckout(t *testing.T) {
+	s := testStore(t)
+	g := newFake()
+	svc := NewService(g, s, Config{Deployment: "test"})
+	ctx := context.Background()
+	u := user(t, s, "support")
+	for _, amount := range []int64{0, 99, 150, 1000000} {
+		if _, err := svc.Support(ctx, u, amount, accepted, "https://portal.test"); err == nil {
+			t.Fatalf("accepted %d", amount)
+		}
+	}
+	first, err := svc.Support(ctx, u, 4200, accepted, "https://portal.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.Support(ctx, u, 4200, accepted, "https://portal.test")
+	if err != nil || again != first || g.creates != 1 {
+		t.Fatal("support checkout retry not idempotent", err)
+	}
+	r := g.requests[0]
+	if r.SupportAmountCents != 4200 || r.SuccessURL != "https://portal.test/thank-you?checkout={CHECKOUT_SESSION_ID}" {
+		t.Fatalf("wrong checkout: %+v", r)
+	}
+	_, err = svc.Support(ctx, u, 4300, accepted, "https://portal.test")
+	if err != nil || g.creates != 2 {
+		t.Fatal("amount change failed", err)
+	}
+	if g.status(g.sessions[r.IdempotencyKey].ID) != "expired" {
+		t.Fatal("earlier amount remains payable")
+	}
+	customer, err := s.CustomerFor(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.subs[customer] = []billing.Subscription{{ID: "sub_support", SupportAmountCents: 4300, Status: "active"}}
+	if _, err = svc.Support(ctx, u, 4400, accepted, "https://portal.test"); !errors.Is(err, ErrSubscriptionOpen) {
+		t.Fatal("duplicate contribution allowed", err)
 	}
 }

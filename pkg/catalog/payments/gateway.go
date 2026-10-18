@@ -15,6 +15,7 @@ import (
 )
 
 type CheckoutRequest struct {
+	SupportAmountCents                     int64
 	CustomerID, PriceID, UserID, AttemptID string
 	SuccessURL, CancelURL, IdempotencyKey  string
 }
@@ -108,6 +109,14 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 		Metadata:          map[string]string{"francois_user_id": r.UserID, "checkout_attempt_id": r.AttemptID},
 		SubscriptionData:  &stripe.CheckoutSessionCreateSubscriptionDataParams{Metadata: map[string]string{"francois_user_id": r.UserID}},
 	}
+	if r.SupportAmountCents > 0 {
+		p.LineItems = []*stripe.CheckoutSessionCreateLineItemParams{{Quantity: stripe.Int64(1), PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
+			Currency: stripe.String("usd"), UnitAmount: stripe.Int64(r.SupportAmountCents),
+			Recurring:   &stripe.CheckoutSessionCreateLineItemPriceDataRecurringParams{Interval: stripe.String("month")},
+			ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Support slop.boutique")},
+		}}}
+		p.SubscriptionData.Metadata["francois_monthly_support"] = "true"
+	}
 	p.SetIdempotencyKey(r.IdempotencyKey)
 	s, err := g.client.V1CheckoutSessions.Create(ctx, p)
 	if err != nil {
@@ -174,6 +183,9 @@ func Project(s *stripe.Subscription) billing.Subscription {
 			item := s.Items.Data[0]
 			if item.Price != nil {
 				out.PriceID = item.Price.ID
+				if s.Metadata["francois_monthly_support"] == "true" && item.Price.Currency == stripe.CurrencyUSD && item.Price.Recurring != nil && item.Price.Recurring.Interval == stripe.PriceRecurringIntervalMonth && item.Price.Recurring.IntervalCount == 1 && item.Quantity == 1 {
+					out.SupportAmountCents = item.Price.UnitAmount
+				}
 			}
 			out.Quantity = int(item.Quantity)
 			if item.CurrentPeriodEnd > 0 {
@@ -181,6 +193,10 @@ func Project(s *stripe.Subscription) billing.Subscription {
 				out.AccessUntil = &t
 			}
 		}
+	}
+	if s.StartDate > 0 {
+		t := time.Unix(s.StartDate, 0).UTC()
+		out.StartedAt = &t
 	}
 	if s.TrialEnd > 0 {
 		t := time.Unix(s.TrialEnd, 0).UTC()

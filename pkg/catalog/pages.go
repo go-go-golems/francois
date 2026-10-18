@@ -114,6 +114,7 @@ type pageData struct {
 	User                                               *store.User
 	JournalEnabled                                     bool
 	JournalPreview                                     bool
+	Supporter                                          bool
 	Sensitive                                          bool
 	LoginAvailable                                     bool
 	LoginHref                                          string
@@ -165,6 +166,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	// Demo guests browse like visitors: no account pages, and they may sign in.
 	if p != nil && p.User.Role != "guest" {
 		d.User = &p.User
+		support, err := s.userSupport(r.Context(), p.User, rev.Document)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		d.Supporter = support.Active
 		nav = append(nav, navItem{Href: "/account", Label: "Account"})
 		if p.User.Role == "creator" || p.User.Role == "admin" {
 			nav = append(nav, navItem{Href: "/studio", Label: "Studio"})
@@ -747,41 +754,9 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "", m.CreatedAt, f)
 }
 
-type planView struct {
-	settings.Plan
-	Current bool
-}
-
-// pricingPage lists the public plans by rank, marking the caller's plan.
+// pricingPage presents contributions; render supplies confirmed supporter state.
 func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	rev, err := s.Store.ActiveSettings(ctx)
-	if err != nil {
-		s.pageFailed(w, r, err)
-		return
-	}
-	current, paid, staff := "", false, false
-	if p := principal(ctx); p != nil {
-		if e, err := s.entitlementIn(ctx, p.User, rev.Document); err == nil {
-			current, paid, staff = e.Plan.Key, e.Source == SourceSubscription || e.Source == SourceTrial, e.Source == SourceStaff
-		}
-	}
-	if staff {
-		current = ""
-	}
-	plans := []planView{}
-	name := ""
-	for _, p := range rev.Document.Plans {
-		if p.Key == current {
-			name = p.Name
-		}
-		if p.Public {
-			plans = append(plans, planView{Plan: p, Current: p.Key == current})
-		}
-	}
-	sort.Slice(plans, func(i, j int) bool { return plans[i].Rank < plans[j].Rank })
-	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support independent experiments in computation and intelligence.",
-		Body: map[string]any{"Plans": plans, "Current": name, "Paid": paid, "Staff": staff}})
+	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support independent experiments in computation and intelligence."})
 }
 
 // publicPlans is GET /api/plans: the public plans, without price IDs.

@@ -2,6 +2,7 @@ package payments
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/billing"
@@ -70,13 +71,25 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 // attempt/Session; a request for another price retires the earlier attempt
 // first, so its Session can no longer be paid.
 func (s *Service) Checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string) (string, error) {
+	return s.checkout(ctx, u, price, accepted, portal, 0)
+}
+
+// Support creates a monthly USD contribution without changing access entitlements.
+func (s *Service) Support(ctx context.Context, u store.User, cents int64, accepted map[string]bool, portal string) (string, error) {
+	if cents < 100 || cents > 999900 || cents%100 != 0 {
+		return "", errors.New("monthly support must be 1–9999 whole US dollars")
+	}
+	return s.checkout(ctx, u, "support:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents)
+}
+
+func (s *Service) checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string, supportAmount int64) (string, error) {
 	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
 		if err != nil {
 			return "", errors.Wrap(err, "refresh subscriptions")
 		}
 		for _, sub := range subs {
-			if accepted[sub.PriceID] && billing.OpenStatus(sub.Status) {
+			if (accepted[sub.PriceID] || sub.SupportAmountCents > 0) && billing.OpenStatus(sub.Status) {
 				_ = s.Store.EnqueueRefresh(ctx, customer, "checkout")
 				s.Wake()
 				return "", ErrSubscriptionOpen
@@ -107,9 +120,13 @@ func (s *Service) Checkout(ctx context.Context, u store.User, price string, acce
 	}
 	// Pending: first try or an uncertain earlier try; the same key returns
 	// the same Session from Stripe.
+	successPath := "/account"
+	if supportAmount > 0 {
+		successPath = "/thank-you"
+	}
 	cs, err := s.Gateway.CreateCheckout(ctx, CheckoutRequest{
-		CustomerID: customer, PriceID: price, UserID: u.ID, AttemptID: attempt.ID,
-		SuccessURL:     portal + "/account?checkout={CHECKOUT_SESSION_ID}",
+		CustomerID: customer, PriceID: price, SupportAmountCents: supportAmount, UserID: u.ID, AttemptID: attempt.ID,
+		SuccessURL:     portal + successPath + "?checkout={CHECKOUT_SESSION_ID}",
 		CancelURL:      portal + "/account",
 		IdempotencyKey: s.Config.Deployment + "-checkout-" + attempt.ID,
 	})

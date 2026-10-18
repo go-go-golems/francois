@@ -348,3 +348,154 @@ Read sources/implementation/checks.json and browser-validation.json, then the mo
 - Private development database URL file: /tmp/francois-012/database-url; no secret file is committed.
 - Data changes: local Studio publication of tracked page.md write-ups and existing showcase media, plus public sample preview releases through the standard release workflow.
 - No database migration, new hosting endpoint, custom payment flow or production release was added.
+
+## Step 6: Restore the missing support amount and connect the complete contribution workflow
+
+Reopened the visual implementation after the user identified the missing 42 USD design. Direct Paper inspection confirmed that the current template omitted the complete editable contribution block, changed the lead/principle copy and replaced the year-funding amount. Implemented the missing layout and a distinct monthly contribution path through the existing billing components. This checkpoint is implemented but not yet qualified.
+
+### Prompt Context
+**User prompt (verbatim):** "cool, that works. We need to properly pass the $42 dollars design (which I don't see on slop.boutique/pricing), they're the pages from ramon's paper project. https://app.paper.design/file/01M4XVT9C83GGYK57CMAAAEJJT/p-6-0"
+**Follow-up (verbatim):** "complete checkout flow. Also, when signed in as a free user, show the banner about keeping the lab running on the user page. Also implement the thank you page when supporter"
+**Follow-up (verbatim):** "and make sure that if logged in as a support, you don't see the support monthly banners"
+**Assistant interpretation:** Implement the real amount selector and complete checkout, free account callout, thank-you/supporter state and suppression of support solicitation for supporters.
+**Inferred user intent:** Ship Ramon’s minimal presentation with working behavior and truthful billing state.
+
+### What I did
+- Read the Paper guide, Final metadata and exact desktop/mobile support and account JSX; inspected the support screenshot and confirmed ABC Areal availability.
+- Checked live `/api/plans`: one configured Subscriber monthly price with an empty label; no custom amount workflow exists.
+- Added the active contribution implementation guide and task 8yxo.
+- Implemented monthly inline Stripe price data, reuse of existing admission/ownership/idempotency, two projection columns, and a support summary separate from access entitlements.
+- Added the support form, thank-you route/account presentation, free-account callout and server/React supporter visibility rules.
+
+### Why
+- Showing 42 while charging a configured unrelated fixed price would be incorrect. Contributions must preserve the chosen amount end-to-end.
+- Support does not unlock content; its state must be separate from access-plan privileges.
+
+### What worked
+- Paper MCP provided exact current exports and a reference screenshot. The existing billing service already handles retries, changed-choice supersession and owner-scoped refresh.
+
+### What didn't work
+- Initial branch creation failed with a read-only Git ref lock; the authorized escalated command created `feat/ramon-support-pricing` successfully.
+- Early path guesses for the frontend package and billing handler were wrong; actual paths are root `package.json`, `ui/catalog/public.ts` and `pkg/catalog/routes.go`.
+
+### What I learned
+- The omitted design requires a billing amount contract, not only CSS. The supporter account artboard includes real history and impact data that must come from authoritative records.
+
+### What was tricky to build
+- Separate donation state from privileges while retaining the existing plan APIs. Preserve real Stripe price IDs and project contribution metadata/amount instead of adding price aliases.
+
+### What warrants a second pair of eyes
+- Chosen-amount idempotency, duplicate subscription prevention, projection trust and visibility of calls to action after subscription confirmation.
+
+### What should be done in the future
+- Complete qualification and real local desktop/mobile captures; no deployment is claimed at this checkpoint.
+
+### Code review instructions
+- Start with the active contribution guide, `support.go`, gateway/service changes and the existing account refresh flow. Inspect migration 015 and confirm existing users/sessions are unaffected.
+
+### Technical details
+- Default 42 USD/month, editable whole-dollar range 1–9999. Inline monthly prices carry server-authored metadata; the existing webhook worker remains the only reconciliation service.
+- Source reference: https://docs.stripe.com/api/checkout/sessions/create
+
+## Step 7: Qualify the complete monthly checkout and supporter presentation
+
+Qualified the implemented contribution flow against PostgreSQL, real Chromium and Stripe sandbox. The actual 43 USD selection reached hosted Checkout, completed with the standard test card and returned to a confirmed supporter thank-you page. Local account data recorded the same amount, while access stayed free. No production deployment was performed.
+
+### Prompt Context
+**User prompts:** See Step 6, including complete checkout, free-account banner, thank-you page and no monthly prompts for supporters.
+**Assistant interpretation:** Finish the implementation with meaningful integrated evidence and preserve a simple code path.
+**Inferred user intent:** Launch a coherent support experience rather than a visual amount control detached from payment behavior.
+**Commit (code):** 539a447 — Implement Ramon support contribution page and monthly checkout workflow; this checkpoint completes qualification and cleanup.
+
+### What I did
+- Added service regressions for amount bounds, same-amount reuse, changed-amount session expiry and duplicate subscription prevention.
+- Added an actual stripe-go HTTP payload test and projection tests for server metadata/currency recognition.
+- Added catalog integration checks for amount markup, real support summary, suppressed Go prompts and unchanged free entitlements.
+- Fixed the support endpoint to use the existing enabled-account guard, retained honest bounded confirmation feedback and routed demo guests through normal sign-in.
+- Removed unused plan-view assembly and the superseded plan-link JavaScript from the contribution page. Existing plan APIs remain functional for their existing consumers.
+- Built assets, started the isolated preview in tmux `francois-support-012` on localhost:18796 and recorded desktop/mobile screenshots.
+- Read the configured Stripe credential privately, required its test-mode prefix, and used only sandbox Checkout. Private files contain the credential and transient browser state; none are committed.
+- Completed hosted Checkout with the standard 4242 test card, verified owner-scoped refresh and actual Stripe projection, tested Customer Portal creation and scheduled cancellation of the test subscription.
+- Saved current exact Paper JSX exports for desktop/mobile support and desktop account beside the implementation evidence.
+
+### Why
+- Amount/idempotency/projection tests exercise payment correctness rather than just matching the implementation. Real hosted Checkout proves that the selected amount survives the gateway and authoritative reconciliation boundary.
+- Supporter presentation uses active paid-through subscription state, not the checkout URL or account role. Contributions do not unlock a higher access plan.
+
+### What worked
+- Full database-backed `go test ./... -count=1`: all packages passed; catalog 15.439s, payments 1.352s.
+- Focused support/payment regression run passed; final simplified presentation checks passed (0.779s).
+- `pnpm check`, nine frontend/worker tests, `pnpm build`, `go build ./...`, lint and logging checks passed.
+- Browser checks passed at 1440/390px: amount stepping, no document overflow, free-account callout, supporter thank-you and absence of monthly solicitation.
+- Actual sandbox receipt: chosen 4300 cents = Stripe 4300 cents; returned to `/thank-you`; confirmed support; free access retained; Customer Portal available; test cancellation scheduled.
+- Reviewed pricing mobile and actual supporter desktop/mobile screenshots visually. Clean recapture removed the transient success-toast overlay.
+
+### What didn't work
+- Initial full Go run failed only `TestPlans` with `plans_test.go:139: pricing 200`: it expected Studio/Current support plan-card markup. Updated the assertion to verify the requested supporter page and no contribution form; focused and final full tests then passed.
+- Initial lint reported `variable copy has same name as predeclared identifier (predeclared)` at support_test.go:54. Renamed it to `candidate`; final lint passed.
+- First hosted form inspection found no input fields because Stripe initially displays payment-method accordions. Used the existing documented Card selection sequence, then filled the standard sandbox fields and completed checkout successfully.
+- Formatting the shared API type file introduced unrelated churn. Restored its already-committed contents while retaining the new support contracts.
+
+### What I learned
+- Inline recurring prices work with the configured sandbox credential. Stripe’s existing subscription metadata and current-period fields are sufficient to distinguish contributions without price aliases or a new billing service.
+
+### What was tricky to build
+- The account return must wait for authoritative projection. The real flow used the existing owner-bound refresh operation and worker; a URL alone never created supporter state.
+- Support cancellation keeps prompts hidden through the paid-through period. The contribution itself leaves access entitlements unchanged.
+
+### What warrants a second pair of eyes
+- Review server-authored contribution metadata, supported monthly USD recognition, amount-bound checkout keys and changed-amount supersession. Review enabled-account/CSRF handling and supporter prompt suppression in both Go and React shells.
+
+### What should be done in the future
+- Review and deploy this branch when requested. Current production still runs the previously deployed onboarding image.
+
+### Code review instructions
+- Start with support-sandbox-checkout.json and the actual sandbox thank-you screenshots, then support.go, payments/service.go, payments/gateway.go, migration 015 and ui/catalog/account.tsx.
+- Reproduce the isolated preview with script 04 after supplying sandbox-only private credential files. Scripts 05–07 never save keys, cookies, payment URLs or authentication links to the ticket.
+
+### Technical details
+- Preview: http://localhost:18796/pricing. Private directory: /tmp/francois-support-private, mode 0700; credential files mode 0600.
+- Migration 015 adds support_amount_cents and started_at to the existing subscription projection. No new queue, background service or identity-provider changes.
+- Structured receipts and eight new screenshots are under sources/implementation/support-*; original visual-ticket evidence is preserved.
+
+## Step 8: Publish the qualified implementation for review
+
+Pushed the implementation and qualification evidence, then opened PR #15. Production remains on the previous onboarding release; this checkpoint records publication for review only.
+
+### Prompt Context
+**User prompts:** See Step 6.
+**Assistant interpretation:** Make the completed, locally qualified work concrete and reviewable.
+**Inferred user intent:** Preserve commits, evidence and a straightforward route to deployment.
+**Commit (code/evidence):** 539a447 and d8634b2.
+
+### What I did
+- Pushed `feat/ramon-support-pricing` and opened https://github.com/go-go-golems/francois/pull/15 with the exact feature, migration and sandbox results.
+- Normalized the trailing blank line in the routine TypeScript success receipt after Git’s whitespace check reported it.
+
+### Why
+- A source PR keeps review and the official image/GitOps pipeline attached to the tested implementation.
+
+### What worked
+- Branch push and PR creation succeeded. Required CI/review starts from the PR; it is not described as complete here.
+
+### What didn't work
+- `git diff --cached --check` reported `support-types.txt:4: new blank line at EOF`; the preceding qualification commit included this harmless receipt whitespace. Removed it in this publication checkpoint.
+
+### What I learned
+- Routine command receipts can be bounded and normalized; they need not retain decorative terminal blank lines.
+
+### What was tricky to build
+- N/A: this checkpoint publishes already qualified code and records review status.
+
+### What warrants a second pair of eyes
+- PR #15 billing trust, chosen-amount handling and supporter state boundaries.
+
+### What should be done in the future
+- Review, merge and deploy when requested; no production rollout is claimed.
+
+### Code review instructions
+- Read the PR description and the active support guide’s verified result. Use the actual sandbox receipt rather than seeded screenshots as proof of payment completion.
+
+### Technical details
+- PR: https://github.com/go-go-golems/francois/pull/15
+- Local preview: http://localhost:18796/pricing

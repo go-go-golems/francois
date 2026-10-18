@@ -511,11 +511,8 @@ select.btn { appearance: none; cursor: pointer; }
 .support-principles { list-style:none; counter-reset:principle; padding:0; margin:72px 0; max-width:760px; border-top:1px solid var(--color-line); }
 .support-principles li { counter-increment:principle; display:grid; grid-template-columns:40px 1fr; gap:24px; border-bottom:1px solid var(--color-line); padding:14px 0; font-size:24px; line-height:32px; letter-spacing:-.01em; }
 .support-principles li::before { content:counter(principle); color:var(--color-muted); }
-.support-option { margin-bottom:32px; }
-.support-option h2 { font-weight:400; font-size:20px; }
-.support-option a { margin:0 12px 12px 0; }
 .support-year { max-width:760px; border-top:1px solid var(--color-line); margin-top:48px; padding-top:40px; }
-.support-year h2 { font-size:48px; line-height:52px; letter-spacing:-.03em; font-weight:400; margin:24px 0; }
+.support-year h2 { font-size:56px; line-height:60px; letter-spacing:-.03em; font-weight:400; margin:16px 0; }
 .support-year > p:not(.final-label) { color:var(--color-muted); font-size:15px; line-height:22px; }
 .support-contact { padding-top:140px; }
 .support-contact .final-content > p { max-width:760px; margin:0; color:var(--color-muted); font-size:15px; line-height:22px; }
@@ -568,7 +565,7 @@ select.btn { appearance: none; cursor: pointer; }
  .final-lead { font-size:18px; line-height:26px; }
  .support-principles { margin:48px 0; }
  .support-principles li { grid-template-columns:20px 1fr; gap:14px; font-size:18px; line-height:26px; padding:12px 0; }
- .support-year h2 { font-size:36px; line-height:40px; }
+ .support-year h2 { font-size:44px; line-height:48px; }
  .support-contact { padding-top:80px; }
  .account-detail { grid-template-columns:1fr; gap:4px; }
 }
@@ -633,7 +630,6 @@ select.btn { appearance: none; cursor: pointer; }
  .archive-thumb > img,.archive-thumb > video { position:absolute; inset:0; }
  .archive-monogram { font-size:15px; }
 }
-.support-option .site-support { background:#cee5ff; }
 
 /* Final supporter email sign-in. */
 .final-signin { min-height: 48vh; }
@@ -658,3 +654,37 @@ select.btn { appearance: none; cursor: pointer; }
 @media (max-width: 600px) { .signin-social { grid-template-columns: 1fr; } }
 
 .signin-other { margin-top: 32px; font-size: 15px; line-height: 22px; }
+
+/* Final support contribution control, exported from Ramon’s desktop/mobile artboards. */
+.support-monthly { display:flex; flex-direction:column; align-items:flex-start; gap:16px; }
+.support-amount-controls { display:flex; align-items:center; gap:16px; }
+.support-amount-controls > button { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:44px; height:44px; padding:0; border:0; border-radius:3px; background:var(--color-table); color:var(--color-ink); font:inherit; font-size:22px; cursor:pointer; }
+.support-amount-value { display:flex; align-items:baseline; gap:12px; padding:0 4px; border-bottom:1px solid var(--color-line); font-size:56px; line-height:64px; letter-spacing:-.03em; }
+.support-amount-value input { appearance:textfield; width:2ch; min-width:2ch; max-width:4ch; padding:0; border:0; border-radius:0; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; }
+.support-amount-value input::-webkit-inner-spin-button,.support-amount-value input::-webkit-outer-spin-button { appearance:none; margin:0; }
+.support-amount-help { max-width:560px; margin:0; color:var(--color-muted); font-size:15px; line-height:22px; }
+.support-monthly > .site-button { margin-top:8px; padding:12px 18px; background:#cee5ff; cursor:pointer; }
+.final-support .support-year > p { margin:0; }
+.final-support .support-year > a { display:inline-block; margin-top:24px; font-size:15px; line-height:22px; }
+@media(max-width:900px) {
+ .final-support > .final-section > .final-label { display:none; }
+ .final-support .final-lead { font-size:17px; }
+ .support-monthly { gap:12px; }
+ .support-monthly > label,.support-amount-help { font-size:14px; line-height:20px; }
+ .support-amount-controls { gap:12px; }
+ .support-amount-controls > button { width:40px; height:40px; font-size:20px; }
+ .support-amount-value { gap:10px; font-size:44px; line-height:52px; }
+ .support-monthly > .site-button { width:100%; margin-top:6px; padding:14px 18px; }
+ .final-support .support-year { padding-top:32px; }
+ .final-support .support-year > p:not(.final-label) { font-size:14px; line-height:20px; }
+ .final-support .support-contact { padding-top:96px; }
+ .final-support .support-contact > .final-label { display:block; color:var(--color-ink); }
+}
+
+.support-impact { display:flex; align-items:flex-end; gap:24px; margin:40px 0 56px; }
+.support-impact-count { font-size:120px; line-height:104px; letter-spacing:-.05em; }
+.support-impact > div { max-width:420px; }
+.support-impact p { margin:0 0 12px; font-size:20px; line-height:28px; }
+.support-impact a { font-size:15px; }
+.support-thanks { font-size:14px; line-height:20px; color:var(--color-muted); }
+@media(max-width:900px) { .support-impact { gap:16px; align-items:flex-start; } .support-impact-count { font-size:80px; line-height:76px; } .support-impact p { font-size:17px; line-height:24px; } .site-nav .support-thanks { display:none; } }

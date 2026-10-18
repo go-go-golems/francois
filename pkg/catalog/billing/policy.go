@@ -6,17 +6,19 @@ import "time"
 
 // Subscription is the projection of one Stripe subscription.
 type Subscription struct {
-	ID                string     `json:"id"`
-	CustomerID        string     `json:"customerId"`
-	PriceID           string     `json:"priceId"`
-	Status            string     `json:"status"`
-	Quantity          int        `json:"quantity"`
-	ItemCount         int        `json:"itemCount"`
-	AccessUntil       *time.Time `json:"accessUntil,omitempty"`
-	TrialUntil        *time.Time `json:"trialUntil,omitempty"`
-	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
-	CanceledAt        *time.Time `json:"canceledAt,omitempty"`
-	RefreshedAt       time.Time  `json:"refreshedAt"`
+	SupportAmountCents int64      `json:"supportAmountCents"`
+	StartedAt          *time.Time `json:"startedAt,omitempty"`
+	ID                 string     `json:"id"`
+	CustomerID         string     `json:"customerId"`
+	PriceID            string     `json:"priceId"`
+	Status             string     `json:"status"`
+	Quantity           int        `json:"quantity"`
+	ItemCount          int        `json:"itemCount"`
+	AccessUntil        *time.Time `json:"accessUntil,omitempty"`
+	TrialUntil         *time.Time `json:"trialUntil,omitempty"`
+	CancelAtPeriodEnd  bool       `json:"cancelAtPeriodEnd"`
+	CanceledAt         *time.Time `json:"canceledAt,omitempty"`
+	RefreshedAt        time.Time  `json:"refreshedAt"`
 }
 
 // Comp is an administrator-granted complimentary access window.

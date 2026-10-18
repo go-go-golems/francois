@@ -1,0 +1,2 @@
+ok  	github.com/go-go-golems/francois/pkg/catalog	0.336s
+ok  	github.com/go-go-golems/francois/pkg/catalog/payments	0.207s

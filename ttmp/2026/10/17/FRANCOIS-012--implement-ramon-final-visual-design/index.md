@@ -7,7 +7,13 @@ Topics:
 DocType: index
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/payments/gateway.go
+      Note: Stripe recurring checkout boundary
+    - Path: repo://pkg/catalog/web/templates/pricing.tmpl
+      Note: Final support page and contribution form
+    - Path: repo://ui/catalog/public.ts
+      Note: Contribution controls and hosted checkout binding
 ExternalSources: []
 Summary: Detailed intern guide for a small concrete implementation; runtime work remains open.
 LastUpdated: 2026-10-17T15:30:25.528444728-04:00
@@ -16,6 +22,8 @@ WhenToUse: Planning and reviewing this implementation.
 ---
 
 # Final visual redesign intern implementation guide
+
+The follow-up [support contribution guide](design-doc/02-restore-ramon-final-support-contribution-page.md) documents the restored 42 USD monthly selector, complete Stripe checkout, free-account callout and confirmed supporter thank-you view. See diary Steps 6–7 and the actual sandbox checkout receipt for validation. This follow-up is locally qualified and awaits production deployment.
 
 Implemented the scoped Final visual design: shared Go/React shell, compact searchable archive, editorial experiment pages, top current-release download and explicit-start isolated runner. Local preview: http://localhost:18792 (fake backend). Email-link sign-in remains FRANCOIS-013.
 

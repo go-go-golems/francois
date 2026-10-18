@@ -14,7 +14,8 @@ function Routes() {
   if (parts[0] === "instances" && parts[1]) return <Launcher id={parts[1]} />;
   let page: React.ReactNode;
   if (parts[0] === "instances") page = <Instances />;
-  else if (parts[0] === "account") page = <Account />;
+  else if (parts[0] === "account" || parts[0] === "thank-you")
+    page = <Account />;
   else if (parts[0] === "admin") page = <Admin />;
   else if (parts[0] === "studio") page = <Studio />;
   else
