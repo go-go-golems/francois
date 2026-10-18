@@ -561,8 +561,7 @@ Rebased the completed feature onto the user-merged PR and deployed its official 
 Investigated the follow-up against the deployed settings and aggregate billing records, then implemented the one-time year action and unified subscriber resolution. The previous adjustable-monthly flow intentionally retained Free access; the user now explicitly requests that every subscriber use the one paid tier, so that behavior is replaced. This checkpoint precedes qualification.
 
 ### Prompt Context
-**User prompt (verbatim):** "- fund a year also goes to stripe (it's the max price stripe supports). 
-- now that we have only one subscription tier, we need to make every subscriber in that tier."
+**User prompt (verbatim, JSON-encoded):** `"- fund a year also goes to stripe (it's the max price stripe supports). \n- now that we have only one subscription tier, we need to make every subscriber in that tier."`
 **Assistant interpretation:** Make the year action a real fixed-amount Stripe payment and make every confirmed subscriber resolve to the existing paid Subscriber plan.
 **Inferred user intent:** Complete both payment choices with one straightforward subscriber entitlement, without migrating or duplicating Stripe subscriptions.
 
@@ -601,3 +600,58 @@ Investigated the follow-up against the deployed settings and aggregate billing r
 ### Technical details
 - Fixed year amount: 99,999,999 cents, USD, single payment. Monthly support keeps its selected amount and monthly recurrence.
 - Stripe source: https://docs.stripe.com/currencies
+
+## Step 11: Verify maximum Stripe payment, unified tier and refund revocation
+
+Qualified the complete follow-up with database tests and a real 999,999.99 USD Stripe sandbox payment. The same existing monthly supporter held the Subscriber tier before the year purchase, during its confirmed year standing and after its sandbox refund. Checkout used payment mode and created no recurring subscription. No production payment was submitted.
+
+### Prompt Context
+**User prompt:** See Step 10.
+**Assistant interpretation:** Finish the complete payment/tier correction, validate it once at the feature boundary and preserve reviewable evidence.
+**Inferred user intent:** Make the year action work end-to-end and put all confirmed subscribers in the same tier.
+**Commit (implementation):** 570439f — Unify subscriber entitlement and add one-time Stripe year funding.
+
+### What I did
+- Added Stripe payload/projection tests for exact 99,999,999-cent one-time payment, omitted recurrence, server metadata and refund visibility.
+- Added service/store tests for unpaid rejection, one-time checkout reuse, immutable paid-through date on replay, authoritative confirmation, refund revocation and purchase by an existing monthly subscriber.
+- Updated earlier tests that deliberately expected adjustable support to stay Free or payment prices to select different subscriber tiers.
+- Made return polling confirm the exact checkout attempt’s paid-through projection. An existing monthly supporter cannot prematurely confirm a new year purchase merely by already being active.
+- Added scripts 10–11 for the isolated sandbox journey/settings fixture. Captured confirmed year-funder pages at 1440/390px and refunded the test payment afterward.
+
+### Why
+- Payment mode and exact charge amount are insufficient unless the same owner-bound confirmation grants standing and refunds revoke it. Real Stripe validation covers those integration boundaries.
+- Computed entitlement mapping updates existing active subscribers without changing roles, charging again or rewriting Stripe objects.
+
+### What worked
+- Full database-backed `go test ./... -count=1` passed: catalog 28.318s, payments 3.991s; focused year/support tests passed separately.
+- `pnpm check`, nine frontend/worker tests, embedded frontend build, Go build, lint and logcopter checks passed.
+- Real sandbox receipt: amount 99,999,999 cents, mode payment, no recurring subscription, confirmed paid year, no support prompts and Subscriber tier before/during/after refund.
+- Sandbox refund removed year standing and preserved the existing monthly subscription’s Subscriber entitlement.
+- Both desktop/mobile screenshots fit without horizontal overflow; reviewed the mobile funded-year view visually.
+
+### What didn't work
+- Initial full suite failed three old presentation/policy tests: TestResolveEntitlement expected supporter or Free instead of the unified tier; TestPlans expected the old lower-tier workspace restrictions; TestSupporterPresentation reported `contribution unexpectedly grants paid privileges`. Updated those superseded expectations and reran the focused/final suite successfully.
+- First real-browser run stopped before payment with `actual: 'free', expected: 'subscriber'` for the preview plan. The settings fixture used `INSERT ... SELECT ... FROM platform_settings` on an empty table, so it inserted zero rows and the server kept Free-only defaults. Added a small generator using `settings.Defaults()` plus Subscriber and inserted the complete fixture document; the rerun passed.
+- Git whitespace checking flagged the preserved prompt’s trailing space. Kept its exact text in JSON-encoded form to preserve that whitespace without adding trailing file whitespace.
+
+### What I learned
+- Existing-supporter returns need attempt-specific confirmation. The general supporter boolean is true before a year purchase, so it cannot prove the new payment completed.
+- Default settings can be virtual revision zero with no database row; a fixture cannot assume an existing row to clone.
+
+### What was tricky to build
+- Keep the paid-through time anchored to the actual charge rather than webhook arrival or refresh time. The exact checkout row owns its projection, and replay cannot extend it.
+- A full refund clears only that year’s standing; another active monthly subscription still grants the single tier.
+
+### What warrants a second pair of eyes
+- Review maximum fixed charge, no recurrence, payment-owner validation, atomic projection, refund refresh and the exact-attempt UI gate. Review that free registrants still remain Free because role alone is not proof of payment.
+
+### What should be done in the future
+- Review and deploy the follow-up. Production currently remains on sha-08332bb until the new source image is merged/released.
+
+### Code review instructions
+- Start with year-funding-sandbox.json, the two year-funding-confirmed screenshots and the current single-tier guide. Then read gateway/service year handling, migration 016, store/year_support.go, policy acceptance and entitlement resolution.
+- Scripts 10–11 are fixed to the local preview and require a test-mode Stripe credential; they never accept a production payment path.
+
+### Technical details
+- Sandbox payment was refunded after evidence capture. Temporary cookies were revoked; no key, cookie or hosted checkout URL is stored in ticket evidence.
+- Production preflight aggregates: two active subscription rows, one marked custom-monthly support; one paid Subscriber configuration. Actual Stripe subscription objects require no migration.

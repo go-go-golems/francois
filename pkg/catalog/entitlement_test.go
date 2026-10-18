@@ -41,11 +41,11 @@ func TestResolveEntitlement(t *testing.T) {
 		plan, source string
 	}{
 		{"free", store.User{Role: "subscriber"}, billing.Decision{Reason: billing.ReasonRequired}, "free", SourceFree},
-		{"monthly supporter", store.User{Role: "subscriber"}, sub("price_sup_m"), "supporter", SourceSubscription},
-		{"yearly supporter", store.User{Role: "subscriber"}, sub("price_sup_y"), "supporter", SourceSubscription},
+		{"monthly supporter", store.User{Role: "subscriber"}, sub("price_sup_m"), "studio", SourceSubscription},
+		{"yearly supporter", store.User{Role: "subscriber"}, sub("price_sup_y"), "studio", SourceSubscription},
 		{"studio", store.User{Role: "subscriber"}, sub("price_studio_m"), "studio", SourceSubscription},
-		{"unknown price", store.User{Role: "subscriber"}, sub("price_gone"), "free", SourceFree},
-		{"trial", store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonTrial, PriceID: "price_sup_m"}, "supporter", SourceTrial},
+		{"approved inline price", store.User{Role: "subscriber"}, sub("price_inline"), "studio", SourceSubscription},
+		{"trial", store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonTrial, PriceID: "price_sup_m"}, "studio", SourceTrial},
 		{"grant without plan", store.User{Role: "subscriber"}, comp(""), "studio", SourceComplimentary},
 		{"grant with plan", store.User{Role: "subscriber"}, comp("friends"), "friends", SourceComplimentary},
 		{"grant with unknown plan", store.User{Role: "subscriber"}, comp("gone"), "studio", SourceComplimentary},

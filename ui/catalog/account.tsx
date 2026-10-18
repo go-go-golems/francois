@@ -22,6 +22,14 @@ export function Account() {
     skip: !session?.authenticated,
     pollingInterval: polling ? 2500 : 0,
   });
+  const returnedAttempt = a?.checkouts.find(
+    (checkout) => checkout.sessionId === returned,
+  );
+  const returnedConfirmed =
+    !!returnedAttempt &&
+    (returnedAttempt.price === "support:year:99999999"
+      ? !!returnedAttempt.supportUntil
+      : !!a?.support.active);
   const [portal, { isLoading: opening }] = api.usePortalMutation();
   const [refresh] = api.useRefreshBillingMutation();
   const dispatch = useDispatch();
@@ -34,12 +42,12 @@ export function Account() {
     return () => clearTimeout(stop);
   }, [returned, session?.authenticated]);
   useEffect(() => {
-    if (polling && a?.support.active) {
+    if (polling && returnedConfirmed) {
       setPolling(false);
       dispatch(api.util.invalidateTags(["Session"]));
       dispatch(show({ text: "Thank you for supporting the lab." }));
     }
-  }, [polling, a?.support.active]);
+  }, [polling, returnedConfirmed]);
   if (!session)
     return (
       <main>
@@ -116,7 +124,9 @@ export function Account() {
             <span>{a.support.active ? "Support" : "Access"}</span>
             <p>
               {a.support.active && a.support.amountCents > 0
-                ? a.support.kind === "year" ? `${(a.support.amountCents / 100).toLocaleString("en-US",{minimumFractionDigits:2})} USD. A year funded.` : `${a.support.amountCents / 100} USD a month.`
+                ? a.support.kind === "year"
+                  ? `${(a.support.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} USD. A year funded.`
+                  : `${a.support.amountCents / 100} USD a month.`
                 : a.entitlement.plan.name}
             </p>
           </div>
@@ -135,13 +145,15 @@ export function Account() {
           )}
           {a.support.active && (
             <p>
-              {a.support.kind === "year" ? "Thank you for funding a year. This was a single payment; it will not renew." : "You can stop any time. There will be no further payments, and everything stays free and open to you."}
+              {a.support.kind === "year"
+                ? "Thank you for funding a year. This was a single payment; it will not renew."
+                : "You can stop any time. There will be no further payments, and everything stays free and open to you."}
             </p>
           )}
-          {polling && !a.support.active && (
+          {polling && !returnedConfirmed && (
             <p role="status">Checking your subscription…</p>
           )}
-          {returned && !polling && !a.support.active && (
+          {returned && !polling && !returnedConfirmed && (
             <p role="status">
               Your payment is still being confirmed. You can check again by
               reloading this page or manage your billing below.

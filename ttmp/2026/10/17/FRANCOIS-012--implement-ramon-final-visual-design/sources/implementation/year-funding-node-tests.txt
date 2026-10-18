@@ -1,0 +1,21 @@
+
+> francois@ test /home/manuel/code/wesen/go-go-golems/francois
+> node --import tsx tests/run.ts
+
+✔ normalization copies turns and merges adjacent roles (22.254208ms)
+✔ JSON reads final fenced values and rejects truncated completions (1.587108ms)
+✔ refs validate synchronously and query snapshots retain identity (51.880517ms)
+✔ local writes emit pending snapshots and roll back rejected changes (46.732898ms)
+✔ provider failures distinguish authentication and limits without leaking diagnostics (3.387997ms)
+✔ date presets and inclusive boundaries use UTC across DST, leap years and year ends (68.231613ms)
+✔ daily charts sort by calendar day, zero-fill gaps and preserve direct versus Other (2.216754ms)
+✔ SVG graphs expose exact daily values and render zero and one-day data without invalid coordinates (58.085752ms)
+✔ instance launch only accepts its exact child and origin, and cleans up pending replies (4.802673ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 771.461494

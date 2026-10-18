@@ -23,6 +23,8 @@ WhenToUse: Planning and reviewing this implementation.
 
 # Final visual redesign intern implementation guide
 
+The current [single Subscriber tier and one-time year-funding guide](design-doc/03-single-subscriber-tier-and-one-time-year-funding.md) documents the follow-up: real maximum-amount Stripe year funding and one paid tier for all confirmed subscribers. See diary Steps 10–11 and the sandbox payment/refund receipt. This follow-up awaits production deployment.
+
 The follow-up [support contribution guide](design-doc/02-restore-ramon-final-support-contribution-page.md) documents the restored 42 USD monthly selector, complete Stripe checkout, free-account callout and confirmed supporter thank-you view. See diary Steps 6–7 and the actual sandbox checkout receipt for validation. The follow-up is deployed on production k3s as `sha-08332bb`; see the [rollout receipt](sources/implementation/support-production.json) and diary Step 9.
 
 Implemented the scoped Final visual design: shared Go/React shell, compact searchable archive, editorial experiment pages, top current-release download and explicit-start isolated runner. Local preview: http://localhost:18792 (fake backend). Email-link sign-in remains FRANCOIS-013.

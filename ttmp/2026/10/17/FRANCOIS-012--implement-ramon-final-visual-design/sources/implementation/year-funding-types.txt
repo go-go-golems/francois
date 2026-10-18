@@ -1,0 +1,3 @@
+
+> francois@ check /home/manuel/code/wesen/go-go-golems/francois
+> tsc --noEmit

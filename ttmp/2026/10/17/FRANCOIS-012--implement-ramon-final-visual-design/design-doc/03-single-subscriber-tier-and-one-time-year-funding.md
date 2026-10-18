@@ -7,7 +7,13 @@ Topics:
 DocType: design-doc
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/entitlement.go
+      Note: One paid Subscriber resolution
+    - Path: repo://pkg/catalog/payments/gateway.go
+      Note: Fixed one-time maximum charge and authoritative payment readback
+    - Path: repo://pkg/catalog/store/year_support.go
+      Note: Owner-bound paid-through standing
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-10-17T22:09:04.281110631-04:00
@@ -59,3 +65,16 @@ The account summary distinguishes `kind: month` from `kind: year`. A year funder
 - `pricing.tmpl`, `ui/catalog/public.ts`, `account.tsx`: working year action and truthful funded-year presentation.
 
 Qualification happens after implementation: database-backed policy/service/catalog tests, TypeScript/build/lint, then one isolated sandbox checkout at the exact maximum amount and a real monthly subscriber entitlement readback. Do not submit production payments or rewrite Stripe subscriptions as a migration mechanism.
+
+
+## Qualification result
+
+Implemented and locally qualified on `feat/year-funding-single-subscriber`, initial implementation commit `570439f`. Full PostgreSQL-backed Go suite passed (catalog 28.318s, payments 3.991s), including existing-user policy and new year payment confirmation/refund tests. TypeScript checks, nine frontend tests, embedded asset build, Go build, lint and logcopter checks passed.
+
+The real sandbox run paid 99,999,999 cents through hosted Checkout in one-time payment mode. It confirmed no recurring subscription was created, showed a funded-year thank-you view, retained the single Subscriber plan for the existing monthly supporter, and revoked year standing after a sandbox refund while preserving the monthly Subscriber tier. Desktop/mobile screenshots and `year-funding-sandbox.json` preserve the result. No production payment or deployment occurred in this implementation checkpoint.
+
+The return flow also checks confirmation for the exact owner-bound checkout attempt. An already-active monthly subscription cannot prematurely mark a new year payment as confirmed. Migration 016’s paid-through field supplies that per-attempt proof; the existing bounded polling remains unchanged.
+
+![Funded year, desktop](../sources/implementation/year-funding-confirmed-1440.png)
+
+![Funded year, mobile](../sources/implementation/year-funding-confirmed-390.png)

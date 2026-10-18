@@ -70,7 +70,7 @@ func TestPlans(t *testing.T) {
 
 	// The session reports the resolved plan.
 	_, s := e.portal(&sup, "GET", "/api/session", nil)
-	if plan := s["plan"].(map[string]any); plan["key"] != "supporter" || plan["source"] != SourceSubscription {
+	if plan := s["plan"].(map[string]any); plan["key"] != "studio" || plan["source"] != SourceSubscription {
 		t.Fatalf("session plan %v", plan)
 	}
 
@@ -80,38 +80,37 @@ func TestPlans(t *testing.T) {
 	code, supInst := create(sup, basic)
 	expect("supporter creates basic", code, supInst, 201, "")
 	code, out = create(sup, premium)
-	expect("supporter creates premium", code, out, 403, "plan_required")
+	expect("same tier creates premium", code, out, 201, "")
 	code, out = create(sup, basic)
-	expect("supporter over instance limit", code, out, 409, "instance_limit")
+	expect("same subscriber instance allowance", code, out, 201, "")
 	code, out = create(stu, premium)
 	expect("studio creates premium", code, out, 201, "")
 	code, out = create(cleo, premium)
 	expect("staff create premium", code, out, 201, "")
 
 	// Downloads follow the same rule.
-	if code, _, _ := e.do(&sup, "portal.test", "GET", downloadPath(t, e, premium), nil, nil); code != 403 {
+	if code, _, _ := e.do(&sup, "portal.test", "GET", downloadPath(t, e, premium), nil, nil); code != 200 {
 		t.Fatalf("supporter downloads premium: %d", code)
 	}
 	if code, _, _ := e.do(&stu, "portal.test", "GET", downloadPath(t, e, premium), nil, nil); code != 200 {
 		t.Fatalf("studio downloads premium: %d", code)
 	}
 
-	// The owner's plan sets the member limit (supporter: owner + 1).
+	// All paid subscribers share the same member allowance.
 	code, out = e.portal(&sup, "POST", "/api/instances/"+supInst["id"].(string)+"/members", map[string]string{"email": "stan@example.com", "role": "viewer"})
 	expect("first member", code, out, 200, "")
 	code, out = e.portal(&sup, "POST", "/api/instances/"+supInst["id"].(string)+"/members", map[string]string{"email": "fay@example.com", "role": "viewer"})
-	expect("member limit", code, out, 409, "member_limit")
+	expect("same subscriber member allowance", code, out, 200, "")
 
-	// A downgrade keeps data; workspaces beyond the new limit stop launching
-	// and so do artifacts the new plan does not include.
+	// Changing an existing payment price keeps the same subscriber tier and data.
 	_, a1 := create(stu, basic)
 	_, a2 := create(stu, basic)
 	e.subscribe(stu, "price_sup")
 	_, status, errc := e.launch(stu, a1) // second-oldest workspace of stan (premium is first)
-	if status != 403 || errc != "over_plan_limit" {
+	if status != 200 {
 		t.Fatalf("over-limit launch: %d %s", status, errc)
 	}
-	if _, status, errc = e.launch(stu, a2); status != 403 || errc != "over_plan_limit" {
+	if _, status, errc = e.launch(stu, a2); status != 200 {
 		t.Fatalf("over-limit launch 2: %d %s", status, errc)
 	}
 	insts, _ := e.store.MemberInstances(ctx, stu.user.ID)

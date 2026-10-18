@@ -129,22 +129,24 @@ WHERE billing_subscriptions.user_id=EXCLUDED.user_id`,
 // Checkout attempts.
 
 type CheckoutAttempt struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"userId"`
-	Price      string     `json:"price"`
-	State      string     `json:"state"`
-	SessionID  *string    `json:"sessionId,omitempty"`
-	SessionURL *string    `json:"-"`
-	ExpiresAt  *time.Time `json:"expiresAt,omitempty"`
-	ErrorCode  *string    `json:"errorCode,omitempty"`
-	CreatedAt  time.Time  `json:"createdAt"`
+	SupportPaidAt *time.Time `json:"supportPaidAt,omitempty"`
+	SupportUntil  *time.Time `json:"supportUntil,omitempty"`
+	ID            string     `json:"id"`
+	UserID        string     `json:"userId"`
+	Price         string     `json:"price"`
+	State         string     `json:"state"`
+	SessionID     *string    `json:"sessionId,omitempty"`
+	SessionURL    *string    `json:"-"`
+	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
+	ErrorCode     *string    `json:"errorCode,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
 }
 
-const attemptColumns = `id,user_id,price,state,session_id,session_url,expires_at,error_code,created_at`
+const attemptColumns = `id,user_id,price,state,session_id,session_url,expires_at,error_code,created_at,support_paid_at,support_until`
 
 func scanAttempt(r pgx.Row) (CheckoutAttempt, error) {
 	var a CheckoutAttempt
-	err := r.Scan(&a.ID, &a.UserID, &a.Price, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt)
+	err := r.Scan(&a.ID, &a.UserID, &a.Price, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt, &a.SupportPaidAt, &a.SupportUntil)
 	return a, notFound(err)
 }
 

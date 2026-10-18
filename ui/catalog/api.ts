@@ -182,7 +182,7 @@ export type Account = {
   allowance: Allowance;
   models: { selector: string; label: string; credits: number; thinking: string[] }[];
   hasCustomer: boolean;
-  checkouts: { id: string; state: string; createdAt: string }[];
+  checkouts: { id: string; state: string; price: string; sessionId?: string; supportUntil?: string; createdAt: string }[];
   sessions: number;
   billingEnabled: boolean;
   identityIssuer: string;
