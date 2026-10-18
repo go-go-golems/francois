@@ -555,3 +555,49 @@ Rebased the completed feature onto the user-merged PR and deployed its official 
 - Release: https://github.com/go-go-golems/francois/actions/runs/39085953535
 - GitOps: https://github.com/wesen/2026-03-27--hetzner-k3s/pull/371
 - Public contribution page: https://slop.boutique/pricing
+
+## Step 10: Implement Stripe year funding and one Subscriber tier
+
+Investigated the follow-up against the deployed settings and aggregate billing records, then implemented the one-time year action and unified subscriber resolution. The previous adjustable-monthly flow intentionally retained Free access; the user now explicitly requests that every subscriber use the one paid tier, so that behavior is replaced. This checkpoint precedes qualification.
+
+### Prompt Context
+**User prompt (verbatim):** "- fund a year also goes to stripe (it's the max price stripe supports). 
+- now that we have only one subscription tier, we need to make every subscriber in that tier."
+**Assistant interpretation:** Make the year action a real fixed-amount Stripe payment and make every confirmed subscriber resolve to the existing paid Subscriber plan.
+**Inferred user intent:** Complete both payment choices with one straightforward subscriber entitlement, without migrating or duplicating Stripe subscriptions.
+
+### What I did
+- Confirmed Stripe’s documented USD maximum is 999,999.99 and saved its primary-source reference in the new active guide.
+- Read production public plans and aggregate subscription counts only: one paid Subscriber plan, two active rows, one custom-monthly-support row. No emails or payment credentials were printed.
+- Added the year checkout option to the existing endpoint/service/gateway and replaced the contact link with a checkout action.
+- Reused checkout attempts for paid-at/paid-through projection, integrated owner-bound authoritative retrieval in the existing worker and added refund refresh handling.
+- Updated support summaries and UI to distinguish monthly recurrence from a one-time funded year. Updated monthly policy acceptance and subscriber resolution to the one paid tier.
+
+### Why
+- A role shared by free registrants and paying users cannot establish paid membership. Authoritative billing state can, with no destructive backfill or Stripe subscription rewrite.
+- A one-time payment needs a fixed paid-through boundary; treating it as another monthly subscription would misrepresent both charge recurrence and access.
+
+### What worked
+- Production configuration and aggregate counts establish the exact mismatch and the target tier. Existing checkout ownership/admission and refresh worker provide the needed integration points.
+
+### What didn't work
+- No qualification results yet. Earlier monthly checkout’s Free entitlement is now a superseded product decision, not a payment-delivery failure.
+
+### What I learned
+- The current production tier configuration already needs no structural migration. New monthly support only needs to participate in the same confirmed-subscriber policy.
+
+### What was tricky to build
+- Reuse one-time checkout identity and charge time so webhook retries cannot extend a funded year. Keep the year purchase available to an existing monthly subscriber without creating a second recurring subscription.
+
+### What warrants a second pair of eyes
+- Fixed maximum amount, payment/owner/metadata checks, refund revocation, one-year idempotency and the distinction between free role membership and paid subscriber standing.
+
+### What should be done in the future
+- Qualify the completed implementation and capture a real isolated sandbox journey. No production payment or deployment is claimed here.
+
+### Code review instructions
+- Read the new active single-tier/year-funding guide, migration 016, gateway year mode, worker projection and entitlement resolution before reviewing UI copy.
+
+### Technical details
+- Fixed year amount: 99,999,999 cents, USD, single payment. Monthly support keeps its selected amount and monthly recurrence.
+- Stripe source: https://docs.stripe.com/currencies

@@ -116,7 +116,7 @@ export function Account() {
             <span>{a.support.active ? "Support" : "Access"}</span>
             <p>
               {a.support.active && a.support.amountCents > 0
-                ? `${a.support.amountCents / 100} USD a month.`
+                ? a.support.kind === "year" ? `${(a.support.amountCents / 100).toLocaleString("en-US",{minimumFractionDigits:2})} USD. A year funded.` : `${a.support.amountCents / 100} USD a month.`
                 : a.entitlement.plan.name}
             </p>
           </div>
@@ -135,8 +135,7 @@ export function Account() {
           )}
           {a.support.active && (
             <p>
-              You can stop any time. There will be no further payments, and
-              everything stays free and open to you.
+              {a.support.kind === "year" ? "Thank you for funding a year. This was a single payment; it will not renew." : "You can stop any time. There will be no further payments, and everything stays free and open to you."}
             </p>
           )}
           {polling && !a.support.active && (

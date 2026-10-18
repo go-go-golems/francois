@@ -327,6 +327,18 @@ function bindSupport(form: HTMLFormElement) {
   });
 }
 
+function bindYearSupport(form: HTMLFormElement) {
+ const button=form.querySelector<HTMLButtonElement>("button")!;
+ form.addEventListener("submit",async event=>{
+  event.preventDefault();if(button.disabled)return;button.disabled=true;
+  try {
+   const session=await getSession();
+   if(!session.authenticated || session.user?.role==="guest") {location.assign("/signin?return="+encodeURIComponent("/pricing?fund=year"));return;}
+   const result=await post<{url:string}>("/api/billing/support",{kind:"year"});location.assign(result.url);
+  }catch(err){fail(form,(err as Error).message);button.disabled=false;}
+ });
+}
+
 function bindSignOut(btn: HTMLElement) {
   btn.addEventListener("click", async () => {
     try {
@@ -353,6 +365,7 @@ function main() {
   document
     .querySelectorAll<HTMLFormElement>("[data-support-monthly]")
     .forEach(bindSupport);
+  document.querySelectorAll<HTMLFormElement>("[data-support-year]").forEach(bindYearSupport);
   document.querySelectorAll<HTMLElement>("[data-actions]").forEach((box) => {
     renderActions(box).catch(() => {
       /* keep the server-rendered fallback */

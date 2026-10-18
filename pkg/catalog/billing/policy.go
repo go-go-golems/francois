@@ -78,7 +78,7 @@ func (p Policy) Access(a Account, subs []Subscription, comps []Comp, now time.Ti
 	eligible := []Subscription{}
 	incomplete := false
 	for _, s := range subs {
-		if !p.AcceptedPrices[s.PriceID] || s.Quantity != 1 || s.ItemCount != 1 {
+		if (!p.AcceptedPrices[s.PriceID] && s.SupportAmountCents <= 0) || s.Quantity != 1 || s.ItemCount != 1 {
 			continue
 		}
 		if s.Status == "incomplete" {
@@ -137,4 +137,14 @@ func (p Policy) Access(a Account, subs []Subscription, comps []Comp, now time.Ti
 // rather than a second Checkout.
 func OpenStatus(status string) bool {
 	return standing[status] || status == "incomplete"
+}
+
+// YearFundingCents is Stripe's eight-digit USD maximum, paid once.
+const YearFundingCents int64 = 99999999
+const YearFundingKey = "support:year:99999999"
+
+type YearSupport struct {
+	AttemptID string
+	PaidAt    *time.Time
+	Until     *time.Time
 }

@@ -99,7 +99,15 @@ func (s *Store) Access(ctx context.Context, p billing.Policy, u User, now time.T
 	if err != nil {
 		return billing.Decision{}, err
 	}
-	return p.Access(billing.Account{Disabled: u.Disabled}, subs, comps, now), nil
+	decision := p.Access(billing.Account{Disabled: u.Disabled}, subs, comps, now)
+	year, err := s.YearSupport(ctx, u.ID, now)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return billing.Decision{}, err
+	}
+	if !u.Disabled && year.Until != nil && (!decision.Allowed || decision.Until == nil || year.Until.After(*decision.Until)) {
+		return billing.Decision{Allowed: true, Reason: billing.ReasonSubscriber, Until: year.Until, Status: "active"}, nil
+	}
+	return decision, nil
 }
 
 // UpsertSubscriptions writes projections keyed by Stripe subscription ID. It
@@ -251,7 +259,7 @@ RETURNING event_id,type,customer_id,subscription_id,session_id,livemode,state,at
 
 // CompleteEvent writes the Customer's current subscription projections and
 // marks the event processed in one transaction, if the lease is still owned.
-func (s *Store) CompleteEvent(ctx context.Context, e StripeEvent, user string, subs []billing.Subscription, state string) error {
+func (s *Store) CompleteEvent(ctx context.Context, e StripeEvent, user string, subs []billing.Subscription, years []billing.YearSupport, state string) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -269,6 +277,12 @@ func (s *Store) CompleteEvent(ctx context.Context, e StripeEvent, user string, s
 			return err
 		}
 	}
+	for _, year := range years {
+		if _, err = tx.Exec(ctx, `UPDATE checkout_attempts SET support_paid_at=$3,support_until=$4,updated_at=now() WHERE id=$1 AND user_id=$2 AND price=$5`, year.AttemptID, user, year.PaidAt, year.Until, billing.YearFundingKey); err != nil {
+			return err
+		}
+	}
+
 	if _, err = tx.Exec(ctx, `UPDATE stripe_events SET state=$2,processed_at=now(),lease_token=NULL,lease_until=NULL,error_code=NULL WHERE event_id=$1`, e.EventID, state); err != nil {
 		return err
 	}
@@ -331,7 +345,7 @@ func (s *Store) BillingHealth(ctx context.Context) (BillingHealth, error) {
 
 // KnownCustomers with nonterminal subscriptions, for scheduled reconciliation.
 func (s *Store) CustomersToReconcile(ctx context.Context) ([]string, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT stripe_customer_id FROM billing_subscriptions WHERE status NOT IN ('canceled','incomplete_expired') AND refreshed_at < now() - interval '6 hours'`)
+	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT stripe_customer_id FROM billing_subscriptions WHERE status NOT IN ('canceled','incomplete_expired') AND refreshed_at < now() - interval '6 hours' UNION SELECT c.stripe_customer_id FROM billing_customers c JOIN checkout_attempts a ON a.user_id=c.user_id WHERE a.support_until>now() AND a.updated_at<now()-interval '6 hours'`)
 	if err != nil {
 		return nil, err
 	}

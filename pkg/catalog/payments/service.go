@@ -71,19 +71,24 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 // attempt/Session; a request for another price retires the earlier attempt
 // first, so its Session can no longer be paid.
 func (s *Service) Checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string) (string, error) {
-	return s.checkout(ctx, u, price, accepted, portal, 0)
+	return s.checkout(ctx, u, price, accepted, portal, 0, false)
 }
 
-// Support creates a monthly USD contribution without changing access entitlements.
+// Support creates monthly USD support in the single Subscriber tier.
 func (s *Service) Support(ctx context.Context, u store.User, cents int64, accepted map[string]bool, portal string) (string, error) {
 	if cents < 100 || cents > 999900 || cents%100 != 0 {
 		return "", errors.New("monthly support must be 1–9999 whole US dollars")
 	}
-	return s.checkout(ctx, u, "support:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents)
+	return s.checkout(ctx, u, "support:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents, false)
 }
 
-func (s *Service) checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string, supportAmount int64) (string, error) {
-	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil {
+// FundYear opens a one-time USD payment at Stripe's maximum charge amount.
+func (s *Service) FundYear(ctx context.Context, u store.User, portal string) (string, error) {
+	return s.checkout(ctx, u, billing.YearFundingKey, nil, portal, 0, true)
+}
+
+func (s *Service) checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string, supportAmount int64, yearFunding bool) (string, error) {
+	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil && !yearFunding {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
 		if err != nil {
 			return "", errors.Wrap(err, "refresh subscriptions")
@@ -121,11 +126,11 @@ func (s *Service) checkout(ctx context.Context, u store.User, price string, acce
 	// Pending: first try or an uncertain earlier try; the same key returns
 	// the same Session from Stripe.
 	successPath := "/account"
-	if supportAmount > 0 {
+	if supportAmount > 0 || yearFunding {
 		successPath = "/thank-you"
 	}
 	cs, err := s.Gateway.CreateCheckout(ctx, CheckoutRequest{
-		CustomerID: customer, PriceID: price, SupportAmountCents: supportAmount, UserID: u.ID, AttemptID: attempt.ID,
+		CustomerID: customer, PriceID: price, SupportAmountCents: supportAmount, YearFunding: yearFunding, UserID: u.ID, AttemptID: attempt.ID,
 		SuccessURL:     portal + successPath + "?checkout={CHECKOUT_SESSION_ID}",
 		CancelURL:      portal + "/account",
 		IdempotencyKey: s.Config.Deployment + "-checkout-" + attempt.ID,
@@ -279,7 +284,7 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 		}
 	}
 	if customer == "" {
-		return true, s.Store.CompleteEvent(ctx, e, "", nil, "ignored")
+		return true, s.Store.CompleteEvent(ctx, e, "", nil, nil, "ignored")
 	}
 	user, err := s.Store.UserForCustomer(ctx, customer)
 	if errors.Is(err, store.ErrNotFound) {
@@ -290,7 +295,7 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 			return true, s.Store.FailEvent(ctx, e, "stripe_unavailable", backoff, terminal)
 		}
 		if dep != s.Config.Deployment {
-			return true, s.Store.CompleteEvent(ctx, e, "", nil, "ignored")
+			return true, s.Store.CompleteEvent(ctx, e, "", nil, nil, "ignored")
 		}
 		// Never create users from event data; retry in case the mapping
 		// write is still in flight, then surface for operators.
@@ -303,6 +308,28 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, s.Store.FailEvent(ctx, e, "stripe_unavailable", backoff, terminal)
 	}
+	attempts, err := s.Store.YearCheckouts(call, user)
+	if err != nil {
+		return true, err
+	}
+	var years []billing.YearSupport
+	for _, attempt := range attempts {
+		cs, err := s.Gateway.RetrieveCheckout(call, *attempt.SessionID)
+		if err != nil {
+			return true, s.Store.FailEvent(ctx, e, "stripe_unavailable", backoff, terminal)
+		}
+		if cs.CustomerID != customer {
+			return true, s.Store.FailEvent(ctx, e, "checkout_owner_mismatch", backoff, terminal)
+		}
+		year := billing.YearSupport{AttemptID: attempt.ID}
+		if cs.Status == "complete" && cs.YearFunding && cs.PaymentPaid && !cs.Refunded && cs.PaidAt != nil {
+			until := cs.PaidAt.AddDate(1, 0, 0)
+			year.PaidAt = cs.PaidAt
+			year.Until = &until
+		}
+		years = append(years, year)
+	}
+
 	if e.SessionID != "" {
 		if a, aerr := s.Store.CheckoutBySession(ctx, e.SessionID); aerr == nil {
 			state := "completed"
@@ -312,7 +339,7 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 			_ = s.Store.FinishCheckout(ctx, a.ID, state, "")
 		}
 	}
-	if err = s.Store.CompleteEvent(ctx, e, user, subs, "processed"); err != nil {
+	if err = s.Store.CompleteEvent(ctx, e, user, subs, years, "processed"); err != nil {
 		return true, err
 	}
 	if s.OnChange != nil {

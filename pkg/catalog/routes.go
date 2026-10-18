@@ -329,7 +329,11 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
 	}
-	support := supportStatus(subs, doc, time.Now())
+	support, err := s.supportSummary(ctx, p.User, subs, doc)
+	if err != nil {
+		httpx.Fail(w, 503, "unavailable", "Account unavailable")
+		return
+	}
 	if support.Active && support.StartedAt != nil {
 		if err := s.Store.Pool.QueryRow(ctx, `SELECT count(*) FROM catalog_artifacts a WHERE a.visibility='listed' AND (SELECT min(r.published_at) FROM releases r WHERE r.artifact_id=a.id AND r.state='published') >= $1`, support.StartedAt).Scan(&support.Experiments); err != nil {
 			httpx.Fail(w, 503, "unavailable", "Account unavailable")

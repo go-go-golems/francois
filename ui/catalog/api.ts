@@ -173,7 +173,7 @@ export type AccessGrant = {
   revokedAt?: string;
 };
 export type Account = {
- support: {active:boolean; amountCents:number; startedAt?:string; until?:string; cancelScheduled:boolean; experiments:number};
+ support: {kind:"month"|"year"; active:boolean; amountCents:number; startedAt?:string; until?:string; cancelScheduled:boolean; experiments:number};
   user: SessionUser & { createdAt: string };
   access: Decision;
   entitlement: Entitlement;

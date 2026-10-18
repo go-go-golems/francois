@@ -15,17 +15,23 @@ import (
 )
 
 type CheckoutRequest struct {
+	YearFunding                            bool
 	SupportAmountCents                     int64
 	CustomerID, PriceID, UserID, AttemptID string
 	SuccessURL, CancelURL, IdempotencyKey  string
 }
 
 type CheckoutSession struct {
-	ID         string
-	URL        string
-	Status     string // open|complete|expired
-	CustomerID string
-	ExpiresAt  time.Time
+	YearFunding bool
+	PaymentPaid bool
+	Refunded    bool
+	AmountCents int64
+	PaidAt      *time.Time
+	ID          string
+	URL         string
+	Status      string // open|complete|expired
+	CustomerID  string
+	ExpiresAt   time.Time
 }
 
 // Event is the minimal routing data extracted from a verified webhook.
@@ -95,6 +101,17 @@ func session(s *stripe.CheckoutSession) CheckoutSession {
 	if s.Customer != nil {
 		out.CustomerID = s.Customer.ID
 	}
+	out.AmountCents = s.AmountTotal
+	out.YearFunding = s.Mode == stripe.CheckoutSessionModePayment && s.Currency == stripe.CurrencyUSD && s.AmountTotal == billing.YearFundingCents && s.Metadata["francois_year_funding"] == "true"
+	out.PaymentPaid = s.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid
+	if s.PaymentIntent != nil && s.PaymentIntent.LatestCharge != nil {
+		c := s.PaymentIntent.LatestCharge
+		out.Refunded = c.Refunded || (c.Amount > 0 && c.AmountRefunded >= c.Amount) || c.Disputed
+		if c.Created > 0 {
+			t := time.Unix(c.Created, 0).UTC()
+			out.PaidAt = &t
+		}
+	}
 	return out
 }
 
@@ -117,6 +134,14 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 		}}}
 		p.SubscriptionData.Metadata["francois_monthly_support"] = "true"
 	}
+	if r.YearFunding {
+		p.Mode = stripe.String(stripe.CheckoutSessionModePayment)
+		p.SubscriptionData = nil
+		p.LineItems = []*stripe.CheckoutSessionCreateLineItemParams{{Quantity: stripe.Int64(1), PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{Currency: stripe.String("usd"), UnitAmount: stripe.Int64(billing.YearFundingCents), ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Fund a year of slop.boutique")}}}}
+		p.Metadata["francois_year_funding"] = "true"
+		p.InvoiceCreation = &stripe.CheckoutSessionCreateInvoiceCreationParams{Enabled: stripe.Bool(true)}
+	}
+
 	p.SetIdempotencyKey(r.IdempotencyKey)
 	s, err := g.client.V1CheckoutSessions.Create(ctx, p)
 	if err != nil {
@@ -126,7 +151,9 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 }
 
 func (g *stripeGateway) RetrieveCheckout(ctx context.Context, id string) (CheckoutSession, error) {
-	s, err := g.client.V1CheckoutSessions.Retrieve(ctx, id, &stripe.CheckoutSessionRetrieveParams{})
+	p := &stripe.CheckoutSessionRetrieveParams{}
+	p.AddExpand("payment_intent.latest_charge")
+	s, err := g.client.V1CheckoutSessions.Retrieve(ctx, id, p)
 	if err != nil {
 		return CheckoutSession{}, err
 	}
@@ -224,6 +251,7 @@ func (g *stripeGateway) CustomerSubscriptions(ctx context.Context, customer stri
 }
 
 var supported = map[string]bool{
+	"charge.refunded":               true,
 	"customer.subscription.created": true, "customer.subscription.updated": true, "customer.subscription.deleted": true,
 	"customer.subscription.paused": true, "customer.subscription.resumed": true,
 	"checkout.session.completed": true, "checkout.session.expired": true,
