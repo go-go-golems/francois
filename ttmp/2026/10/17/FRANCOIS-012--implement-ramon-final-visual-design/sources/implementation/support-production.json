@@ -1,0 +1,89 @@
+{
+  "at": "2026-10-18T01:22:12.429546+00:00",
+  "image": "ghcr.io/go-go-golems/francois:sha-08332bb",
+  "replicas": {
+    "ready": 1,
+    "updated": 1
+  },
+  "argo": {
+    "sync": "Synced",
+    "health": "Healthy",
+    "phase": "Succeeded",
+    "revision": "de029e0dd79947aea9d36dcd631b09cfbe9c2902"
+  },
+  "migration": "015_monthly_support.sql|2026-10-18 01:21:49.336381+00",
+  "unifiedPendingTables": "t|t|t",
+  "sites": [
+    {
+      "origin": "https://slop.boutique",
+      "checks": [
+        {
+          "path": "/healthz",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/apps",
+          "status": 200
+        },
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200
+        },
+        {
+          "path": "/feed.xml",
+          "status": 200
+        }
+      ],
+      "pricing42USD": true,
+      "thankYouRoute": true,
+      "signinNoStore": true,
+      "signinNoReferrer": true,
+      "allMethodsAndSignupGuidance": true,
+      "emailMaxLength": 200,
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "authenticated": false
+    },
+    {
+      "origin": "https://francois.yolo.scapegoat.dev",
+      "checks": [
+        {
+          "path": "/healthz",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/apps",
+          "status": 200
+        },
+        {
+          "path": "/apps/lattice-deck",
+          "status": 200
+        },
+        {
+          "path": "/feed.xml",
+          "status": 200
+        }
+      ],
+      "pricing42USD": true,
+      "thankYouRoute": true,
+      "signinNoStore": true,
+      "signinNoReferrer": true,
+      "allMethodsAndSignupGuidance": true,
+      "emailMaxLength": 200,
+      "signupAvailable": true,
+      "journalEnabled": false,
+      "authenticated": false
+    }
+  ],
+  "productionEmailRequested": false,
+  "credentialsSaved": false,
+  "productionCheckoutRequested": false
+}

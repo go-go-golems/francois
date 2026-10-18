@@ -64,7 +64,7 @@ Implement the whole flow first, then run the database-backed suite, TypeScript t
 
 Implementation is complete on `feat/ramon-support-pricing`. The database-backed full Go suite passed (catalog 15.439s); focused presentation checks also passed after removing unused pricing-plan assembly. TypeScript checks, nine frontend/worker tests, embedded frontend build, Go build, lint and logger checks passed.
 
-Scripts 04–07 preserve the local preview and evidence workflow. Script 05 captured pricing, free account and seeded supporter state at 1440/390px and opened real Stripe sandbox Checkout at the selected 43 USD. Script 06 paid through the actual hosted sandbox form with Stripe’s test card, returned to `/thank-you`, and verified the authoritative 4300-cent subscription projection, free access source, absent support prompts and working Customer Portal. Its test subscription was scheduled to cancel. Script 07 captured clean screenshots from the confirmed real sandbox supporter. No production deployment was performed.
+Scripts 04–07 preserve the local preview and evidence workflow. Script 05 captured pricing, free account and seeded supporter state at 1440/390px and opened real Stripe sandbox Checkout at the selected 43 USD. Script 06 paid through the actual hosted sandbox form with Stripe’s test card, returned to `/thank-you`, and verified the authoritative 4300-cent subscription projection, free access source, absent support prompts and working Customer Portal. Its test subscription was scheduled to cancel. Script 07 captured clean screenshots from the confirmed real sandbox supporter. That qualification checkpoint preceded production deployment; the subsequent release is recorded below.
 
 Receipts: `sources/implementation/support-browser.json`, `support-sandbox-checkout.json` and `support-go-tests.txt`. All cookies, credentials and hosted checkout URLs remain in private temporary storage and are excluded from ticket evidence.
 
@@ -75,3 +75,10 @@ Receipts: `sources/implementation/support-browser.json`, `support-sandbox-checko
 ![Confirmed sandbox supporter, desktop](../sources/implementation/support-real-sandbox-thank-you-1440.png)
 
 ![Confirmed sandbox supporter, mobile](../sources/implementation/support-real-sandbox-thank-you-390.png)
+
+
+## Production deployment
+
+Source PR #15 was merged as `08332bb6649ebfba671a46f0a2138d1a54416ca7`. The feature branch was rebased cleanly onto that merge and the local checkout fast-forwarded to main. Official release run 39085953535 published `ghcr.io/go-go-golems/francois:sha-08332bb`; validated GitOps PR #371 merged as `de029e0dd79947aea9d36dcd631b09cfbe9c2902`.
+
+The production receipt at 2026-10-18T01:22:12Z confirms the exact image, one ready replica, Synced/Healthy/Succeeded Argo and migration 015. Both public hostnames serve the 42 USD contribution markup and thank-you route while retaining the existing archive, RSS and three sign-in methods. Live browser captures verify working amount controls and no overflow at 1440/390px. Deployment verification did not submit a payment or an email. See `sources/implementation/support-production.json` and `support-production-pricing-*.png`.

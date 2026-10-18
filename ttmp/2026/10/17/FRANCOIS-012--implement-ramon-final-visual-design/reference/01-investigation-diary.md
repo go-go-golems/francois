@@ -499,3 +499,59 @@ Pushed the implementation and qualification evidence, then opened PR #15. Produc
 ### Technical details
 - PR: https://github.com/go-go-golems/francois/pull/15
 - Local preview: http://localhost:18796/pricing
+
+## Step 9: Rebase the merged support release and deploy to production k3s
+
+Rebased the completed feature onto the user-merged PR and deployed its official image through the existing GitOps pipeline. Production now serves Ramon’s 42 USD contribution controls; migration 015 is applied and both public origins pass read-only rollout checks. No production checkout or email was submitted during deployment verification.
+
+### Prompt Context
+**User prompt (verbatim):** "merged, rebase, deploy"
+**Assistant interpretation:** Reconcile the local branch with merged main and deploy the merged support implementation to production.
+**Inferred user intent:** Make the reviewed support experience available on slop.boutique.
+**Commit (code):** 08332bb6649ebfba671a46f0a2138d1a54416ca7 — Merge pull request #15.
+
+### What I did
+- Confirmed PR #15 was merged, fetched main and ran `git rebase origin/main` successfully on the feature branch. Switched to main and fast-forwarded to the merge.
+- Used official image release run 39085953535; it succeeded and published `ghcr.io/go-go-golems/francois:sha-08332bb`.
+- Prepared the image-only manifest in the isolated GitOps checkout and ran `bash scripts/validate_gitops.sh`: 54 packages, zero violations.
+- Verified the generated automation manifest byte-for-byte against the validated manifest. GitOps PR #371 had exactly one image-pin change and passed its validate check.
+- Merged exact PR head a711ec84150611923034db7f317c5d402fe20ecd; GitOps merge de029e0dd79947aea9d36dcd631b09cfbe9c2902.
+- Refreshed the Francois Argo application and waited for the exact image, deployment readiness and Healthy status.
+- Added read-only production verification and screenshot scripts 08–09, preserving prior qualification evidence.
+
+### Why
+- The official source/image/GitOps path retains immutable release provenance. No application configuration, identity setting, credentials or additional service needed modification.
+
+### What worked
+- Rebase completed without conflicts; local feature head equals merged source 08332bb.
+- GitOps validation passed all 54 packages. Automated deployment content matched the validated file exactly.
+- Deployment rolled out successfully; Argo is Synced/Healthy/Succeeded at the GitOps merge revision.
+- Migration `015_monthly_support.sql` applied at 2026-10-18 01:21:49.336381 UTC.
+- Receipt at 01:22:12 UTC confirms one ready/updated replica, exact image and both public hostnames.
+- Pricing includes the 42 USD form and year-funding section; `/thank-you`, health, readiness, archive, Lattice Deck and RSS return 200. Existing email/Google/GitHub sign-in and hidden-journal settings are retained.
+- Live Chromium checks at 1440/390px verified plus/minus changes 42→43→42 and no horizontal overflow, with new production screenshots.
+
+### What didn't work
+- No deployment or verification failures observed. The reused GitOps checkout retained the prior deployment’s validated image edit; before restoring it, compared its bytes with current origin/main to prove that no unexpected local change would be discarded.
+- The prior local-preview restart briefly reported `duplicate session: francois-support-012` while the old Go process exited. Once that session had exited, started a new tmux session and verified HTTP 200 with the 42 USD form. This affected the local preview only.
+
+### What I learned
+- The support release needs only its image update: startup migration handles the added projection fields, and the existing runtime Stripe configuration supports the new flow.
+
+### What was tricky to build
+- Waited for the desired image before checking rollout success, then verified database migration separately from public route availability. The existing one-replica Recreate deployment strategy was preserved.
+
+### What warrants a second pair of eyes
+- The production checks are read-only. Actual payment and confirmed supporter behavior were qualified through real Stripe sandbox Checkout in Step 7; deployment verification deliberately did not submit another payment.
+
+### What should be done in the future
+- No deployment step remains for this release.
+
+### Code review instructions
+- Read support-production.json, production pricing screenshots, source PR #15, release run 39085953535 and GitOps PR #371. Scripts 08–09 reproduce read-only runtime checks without exposing credentials or creating checkout sessions.
+
+### Technical details
+- Source: https://github.com/go-go-golems/francois/pull/15
+- Release: https://github.com/go-go-golems/francois/actions/runs/39085953535
+- GitOps: https://github.com/wesen/2026-03-27--hetzner-k3s/pull/371
+- Public contribution page: https://slop.boutique/pricing
