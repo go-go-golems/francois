@@ -457,3 +457,45 @@ Qualified the implemented contribution flow against PostgreSQL, real Chromium an
 - Preview: http://localhost:18796/pricing. Private directory: /tmp/francois-support-private, mode 0700; credential files mode 0600.
 - Migration 015 adds support_amount_cents and started_at to the existing subscription projection. No new queue, background service or identity-provider changes.
 - Structured receipts and eight new screenshots are under sources/implementation/support-*; original visual-ticket evidence is preserved.
+
+## Step 8: Publish the qualified implementation for review
+
+Pushed the implementation and qualification evidence, then opened PR #15. Production remains on the previous onboarding release; this checkpoint records publication for review only.
+
+### Prompt Context
+**User prompts:** See Step 6.
+**Assistant interpretation:** Make the completed, locally qualified work concrete and reviewable.
+**Inferred user intent:** Preserve commits, evidence and a straightforward route to deployment.
+**Commit (code/evidence):** 539a447 and d8634b2.
+
+### What I did
+- Pushed `feat/ramon-support-pricing` and opened https://github.com/go-go-golems/francois/pull/15 with the exact feature, migration and sandbox results.
+- Normalized the trailing blank line in the routine TypeScript success receipt after Git’s whitespace check reported it.
+
+### Why
+- A source PR keeps review and the official image/GitOps pipeline attached to the tested implementation.
+
+### What worked
+- Branch push and PR creation succeeded. Required CI/review starts from the PR; it is not described as complete here.
+
+### What didn't work
+- `git diff --cached --check` reported `support-types.txt:4: new blank line at EOF`; the preceding qualification commit included this harmless receipt whitespace. Removed it in this publication checkpoint.
+
+### What I learned
+- Routine command receipts can be bounded and normalized; they need not retain decorative terminal blank lines.
+
+### What was tricky to build
+- N/A: this checkpoint publishes already qualified code and records review status.
+
+### What warrants a second pair of eyes
+- PR #15 billing trust, chosen-amount handling and supporter state boundaries.
+
+### What should be done in the future
+- Review, merge and deploy when requested; no production rollout is claimed.
+
+### Code review instructions
+- Read the PR description and the active support guide’s verified result. Use the actual sandbox receipt rather than seeded screenshots as proof of payment completion.
+
+### Technical details
+- PR: https://github.com/go-go-golems/francois/pull/15
+- Local preview: http://localhost:18796/pricing
