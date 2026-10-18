@@ -9,7 +9,7 @@ Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: ""
+Summary: Ramon Final support page with editable monthly contributions, confirmed thank-you state and supporter prompt suppression.
 LastUpdated: 2026-10-17T20:49:01.065784328-04:00
 WhatFor: ""
 WhenToUse: ""
@@ -58,3 +58,20 @@ The year-funding amount and copy match Paper. Its action opens the lab contact a
 ## Qualification boundary
 
 Implement the whole flow first, then run the database-backed suite, TypeScript tests/typecheck, build and required lint. Add focused checks for amount boundaries, same-amount reuse, changed-amount supersession, duplicate subscriptions, projection trust, free/supporter banner visibility and checkout return ownership. Capture the actual local pricing and free/supporter account pages at desktop/mobile widths. An external charge is not a test action; qualify hosted Stripe integration in sandbox mode only.
+
+
+## Verified result
+
+Implementation is complete on `feat/ramon-support-pricing`. The database-backed full Go suite passed (catalog 15.439s); focused presentation checks also passed after removing unused pricing-plan assembly. TypeScript checks, nine frontend/worker tests, embedded frontend build, Go build, lint and logger checks passed.
+
+Scripts 04–07 preserve the local preview and evidence workflow. Script 05 captured pricing, free account and seeded supporter state at 1440/390px and opened real Stripe sandbox Checkout at the selected 43 USD. Script 06 paid through the actual hosted sandbox form with Stripe’s test card, returned to `/thank-you`, and verified the authoritative 4300-cent subscription projection, free access source, absent support prompts and working Customer Portal. Its test subscription was scheduled to cancel. Script 07 captured clean screenshots from the confirmed real sandbox supporter. No production deployment was performed.
+
+Receipts: `sources/implementation/support-browser.json`, `support-sandbox-checkout.json` and `support-go-tests.txt`. All cookies, credentials and hosted checkout URLs remain in private temporary storage and are excluded from ticket evidence.
+
+![Monthly contribution, mobile](../sources/implementation/support-pricing-390.png)
+
+![Free account callout, desktop](../sources/implementation/support-free-account-1440.png)
+
+![Confirmed sandbox supporter, desktop](../sources/implementation/support-real-sandbox-thank-you-1440.png)
+
+![Confirmed sandbox supporter, mobile](../sources/implementation/support-real-sandbox-thank-you-390.png)

@@ -81,7 +81,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("HEAD /api/releases/{release}/files/{file}/download", s.guard(public, noToken, s.download))
 	m.HandleFunc("GET /api/account", s.guard(session, scopeAccount, s.account))
 	m.HandleFunc("POST /api/billing/checkout", s.guard(enabled, scopeAccount, s.checkout))
-	m.HandleFunc("POST /api/billing/support", s.guard(session, scopeAccount, s.supportCheckout))
+	m.HandleFunc("POST /api/billing/support", s.guard(enabled, scopeAccount, s.supportCheckout))
 	m.HandleFunc("POST /api/billing/portal", s.guard(session, scopeAccount, s.portalSession))
 	m.HandleFunc("POST /api/billing/refresh", s.guard(session, scopeAccount, s.refresh))
 	m.HandleFunc("POST /webhooks/stripe", s.webhook)
@@ -142,7 +142,7 @@ func portSuffix(p string) string {
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	site := s.site(r)
-	out := map[string]any{"authenticated": p != nil, "loginAvailable": site.OIDC.Configured() || s.Config.EmailLogin != nil, "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
+	out := map[string]any{"authenticated": p != nil, "supporter": false, "loginAvailable": site.OIDC.Configured() || s.Config.EmailLogin != nil, "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
 		"typeCredit": s.fonts.present, "journalEnabled": false}
 	// The SPA shows the same brand in its crumb as the server-rendered pages.
 	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {

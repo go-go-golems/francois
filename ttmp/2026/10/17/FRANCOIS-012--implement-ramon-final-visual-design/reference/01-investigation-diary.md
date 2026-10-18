@@ -396,3 +396,64 @@ Reopened the visual implementation after the user identified the missing 42 USD 
 ### Technical details
 - Default 42 USD/month, editable whole-dollar range 1–9999. Inline monthly prices carry server-authored metadata; the existing webhook worker remains the only reconciliation service.
 - Source reference: https://docs.stripe.com/api/checkout/sessions/create
+
+## Step 7: Qualify the complete monthly checkout and supporter presentation
+
+Qualified the implemented contribution flow against PostgreSQL, real Chromium and Stripe sandbox. The actual 43 USD selection reached hosted Checkout, completed with the standard test card and returned to a confirmed supporter thank-you page. Local account data recorded the same amount, while access stayed free. No production deployment was performed.
+
+### Prompt Context
+**User prompts:** See Step 6, including complete checkout, free-account banner, thank-you page and no monthly prompts for supporters.
+**Assistant interpretation:** Finish the implementation with meaningful integrated evidence and preserve a simple code path.
+**Inferred user intent:** Launch a coherent support experience rather than a visual amount control detached from payment behavior.
+**Commit (code):** 539a447 — Implement Ramon support contribution page and monthly checkout workflow; this checkpoint completes qualification and cleanup.
+
+### What I did
+- Added service regressions for amount bounds, same-amount reuse, changed-amount session expiry and duplicate subscription prevention.
+- Added an actual stripe-go HTTP payload test and projection tests for server metadata/currency recognition.
+- Added catalog integration checks for amount markup, real support summary, suppressed Go prompts and unchanged free entitlements.
+- Fixed the support endpoint to use the existing enabled-account guard, retained honest bounded confirmation feedback and routed demo guests through normal sign-in.
+- Removed unused plan-view assembly and the superseded plan-link JavaScript from the contribution page. Existing plan APIs remain functional for their existing consumers.
+- Built assets, started the isolated preview in tmux `francois-support-012` on localhost:18796 and recorded desktop/mobile screenshots.
+- Read the configured Stripe credential privately, required its test-mode prefix, and used only sandbox Checkout. Private files contain the credential and transient browser state; none are committed.
+- Completed hosted Checkout with the standard 4242 test card, verified owner-scoped refresh and actual Stripe projection, tested Customer Portal creation and scheduled cancellation of the test subscription.
+- Saved current exact Paper JSX exports for desktop/mobile support and desktop account beside the implementation evidence.
+
+### Why
+- Amount/idempotency/projection tests exercise payment correctness rather than just matching the implementation. Real hosted Checkout proves that the selected amount survives the gateway and authoritative reconciliation boundary.
+- Supporter presentation uses active paid-through subscription state, not the checkout URL or account role. Contributions do not unlock a higher access plan.
+
+### What worked
+- Full database-backed `go test ./... -count=1`: all packages passed; catalog 15.439s, payments 1.352s.
+- Focused support/payment regression run passed; final simplified presentation checks passed (0.779s).
+- `pnpm check`, nine frontend/worker tests, `pnpm build`, `go build ./...`, lint and logging checks passed.
+- Browser checks passed at 1440/390px: amount stepping, no document overflow, free-account callout, supporter thank-you and absence of monthly solicitation.
+- Actual sandbox receipt: chosen 4300 cents = Stripe 4300 cents; returned to `/thank-you`; confirmed support; free access retained; Customer Portal available; test cancellation scheduled.
+- Reviewed pricing mobile and actual supporter desktop/mobile screenshots visually. Clean recapture removed the transient success-toast overlay.
+
+### What didn't work
+- Initial full Go run failed only `TestPlans` with `plans_test.go:139: pricing 200`: it expected Studio/Current support plan-card markup. Updated the assertion to verify the requested supporter page and no contribution form; focused and final full tests then passed.
+- Initial lint reported `variable copy has same name as predeclared identifier (predeclared)` at support_test.go:54. Renamed it to `candidate`; final lint passed.
+- First hosted form inspection found no input fields because Stripe initially displays payment-method accordions. Used the existing documented Card selection sequence, then filled the standard sandbox fields and completed checkout successfully.
+- Formatting the shared API type file introduced unrelated churn. Restored its already-committed contents while retaining the new support contracts.
+
+### What I learned
+- Inline recurring prices work with the configured sandbox credential. Stripe’s existing subscription metadata and current-period fields are sufficient to distinguish contributions without price aliases or a new billing service.
+
+### What was tricky to build
+- The account return must wait for authoritative projection. The real flow used the existing owner-bound refresh operation and worker; a URL alone never created supporter state.
+- Support cancellation keeps prompts hidden through the paid-through period. The contribution itself leaves access entitlements unchanged.
+
+### What warrants a second pair of eyes
+- Review server-authored contribution metadata, supported monthly USD recognition, amount-bound checkout keys and changed-amount supersession. Review enabled-account/CSRF handling and supporter prompt suppression in both Go and React shells.
+
+### What should be done in the future
+- Review and deploy this branch when requested. Current production still runs the previously deployed onboarding image.
+
+### Code review instructions
+- Start with support-sandbox-checkout.json and the actual sandbox thank-you screenshots, then support.go, payments/service.go, payments/gateway.go, migration 015 and ui/catalog/account.tsx.
+- Reproduce the isolated preview with script 04 after supplying sandbox-only private credential files. Scripts 05–07 never save keys, cookies, payment URLs or authentication links to the ticket.
+
+### Technical details
+- Preview: http://localhost:18796/pricing. Private directory: /tmp/francois-support-private, mode 0700; credential files mode 0600.
+- Migration 015 adds support_amount_cents and started_at to the existing subscription projection. No new queue, background service or identity-provider changes.
+- Structured receipts and eight new screenshots are under sources/implementation/support-*; original visual-ticket evidence is preserved.

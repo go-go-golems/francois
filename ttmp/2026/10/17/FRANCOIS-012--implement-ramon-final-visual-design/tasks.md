@@ -7,4 +7,4 @@
 - [x] Implement Final shared shells, scoped CSS and compact archive controls. <!-- t:iswv -->
 - [x] Implement detail presentation and explicit-start inline runner using existing contracts. <!-- t:23vn -->
 - [x] Verify real-content desktop/mobile layouts, service states and affected tests. <!-- t:17fm -->
-- [ ] Match the current Final support page, including the 42 USD amount selector and complete checkout wiring. <!-- t:8yxo -->
+- [x] Match the current Final support page, including the 42 USD amount selector and complete checkout wiring. <!-- t:8yxo -->

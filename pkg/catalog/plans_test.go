@@ -135,7 +135,7 @@ func TestPlans(t *testing.T) {
 
 	// Pricing lists public plans and marks the caller's; the public API
 	// never exposes price IDs.
-	if code, b, _ := e.do(&sup, "portal.test", "GET", "/pricing", nil, nil); code != 200 || !strings.Contains(string(b), "Studio") || !strings.Contains(string(b), "Current support") {
+	if code, b, _ := e.do(&sup, "portal.test", "GET", "/pricing", nil, nil); code != 200 || strings.Contains(string(b), `data-support-monthly`) || !strings.Contains(string(b), `Manage subscription`) {
 		t.Fatalf("pricing %d", code)
 	}
 	if _, b, _ := e.do(nil, "portal.test", "GET", "/api/plans", nil, nil); strings.Contains(string(b), "price_") || !strings.Contains(string(b), `"supporter"`) {

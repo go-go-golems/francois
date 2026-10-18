@@ -70,8 +70,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const loginHref = () =>
-  "/signin?return=" +
-  encodeURIComponent(location.pathname + location.search);
+  "/signin?return=" + encodeURIComponent(location.pathname + location.search);
 
 function fail(box: HTMLElement, message: string) {
   box.querySelector(".action-error")?.remove();
@@ -266,72 +265,63 @@ function bindArchive() {
   );
 }
 
-// bindCheckout turns the pricing page's subscribe links into Checkout for
-// signed-in visitors; an existing subscription opens the billing portal,
-// where plans are changed.
-async function bindCheckout(box: HTMLElement) {
-  const s = await getSession();
-  if (!s.authenticated) return;
-  box.querySelectorAll<HTMLAnchorElement>("a[data-interval]").forEach((a) => {
-    a.addEventListener("click", async (e) => {
-      e.preventDefault();
-      a.setAttribute("aria-busy", "true");
-      try {
-        const out = await post<{ url: string }>("/api/billing/checkout", {
-          plan: box.dataset.plan,
-          interval: a.dataset.interval,
-        });
-        location.assign(out.url);
-      } catch (err) {
-        if (err instanceof RequestError && err.code === "subscription_open") {
-          try {
-            const out = await post<{ url: string }>("/api/billing/portal", {});
-            location.assign(out.url);
-            return;
-          } catch (perr) {
-            err = perr;
-          }
-        }
-        a.removeAttribute("aria-busy");
-        fail(box, (err as Error).message);
-      }
-    });
-  });
-}
-
 function bindSupport(form: HTMLFormElement) {
   const input = form.querySelector<HTMLInputElement>("[name=amount]")!;
   const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
-  const resize = () => { input.style.width = Math.max(2, input.value.length) + "ch"; };
+  const resize = () => {
+    input.style.width = Math.max(2, input.value.length) + "ch";
+  };
   const initial = Number(new URLSearchParams(location.search).get("amount"));
-  if (Number.isInteger(initial) && initial >= 1 && initial <= 9999) input.value = String(initial);
+  if (Number.isInteger(initial) && initial >= 1 && initial <= 9999)
+    input.value = String(initial);
   resize();
-  input.addEventListener("input",resize);
-  form.querySelectorAll<HTMLButtonElement>("[data-amount-step]").forEach(button => {
-    button.addEventListener("click", () => {
-      const current = Number(input.value);
-      input.value = String(Math.min(9999, Math.max(1, (Number.isFinite(current) ? Math.round(current) : 42) + Number(button.dataset.amountStep))));
-      resize();
+  input.addEventListener("input", resize);
+  form
+    .querySelectorAll<HTMLButtonElement>("[data-amount-step]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        const current = Number(input.value);
+        input.value = String(
+          Math.min(
+            9999,
+            Math.max(
+              1,
+              (Number.isFinite(current) ? Math.round(current) : 42) +
+                Number(button.dataset.amountStep),
+            ),
+          ),
+        );
+        resize();
+      });
     });
-  });
-  form.addEventListener("submit", async event => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (submit.disabled || !form.reportValidity()) return;
     submit.disabled = true;
     try {
       const session = await getSession();
-      if (!session.authenticated) {
-        location.assign("/signin?return=" + encodeURIComponent("/pricing?amount="+input.value));
+      if (!session.authenticated || session.user?.role === "guest") {
+        location.assign(
+          "/signin?return=" +
+            encodeURIComponent("/pricing?amount=" + input.value),
+        );
         return;
       }
-      const result = await post<{url:string}>("/api/billing/support",{amountCents:Number(input.value)*100});
+      const result = await post<{ url: string }>("/api/billing/support", {
+        amountCents: Number(input.value) * 100,
+      });
       location.assign(result.url);
-    } catch(err) {
+    } catch (err) {
       if (err instanceof RequestError && err.code === "subscription_open") {
-        try { const result = await post<{url:string}>("/api/billing/portal",{}); location.assign(result.url); return; }
-        catch(portalError) { err = portalError; }
+        try {
+          const result = await post<{ url: string }>("/api/billing/portal", {});
+          location.assign(result.url);
+          return;
+        } catch (portalError) {
+          err = portalError;
+        }
       }
-      fail(form,(err as Error).message);
+      fail(form, (err as Error).message);
       submit.disabled = false;
     }
   });
@@ -360,12 +350,9 @@ function main() {
       });
   }
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
-  document.querySelectorAll<HTMLFormElement>("[data-support-monthly]").forEach(bindSupport);
-  document.querySelectorAll<HTMLElement>("[data-checkout]").forEach((box) => {
-    bindCheckout(box).catch(() => {
-      /* links keep pointing to sign-in */
-    });
-  });
+  document
+    .querySelectorAll<HTMLFormElement>("[data-support-monthly]")
+    .forEach(bindSupport);
   document.querySelectorAll<HTMLElement>("[data-actions]").forEach((box) => {
     renderActions(box).catch(() => {
       /* keep the server-rendered fallback */

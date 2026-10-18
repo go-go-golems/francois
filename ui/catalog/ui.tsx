@@ -83,10 +83,16 @@ export function Header() {
         ) : (
           session?.loginAvailable && <a href={loginHref()}>Sign in</a>
         )}
-        {session?.supporter ? <span className="support-thanks">Thank you for supporting the lab</span> : <a className="site-support" href="/pricing">
-          <span className="support-desktop">Support the lab</span>
-          <span className="support-mobile">Support</span>
-        </a>}
+        {session?.supporter ? (
+          <span className="support-thanks">
+            Thank you for supporting the lab
+          </span>
+        ) : (
+          <a className="site-support" href="/pricing">
+            <span className="support-desktop">Support the lab</span>
+            <span className="support-mobile">Support</span>
+          </a>
+        )}
       </nav>
     </header>
   );
