@@ -762,36 +762,19 @@ Normal Open resumes a saved workspace through `POST /api/instances/open`. If its
 
 ## Email and social sign-in
 
-The shared `/signin` page offers email magic links and configured Google/GitHub options to all roles. Email links use ZITADEL’s Session API and select an existing enabled non-guest account with a unique verified address and enrolled OTP email factor. With `--signup-allowed`, new addresses can create an account through the same form: ZITADEL verifies the address before Francois creates the local user/session, then email OTP is enrolled for future sign-ins. No account is linked by email. Existing unrelated identities are never enrolled by the registration path. Social authentication reuses `/auth/login` and the existing OIDC callback; new identities receive the ordinary local role, and existing roles are preserved. Payment access is checked separately. Email support remains off by default in the binary and is explicitly enabled in production.
+The shared `/signin` page keeps Google, GitHub and email sign-in available to every account role. Google/GitHub use the existing OIDC callback. Email uses one ZITADEL email-verification flow for new, existing, already-verified and previously unverified identities. Email OTP enrollment and temporary provider sessions are not required or changed.
 
-Apply migrations `012_email_signins.sql` and `013_email_registrations.sql` through the ordinary catalog migration command before running the new binary. To enable the feature, provision a **dedicated** ZITADEL machine user with the built-in `IAM_LOGIN_CLIENT` role and write its short-lived/rotated PAT to a mounted secret file. This role is privileged; do not reuse the Terraform administrator credential. The application requires user read/write and session read/write/delete permissions. Email signup uses the same dedicated IAM_LOGIN_CLIENT; it additionally creates unverified humans and verifies/enrolls email only for registration-owned identities. The default ORG_USER_MANAGER role does not include session.write on v4.16.1.
+Apply migration `014_email_links.sql` through the existing startup `--migrate` option. It replaces only the obsolete pending email tables with `email_links`; users, sessions, provider factors and artifacts are preserved. Previously pending links are intentionally invalidated, without compatibility handling.
 
-Configure the existing serve command with:
+Keep the existing `--email-signin-enabled`, `--zitadel-login-token-file`, `--zitadel-organization` and `--oidc-issuer` configuration. The dedicated IAM_LOGIN_CLIENT credential is delivered by Vault/VSO; do not use the Terraform administrator PAT. Existing SMTP remains owned by ZITADEL (SES at email-smtp.us-east-1.amazonaws.com:587, configured through the shared identity infrastructure). No new runtime secret, mail service, worker or queue is required.
 
-```text
---email-signin-enabled
---zitadel-login-token-file=/run/secrets/francois/zitadel-login-token
---zitadel-organization=<Francois organization ID>
---oidc-issuer=https://zitadel.yolo.scapegoat.dev
-```
+The server resolves exactly one matching human in the configured organization, or creates an unverified identity if signup is enabled. Creation suppresses the initial provider message. `POST /v2/users/{id}/email/send` sends the one actual link, and `/email/verify` proves mailbox ownership. Only after that proof does Francois create or refresh the same issuer/subject account and insert its local session in one transaction. Fresh proof reconciles stale local email verification; a same-identity account provisioned concurrently through Google/GitHub is reused. Disabled accounts, role changes, ambiguous identities and a different local owner still fail closed.
 
-ZITADEL, not Francois, owns SMTP. A read-only check on 2026-10-17 confirmed an active SES provider at `email-smtp.us-east-1.amazonaws.com:587`, TLS enabled, sender `no-reply@mail.scapegoat.dev` / `The Scapegoat`. Its credentials/configuration record is `kv/apps/zitadel/prod/smtp`. The SES identity/DNS/monitoring are owned by the shared Terraform `ses/domains/mail-scapegoat-dev/envs/prod` tree; SMTP credentials are deliberately outside Terraform state. The inspected K3s manifests inject database/bootstrap secrets but do not include an SMTP reconciler; the live provider configuration is stored in ZITADEL. This check did not send mail or qualify external delivery. During controlled supporter provisioning, enroll email OTP with authenticated `POST /v2/users/{zitadel-subject}/otp_email` and `{}`. First check that the user has the intended verified primary address and belongs to Francois. Classify an already-enrolled factor deliberately; do not suppress other errors. Creating a Francois account or enrolling a factor does not grant a subscription.
+Links last fifteen minutes and must be opened in the requesting browser, followed by Continue. Confirmation GETs remain read-only and no-store/no-referrer. Provider calls have a fifteen-second total request budget without an artificial acknowledgement delay. Delivery failures show a retryable error instead of reporting success. Limits are ten successful sends per recipient/hour, twenty attempts per client/hour and one hundred attempts per process/hour. Failed issuance refunds its own recipient reservation; process/client attempt limits still apply.
 
-The application uses `POST /v2/sessions` with `challenges.otpEmail.sendCode.urlTemplate`, pointing to its trusted portal confirmation page. The deployed v4.16.1 proto uses a sendCode/returnCode object oneof; do not copy the older boolean returnCode email example from the MFA guide. The user opens the link **in the same browser**, then confirms with a POST. GET requests from mail scanners cannot authenticate. Both the portal attempt and temporary ZITADEL session expire in five minutes, matching the provider's default email-code expiry.
+`--signup-allowed=false` prevents creation of provider/local identities while leaving existing-account email authentication available. The final transaction checks whether a local account exists at confirmation time, so a same-identity SSO completion can still sign in if signup was disabled in the meantime. User roles and paid access are not changed by onboarding.
 
-Each link permits one verification attempt. After a failed or timed-out attempt, request a new email. Limits are three sends per recipient/hour, twenty attempts per client address/hour and one hundred/hour per process. New, existing, ambiguous, disabled and guest addresses receive the same generic acknowledgement. Signup is attempted only when no local record exists and `--signup-allowed` is enabled; disabling that flag also rejects pending signup confirmations. Unknown addresses otherwise receive no message. Provider outages leave ordinary portal sessions working. Setting `--email-signin-enabled=false` disables new email authentication; existing sessions retain their normal expiry and can be revoked through existing administration.
-
-Email sessions use the existing local idle/absolute expiry and have no OIDC ID token. Logout stays local. Temporary provider proof sessions are deleted after redemption and expire automatically if cleanup fails. Changing a user's role revokes all portal sessions and runtime grants, and invalidates pending email attempts; promotion cannot turn an email session into an admin session.
-
-For a reproducible isolated test, use FRANCOIS-013's `scripts/03-local-stack.yaml` and `04-provision-local.py`. They are fixed to localhost ports 18083 (ZITADEL v4.16.1), 18025 (mail sink) and 5437 (PostgreSQL); they do not configure production. The bootstrap and dedicated test PATs remain under `/tmp/francois-013-private`. The opt-in Go test `TestEmailSigninRealZitadel` accepts `-email-login-fixture=/tmp/francois-013-private/fixture.json`; provide TEST_DATABASE_URL pointing to the isolated database. Test credentials, codes, live links and cookies must never be copied into ticket screenshots/logs.
-
-### Production enablement and rotation (2026-10-17)
-
-Email-link sign-in is enabled by infrastructure PR #364. Terraform PR #35 owns the dedicated Francois machine user and its `IAM_LOGIN_CLIENT` membership. The PAT is stored at `kv/apps/francois/prod/runtime`, key `zitadel-login-token`, and mounted at `/run/secrets/francois/zitadel-login-token`. Metadata keys `zitadel-login-user-id`, `zitadel-login-pat-id` and `zitadel-login-expires-at` identify the credential without exposing it. The initial PAT expires **2027-01-15T22:07:33Z**.
-
-Rotate using `zitadel/francois/envs/prod/provision-email-login.py --service-user-id <id> --rotate` in the shared Terraform repository. It issues a 90-day PAT outside Terraform state, checks session create/read/delete without sending mail, and updates Vault with CAS read/merge/write. Wait for VSO delivery and a healthy application restart before revoking the previous PAT by ID. The bootstrap script preserves these fields. No SMTP configuration change is required.
-
-The public email form and staff fallback were verified on both hostnames. With explicit user authorization, the single existing enabled supporter with a matching verified provider email was enrolled in email OTP on 2026-10-17; provider readback confirmed enrollment and preservation of existing authentication methods. Staff accounts and subscriptions were unchanged. No login email was requested. Credential/session API and enrollment checks do not constitute an end-to-end production mail-delivery test.
+Local qualification uses ticket scripts `12-run-email-signup-preview.sh` and `17-verify-unified-email.mjs`, backed by fixed-loopback ZITADEL v4.16.1, PostgreSQL and Mailpit. The journey covers a new address and an already-verified provider-only identity without email OTP, each followed by a returning login. Script 18 creates only the isolated provider fixture. Test codes and credentials are never committed.
 
 ## Public blog visibility
 
@@ -807,9 +790,7 @@ Configure the existing Google/GitHub organization IdPs using nonsecret
 select only the fixed names `google` or `github`; the backend adds ZITADEL’s
 provider-selection scope without dropping organization scope, state, nonce or
 S256 PKCE. The neutral More sign-in options link keeps native ZITADEL accounts
-usable without a separate staff flow. All roles may use email links if their
-email OTP factor is enrolled; no human factor is enrolled implicitly by this
-code change. Role changes revoke sessions/pending links, and a claimed link
+usable without a separate staff flow. All roles use the same email verification-link flow without an OTP-enrollment prerequisite. Role changes revoke sessions/pending links, and a claimed link
 cannot create a session after its account changes role.
 
 The explicitly approved Terraform PR #36 permits public creation through the
@@ -828,11 +809,3 @@ login forms with the intended scopes and OIDC protections. No credentials,
 external consent or test-account creation were submitted during that check.
 The exact rollout and browser receipts are in FRANCOIS-013's
 `sources/implementation/social-production-*.json` files.
-
-### Email-only registration implementation
-
-The new-email path uses ZITADEL v4.16.1 `POST /v2/users/human` with an explicitly unverified email and custom verification URL. `email_registrations` reserves the random subject before provider I/O and stores the current five-minute browser-bound attempt as digests. Local account/session creation happens only after the confirmation POST verifies the code and rechecks the provider identity. The subsequent `otp_email` enrollment applies only to this registration-owned identity. A verified provider account left behind by an interrupted completion can recover through a fresh OTP proof. Existing provider-email collisions fail closed rather than linking accounts.
-
-The first email is a verification message, and subsequent emails use the existing temporary-session OTP message. Both links use `/auth/email/verify` and require Continue in the requesting browser; scanner GETs remain read-only. Provider errors are acknowledged generically and logged without codes or upstream bodies. The form accepts at most 200 characters to match the provider API. Reservations persist so retries reuse a provider identity; no background cleanup service is introduced.
-
-Use ticket scripts `12-run-email-signup-preview.sh` and `13-verify-email-signup.mjs` for the isolated signup journey on localhost:18795, with a dedicated preview database. These scripts cannot send production mail. Production still runs its previous release until a separate merge/deployment occurs.

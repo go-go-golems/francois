@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-17T23:51:05.305Z",
+  "base": "http://localhost:18795",
+  "checks": [
+    "new address: first confirmation delivered, authenticated same identity, replay denied",
+    "new address: returning login delivered, authenticated same identity, replay denied",
+    "existing verified provider: first confirmation delivered, authenticated same identity, replay denied",
+    "existing verified provider: returning login delivered, authenticated same identity, replay denied",
+    "existing verified identity required no OTP enrollment or provider session"
+  ],
+  "productionMailRequested": false,
+  "credentialsSaved": false
+}

@@ -12,8 +12,8 @@ RelatedFiles:
       Note: Credential rotation and production enablement contract
     - Path: repo://pkg/catalog/auth.go
       Note: Allowlisted shared OIDC provider selection
-    - Path: repo://pkg/catalog/store/email_signins.go
-      Note: Role-neutral email proof with role-change protection
+    - Path: repo://pkg/catalog/store/email_links.go
+      Note: Current successor to the historical split email stores
     - Path: repo://pkg/catalog/web/templates/signin.tmpl
       Note: One public sign-in page for all roles
     - Path: repo://ttmp/2026/10/17/FRANCOIS-013--implement-email-link-sign-in/sources/implementation/production-enablement.json
@@ -1166,3 +1166,181 @@ Read sources/implementation/email-signup-production.json and reference/02-email-
 
 ### Technical details
 The vault report is Projects/2026/10/17/PROJ - Francois - Passwordless Email Signup and Production Delivery - A Technical Deep Dive.md. Source-relative figures resolve inside the ticket; the vault copy uses _assets/francois-email-signup-*.png. Production observation time is 2026-10-17T23:28:12.448415+00:00. No source/runtime changes followed the merged image; remaining commits only preserve ticket/report evidence.
+
+
+## Step 21: Replace split email registration/login with one mailbox-proof design
+
+The deployed collision guard blocked an existing verified provider identity with no local account. The user requests a simple launch-ready onboarding workflow rather than more exceptions. Expanded the active design into one email-verification path for every email login and retained Google/GitHub SSO unchanged. The plan removes temporary provider sessions, OTP enrollment and separate registration handling instead of adding fallbacks around them.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, streamline, no backwards compatibility, no overnengineering, no overcautiousness we want to provide somoth, elegant, simple implementation of similarly simple onbaording workflow. Expand the design doc, then implement. No need to test all the time either, it's about getting this up so we can launch."
+**User prompt (verbatim):** "we do want to keep github / gmail sso"
+**Assistant interpretation:** Rewrite the active email design and implement one onboarding/sign-in path while preserving Google and GitHub SSO; qualify the completed implementation once.
+**Inferred user intent:** A visitor should receive and use a link regardless of which system already has their account, without manual factor setup or confusing rejection.
+
+### What I did
+- Reviewed current provider/session/registration paths and the pinned email send/verify implementation.
+- Replaced the active design with a concrete unified-flow specification, one pending table, fifteen-minute links, realistic request timeout, send failure feedback and quota refunds.
+- Specified same-identity reconciliation, role/disabled protections and removal of obsolete internal paths without compatibility adapters.
+
+### Why
+Provider email verification already supplies the needed mailbox proof. Separate OTP enrollment and provider-session machinery add states the visitor should never have to understand.
+
+### What worked
+The pinned `/email/send` and `/email/verify` contracts support the intended unified proof. Existing Google/GitHub routing and page controls can remain unchanged.
+
+### What didn't work
+The former split design rejected legitimate provider-only accounts and required OTP enrollment for returning local accounts. These are design restrictions being removed, not cases for another compatibility layer.
+
+### What I learned
+The correct primary decision is identity resolution followed by fresh proof and local reconciliation, rather than registration versus login based on local verification flags.
+
+### What was tricky to build
+Provider creation must suppress its automatic message so the unified send operation produces the one intended link. Local completion must accept a same-identity OIDC account created while confirmation was pending without authorizing a role change.
+
+### What warrants a second pair of eyes
+Validate already-verified provider-only mail delivery against the pinned real provider, and preserve the same browser/CSRF and role invariants in the replacement.
+
+### What should be done in the future
+Implement completely, then run the consolidated qualification boundary. No intermediate broad test loops or production mailbox requests are planned.
+
+### Code review instructions
+Read the rewritten design-doc/02-email-only-signup-implementation-guide.md. Google/GitHub controls and OIDC endpoints remain part of the existing shared page.
+
+### Technical details
+Migration 014 replaces only pending email tables. Existing user data, provider factors, ordinary sessions and artifact data are preserved. The email path no longer needs provider sessions or OTP enrollment.
+
+
+## Step 22: Implement the unified proof and account reconciliation
+
+Replaced the old email registration/session branches with one provider resolution/send/verify path and one pending-link store. Google/GitHub routes and controls remain intact. Removed the old registration/session clients and stores rather than wrapping them. New provider accounts suppress the automatic creation email, so the shared send operation produces the one user-visible message.
+
+The implementation is complete before running its qualification gate. New tests cover the actual provider-only case, stale local state, account reuse during SSO, role preservation, disabled/identity guards, read-only GET, one-time claims and recipient refunds. The real browser journey additionally checks an already-verified provider identity without any email OTP enrollment.
+
+### Prompt Context
+See Step 21 for the exact simplification request and explicit preservation of Google/GitHub SSO.
+**Commit (design):** 1f5325e — docs: streamline email onboarding into one mailbox-proof flow.
+
+### What I did
+- Added provider email_link.go and store/email_links.go; removed the old provider signup/OTP/session and separate pending stores.
+- Added migration 014 to replace only the two obsolete pending tables. Role/disable invalidation targets canonical issuer/subject in email_links.
+- Unified request/confirmation handlers and local reconciliation. Fresh proof can update stale local verification/email and reuse a same-identity account created through OIDC while confirmation was pending.
+- Set fifteen-minute local links and a fifteen-second bounded provider request budget without an artificial wait. Provider failures show a retry message and refund the exact reserved recipient slot. Global/client abuse attempts still count.
+- Updated operator docs, CLI help and active design relations. Replaced split-flow tests and prepared one real local browser/provider gate.
+
+### Why
+One mailbox proof is sufficient for both onboarding and returning login. Provider-factor enrollment and temporary provider sessions add no required product behavior. Short-lived candidate links isolate a failed send from other local attempts, and canonical identity reconciliation avoids treating an existing record as an error.
+
+### What worked
+Implementation and focused replacement coverage are authored; no intermediate broad test cycles were run. The existing OIDC implementation remains unchanged.
+
+### What didn't work
+No runtime qualification has run yet at this checkpoint. A diff whitespace check found an extra final blank line in production.md; it was removed before qualification. One earlier source read used the wrong integration-test filename; the old optional test was email_signin_local_test.go and is replaced by the unified real-browser gate.
+
+### What I learned
+Provider search plus username uniqueness and one bounded conflict re-resolution removes the need for a durable random-subject reservation. Empty optional OIDC email handling remains in the existing OIDC store path.
+
+### What was tricky to build
+Completion must lock and reconcile the same issuer/subject without changing roles, while new-account creation remains gated by the current signup flag. The expected-role snapshot and role-change invalidation still reject elevation during a pending proof.
+
+### What warrants a second pair of eyes
+Confirm the real pinned provider sends and accepts a fresh verification code for an already-verified account, with no email OTP factor. Validate migration/role invalidation and existing Google/GitHub regression coverage together.
+
+### What should be done in the future
+Run the completed feature's consolidated Go/database/build/lint and isolated-browser gate, repair concrete failures and record final results.
+
+### Code review instructions
+Start with the active design, identity/email_link.go, store/email_links.go and email_signin.go. Social sign-in tests remain unchanged, and the template only changes the link-time guidance.
+
+### Technical details
+The local fixture services are fixed to localhost ZITADEL 18083, Mailpit 18025 and PostgreSQL 5437. Scripts 17 and 18 never target production and never print codes, live links or bearer tokens. No production mailbox is contacted during qualification.
+
+
+## Step 23: Qualify the unified launch workflow once
+
+The full database-backed Go suite passed for the completed replacement, including the unchanged Google/GitHub tests. The real ZITADEL v4.16.1/Mailpit browser journey also passed for both a new address and an already-verified provider-only account without email OTP. Each case completed first onboarding and a returning login through the same email proof, and replay was rejected. No factor was enrolled and no provider session was needed.
+
+The build passed. Lint found one mechanical staticcheck suggestion in the completion branch; changed the equivalent if/else to a tagged switch and reran only lint/logger checks. Those passed with zero issues. There was no repeated full-suite or real-provider loop after that syntax cleanup.
+
+### Prompt Context
+See Step 21 for the implementation and consolidated-testing request, including preservation of Google/GitHub SSO.
+
+### What I did
+- Ran `TEST_DATABASE_URL='postgres://emailtest:emailtest@127.0.0.1:5437/postgres?sslmode=disable' go test ./... -count=1`: all packages passed; catalog tests completed in 17.745 seconds.
+- Ran `go build ./...`: passed. Ran required lint/logger checks and repaired the sole QF1003 suggestion.
+- Ran script 17 once against the rebuilt local preview. Four real email/browser passes succeeded: new-address onboarding, its returning login, verified-provider-only onboarding and its returning login.
+- Checked provider readback after the verified-user journey: AUTHENTICATION_METHOD_TYPE_OTP_EMAIL remained absent. Captured a sanitized JSON receipt and bounded test/lint logs.
+- Reviewed the final template diff: only five-minute guidance changes to fifteen minutes; Google/GitHub links, native fallback and their routing remain.
+
+### Why
+The actual provider-only journey directly reproduces the production case that failed previously. One complete qualification boundary is sufficient here; syntax-only lint cleanup does not justify repeating unrelated tests.
+
+### What worked
+The same flow handles new/provider-only/local-unverified/stale-local-email/creator/admin cases, same-identity concurrent SSO, returning login with signup disabled, wrong code/browser/origin, expiry, changed identity, disabled/role-change guards, one-time concurrent claims and failed-send quota refund. Real provider delivery and browser confirmation passed without OTP enrollment.
+
+### What didn't work
+`make lint logcopter-check` initially stopped at `pkg/catalog/store/email_links.go:117:2: QF1003: could use tagged switch on err (staticcheck)`. Replaced that if/else with the equivalent switch; the final lint/logger run passed. No runtime or browser failure occurred.
+
+### What I learned
+ZITADEL's email verification mechanism supplies fresh mailbox proof for an already-verified human without modifying their authentication methods. This removes the factor/session provisioning prerequisites rather than teaching the onboarding flow to work around them.
+
+### What was tricky to build
+The real fixture has a verified active provider identity and no local account or email OTP factor. Creation of a fresh identity suppresses its automatic creation mail, so both paths deliver the one intended link and authenticate through the same callback.
+
+### What warrants a second pair of eyes
+Migration 014 intentionally invalidates old pending links and removes their two tables. Existing provider factors, application sessions and user roles are preserved. The implementation is locally qualified; production deployment is not claimed by this step.
+
+### What should be done in the future
+Release the completed replacement through the normal image/GitOps path when deploying. No additional onboarding service, compatibility layer or factor enrollment is necessary.
+
+### Code review instructions
+Read the current design, identity/email_link.go, store/email_links.go and the much shorter request/confirmation dispatch. The sanitized real journey is sources/implementation/unified-email-browser.json. Run script 17 against the local tmux preview for reproduction.
+
+### Technical details
+Local preview: http://localhost:18795/signin, tmux francois-unified-email-013. The mailbox sink and provider are loopback only. No production email was sent or production data modified during this implementation.
+
+Metadata cleanup: docmgr doctor reported five missing RelatedFiles references after obsolete paths were deleted. Updated only the affected metadata to current successor files, keeping historical diary/report bodies and their source-commit evidence intact. Doctor then passed.
+
+## Step 24: Review the unified workflow before production deployment
+
+Opened PR #14 for the locally qualified unified flow. Automated review identified that recipient-only exhaustion returned an observable 429 while ineligible addresses returned the generic acknowledgement. Separated recipient exhaustion from client/global limits and added a focused HTTP regression before proceeding with deployment.
+
+### Prompt Context
+**User prompt (verbatim):** "deploy"
+**Assistant interpretation:** Release the unified onboarding implementation to production k3s.
+**Inferred user intent:** Make the streamlined flow available while retaining Google/GitHub SSO.
+**Commit (code):** 6a2be1e — implementation submitted for review; this checkpoint records its review correction.
+
+### What I did
+- Opened source PR #14 and inspected inline review comment 4305136282.
+- Made `reserveEmail` return reservation and client/global eligibility separately. Recipient exhaustion now renders generic HTTP 200 without sending mail; client/global limits retain HTTP 429.
+- Extended `TestEmailDeliveryFailureAndQuotaRefund` to check generic acknowledgement and absence of Retry-After.
+
+### Why
+- A recipient-specific response must not disclose account eligibility. This is a narrow correction to the existing limiter, without new services or compatibility code.
+
+### What worked
+- Database-backed `go test ./pkg/catalog -run TestEmailDeliveryFailureAndQuotaRefund -count=1` passed (0.117s).
+- The original PR Go suite, lint, browser/worker, CodeQL, dependency, vulnerability and secret checks passed; image/security jobs were still running at this checkpoint.
+
+### What didn't work
+- The first focused test failed to compile with `pkg/catalog/email_signin.go:221:5: undefined: finish`: a text replacement inserted the request-only guard into `verifyEmail` as well. Removed that misplaced block, reviewed the diff, and reran the focused test successfully.
+- Initial screenshot-script lookup used an incorrect filename; the existing helper is `16-capture-production-signup.mjs`.
+
+### What I learned
+- Recipient capacity and request abuse limits need separate response semantics even though both prevent delivery.
+
+### What was tricky to build
+- Reservation refunds must remain scoped to the failed send; the correction changes only exhaustion responses and retains existing quota accounting.
+
+### What warrants a second pair of eyes
+- Ensure recipient exhaustion returns the same sent page as an ineligible address and does not call the provider.
+
+### What should be done in the future
+- Finish required CI, merge, publish the official image, and verify the GitOps rollout (next checkpoint).
+
+### Code review instructions
+- Read the small diff in `pkg/catalog/email_signin.go` and its quota regression. Inspect PR #14 checks before merging.
+
+### Technical details
+- Recipient: ten successful sends/hour; client: twenty attempts/hour; global: one hundred attempts/hour. The generic response does not imply delivery.
