@@ -59,3 +59,7 @@ Deployed email-only signup on k3s: source PR #13 / 5068ad1, official release 390
 ## 2026-10-17
 
 Replaced split email registration/OTP login with one ZITADEL resolve/send/verify flow and one pending-link table; Google/GitHub SSO unchanged. Existing provider-only and stale local accounts reconcile after fresh proof; same-identity SSO races succeed. Added fifteen-minute links, bounded realistic sending, honest provider errors and successful-send quota refunds. Full Go/database suite, build, lint/logger and one real local new/provider-only onboarding+return journey passed; no production mutation.
+
+## 2026-10-17
+
+Deployed unified mailbox onboarding to production k3s: source PR #14 / 8f5fa4a, official release 39083498348, validated GitOps PR #370 / 1bfd467. Verified exact image, migration 014, unified pending tables, ready replica, Healthy/Synced Argo and both public sites; saved desktop/mobile screenshots without sending production mail. Google/GitHub SSO retained.

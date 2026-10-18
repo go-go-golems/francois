@@ -15,7 +15,7 @@ RelatedFiles:
     - Path: repo://pkg/catalog/store/email_links.go
       Note: Unified pending links and role-preserving local sessions
 ExternalSources: []
-Summary: Detailed intern guide for a small concrete implementation; runtime work remains open.
+Summary: Unified mailbox verification deployed on production k3s, preserving Google and GitHub SSO.
 LastUpdated: 2026-10-17T16:44:52.803167379-04:00
 WhatFor: Implement the scoped feature.
 WhenToUse: Planning and reviewing this implementation.
@@ -23,7 +23,7 @@ WhenToUse: Planning and reviewing this implementation.
 
 # Email link sign in intern implementation guide
 
-Implemented and verified locally with real ZITADEL v4.16.1 SMTP delivery and Chromium form navigation. The feature is off by default; production enablement requires its dedicated credential, SMTP and supporter enrollment. The superseded local-token design is archived.
+Unified email onboarding is deployed on production k3s as `sha-8f5fa4a` (source PR #14, GitOps PR #370). Email verification supports new and existing provider identities without OTP enrollment; Google and GitHub SSO remain available. See the [active implementation guide](design-doc/02-email-only-signup-implementation-guide.md), [production receipt](sources/implementation/unified-email-production.json), and diary Steps 24–25. Earlier fixture and deployment evidence below is historical.
 
 Local preview: http://localhost:18793/signin. The isolated fixture mailbox is at http://localhost:18025. Both use test-only data.
 

@@ -14,7 +14,6 @@ RelatedFiles:
       Note: Unified onboarding, provider-only, stale local state and session guards
     - Path: repo://pkg/catalog/identity/email.go
       Note: |-
-        ZITADEL verification and OTP client
         Bounded authenticated provider transport without OTP/session machinery
     - Path: repo://pkg/catalog/identity/email_link.go
       Note: One provider identity resolution and email proof client
@@ -162,4 +161,4 @@ Run the database-backed Go suite, required lint/build checks and one real isolat
 
 ## Qualification result
 
-The replacement is implemented and locally qualified. The complete database-backed Go suite and build passed, including existing Google/GitHub tests. Final lint/logger checks passed after one mechanical switch cleanup. Script 17 delivered and confirmed four real local emails: onboarding and returning login for a new address, then onboarding and returning login for an already-verified provider-only identity without email OTP. The existing provider identity remained unenrolled in email OTP afterward. The receipt is `sources/implementation/unified-email-browser.json`. This result does not claim a production deployment of the replacement.
+The replacement is implemented and locally qualified. The complete database-backed Go suite and build passed, including existing Google/GitHub tests. Final lint/logger checks passed after one mechanical switch cleanup. Script 17 delivered and confirmed four real local emails: onboarding and returning login for a new address, then onboarding and returning login for an already-verified provider-only identity without email OTP. The existing provider identity remained unenrolled in email OTP afterward. The receipt is `sources/implementation/unified-email-browser.json`. The replacement was subsequently deployed to production k3s as `ghcr.io/go-go-golems/francois:sha-8f5fa4a` through source PR #14 and GitOps PR #370. The read-only receipt `sources/implementation/unified-email-production.json` confirms one ready replica, Synced/Healthy/Succeeded Argo, migration 014 and both public sites. Google/GitHub/email methods remain available. No production email was requested by the deployment checks.

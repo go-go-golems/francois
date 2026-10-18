@@ -1344,3 +1344,57 @@ Opened PR #14 for the locally qualified unified flow. Automated review identifie
 
 ### Technical details
 - Recipient: ten successful sends/hour; client: twenty attempts/hour; global: one hundred attempts/hour. The generic response does not imply delivery.
+
+## Step 25: Publish and verify the unified onboarding production rollout
+
+Released the reviewed unified workflow through the official source-image-GitOps pipeline. Production now runs the new image and migration 014; both public origins and desktop/mobile sign-in captures passed read-only verification. No production email address was submitted, and no credentials were saved.
+
+### Prompt Context
+**User prompt:** See Step 24 ("deploy").
+**Assistant interpretation:** Complete production rollout and retain reviewable evidence.
+**Inferred user intent:** Launch the simple onboarding workflow with Google/GitHub SSO retained.
+**Commit (code):** 8f5fa4a17432b5c4e77e23ce2bfd2079936505b6 — source PR #14; includes review fix c4cdf5d.
+
+### What I did
+- Waited for all source checks on c4cdf5d: Go tests, lint, CodeQL, GoSec, dependency/vulnerability/secret checks, browser/worker and container qualification all passed; the PR-only GitOps publication job was correctly skipped.
+- Merged source PR #14 with its exact checked head. Official main release run 39083498348 published `ghcr.io/go-go-golems/francois:sha-8f5fa4a` and opened GitOps PR #370.
+- Validated the image-only manifest in `/tmp/francois-email-k3s`: 54 packages, zero violations. Compared the automated manifest byte-for-byte with the locally validated version.
+- Merged exact GitOps PR head b3c1131f38b446e10f54e64d4cfe66cb9074ff06 after its validate check passed. GitOps merge: 1bfd46723d607d664b880b3ffa9bde4f9c8fae03.
+- Refreshed only the Francois Argo application, waited for the exact desired image, deployment readiness and application health.
+- Added read-only verification script 19 and screenshot script 20, with new output filenames preserving previous release evidence.
+
+### Why
+- The established release pipeline produces an immutable image and a reviewed desired-state change. No cluster image override, additional service, queue, identity configuration or secret change was necessary.
+
+### What worked
+- `bash scripts/validate_gitops.sh`: 54 packages, zero violations.
+- `kubectl ... rollout status deployment/francois --timeout=45s`: successfully rolled out.
+- Production receipt at 2026-10-18T00:43:39Z: exact image, one ready/updated replica, Argo Synced/Healthy/Succeeded at the GitOps merge revision.
+- Migration `014_email_links.sql` applied at 00:42:58Z. Schema checks confirmed `email_links` exists and both superseded pending tables are absent.
+- Both slop.boutique and francois.yolo.scapegoat.dev returned HTTP 200 for health, readiness, archive, Lattice Deck and RSS. Sign-in retained no-store/no-referrer, fifteen-minute guidance and all three methods. Signup remains enabled; journal remains hidden.
+- Chromium captured the deployed form at widths 1440 and 390 without overflow or email submission.
+
+### What didn't work
+- The first schema-check command failed with `sh: syntax error: unterminated quoted string`. A first correction then failed Python parsing with `SyntaxError: unterminated string literal (detected at line 38)`. Replaced the ambiguous triple-quoted boundary with an explicit Python string and reran the read-only verifier successfully. These were checker errors; rollout and migration had already completed.
+
+### What I learned
+- Runtime image, completed migration and public routes provide separate deployment evidence. Successful publication alone does not establish rollout.
+
+### What was tricky to build
+- Ordered deployment verification after the desired image changed, avoiding a successful status from the previous replica. Kept the existing single-replica Recreate strategy so obsolete handlers cannot overlap the pending-table replacement.
+
+### What warrants a second pair of eyes
+- Migration 014 intentionally invalidates prior pending links while retaining users and sessions. Runtime checks do not prove delivery to an external inbox; actual email journeys were qualified against isolated real ZITADEL/Mailpit before release.
+
+### What should be done in the future
+- No further deployment step remains. A user-requested external inbox attempt can establish live mail delivery separately.
+
+### Code review instructions
+- Review source PR #14, release run 39083498348 and GitOps PR #370. Inspect `sources/implementation/unified-email-production.json`, both `unified-email-production-signin-*.png` captures, and scripts 19–20.
+
+### Technical details
+- Source: https://github.com/go-go-golems/francois/pull/14
+- Release: https://github.com/go-go-golems/francois/actions/runs/39083498348
+- GitOps: https://github.com/wesen/2026-03-27--hetzner-k3s/pull/370
+- Public sign-in: https://slop.boutique/signin
+- No production email request, PAT, code, authentication link or cookie is part of the saved evidence.
