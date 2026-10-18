@@ -25,7 +25,7 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(web.PortalIndex)
 	}
-	for _, p := range []string{"GET /account", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
+	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
 		m.HandleFunc(p, spa)
 	}
 	// Server-rendered storefront.
@@ -81,6 +81,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("HEAD /api/releases/{release}/files/{file}/download", s.guard(public, noToken, s.download))
 	m.HandleFunc("GET /api/account", s.guard(session, scopeAccount, s.account))
 	m.HandleFunc("POST /api/billing/checkout", s.guard(enabled, scopeAccount, s.checkout))
+	m.HandleFunc("POST /api/billing/support", s.guard(session, scopeAccount, s.supportCheckout))
 	m.HandleFunc("POST /api/billing/portal", s.guard(session, scopeAccount, s.portalSession))
 	m.HandleFunc("POST /api/billing/refresh", s.guard(session, scopeAccount, s.refresh))
 	m.HandleFunc("POST /webhooks/stripe", s.webhook)
@@ -149,12 +150,18 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 		out["journalEnabled"] = rev.Document.Storefront.JournalEnabled
 	}
 	if p != nil {
-		e, _, err := s.entitlement(r.Context(), p.User)
+		e, doc, err := s.entitlement(r.Context(), p.User)
 		if err != nil {
 			httpx.Fail(w, 503, "unavailable", "Account unavailable")
 			return
 		}
 		out["user"] = map[string]any{"id": p.User.ID, "name": p.User.DisplayName, "email": p.User.Email, "emailVerified": p.User.EmailVerified, "role": p.User.Role, "disabled": p.User.Disabled}
+		support, err := s.userSupport(r.Context(), p.User, doc)
+		if err != nil {
+			httpx.Fail(w, 503, "unavailable", "Account unavailable")
+			return
+		}
+		out["supporter"] = support.Active
 		out["csrfToken"] = p.Session.CSRF
 		out["access"] = e.Decision
 		out["plan"] = map[string]any{"key": e.Plan.Key, "name": e.Plan.Name, "rank": e.Plan.Rank, "source": e.Source, "paid": e.Paid(), "instances": e.Plan.Instances}
@@ -322,6 +329,14 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
 	}
+	support := supportStatus(subs, doc, time.Now())
+	if support.Active && support.StartedAt != nil {
+		if err := s.Store.Pool.QueryRow(ctx, `SELECT count(*) FROM catalog_artifacts a WHERE a.visibility='listed' AND (SELECT min(r.published_at) FROM releases r WHERE r.artifact_id=a.id AND r.state='published') >= $1`, support.StartedAt).Scan(&support.Experiments); err != nil {
+			httpx.Fail(w, 503, "unavailable", "Account unavailable")
+			return
+		}
+	}
+
 	allowance, err := s.Store.AllowanceFor(ctx, p.User.ID, e.Plan.MonthlyCredits, e.Plan.DailyCredits)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
@@ -342,6 +357,7 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 		"access":         e.Decision,
 		"entitlement":    e,
 		"subscriptions":  subs,
+		"support":        support,
 		"complimentary":  grants,
 		"allowance":      allowance,
 		"models":         models,

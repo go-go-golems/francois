@@ -114,6 +114,7 @@ type pageData struct {
 	User                                               *store.User
 	JournalEnabled                                     bool
 	JournalPreview                                     bool
+	Supporter                                          bool
 	Sensitive                                          bool
 	LoginAvailable                                     bool
 	LoginHref                                          string
@@ -165,6 +166,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	// Demo guests browse like visitors: no account pages, and they may sign in.
 	if p != nil && p.User.Role != "guest" {
 		d.User = &p.User
+		support, err := s.userSupport(r.Context(), p.User, rev.Document)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		d.Supporter = support.Active
 		nav = append(nav, navItem{Href: "/account", Label: "Account"})
 		if p.User.Role == "creator" || p.User.Role == "admin" {
 			nav = append(nav, navItem{Href: "/studio", Label: "Studio"})
@@ -766,11 +773,20 @@ func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
 			current, paid, staff = e.Plan.Key, e.Source == SourceSubscription || e.Source == SourceTrial, e.Source == SourceStaff
 		}
 	}
+	if p := principal(ctx); p != nil {
+		support, err := s.userSupport(ctx, p.User, rev.Document)
+		if err != nil {
+			s.pageFailed(w, r, err)
+			return
+		}
+		paid = support.Active
+	}
+
 	if staff {
 		current = ""
 	}
 	plans := []planView{}
-	name := ""
+	name := "Monthly support"
 	for _, p := range rev.Document.Plans {
 		if p.Key == current {
 			name = p.Name

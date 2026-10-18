@@ -348,3 +348,51 @@ Read sources/implementation/checks.json and browser-validation.json, then the mo
 - Private development database URL file: /tmp/francois-012/database-url; no secret file is committed.
 - Data changes: local Studio publication of tracked page.md write-ups and existing showcase media, plus public sample preview releases through the standard release workflow.
 - No database migration, new hosting endpoint, custom payment flow or production release was added.
+
+## Step 6: Restore the missing support amount and connect the complete contribution workflow
+
+Reopened the visual implementation after the user identified the missing 42 USD design. Direct Paper inspection confirmed that the current template omitted the complete editable contribution block, changed the lead/principle copy and replaced the year-funding amount. Implemented the missing layout and a distinct monthly contribution path through the existing billing components. This checkpoint is implemented but not yet qualified.
+
+### Prompt Context
+**User prompt (verbatim):** "cool, that works. We need to properly pass the $42 dollars design (which I don't see on slop.boutique/pricing), they're the pages from ramon's paper project. https://app.paper.design/file/01M4XVT9C83GGYK57CMAAAEJJT/p-6-0"
+**Follow-up (verbatim):** "complete checkout flow. Also, when signed in as a free user, show the banner about keeping the lab running on the user page. Also implement the thank you page when supporter"
+**Follow-up (verbatim):** "and make sure that if logged in as a support, you don't see the support monthly banners"
+**Assistant interpretation:** Implement the real amount selector and complete checkout, free account callout, thank-you/supporter state and suppression of support solicitation for supporters.
+**Inferred user intent:** Ship Ramon’s minimal presentation with working behavior and truthful billing state.
+
+### What I did
+- Read the Paper guide, Final metadata and exact desktop/mobile support and account JSX; inspected the support screenshot and confirmed ABC Areal availability.
+- Checked live `/api/plans`: one configured Subscriber monthly price with an empty label; no custom amount workflow exists.
+- Added the active contribution implementation guide and task 8yxo.
+- Implemented monthly inline Stripe price data, reuse of existing admission/ownership/idempotency, two projection columns, and a support summary separate from access entitlements.
+- Added the support form, thank-you route/account presentation, free-account callout and server/React supporter visibility rules.
+
+### Why
+- Showing 42 while charging a configured unrelated fixed price would be incorrect. Contributions must preserve the chosen amount end-to-end.
+- Support does not unlock content; its state must be separate from access-plan privileges.
+
+### What worked
+- Paper MCP provided exact current exports and a reference screenshot. The existing billing service already handles retries, changed-choice supersession and owner-scoped refresh.
+
+### What didn't work
+- Initial branch creation failed with a read-only Git ref lock; the authorized escalated command created `feat/ramon-support-pricing` successfully.
+- Early path guesses for the frontend package and billing handler were wrong; actual paths are root `package.json`, `ui/catalog/public.ts` and `pkg/catalog/routes.go`.
+
+### What I learned
+- The omitted design requires a billing amount contract, not only CSS. The supporter account artboard includes real history and impact data that must come from authoritative records.
+
+### What was tricky to build
+- Separate donation state from privileges while retaining the existing plan APIs. Preserve real Stripe price IDs and project contribution metadata/amount instead of adding price aliases.
+
+### What warrants a second pair of eyes
+- Chosen-amount idempotency, duplicate subscription prevention, projection trust and visibility of calls to action after subscription confirmation.
+
+### What should be done in the future
+- Complete qualification and real local desktop/mobile captures; no deployment is claimed at this checkpoint.
+
+### Code review instructions
+- Start with the active contribution guide, `support.go`, gateway/service changes and the existing account refresh flow. Inspect migration 015 and confirm existing users/sessions are unaffected.
+
+### Technical details
+- Default 42 USD/month, editable whole-dollar range 1–9999. Inline monthly prices carry server-authored metadata; the existing webhook worker remains the only reconciliation service.
+- Source reference: https://docs.stripe.com/api/checkout/sessions/create

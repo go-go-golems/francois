@@ -23,7 +23,7 @@
 <p class="site-statement">A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.</p>
 <nav class="site-nav" aria-label="Main navigation">
 {{if .User}}<a href="/account">Account</a>{{else if .LoginAvailable}}<a href="{{.LoginHref}}">Sign in</a>{{end}}
-<a class="site-support" href="/pricing"><span class="support-desktop">Support the lab</span><span class="support-mobile">Support</span></a>
+{{if .Supporter}}<span class="support-thanks">Thank you for supporting the lab</span>{{else}}<a class="site-support" href="/pricing"><span class="support-desktop">Support the lab</span><span class="support-mobile">Support</span></a>{{end}}
 </nav>
 </header>
 <div class="page">
@@ -31,7 +31,7 @@
 {{template "content" .}}
 <footer class="site-footer">
 <div class="footer-brand"><a class="site-wordmark" href="/">{{.Brand}}</a><a href="mailto:hej@slop.boutique">hej@slop.boutique</a></div>
-<div><span>For humans</span><a href="/feed.xml">RSS</a>{{if .JournalEnabled}}<a href="/journal">Journal</a>{{end}}<a href="/pricing">Support the lab</a>{{if .User}}{{range .Nav}}{{if ne .Href "/"}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{end}}</div>
+<div><span>For humans</span><a href="/feed.xml">RSS</a>{{if .JournalEnabled}}<a href="/journal">Journal</a>{{end}}{{if not .Supporter}}<a href="/pricing">Support the lab</a>{{end}}{{if .User}}{{range .Nav}}{{if ne .Href "/"}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{end}}</div>
 <div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
 <div class="footer-type"><span>Type</span>{{if .TypeCredit}}<p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>{{end}}</div>
 </footer>
@@ -74,6 +74,6 @@
 {{/* A card thumbnail: a video shows its poster, or its first frame. */}}
 {{define "thumb"}}{{if and (isVideo .MediaType) .Poster}}<img src="/media/{{.Poster}}" alt="{{.Alt}}" loading="lazy">{{else if isVideo .MediaType}}<video src="/media/{{.ID}}" muted playsinline preload="metadata" aria-label="{{.Alt}}"></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy">{{end}}{{end}}
 
-{{define "support-callout"}}<aside class="support-callout" aria-labelledby="support-heading">
+{{define "support-callout"}}{{if not .Supporter}}<aside class="support-callout" aria-labelledby="support-heading">
 <p class="callout-label">Support the lab</p><div><h2 id="support-heading">Keep the lab running.</h2><p>We prototype and explore, and share the work here. The lab is funded by people who want it to keep going. No ads, no clients, no investors.</p><a class="site-button callout-button" href="/pricing">Support the lab →</a><a class="u callout-contact" href="mailto:hej@slop.boutique">Or get in touch</a></div>
-</aside>{{end}}
+</aside>{{end}}{{end}}

@@ -32,6 +32,7 @@ export type SessionUser = {
   disabled: boolean;
 };
 export type Session = {
+ supporter: boolean;
   authenticated: boolean;
   loginAvailable: boolean;
  journalEnabled: boolean;
@@ -172,6 +173,7 @@ export type AccessGrant = {
   revokedAt?: string;
 };
 export type Account = {
+ support: {active:boolean; amountCents:number; startedAt?:string; until?:string; cancelScheduled:boolean; experiments:number};
   user: SessionUser & { createdAt: string };
   access: Decision;
   entitlement: Entitlement;

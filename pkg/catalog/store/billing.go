@@ -31,14 +31,14 @@ func (s *Store) UserForCustomer(ctx context.Context, customer string) (string, e
 }
 
 func (s *Store) Subscriptions(ctx context.Context, user string) ([]billing.Subscription, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT stripe_subscription_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,trial_until,cancel_at_period_end,canceled_at,refreshed_at
+	rows, err := s.Pool.Query(ctx, `SELECT stripe_subscription_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,trial_until,cancel_at_period_end,canceled_at,refreshed_at,support_amount_cents,started_at
 FROM billing_subscriptions WHERE user_id=$1 ORDER BY refreshed_at DESC`, user)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (billing.Subscription, error) {
 		var s billing.Subscription
-		err := r.Scan(&s.ID, &s.CustomerID, &s.PriceID, &s.Status, &s.Quantity, &s.ItemCount, &s.AccessUntil, &s.TrialUntil, &s.CancelAtPeriodEnd, &s.CanceledAt, &s.RefreshedAt)
+		err := r.Scan(&s.ID, &s.CustomerID, &s.PriceID, &s.Status, &s.Quantity, &s.ItemCount, &s.AccessUntil, &s.TrialUntil, &s.CancelAtPeriodEnd, &s.CanceledAt, &s.RefreshedAt, &s.SupportAmountCents, &s.StartedAt)
 		return s, err
 	})
 }
@@ -50,11 +50,11 @@ type SubscriptionRow struct {
 	Email  string `json:"email"`
 }
 
-const subscriptionRowColumns = `b.stripe_subscription_id,b.stripe_customer_id,b.price_id,b.status,b.quantity,b.item_count,b.access_until,b.trial_until,b.cancel_at_period_end,b.canceled_at,b.refreshed_at,b.user_id,u.email`
+const subscriptionRowColumns = `b.stripe_subscription_id,b.stripe_customer_id,b.price_id,b.status,b.quantity,b.item_count,b.access_until,b.trial_until,b.cancel_at_period_end,b.canceled_at,b.refreshed_at,b.support_amount_cents,b.started_at,b.user_id,u.email`
 
 func scanSubscriptionRow(r pgx.Row) (SubscriptionRow, error) {
 	var s SubscriptionRow
-	err := r.Scan(&s.ID, &s.CustomerID, &s.PriceID, &s.Status, &s.Quantity, &s.ItemCount, &s.AccessUntil, &s.TrialUntil, &s.CancelAtPeriodEnd, &s.CanceledAt, &s.RefreshedAt, &s.UserID, &s.Email)
+	err := r.Scan(&s.ID, &s.CustomerID, &s.PriceID, &s.Status, &s.Quantity, &s.ItemCount, &s.AccessUntil, &s.TrialUntil, &s.CancelAtPeriodEnd, &s.CanceledAt, &s.RefreshedAt, &s.SupportAmountCents, &s.StartedAt, &s.UserID, &s.Email)
 	return s, notFound(err)
 }
 
@@ -106,12 +106,12 @@ func (s *Store) Access(ctx context.Context, p billing.Policy, u User, now time.T
 // only runs inside the event-completion transaction or a reconciliation.
 func upsertSubscriptions(ctx context.Context, tx pgx.Tx, user string, subs []billing.Subscription, live bool) error {
 	for _, sub := range subs {
-		if _, err := tx.Exec(ctx, `INSERT INTO billing_subscriptions(stripe_subscription_id,user_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,trial_until,cancel_at_period_end,canceled_at,livemode,refreshed_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now())
+		if _, err := tx.Exec(ctx, `INSERT INTO billing_subscriptions(stripe_subscription_id,user_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,trial_until,cancel_at_period_end,canceled_at,livemode,refreshed_at,support_amount_cents,started_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),$13,$14)
 ON CONFLICT(stripe_subscription_id) DO UPDATE SET price_id=EXCLUDED.price_id,status=EXCLUDED.status,quantity=EXCLUDED.quantity,item_count=EXCLUDED.item_count,
- access_until=EXCLUDED.access_until,trial_until=EXCLUDED.trial_until,cancel_at_period_end=EXCLUDED.cancel_at_period_end,canceled_at=EXCLUDED.canceled_at,refreshed_at=now()
+ access_until=EXCLUDED.access_until,trial_until=EXCLUDED.trial_until,cancel_at_period_end=EXCLUDED.cancel_at_period_end,canceled_at=EXCLUDED.canceled_at,refreshed_at=now(),support_amount_cents=EXCLUDED.support_amount_cents,started_at=EXCLUDED.started_at
 WHERE billing_subscriptions.user_id=EXCLUDED.user_id`,
-			sub.ID, user, sub.CustomerID, sub.PriceID, sub.Status, sub.Quantity, sub.ItemCount, sub.AccessUntil, sub.TrialUntil, sub.CancelAtPeriodEnd, sub.CanceledAt, live); err != nil {
+			sub.ID, user, sub.CustomerID, sub.PriceID, sub.Status, sub.Quantity, sub.ItemCount, sub.AccessUntil, sub.TrialUntil, sub.CancelAtPeriodEnd, sub.CanceledAt, live, sub.SupportAmountCents, sub.StartedAt); err != nil {
 			return err
 		}
 	}

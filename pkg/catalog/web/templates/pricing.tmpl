@@ -1,11 +1,17 @@
 {{define "content"}}{{with .Body}}<main class="final-support">
 <section class="final-section"><div class="final-label">Support</div><div class="final-content">
-<h1>Support the lab.</h1><p class="final-lead">We work with computation and intelligence as material and medium. Supporting the lab lets us keep working the way we believe in.</p>
-<ol class="support-principles"><li>We prototype and explore. We don’t build products.</li><li>We work in public, unfinished work included.</li><li>We follow curiosity, not a roadmap.</li><li>We stay true to how we actually like to work.</li><li>We share the experiments and what we learn.</li></ol>
-<div class="support-options">{{if .Paid}}<p>Your subscription: {{.Current}}.</p><a class="u" href="/account">Manage subscription →</a>{{end}}
-{{range .Plans}}{{if .Prices}}<section class="support-option" data-checkout data-plan="{{.Key}}"><h2>{{.Name}}</h2>{{if .Current}}<p>Current support. Thank you for supporting the lab.</p>{{else}}{{range .Prices}}<a class="site-button site-support" href="/signin?return=/pricing" data-interval="{{.Interval}}">{{if .Label}}{{.Label}}{{else}}Support {{.Interval}}ly{{end}} →</a>{{end}}{{end}}</section>{{end}}{{end}}
+<h1>Support the lab.</h1><p class="final-lead">Nothing here is behind a paywall. Every experiment, file and write-up is free for everyone, people and agents alike. Supporting doesn’t unlock anything. It lets us keep working the way we believe in.</p>
+<ol class="support-principles"><li>We prototype and explore. We don’t build products.</li><li>We work in public, unfinished work included.</li><li>We follow curiosity, not a roadmap.</li><li>We stay true to how we actually like to work.</li><li>Everything we make stays free and open, for everyone.</li></ol>
+<div class="support-options">
+{{if .Paid}}<p>Your subscription: {{.Current}}.</p><a class="u" href="/account">Manage subscription →</a>{{else}}
+<form class="support-monthly" data-support-monthly>
+<label class="final-label" for="support-amount">Every month</label>
+<div class="support-amount-controls"><button type="button" data-amount-step="-1" aria-label="Decrease monthly support">−</button><div class="support-amount-value"><input id="support-amount" name="amount" type="number" min="1" max="9999" step="1" value="42" inputmode="numeric" aria-label="Monthly support in US dollars" required><span>USD</span></div><button type="button" data-amount-step="1" aria-label="Increase monthly support">+</button></div>
+<p class="support-amount-help" id="support-amount-help">We suggest 42 USD. Choose any amount that feels right, and cancel any time.</p>
+<button class="site-button site-support" type="submit">Support monthly →</button>
+</form>{{end}}
 </div>
-<section class="support-year"><p class="final-label">Or fund a whole year</p><h2>Make room for the work.</h2><p>A year of independent work for both of us, so the lab can be all we do.</p><a class="u" href="mailto:hej@slop.boutique?subject=Fund%20a%20year">Get in touch →</a></section>
+<section class="support-year"><p class="final-label">Or fund a whole year</p><h2>999,999.99 USD</h2><p>This one is a bet. A single payment covers a year of basic income for both of us, so the lab can be all we do. We’re serious about working this way. If you want to fund it, we’re ready.</p><a class="u" href="mailto:hej@slop.boutique?subject=Fund%20a%20year">Fund a year →</a></section>
 </div></section>
 <section class="final-section support-contact"><div class="final-label">Contact</div><div class="final-content"><p>Write to us any time at <a class="u" href="mailto:hej@slop.boutique">hej@slop.boutique</a>. To stay independent, we don’t run ads, take paid partnerships or accept client work. Offers of compute, and things you think we should play with, are always welcome.</p></div></section>
 </main>{{end}}{{end}}

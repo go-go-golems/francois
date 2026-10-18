@@ -7,7 +7,13 @@ Topics:
 DocType: index
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/payments/gateway.go
+      Note: Stripe recurring checkout boundary
+    - Path: repo://pkg/catalog/web/templates/pricing.tmpl
+      Note: Final support page and contribution form
+    - Path: repo://ui/catalog/public.ts
+      Note: Contribution controls and hosted checkout binding
 ExternalSources: []
 Summary: Detailed intern guide for a small concrete implementation; runtime work remains open.
 LastUpdated: 2026-10-17T15:30:25.528444728-04:00

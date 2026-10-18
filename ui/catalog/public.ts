@@ -299,6 +299,44 @@ async function bindCheckout(box: HTMLElement) {
   });
 }
 
+function bindSupport(form: HTMLFormElement) {
+  const input = form.querySelector<HTMLInputElement>("[name=amount]")!;
+  const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+  const resize = () => { input.style.width = Math.max(2, input.value.length) + "ch"; };
+  const initial = Number(new URLSearchParams(location.search).get("amount"));
+  if (Number.isInteger(initial) && initial >= 1 && initial <= 9999) input.value = String(initial);
+  resize();
+  input.addEventListener("input",resize);
+  form.querySelectorAll<HTMLButtonElement>("[data-amount-step]").forEach(button => {
+    button.addEventListener("click", () => {
+      const current = Number(input.value);
+      input.value = String(Math.min(9999, Math.max(1, (Number.isFinite(current) ? Math.round(current) : 42) + Number(button.dataset.amountStep))));
+      resize();
+    });
+  });
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (submit.disabled || !form.reportValidity()) return;
+    submit.disabled = true;
+    try {
+      const session = await getSession();
+      if (!session.authenticated) {
+        location.assign("/signin?return=" + encodeURIComponent("/pricing?amount="+input.value));
+        return;
+      }
+      const result = await post<{url:string}>("/api/billing/support",{amountCents:Number(input.value)*100});
+      location.assign(result.url);
+    } catch(err) {
+      if (err instanceof RequestError && err.code === "subscription_open") {
+        try { const result = await post<{url:string}>("/api/billing/portal",{}); location.assign(result.url); return; }
+        catch(portalError) { err = portalError; }
+      }
+      fail(form,(err as Error).message);
+      submit.disabled = false;
+    }
+  });
+}
+
 function bindSignOut(btn: HTMLElement) {
   btn.addEventListener("click", async () => {
     try {
@@ -322,6 +360,7 @@ function main() {
       });
   }
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
+  document.querySelectorAll<HTMLFormElement>("[data-support-monthly]").forEach(bindSupport);
   document.querySelectorAll<HTMLElement>("[data-checkout]").forEach((box) => {
     bindCheckout(box).catch(() => {
       /* links keep pointing to sign-in */

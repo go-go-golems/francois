@@ -34,12 +34,12 @@ export function Account() {
     return () => clearTimeout(stop);
   }, [returned, session?.authenticated]);
   useEffect(() => {
-    if (polling && a?.access.allowed) {
+    if (polling && a?.support.active) {
       setPolling(false);
       dispatch(api.util.invalidateTags(["Session"]));
-      dispatch(show({ text: "Your subscription is active." }));
+      dispatch(show({ text: "Thank you for supporting the lab." }));
     }
-  }, [polling, a?.access.allowed]);
+  }, [polling, a?.support.active]);
   if (!session)
     return (
       <main>
@@ -77,25 +77,28 @@ export function Account() {
         </div>
         <div className="final-content">
           <h1>
-            {a.entitlement.source === "subscription" ||
-            a.entitlement.source === "trial"
+            {a.support.active
               ? `Thank you, ${a.user.name || "friend"}.`
               : "Your account."}
           </h1>
+          {a.support.active && <div className="support-impact">
+            {a.support.startedAt ? <><span className="support-impact-count">{a.support.experiments}</span><div><p>experiments made possible since you started supporting us on {new Date(a.support.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}.</p><a className="u" href="/">See them in the archive</a></div></> : <p>Your support keeps the lab running. Thank you.</p>}
+          </div>}
           <div className="account-detail">
             <span>Email</span>
             <p>{a.user.email}</p>
           </div>
           <div className="account-detail">
             <span>
-              {a.entitlement.source === "subscription" ||
-              a.entitlement.source === "trial"
+              {a.support.active
                 ? "Support"
                 : "Access"}
             </span>
-            <p>{a.entitlement.plan.name}</p>
+            <p>{a.support.active && a.support.amountCents > 0 ? `${a.support.amountCents / 100} USD a month.` : a.entitlement.plan.name}</p>
           </div>
-          {polling && !a.access.allowed && (
+          {a.support.active && a.support.until && <p className="small muted">{a.support.cancelScheduled ? "Support continues until " : "Next payment on "}{new Date(a.support.until).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}.</p>}
+          {a.support.active && <p>You can stop any time. There will be no further payments, and everything stays free and open to you.</p>}
+          {polling && !a.support.active && (
             <p role="status">Checking your subscription…</p>
           )}
           {a.user.disabled && (
@@ -115,6 +118,7 @@ export function Account() {
           </p>
         </div>
       </section>
+      {!a.support.active && a.entitlement.source === "free" && <aside className="support-callout" aria-labelledby="account-support-heading"><p className="callout-label">Support the lab</p><div><h2 id="account-support-heading">Keep the lab running.</h2><p>We prototype and explore, and share the work here. The lab is funded by people who want it to keep going. No ads, no clients, no investors.</p><a className="site-button callout-button" href="/pricing">Support the lab →</a><a className="u callout-contact" href="mailto:hej@slop.boutique">Or get in touch</a></div></aside>}
       {session.user &&
         (session.user.role === "admin" || session.user.role === "creator") && (
           <Row label="API tokens">
