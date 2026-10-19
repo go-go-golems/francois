@@ -44,7 +44,7 @@ func TestPlans(t *testing.T) {
 	doc := settings.Defaults()
 	doc.Plans = append(doc.Plans,
 		settings.Plan{Key: "supporter", Name: "Supporter", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup"}}, Instances: 1, MembersPerInstance: 2},
-		settings.Plan{Key: "studio", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio"}}, Instances: 5, MembersPerInstance: 10},
+		settings.Plan{Key: "subscriber", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio"}}, Instances: 5, MembersPerInstance: 10},
 	)
 	if _, err := e.store.SaveSettings(ctx, "", doc); err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestPlans(t *testing.T) {
 	e.subscribe(sup, "price_sup")
 	e.subscribe(stu, "price_studio")
 	basic := e.publishArtifact(admin, "basic", "")
-	premium := e.publishArtifact(admin, "premium", "studio")
+	premium := e.publishArtifact(admin, "premium", "subscriber")
 	create := func(a tactor, release string) (int, map[string]any) {
 		return e.portal(&a, "POST", "/api/instances", map[string]string{"releaseId": release})
 	}
@@ -70,7 +70,7 @@ func TestPlans(t *testing.T) {
 
 	// The session reports the resolved plan.
 	_, s := e.portal(&sup, "GET", "/api/session", nil)
-	if plan := s["plan"].(map[string]any); plan["key"] != "studio" || plan["source"] != SourceSubscription {
+	if plan := s["plan"].(map[string]any); plan["key"] != "subscriber" || plan["source"] != SourceSubscription {
 		t.Fatalf("session plan %v", plan)
 	}
 

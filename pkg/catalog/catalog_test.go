@@ -107,14 +107,14 @@ func setup(t *testing.T, opts ...func(*Config)) *env {
 	return &env{t: t, srv: srv, ts: ts, store: s, client: ts.Client()}
 }
 
-// testDoc is a settings document with the free plan and a paid "pro" plan
+// testDoc is a settings document with the free plan and a paid "subscriber" plan
 // (10 workspaces, 10 members, monthly credits as given).
 func testDoc(monthly int, models ...settings.Model) settings.Document {
 	d := settings.Defaults()
 	if len(models) > 0 {
 		d.Models.Allowed = models
 	}
-	d.Plans = append(d.Plans, settings.Plan{Key: "pro", Name: "Pro", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_test_pro", Label: "5 / month"}},
+	d.Plans = append(d.Plans, settings.Plan{Key: "subscriber", Name: "Pro", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_test_pro", Label: "5 / month"}},
 		Instances: 10, MembersPerInstance: 10, MonthlyCredits: monthly})
 	return d
 }

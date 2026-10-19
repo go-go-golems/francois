@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { api, errorMessage } from "./api";
 import { navigate, show } from "./store";
 import { ApiTokens } from "./tokens";
+import { RecurringSupport } from "./recurring-support";
 import { Empty, loginHref, Row, SignOut } from "./ui";
 
 export function Account() {
@@ -146,9 +147,12 @@ export function Account() {
           {a.support.active && (
             <p>
               {a.support.kind === "year"
-                ? "Thank you for funding a year. This was a single payment; it will not renew."
+                ? "Thank you for funding a year. This year payment will not renew automatically."
                 : "You can stop any time. There will be no further payments, and everything stays free and open to you."}
             </p>
+          )}
+          {a.support.kind === "year" && (
+            <RecurringSupport subscriptions={a.subscriptions} />
           )}
           {polling && !returnedConfirmed && (
             <p role="status">Checking your subscription…</p>

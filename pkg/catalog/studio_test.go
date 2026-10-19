@@ -91,8 +91,8 @@ func TestStudio(t *testing.T) {
 	}
 	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"creators": []string{ottoID}})
 	expect("drop own credit", code, out, 400, "invalid_request")
-	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"description": "Weaves.", "tags": []string{"Tools", "tools", " art "}, "featured": true, "requiredPlan": "pro"})
-	if code != 200 || out["description"] != "Weaves." || len(out["tags"].([]any)) != 2 || out["requiredPlan"] != "pro" {
+	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"description": "Weaves.", "tags": []string{"Tools", "tools", " art "}, "featured": true, "requiredPlan": "subscriber"})
+	if code != 200 || out["description"] != "Weaves." || len(out["tags"].([]any)) != 2 || out["requiredPlan"] != "subscriber" {
 		t.Fatalf("patch artifact %d %v", code, out)
 	}
 	code, out = e.portal(&cleo, "PATCH", "/api/studio/artifacts/loom", map[string]any{"requiredPlan": "Bad Plan"})

@@ -78,3 +78,9 @@ The return flow also checks confirmation for the exact owner-bound checkout atte
 ![Funded year, desktop](../sources/implementation/year-funding-confirmed-1440.png)
 
 ![Funded year, mobile](../sources/implementation/year-funding-confirmed-390.png)
+
+## PR 16 review correction
+
+Subscriber resolution selects the explicit public `subscriber` key; it does not select the highest ranked plan. A higher private/grant-only tier must never become the default for a paying customer. Missing or private Subscriber configuration leaves the customer on Free.
+
+Year funding is a separate payment and does not cancel an existing recurring subscription. The funded-year account view also lists ongoing monthly support, its amount and next payment date, or its scheduled stop date. The sentence about no automatic renewal applies only to the year payment.

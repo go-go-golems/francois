@@ -655,3 +655,50 @@ Qualified the complete follow-up with database tests and a real 999,999.99 USD S
 ### Technical details
 - Sandbox payment was refunded after evidence capture. Temporary cookies were revoked; no key, cookie or hosted checkout URL is stored in ticket evidence.
 - Production preflight aggregates: two active subscription rows, one marked custom-monthly support; one paid Subscriber configuration. Actual Stripe subscription objects require no migration.
+
+## Step 12: Address both PR 16 review findings
+
+Corrected two independent mistakes identified by automated review: a year-funded account hid the continuing monthly contract, and subscriber resolution used the highest configured plan. The account now shows existing recurring commitments alongside year standing, while paid customers select the designated public Subscriber tier.
+
+### Prompt Context
+**User prompts (verbatim):** “also address https://github.com/go-go-golems/francois/pull/16 status” and “also address https://github.com/go-go-golems/francois/pull/16 code review”.
+**Assistant interpretation:** Inspect CI/review status, correct actionable findings, test and push the same PR.
+**Inferred user intent:** Finish review without allowing the separate architecture study to stall the payment fixes.
+
+### What I did
+- Addressed review comments 4305397470 and 4305397478. Added `RecurringSupport`, using the existing account subscriptions rather than a new backend projection.
+- Displayed active recurring amount and next charge, or scheduled stop date, alongside year funding. Clarified that only the year payment does not renew automatically.
+- Selected `doc.Plan("subscriber")` only when public. Added a regression proving a higher private plan cannot be granted to an ordinary subscriber.
+- Updated test fixtures and admin filter queries to the designated Subscriber key. Rebuilt the tracked embedded frontend.
+
+### Why
+- One-off funding and monthly contracts coexist; presentation must disclose both. Generic highest-plan selection cannot express the single public Subscriber tier safely.
+
+### What worked
+- PostgreSQL-backed `go test ./pkg/catalog -count=1` passed in 18.187s after fixture correction.
+- `pnpm check`, ten frontend/worker tests and `pnpm build` passed. The new rendering test covers continued renewal and cancellation copy.
+- Final `make lint logcopter-check` passed with zero issues after gofmt.
+
+### What didn't work
+- Initial catalog test command using the isolated fixture on port 5437 failed with `connect: connection refused`; its PostgreSQL container had stopped. Restarted only `francois-email-013-postgres-1`.
+- The next catalog run exposed two old `plan=pro` URL fixtures: `TestCustomerManagement: plan filter 200 []` and `TestUserFiltersBeforeLimit: ... 200 []`. Updated those URLs to `plan=subscriber`; the suite passed.
+- Sandboxed lint could not load packages (`no go files to analyze`). With cache access, lint identified `admin_customers_test.go:162:1: File is not properly formatted (gofmt)` after the URL changes. Ran gofmt and repeated the required check.
+
+### What I learned
+- The existing subscription projection already has the recurring amount/date; a separate support summary must not obscure it.
+- Enforcing an explicit tier requires fixture keys to reflect the real configuration contract rather than silently relying on rank.
+
+### What was tricky to build
+- The year-payment sentence must not imply cancellation of a different ongoing contract. Scheduled cancellation must show a stop date rather than a next charge.
+
+### What warrants a second pair of eyes
+- Missing/private Subscriber configuration intentionally falls back to Free. Staff and named complimentary grants remain unchanged by this focused correction.
+
+### What should be done in the future
+- Push and request review. No merge or production deployment is authorized by these review requests.
+
+### Code review instructions
+- Read `ui/catalog/recurring-support.tsx`, its rendering test and `TestSubscriberNeverSelectsGrantOnlyPlan`, then the narrow account/entitlement diffs.
+
+### Technical details
+- Original PR head: d847ba4. Review IDs are GitHub inline comment identifiers, not new tickets. No payment was submitted during this correction.

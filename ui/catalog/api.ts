@@ -144,6 +144,7 @@ export type Instance = {
   audit?: AuditEntry[];
 };
 export type Subscription = {
+  supportAmountCents: number;
   id: string;
   priceId: string;
   status: string;

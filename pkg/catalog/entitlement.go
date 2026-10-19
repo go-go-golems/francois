@@ -55,7 +55,10 @@ func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document)
 			if d.Reason == billing.ReasonTrial {
 				source = SourceTrial
 			}
-			return Entitlement{Plan: doc.Highest(), Source: source, Decision: d}
+			plan, ok := doc.Plan("subscriber")
+			if ok && plan.Public {
+				return Entitlement{Plan: plan, Source: source, Decision: d}
+			}
 		case billing.ReasonComplimentary:
 			p := doc.Highest()
 			if q, ok := doc.Plan(d.Plan); ok && d.Plan != "" {

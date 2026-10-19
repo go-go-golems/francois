@@ -31,3 +31,7 @@ Rebased merged PR #15 and deployed official image sha-08332bb through validated 
 ## 2026-10-17
 
 Implemented one-time Stripe Fund a year at 999999.99 USD and unified confirmed subscription entitlement. Reused owner-bound checkout projection and existing worker; added exact-attempt confirmation and refund revocation. Full Go/DB, frontend, build and lint passed; real maximum-amount sandbox payment and refund verified Subscriber before/during/after. No production payment or deployment.
+
+## 2026-10-18
+
+Address PR 16 review: disclose continuing monthly renewal alongside year funding and select the explicit public Subscriber tier; catalog/frontend/lint checks pass.
