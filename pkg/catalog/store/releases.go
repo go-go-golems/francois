@@ -19,21 +19,19 @@ type Page struct {
 }
 
 type Artifact struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-	Visibility  string   `json:"visibility"`
-	Page        Page     `json:"page"`
-	PageDraft   *Page    `json:"pageDraft,omitempty"`
-	Featured    bool     `json:"featured"`
-	SortOrder   int      `json:"sortOrder"`
-	// RequiredPlan is the key of the lowest plan that may run the artifact;
-	// empty means the lowest paid plan.
-	RequiredPlan string    `json:"requiredPlan"`
-	DemoEnabled  bool      `json:"demoEnabled"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Description      string     `json:"description"`
+	Tags             []string   `json:"tags"`
+	Visibility       string     `json:"visibility"`
+	Page             Page       `json:"page"`
+	PageDraft        *Page      `json:"pageDraft,omitempty"`
+	Featured         bool       `json:"featured"`
+	SortOrder        int        `json:"sortOrder"`
+	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
+	DemoEnabled      bool       `json:"demoEnabled"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 type ReleaseFile struct {
@@ -90,9 +88,9 @@ func (s *Store) CreateArtifact(ctx context.Context, a Artifact, creators ...stri
 		return a, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	err = tx.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,required_plan,demo_enabled)
+	err = tx.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,early_access_until,demo_enabled)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at,updated_at`,
-		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.RequiredPlan, a.DemoEnabled).Scan(&a.CreatedAt, &a.UpdatedAt)
+		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled).Scan(&a.CreatedAt, &a.UpdatedAt)
 	if isUnique(err) {
 		return a, errors.Wrapf(ErrConflict, "artifact %s already exists", a.ID)
 	}
@@ -131,8 +129,8 @@ func (s *Store) UpdateArtifact(ctx context.Context, a Artifact) (Artifact, error
 	if a.Tags == nil {
 		a.Tags = []string{}
 	}
-	err := s.Pool.QueryRow(ctx, `UPDATE catalog_artifacts SET title=$2,description=$3,tags=$4,visibility=$5,featured=$6,sort_order=$7,required_plan=$8,demo_enabled=$9,updated_at=now()
-WHERE id=$1 RETURNING updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility, a.Featured, a.SortOrder, a.RequiredPlan, a.DemoEnabled).Scan(&a.UpdatedAt)
+	err := s.Pool.QueryRow(ctx, `UPDATE catalog_artifacts SET title=$2,description=$3,tags=$4,visibility=$5,featured=$6,sort_order=$7,early_access_until=$8,demo_enabled=$9,updated_at=now()
+WHERE id=$1 RETURNING updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled).Scan(&a.UpdatedAt)
 	return a, notFound(err)
 }
 
@@ -164,14 +162,18 @@ func (s *Store) DiscardPageDraft(ctx context.Context, id string) error {
 	return err
 }
 
-const artifactColumns = `id,title,description,tags,visibility,page,page_draft,featured,sort_order,required_plan,demo_enabled,created_at,updated_at`
+const artifactColumns = `id,title,description,tags,visibility,page,page_draft,featured,sort_order,early_access_until,demo_enabled,created_at,updated_at`
 
 func scanArtifact(r pgx.Row) (Artifact, error) {
 	var a Artifact
 	var page, draft []byte
-	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &page, &draft, &a.Featured, &a.SortOrder, &a.RequiredPlan, &a.DemoEnabled, &a.CreatedAt, &a.UpdatedAt)
+	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &page, &draft, &a.Featured, &a.SortOrder, &a.EarlyAccessUntil, &a.DemoEnabled, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return a, notFound(err)
+	}
+	if a.EarlyAccessUntil != nil {
+		until := a.EarlyAccessUntil.UTC()
+		a.EarlyAccessUntil = &until
 	}
 	if err = json.Unmarshal(page, &a.Page); err != nil {
 		return a, err
@@ -305,12 +307,21 @@ func (s *Store) Releases(ctx context.Context, artifact string, states ...string)
 }
 
 // PublishRelease moves a draft to published exactly once and audits it.
-func (s *Store) PublishRelease(ctx context.Context, id, actor string) (Release, error) {
+func (s *Store) PublishRelease(ctx context.Context, id, actor string, earlyDays int) (Release, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return Release{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	// Lock the artifact so two first releases cannot independently restart early access.
+	if _, err = tx.Exec(ctx, `SELECT id FROM catalog_artifacts WHERE id=(SELECT artifact_id FROM releases WHERE id=$1) FOR UPDATE`, id); err != nil {
+		return Release{}, err
+	}
+	if earlyDays > 0 {
+		if _, err = tx.Exec(ctx, `UPDATE catalog_artifacts a SET early_access_until=now()+($2::int*interval '1 day') WHERE a.id=(SELECT artifact_id FROM releases WHERE id=$1) AND a.early_access_until IS NULL AND NOT EXISTS(SELECT 1 FROM releases r WHERE r.artifact_id=a.id AND r.published_at IS NOT NULL)`, id, earlyDays); err != nil {
+			return Release{}, err
+		}
+	}
 	tag, err := tx.Exec(ctx, `UPDATE releases SET state='published',published_at=now(),published_by=$2 WHERE id=$1 AND state='draft'`, id, actor)
 	if err != nil {
 		return Release{}, err
@@ -397,4 +408,9 @@ func (s *Store) ReferencedStorageKeys(ctx context.Context) ([]ReleaseFile, error
 		err := r.Scan(&f.ID, &f.ReleaseID, &f.Role, &f.Name, &f.MediaType, &f.Size, &f.SHA256, &f.StorageKey)
 		return f, err
 	})
+}
+
+// EarlyAccess reports the concrete time-based publication restriction.
+func (a Artifact) EarlyAccess(now time.Time) bool {
+	return a.EarlyAccessUntil != nil && now.Before(*a.EarlyAccessUntil)
 }

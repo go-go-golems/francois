@@ -47,10 +47,10 @@ func artifactCommands() (*cobra.Command, error) {
 		def{name: "update", short: "Change an artifact's metadata (only the flags given)",
 			flags: append(argID("artifact ID"), flag("title", "Title"), flag("description", "Description"), list("tags", "Tags (replaces all)"),
 				boolean("clear-tags", "Remove all tags"), flag("visibility", "listed or hidden"), flag("featured", "true or false"), flag("sort-order", "Position on the storefront"),
-				flag("required-plan", "Plan key needed to run it"), flag("demo-enabled", "true or false"), list("creators", "Creator profile IDs (replaces all)")),
+				flag("early-access-until", "RFC3339 date; empty clears early access"), flag("demo-enabled", "true or false"), list("creators", "Creator profile IDs (replaces all)")),
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
 				p := client.ArtifactPatch{Title: a.optS("title"), Description: a.optS("description"), Tags: a.optL("tags", "clear-tags"), Visibility: a.optS("visibility"),
-					RequiredPlan: a.optS("required-plan"), Creators: a.optL("creators", "")}
+					EarlyAccessUntil: a.optS("early-access-until"), Creators: a.optL("creators", "")}
 				var err error
 				if p.Featured, err = a.optB("featured"); err != nil {
 					return nil, err
@@ -328,9 +328,9 @@ func userCommands() (*cobra.Command, error) {
 				return c.Admin.RevokeSessions(ctx, a.S("id"), a.B("tokens"))
 			}},
 		def{name: "grant", short: "Give complimentary access",
-			flags: append(argID("user ID"), integer("days", 0, "Length in days (1–3660)"), required("reason", "Why; stored in the audit log"), flag("plan", "Plan key (default: the highest plan)")),
+			flags: append(argID("user ID"), integer("days", 0, "Length in days (1–3660)"), required("reason", "Why; stored in the audit log")),
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
-				return c.Admin.GrantAccess(ctx, a.S("id"), client.GrantRequest{Days: a.I("days"), Reason: a.S("reason"), Plan: a.S("plan")})
+				return c.Admin.GrantAccess(ctx, a.S("id"), client.GrantRequest{Days: a.I("days"), Reason: a.S("reason")})
 			}},
 		def{name: "revoke-grant", short: "Revoke one complimentary grant", flags: argID("grant ID"), destructive: true,
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
@@ -406,9 +406,9 @@ func planCommands() (*cobra.Command, error) {
 				return p, nil
 			}},
 		def{name: "set", short: "Change a plan (only the flags given); safe against concurrent edits",
-			flags: append(argID("plan key"), flag("name", "Name"), flag("description", "Description"), flag("public", "true or false"),
-				flag("instances", "Workspaces per subscriber"), flag("members", "Members per workspace"), flag("monthly-credits", "Monthly credits"),
-				flag("daily-credits", "Daily credits"), flag("price-month", "Stripe price ID for monthly billing"), flag("price-month-label", "Label, e.g. €5 / month"),
+			flags: append(argID("plan key"),
+				flag("instances", "Workspaces per subscriber"), flag("members", "Members per workspace"), flag("daily-tokens", "Daily generated tokens"),
+				flag("price-month", "Stripe price ID for monthly billing"), flag("price-month-label", "Label, e.g. €5 / month"),
 				flag("price-year", "Stripe price ID for yearly billing"), flag("price-year-label", "Label, e.g. €50 / year")),
 			destructive: true,
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
@@ -418,20 +418,7 @@ func planCommands() (*cobra.Command, error) {
 }
 
 func applyPlanFlags(a in, p *settings.Plan) error {
-	if v := a.optS("name"); v != nil {
-		p.Name = *v
-	}
-	if v := a.optS("description"); v != nil {
-		p.Description = *v
-	}
-	pub, err := a.optB("public")
-	if err != nil {
-		return err
-	}
-	if pub != nil {
-		p.Public = *pub
-	}
-	for name, dst := range map[string]*int{"instances": &p.Instances, "members": &p.MembersPerInstance, "monthly-credits": &p.MonthlyCredits, "daily-credits": &p.DailyCredits} {
+	for name, dst := range map[string]*int{"instances": &p.Instances, "members": &p.MembersPerInstance, "daily-tokens": &p.DailyTokens} {
 		n, err := a.optI(name)
 		if err != nil {
 			return err
@@ -514,15 +501,20 @@ func billingCommands() (*cobra.Command, error) {
 }
 
 func usageCommands() (*cobra.Command, error) {
-	return group("usage", "Model usage and credits (admin scopes)",
+	return group("usage", "Model usage and token ceilings (admin scopes)",
 		def{name: "summary", short: "Usage summary and recent model calls", flags: []*fieldsDef{flag("user", "Only this user"), integer("limit", 0, "Calls to show")},
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
 				return c.Admin.Usage(ctx, a.S("user"), a.I("limit"))
 			}},
-		def{name: "adjust", short: "Add or remove credits for the current period",
-			flags: append(argID("user ID"), integer("credits", 0, "Credits to add (negative removes)"), required("reason", "Why; stored in the audit log")), destructive: true,
+		def{name: "ceiling", short: "Set an absolute daily generated-token ceiling",
+			flags: append(argID("user ID"), integer("tokens", -1, "Daily generated tokens; -1 resets to the class default"), required("reason", "Why; stored in the audit log")), destructive: true,
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
-				return nil, c.Admin.AdjustCredits(ctx, a.S("id"), a.I("credits"), a.S("reason"))
+				limit := a.I("tokens")
+				var ceiling *int
+				if limit >= 0 {
+					ceiling = &limit
+				}
+				return nil, c.Admin.SetTokenCeiling(ctx, a.S("id"), ceiling, a.S("reason"))
 			}},
 	)
 }

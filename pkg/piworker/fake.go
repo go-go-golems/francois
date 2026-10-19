@@ -55,6 +55,9 @@ func (f *Fake) Sample(ctx context.Context, r Request, emit func(Event), execute 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if r.MaxOutputTokens > 0 && len(text) > r.MaxOutputTokens {
+		text = text[:r.MaxOutputTokens]
+	}
 	emit(Event{Type: "usage", CallID: r.CallID, Usage: &Usage{Input: int64(len(r.Input)), Output: int64(len(text)), Model: "test/fake"}})
 	emit(Event{Type: "text", CallID: r.CallID, Text: text, Delta: text})
 	emit(Event{Type: "result", CallID: r.CallID, Result: &Result{Text: text, ModelTierApplied: r.Options.ModelTier, ModelApplied: r.Options.Model, ModelUsed: "test/fake"}})

@@ -100,6 +100,22 @@ func (s *Server) createDemo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 403, "demo_disabled", "There is no demo for this application")
 		return
 	}
+	if a.EarlyAccess(time.Now()) {
+		p := principal(ctx)
+		if p == nil {
+			httpx.Fail(w, 403, "early_access", "This artifact is in early access for Paying customers")
+			return
+		}
+		e, err := s.entitlementIn(ctx, p.User, rev.Document)
+		if err != nil {
+			unavailable(w, err)
+			return
+		}
+		if !e.Paid() {
+			httpx.Fail(w, 403, "early_access", "This artifact is in early access for Paying customers")
+			return
+		}
+	}
 	rels, err := s.Store.Releases(ctx, a.ID, "published")
 	if err != nil || len(rels) == 0 {
 		httpx.Fail(w, 403, "demo_disabled", "There is no demo for this application")

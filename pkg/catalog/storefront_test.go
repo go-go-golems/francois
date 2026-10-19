@@ -30,14 +30,14 @@ func TestContentStore(t *testing.T) {
 	if err != nil || a.Title != "Board" || a.Visibility != "listed" || a.Page.Gallery == nil {
 		t.Fatalf("artifact %+v %v", a, err)
 	}
-	a.Title, a.Featured, a.RequiredPlan, a.DemoEnabled = "Board, renamed", true, "studio", true
+	a.Title, a.Featured, a.DemoEnabled = "Board, renamed", true, true
 	if _, err = st.UpdateArtifact(ctx, a); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err = e.srv.Publisher.CreateDraft(ctx, admin.user.ID, uploadOf("board", "", "1.1.0")); err != nil {
 		t.Fatalf("second release: %v", err)
 	}
-	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || a.RequiredPlan != "studio" || !a.DemoEnabled {
+	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || !a.DemoEnabled {
 		t.Fatalf("metadata changed by upload: %+v", a)
 	}
 	if _, err = st.CreateArtifact(ctx, store.Artifact{ID: "board", Title: "dup"}); !errors.Is(err, store.ErrConflict) {

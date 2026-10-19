@@ -1,0 +1,16 @@
+{
+  "mockedAPI": true,
+  "realPolicyVerifiedSeparately": true,
+  "viewports": [
+    1440,
+    390
+  ],
+  "actions": [
+    "set ceiling",
+    "reset default",
+    "disable",
+    "enable",
+    "grant Paying access"
+  ],
+  "pageErrors": []
+}

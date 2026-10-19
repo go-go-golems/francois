@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/content"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
@@ -28,7 +29,6 @@ const (
 )
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
-var planKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 func (s *Server) studioRoutes(m *http.ServeMux) {
 	c := func(h http.HandlerFunc) http.HandlerFunc { return s.guard(creator, scopeStudio, h) }
@@ -136,7 +136,7 @@ func artifactSummary(a store.Artifact, credits []store.Creator, rels []store.Rel
 		}
 	}
 	return map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "visibility": a.Visibility,
-		"featured": a.Featured, "sortOrder": a.SortOrder, "requiredPlan": a.RequiredPlan, "demoEnabled": a.DemoEnabled,
+		"featured": a.Featured, "sortOrder": a.SortOrder, "earlyAccessUntil": a.EarlyAccessUntil, "demoEnabled": a.DemoEnabled,
 		"cover": a.Page.Cover, "hasDraft": a.PageDraft != nil, "creators": ids, "releases": len(rels), "draftReleases": drafts,
 		"latestVersion": latest, "updatedAt": a.UpdatedAt}
 }
@@ -251,15 +251,15 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Title        *string   `json:"title"`
-		Description  *string   `json:"description"`
-		Tags         []string  `json:"tags"`
-		Visibility   *string   `json:"visibility"`
-		Featured     *bool     `json:"featured"`
-		SortOrder    *int      `json:"sortOrder"`
-		RequiredPlan *string   `json:"requiredPlan"`
-		DemoEnabled  *bool     `json:"demoEnabled"`
-		Creators     *[]string `json:"creators"`
+		Title            *string   `json:"title"`
+		Description      *string   `json:"description"`
+		Tags             []string  `json:"tags"`
+		Visibility       *string   `json:"visibility"`
+		Featured         *bool     `json:"featured"`
+		SortOrder        *int      `json:"sortOrder"`
+		EarlyAccessUntil *string   `json:"earlyAccessUntil"`
+		DemoEnabled      *bool     `json:"demoEnabled"`
+		Creators         *[]string `json:"creators"`
 	}
 	if err := httpx.Read(w, r, &in, 16<<10); err != nil {
 		httpx.Fail(w, 400, "invalid_request", err.Error())
@@ -283,29 +283,26 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 	if in.SortOrder != nil {
 		a.SortOrder = *in.SortOrder
 	}
-	if in.RequiredPlan != nil {
-		a.RequiredPlan = *in.RequiredPlan
+	if in.EarlyAccessUntil != nil {
+		a.EarlyAccessUntil = nil
+		if *in.EarlyAccessUntil != "" {
+			until, err := time.Parse(time.RFC3339, *in.EarlyAccessUntil)
+			if err != nil {
+				httpx.Fail(w, 400, "invalid_request", "earlyAccessUntil must be an RFC3339 date or empty to clear")
+				return
+			}
+			a.EarlyAccessUntil = &until
+		}
 	}
 	if in.DemoEnabled != nil {
 		a.DemoEnabled = *in.DemoEnabled
 	}
 	if a.Title == "" || len(a.Title) > 120 || len(a.Description) > 2000 || (a.Visibility != "listed" && a.Visibility != "hidden") ||
-		(a.RequiredPlan != "" && !planKeyPattern.MatchString(a.RequiredPlan)) || a.SortOrder < -10000 || a.SortOrder > 10000 {
+		a.SortOrder < -10000 || a.SortOrder > 10000 {
 		httpx.Fail(w, 400, "invalid_request", "Invalid title, description, visibility, plan or sort order")
 		return
 	}
 	ctx := r.Context()
-	if in.RequiredPlan != nil && a.RequiredPlan != "" {
-		rev, err := s.Store.ActiveSettings(ctx)
-		if err != nil {
-			unavailable(w, err)
-			return
-		}
-		if _, ok := rev.Document.Plan(a.RequiredPlan); !ok {
-			httpx.Fail(w, 400, "invalid_request", "Unknown plan "+a.RequiredPlan)
-			return
-		}
-	}
 	if in.Creators != nil {
 		if err := s.checkCredits(ctx, r, *in.Creators); err != nil {
 			httpx.Fail(w, 400, "invalid_request", err.Error())
@@ -323,7 +320,7 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_ = s.Store.Audit(ctx, actor(r), "artifact.update", a.ID, map[string]any{"visibility": a.Visibility, "requiredPlan": a.RequiredPlan, "demo": a.DemoEnabled})
+	_ = s.Store.Audit(ctx, actor(r), "artifact.update", a.ID, map[string]any{"visibility": a.Visibility, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled})
 	a, _ = s.Store.Artifact(ctx, a.ID)
 	httpx.OK(w, a)
 }
@@ -637,7 +634,12 @@ func (s *Server) studioPublish(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rel, err := s.Store.PublishRelease(r.Context(), rel.ID, actor(r))
+	rev, err := s.Store.ActiveSettings(r.Context())
+	if err != nil {
+		unavailable(w, err)
+		return
+	}
+	rel, err = s.Store.PublishRelease(r.Context(), rel.ID, actor(r), rev.Document.Publishing.EarlyAccessDays)
 	if errors.Is(err, store.ErrConflict) {
 		httpx.Fail(w, 409, "conflict", "Only a draft can be published")
 		return
@@ -1190,7 +1192,7 @@ func (s *Server) studioPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []map[string]any{}
 	for _, p := range rev.Document.Plans {
-		out = append(out, map[string]any{"key": p.Key, "name": p.Name, "rank": p.Rank, "public": p.Public})
+		out = append(out, map[string]any{"key": p.Key, "name": p.Name})
 	}
 	httpx.OK(w, out)
 }

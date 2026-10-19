@@ -56,16 +56,16 @@ func identityTools() []spec {
 // --- studio -------------------------------------------------------------
 
 type artifactPatchIn struct {
-	ID           string    `json:"id" jsonschema:"artifact ID"`
-	Title        *string   `json:"title,omitempty"`
-	Description  *string   `json:"description,omitempty"`
-	Tags         *[]string `json:"tags,omitempty" jsonschema:"replaces all tags; [] clears them"`
-	Visibility   *string   `json:"visibility,omitempty" jsonschema:"listed or hidden"`
-	Featured     *bool     `json:"featured,omitempty"`
-	SortOrder    *int      `json:"sortOrder,omitempty"`
-	RequiredPlan *string   `json:"requiredPlan,omitempty" jsonschema:"plan key needed to run it"`
-	DemoEnabled  *bool     `json:"demoEnabled,omitempty"`
-	Creators     *[]string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
+	ID               string    `json:"id" jsonschema:"artifact ID"`
+	Title            *string   `json:"title,omitempty"`
+	Description      *string   `json:"description,omitempty"`
+	Tags             *[]string `json:"tags,omitempty" jsonschema:"replaces all tags; [] clears them"`
+	Visibility       *string   `json:"visibility,omitempty" jsonschema:"listed or hidden"`
+	Featured         *bool     `json:"featured,omitempty"`
+	SortOrder        *int      `json:"sortOrder,omitempty"`
+	EarlyAccessUntil *string   `json:"earlyAccessUntil,omitempty" jsonschema:"RFC3339 date; empty clears early access"`
+	DemoEnabled      *bool     `json:"demoEnabled,omitempty"`
+	Creators         *[]string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
 }
 
 type pageIn struct {
@@ -208,14 +208,14 @@ func studioTools() []spec {
 				a, err := s.CreateArtifact(ctx, in)
 				return a, "Created " + a.ID + ".", err
 			}),
-		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, required plan, demo flag or creators. Only the fields given change.",
+		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, early-access end date, demo flag or creators. Only the fields given change.",
 			func(ctx context.Context, e *env, in artifactPatchIn) (client.Artifact, string, error) {
 				s, err := st(ctx, e)
 				if err != nil {
 					return client.Artifact{}, "", err
 				}
 				a, err := s.PatchArtifact(ctx, in.ID, client.ArtifactPatch{Title: in.Title, Description: in.Description, Tags: in.Tags, Visibility: in.Visibility,
-					Featured: in.Featured, SortOrder: in.SortOrder, RequiredPlan: in.RequiredPlan, DemoEnabled: in.DemoEnabled, Creators: in.Creators})
+					Featured: in.Featured, SortOrder: in.SortOrder, EarlyAccessUntil: in.EarlyAccessUntil, DemoEnabled: in.DemoEnabled, Creators: in.Creators})
 				return a, "Updated " + in.ID + ".", err
 			}),
 		tool("save_page_draft", ToolsetStudio, scopeStudio, rw, additive, "Save a draft of an artifact's public page (Markdown body, cover, gallery). The public page changes only after publish_page_draft.",
@@ -531,7 +531,6 @@ type grantIn struct {
 	UserID string `json:"userId" jsonschema:"customer user ID from find_customers"`
 	Days   int    `json:"days" jsonschema:"length of the grant in days, 1 to 3660"`
 	Reason string `json:"reason" jsonschema:"why the grant is made; stored in the audit log"`
-	Plan   string `json:"plan,omitempty" jsonschema:"plan key from list_plans; empty means the highest plan"`
 }
 
 type userIDIn struct {
@@ -548,14 +547,10 @@ type queryIn struct {
 }
 
 type planIn struct {
-	Key                string  `json:"key" jsonschema:"plan key from list_plans"`
-	Name               *string `json:"name,omitempty"`
-	Description        *string `json:"description,omitempty"`
-	Public             *bool   `json:"public,omitempty" jsonschema:"shown on the pricing page"`
-	Instances          *int    `json:"instances,omitempty" jsonschema:"workspaces per subscriber"`
-	MembersPerInstance *int    `json:"membersPerInstance,omitempty"`
-	MonthlyCredits     *int    `json:"monthlyCredits,omitempty"`
-	DailyCredits       *int    `json:"dailyCredits,omitempty"`
+	Key                string `json:"key" jsonschema:"plan key from list_plans"`
+	Instances          *int   `json:"instances,omitempty" jsonschema:"workspaces per subscriber"`
+	MembersPerInstance *int   `json:"membersPerInstance,omitempty"`
+	DailyTokens        *int   `json:"dailyTokens,omitempty"`
 }
 
 type storefrontIn struct {
@@ -574,9 +569,9 @@ type usageIn struct {
 }
 
 type adjustIn struct {
-	UserID  string `json:"userId"`
-	Credits int    `json:"credits" jsonschema:"credits to add; negative removes"`
-	Reason  string `json:"reason"`
+	UserID string `json:"userId"`
+	Limit  *int   `json:"limit" jsonschema:"absolute daily generated-token ceiling; null resets to class default"`
+	Reason string `json:"reason"`
 }
 
 type auditIn struct {
@@ -654,18 +649,14 @@ func customerTools() []spec {
 				r, err := a.RevokeSessions(ctx, in.UserID, in.Tokens)
 				return r, "", err
 			}),
-		tool("grant_complimentary_access", ToolsetCustomers, scopeWrite, rw, additive, "Give a customer free access to a plan for a number of days. Use find_customers first to get the userId.",
+		tool("grant_complimentary_access", ToolsetCustomers, scopeWrite, rw, additive, "Give complimentary Paying access for a number of days. Use find_customers first to get the userId.",
 			func(ctx context.Context, e *env, in grantIn) (client.AccessGrant, string, error) {
 				a, err := ad(ctx, e)
 				if err != nil {
 					return client.AccessGrant{}, "", err
 				}
-				g, err := a.GrantAccess(ctx, in.UserID, client.GrantRequest{Days: in.Days, Reason: in.Reason, Plan: in.Plan})
-				plan := g.Plan
-				if plan == "" {
-					plan = "the highest plan"
-				}
-				return g, fmt.Sprintf("Granted %s until %s.", plan, g.Until.Format("2006-01-02")), err
+				g, err := a.GrantAccess(ctx, in.UserID, client.GrantRequest{Days: in.Days, Reason: in.Reason})
+				return g, fmt.Sprintf("Granted Paying access until %s.", g.Until.Format("2006-01-02")), err
 			}),
 		tool("revoke_access_grant", ToolsetCustomers, scopeWrite, rw, destructive, "Revoke one complimentary grant by its grant ID (see get_customer).",
 			func(ctx context.Context, e *env, in idIn) (client.AccessGrant, string, error) {
@@ -784,20 +775,17 @@ func customerTools() []spec {
 				s, err := a.Settings(ctx)
 				return s.Active, fmt.Sprintf("Revision %d.", s.Active.Revision), err
 			}),
-		tool("update_plan", ToolsetCustomers, scopeWrite, rw, additive, "Change a plan's name, description, visibility, instance and member limits or credits. Only the fields given change; safe against concurrent edits.",
+		tool("update_plan", ToolsetCustomers, scopeWrite, rw, additive, "Change Free or Paying workspace/member limits and daily generated tokens. Only the fields given change; safe against concurrent edits.",
 			func(ctx context.Context, e *env, in planIn) (client.SettingsRevision, string, error) {
 				a, err := ad(ctx, e)
 				if err != nil {
 					return client.SettingsRevision{}, "", err
 				}
 				rev, err := a.EditPlan(ctx, in.Key, func(p *settings.Plan) error {
-					set(&p.Name, in.Name)
-					set(&p.Description, in.Description)
-					set(&p.Public, in.Public)
 					set(&p.Instances, in.Instances)
 					set(&p.MembersPerInstance, in.MembersPerInstance)
-					set(&p.MonthlyCredits, in.MonthlyCredits)
-					set(&p.DailyCredits, in.DailyCredits)
+					set(&p.DailyTokens, in.DailyTokens)
+
 					return nil
 				})
 				return rev, fmt.Sprintf("Settings revision %d is active.", rev.Revision), err
@@ -852,14 +840,14 @@ func customerTools() []spec {
 				u, err := a.Usage(ctx, in.UserID, in.Limit)
 				return u, "", err
 			}),
-		tool("adjust_customer_credits", ToolsetCustomers, scopeWrite, rw, additive, "Add (or with a negative number remove) model credits for a customer this period.",
+		tool("set_customer_token_ceiling", ToolsetCustomers, scopeWrite, rw, additive, "Set the daily generated-token ceiling; null restores the customer class default.",
 			func(ctx context.Context, e *env, in adjustIn) (done, string, error) {
 				a, err := ad(ctx, e)
 				if err != nil {
 					return done{}, "", err
 				}
-				err = a.AdjustCredits(ctx, in.UserID, in.Credits, in.Reason)
-				return done{err == nil}, fmt.Sprintf("Adjusted by %d credits.", in.Credits), err
+				err = a.SetTokenCeiling(ctx, in.UserID, in.Limit, in.Reason)
+				return done{err == nil}, "Daily token ceiling updated.", err
 			}),
 		tool("audit_log", ToolsetCustomers, scopeRead, ro, additive, "Read the audit log, newest first; filter by subject, actor or action. Entries made through a token carry its tokenId.",
 			func(ctx context.Context, e *env, in auditIn) (items[client.AuditEntry], string, error) {

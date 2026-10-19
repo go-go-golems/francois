@@ -29,6 +29,8 @@ WhenToUse: ""
 
 # Free and Paying: simplify the policy, then make the admin explain it
 
+**Historical assessment:** the findings below describe the investigation baseline. The requested implementation is now committed as `8708cc4`; see [the current short design](../design-doc/01-two-customer-classes-daily-generated-token-ceilings-and-clear-administration.md) and diary Steps 4–5.
+
 ## Conclusion and scope
 
 The business model is smaller than the implementation. The application still has a configurable ranked subscription catalog, price-to-plan mappings, named complimentary plans, model credit tariffs and separate demo allowances. That machinery is excessive for two customer classes. At the same time, the existing allowance is not a token ceiling: it charges a configured number of credits for a logical request, independently of the tokens consumed by its provider rounds.

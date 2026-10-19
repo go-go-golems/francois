@@ -124,3 +124,186 @@ The new review identifies repeat year funding during existing standing and outda
 
 ### Technical details
 - Source comments are tracked by GitHub numeric review IDs. This checkpoint does not claim broad simplification is complete.
+
+## Step 4: Implement fixed classes, atomic daily tokens and early-access dates
+
+Implemented the requested simplification across the backend, worker and admin interface. The customer page now explains effective access before exposing administrative details. Replaced per-call credit charging with a bounded generated-token budget for each logical run and a daily PostgreSQL reservation ledger.
+
+The user then specified that payment grants early access as well as higher limits. Implemented a concrete artifact end date, applied once on first publication and enforced consistently for workspaces, downloads, attachments and demos. Later releases cannot restart the window. Existing published artifacts stay available to Free accounts.
+
+### Prompt Context
+**User request:** See Step 3 for the implementation request and cancellation of the vault report.
+**Additional prompts (verbatim):** “there is no need for backwards compatibility btw”; “no need to be overly cautious while working, we care about the final result, not be perfect at each step”; “free accounts can download all normally published artifacts, but we can set a period for new artifacts to only be downloadable / runnable to be only used by paying subscribers”; “like, you pay for early access, and higher limits”.
+**Assistant interpretation:** Ship the simple policy, directly update current callers/schema, preserve evidence and run checks at the integration boundary.
+**Inferred user intent:** Understandable operations for a minimal site: early access and higher limits for Paying customers, ordinary access for Free customers, no product-catalog machinery.
+**Review correction commit:** 8f52e02; diary whitespace correction 7098eed. These were pushed to PR 16 separately from this implementation branch.
+
+### What I did
+- Replaced arbitrary plans with exactly Free and Paying resource entries. Removed rank, visibility/marketing fields, plan model lists, named-plan grants, per-model credit pricing and the retired artifact required-plan field from active contracts.
+- Added daily generated-token reservations, absolute per-user ceiling overrides/reset, UTC resets and conservative recovery. Historical credits and provider input/output/cache measurements remain historical data, not converted quotas.
+- Passed a server-only call-wide output budget to the worker. Every provider round consumes it; missing/invalid usage fails closed. The fake backend also respects the admitted budget.
+- Added a backend customer summary with class/source/expiry, enabled state, AI eligibility/reason, daily usage/reservation/ceiling and workspace limits. Missing core data produces an explicit error. Missing billing-customer records are normal for Free users.
+- Kept disabled state separate from payment standing in admin presentation: a disabled paying customer remains visibly Paying but is blocked from AI. Runtime authorization still checks the original disabled user.
+- Rebuilt Users/detail/settings UI around those facts. Moved payment contracts, identity, staff permissions and session controls under Details. Added direct ceiling preview/reset and complimentary Paying access, with independent form state.
+- Added default early-access days and editable per-artifact end date to Studio/CLI/MCP. Locked first publication, preserved the date across versions and checked the same window for running/download/demo paths, including free-sample releases.
+- Removed automatic oldest-N workspace freezing on downgrade. Creation quotas remain; existing saved workspaces do not get frozen solely by creation order.
+- Added concurrency/settlement/migration/admin/early-access tests and the real worker output-budget unit tests. Captured desktop/mobile browser fixtures and exercised primary customer controls.
+
+### Why
+- Two resource classes and one named daily accounting unit directly express the product. A concrete early-access date expresses the only artifact-specific commercial rule.
+- Transactions and recovery remain necessary for concurrent limits; no queue, service, distributed lock or new scheduling layer was added.
+- A provider error or cancellation does not prove zero usage. Conservatively charging the reserved budget keeps repeated uncertain calls from bypassing the limit.
+
+### What worked
+- Full database-backed `go test ./... -count=1` exercised the implementation; two obsolete expectations remained (removed CLI --plan flag and time-zone spelling). After correction, targeted CLI/catalog integration passed, including the real client contract and all changed policy paths.
+- New tests passed for simultaneous admission, measured settlement/replay, a smaller final run, override/reset, crash recovery and UTC day boundaries.
+- Early-access tests passed for paid/free running and downloads, demo rejection, free-sample enforcement, later releases preserving the clock, expiry and explicit clearing.
+- `pnpm check`, twelve frontend/worker tests, embedded frontend build and Go build passed. Final lint/logcopter checks passed with zero issues.
+- Browser fixtures passed at 1440px and 390px with no horizontal overflow or page errors; set/reset ceiling, disable/enable and complimentary grant all updated the actual bundled UI. These are explicitly mocked API fixtures, not production screenshots.
+
+### What didn't work
+- Initial Go check could not write the sandboxed Go cache (`read-only file system`); reran required checks with cache access.
+- Migration 017 initially failed with `operator is not unique: unknown - unknown (SQLSTATE 42725)` because JSON extraction/subtraction needed parentheses. Corrected the expression and reran the database gate.
+- New migration fixture initially used two parameterized statements in one pgx call: `cannot insert multiple commands into a prepared statement (SQLSTATE 42601)`. Split deletion and parameterized insertion.
+- Strict client decoding rejected the added `customerClass` field until the Go client contract was updated. The newly strict admin aggregate treated an absent Stripe customer as an error; made only ErrNotFound normal while retaining real failures.
+- Old tests expected plan-restricted Free downloads and named grants. Updated them to the requested two-class/time-window policy. A Studio test compared time-zone spellings; normalized stored early-access dates to UTC.
+- Lint found `SA4006: this value of owner is never used` after removing position-based freezing. Removed the unused initialization while preserving shared-owner authorization.
+- Automatic approval review rejected a broad automated rewrite and later a plan-gate removal because its policy scope was not explicit. The rejected rewrites did not run. Continued with bounded edits; the user's explicit early-access policy resolved the access question. No compatibility layer was added.
+
+### What I learned
+- Payment standing and enabled state must be independently represented; otherwise disabling an account misleadingly relabels a paying customer Free.
+- Provider output budgets must span the complete tool loop, rather than restarting at 8,192 per round.
+- First-publication dates must be established under the artifact lock so concurrent versions cannot independently extend early access.
+
+### What was tricky to build
+- Preserve real Stripe price acceptance when collapsing the old catalog, without preserving arbitrary ranks as active policy or translating credit balances into fictitious tokens.
+- Charge uncertain calls conservatively while releasing unused output reservation for successful measured calls. Settlement and recovery are idempotent; an old process must be stopped before running migrations/new worker.
+- Use the same early-access gate for free-sample files and demos, which previously had independent shortcuts.
+
+### What warrants a second pair of eyes
+- Review migrations 017–018, reservation/settlement/recovery, worker round budget and the download/demo early-access branches. The selected quota unit is generated/output tokens; total input/cache usage remains analytics.
+- The global six-call counter is still process-local. This change does not make a multi-replica deployment share six lanes.
+
+### What should be done in the future
+- Review the implementation branch and deploy when requested. No deployment or vault write is included in this task.
+
+### Code review instructions
+- Read the short design, then store/usage.go and migrations, worker/output-budget.ts and main.ts, entitlement/customer_summary, early-access publishing/access paths, and finally the admin controls.
+- Use token_ceiling_test.go and early_access_test.go as behavioral examples. Browser fixtures and screenshots are labelled separately from the database-backed API evidence.
+
+### Technical details
+- Free defaults: 10,000 generated tokens/UTC day, one saved workspace. Paying defaults: 100,000/day, ten workspaces. Default maximum output per logical run: 8,192; six global calls and one per user.
+- New API: `PUT /api/admin/users/{id}/token-ceiling` with `{limit: number|null, reason}`. A null ceiling restores the class default.
+- Artifact patch: `earlyAccessUntil` as RFC3339 or an empty string to clear. Publishing default: `publishing.earlyAccessDays`, 0–365. No scheduler is required for expiry; requests compare the stored date.
+
+## Step 5: Publish the simplification separately from the payment fixes
+
+Committed the implementation as `8708cc4` and pushed `feat/simple-customer-limits`. Opened draft PR 17, stacked on PR 16, so the original payment review fixes remain focused. PR 16 is green at `7098eed`; both new findings have explicit replies. PR 17 CI was running at publication.
+
+- **Prompt context:** See Steps 3–4. No vault report was written and no deployment was performed.
+- **Validation:** Ticket doctor and Git whitespace checks passed. Local implementation checks are recorded in Step 4; screenshots and the browser receipt explicitly identify mocked API fixtures.
+- **Review:** [PR 17](https://github.com/go-go-golems/francois/pull/17), short design, migrations 017–018 and the provider output budget are the starting points. [PR 16](https://github.com/go-go-golems/francois/pull/16) contains the separate overlap/copy corrections.
+- **Next:** Review and deploy when requested. No additional infrastructure or compatibility layer is needed.
+
+## Step 6: Integrate the systemic payment settlement correction
+
+Merged PR 16 correction `4be76a0` into the simplification branch as `d982ea0`. The new payment-state migration composes with the daily-token and early-access migrations; the complete payment/catalog integration tests pass on the combined branch.
+
+- **Prompt context:** The new review and systemic-refactor requests are recorded verbatim in ticket 012, Step 13.
+- **Change:** Checkout completion and year payment settlement are independent. Pending funds block another purchase and remain scheduled for authoritative reconciliation. Known Stripe Sessions are retrieved/retired instead of recreated. Application and Compose use one webhook event list.
+- **Validation:** Combined PostgreSQL tests passed: payments 4.433s, catalog 22.111s. PR 16's lint/logcopter and quiet Compose checks passed before merging. Fresh PR CI was running at publication.
+- **Review evidence:** Replies posted to 4309943413, 4309943417 and 4309943422. The lifecycle test recovers a 40-day-old pending payment without a success webhook or browser return.
+- **External reference:** https://docs.stripe.com/api/idempotent_requests confirms that a pruned key can create a new request; stored Session IDs remain the identity of an existing payment attempt.
+- **Deployment:** No production application or Stripe webhook endpoint was mutated. Apply the shared event list to existing remote endpoints when configuring/deploying them.
+
+
+## Step 7: Rebase the simplification onto merged main and prepare PR 17 for review
+
+PR 16 was merged into main as `40072ce`. Rebased `feat/simple-customer-limits` onto that revision without conflicts, retaining the three simplification and documentation commits. The rebased application and documentation tree is byte-for-byte identical to the previously qualified branch at `55960de`; this step changes ancestry and review readiness rather than application behavior.
+
+### Prompt Context
+**User prompt (verbatim):** “ok, merged, rebase, and then open #17”
+**Assistant interpretation:** Rebase the existing draft PR 17 onto main, publish the rewritten branch and mark the PR ready for review.
+**Inferred user intent:** Review the customer simplification independently now that the payment corrections have landed.
+**Commit (code):** `4d14150` — “Simplify customer limits, enforce daily output budgets and add early access” (rebased from `8708cc4`).
+
+### What I did
+- Confirmed PR 16 is merged and PR 17 is open, draft and already based on main.
+- Fetched origin and ran `git rebase origin/main`. The rebased head before this diary entry is `15b17a9`.
+- Ran `git diff --exit-code 55960de HEAD` and `git diff --check origin/main...HEAD`; both passed.
+- Prepared an updated PR description removing the obsolete stacked-review instruction. Publication uses an explicit remote-head lease so an unexpected concurrent push cannot be overwritten.
+
+### Why
+- Main now contains the entire payment correction. A linear rebase leaves only the customer-limit and early-access changes in PR 17.
+
+### What worked
+- All three commits replayed without conflicts. Main is `40072ce7a3e694c02c9dcabcaf85da73dab6c8d2`.
+- File-tree equality establishes that the integration evidence in Steps 4 and 6 still describes the application being published. No application checks were repeated solely for this ancestry change.
+
+### What didn't work
+- No rebase or verification failures occurred. `gh pr edit 17 --repo go-go-golems/francois --body-file /tmp/francois-pr17-ready-body.md` failed because this gh version queries deprecated `repository.pullRequest.projectCards` (Projects classic). Updated the description through the REST pulls endpoint instead. Repository discovery found no checked-in AGENTS.md files; the user-provided instructions remain applicable.
+
+### What I learned
+- GitHub had already retargeted PR 17 to main after PR 16 merged; no separate base change is needed.
+
+### What was tricky to build
+- The old simplification branch included a merge of PR 16. Rebasing onto the merged main correctly omitted that already-integrated ancestry and retained the three unique commits.
+
+### What warrants a second pair of eyes
+- The substantive review remains the daily-token accounting, worker output budget, early-access enforcement and admin presentation described in Steps 4–6.
+
+### What should be done in the future
+- PR 17 is published against main and marked ready for review (`isDraft=false`, state OPEN), verified through GitHub. No deployment or vault write is part of this request.
+
+### Code review instructions
+- Review PR 17 against main using the short design and the review starting points in Step 4. Payment settlement corrections are already part of the base.
+
+### Technical details
+- Previous remote head for the push lease: `55960de464148af9472f152df6595d6d372e60e5`.
+- Rebased unique commits: `4d14150`, `663420e`, `15b17a9`; this checkpoint adds documentation only.
+
+
+## Step 8: Keep explicitly marked free samples downloadable during early access
+
+The reviewer identified an inconsistency: the public page exposed an HTML download while the early-access gate rejected it. The user clarified that a free sample should be downloadable. Corrected the underlying policy instead of hiding a deliberately public sample. This supersedes the free-sample restriction described in Step 4; that earlier entry remains historical evidence.
+
+### Prompt Context
+**User prompt (verbatim, policy clarification):** “Do we actualy need to tighten? if it's a free sample it should be downloadable”
+**Assistant interpretation:** Preserve explicit free-sample downloads throughout early access and align HTML and attachment link presentation with that policy.
+**Inferred user intent:** An editor's free-sample flag is a deliberate public-download choice, independent of Paying early access to the hosted application.
+
+### What I did
+- Moved the `rel.FreeSample` success branch ahead of the artifact early-access lookup in `mayDownload`. Existing disabled-account denial remains first.
+- Restored `!rel.FreeSample && !mayDownload` for page locking and used `!l.Locked` for HTML download population, matching attachment link rendering.
+- Expanded the existing early-access integration test to check anonymous, Free and Paying sample downloads for both HTML and an attachment, plus matching public-page links. Ordinary restricted releases do not advertise downloads. Hosted Free runs and demos remain denied during early access.
+- Updated the short design to state the explicit sample exception. No migration or new configuration is needed.
+
+### Why
+- The reported mismatch exposed an overly broad implementation decision. Hiding the link would preserve the wrong sample policy; restoring the explicit download exception satisfies the user's clarification.
+
+### What worked
+- Source edits, `gofmt` and `git diff --check` completed. Diff review confirms both download kinds use the existing shared endpoint rule and one page lock condition.
+- `GOCACHE=/tmp/francois-go-cache go test ./pkg/catalog -run 'TestEarlyAccessAcrossRunDownloadAndDemo|TestArtifactPageLatestDownload|TestAttachments' -count=1 -v` compiled successfully (package 0.032s). All three integration tests were explicitly skipped because `TEST_DATABASE_URL` was unset; this is compile evidence, not behavioral validation.
+
+### What didn't work
+- Automatic approval review twice rejected execution because its reviewer was unavailable: `Selected model is at capacity. Please try a different model.` This was an approval infrastructure failure, not an unsafe-action determination. The first read-only inspection succeeded through the normal sandbox; Docker access remained unavailable.
+- `docker ps --format '{{.Names}}\t{{.Ports}}'` in the sandbox failed with `connect: operation not permitted`. PostgreSQL probes on ports 5437 and 5435 reported `no response`; database-backed behavior has not yet been qualified in this checkpoint.
+- Initial `go test ./pkg/catalog -run 'TestEarlyAccessAcrossRunDownloadAndDemo|TestArtifactPageLatestDownload|TestAttachments' -count=1 -v` failed writing `/home/manuel/.cache/go-build`: `read-only file system`. Retried with `GOCACHE=/tmp/francois-go-cache`; results are recorded below when available.
+
+### What I learned
+- Early-access restrictions and an explicit public sample serve separate decisions. The download exception does not imply free hosted compute.
+
+### What was tricky to build
+- HTML links and attachment links previously used separate Boolean expressions. Both now use the release line's lock state, while the endpoint recognizes the same public-sample exception.
+
+### What warrants a second pair of eyes
+- Check the ordinary-release early-access denials alongside sample HTML and attachment permissions. Hosted runtime and demo gates were intentionally left unchanged.
+
+### What should be done in the future
+- Complete the focused database test, commit and publish this correction when infrastructure permits. No production deployment is included.
+
+### Code review instructions
+- Start with `routes.go:mayDownload`, the release loop in `pages.go:artifactPage`, then `TestEarlyAccessAcrossRunDownloadAndDemo`. The short design explicitly documents the updated exception.
+
+### Technical details
+- `freeSample=true`: public release-file and attachment downloads, including during early access. Other releases retain sign-in and early-access authorization. Saved workspace creation and demos still apply the artifact's early-access date.

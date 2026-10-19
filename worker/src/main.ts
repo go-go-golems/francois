@@ -1,3 +1,4 @@
+import { OutputBudget } from "./output-budget";
 import { ProviderError } from "./provider-error";
 import { registerLunaroute } from "./lunaroute";
 import { createInterface } from "node:readline";
@@ -30,6 +31,7 @@ type Request = {
   };
   tools?: { name: string; description: string; inputSchema?: object }[];
   maxRounds?: number;
+  maxOutputTokens?: number;
 };
 type ToolResult = { value: unknown; isError: boolean };
 const controllers = new Map<string, AbortController>();
@@ -230,6 +232,7 @@ async function sample(r: Request) {
         ];
       }
     }
+    const outputBudget = new OutputBudget(r.maxOutputTokens);
     const rounds = Math.min(Math.max(r.maxRounds || 5, 1), 10);
     for (let round = 0; round < rounds; round++) {
       if (round === rounds - 1) context.tools = [];
@@ -256,7 +259,7 @@ async function sample(r: Request) {
       const stream = runtime.streamSimple(model, context, {
         signal: ctl.signal,
         reasoning,
-        maxTokens: Math.min(model.maxTokens, 8192),
+        maxTokens: outputBudget.next(model.maxTokens),
       });
       let roundText = "";
       let separated = false;
@@ -282,6 +285,7 @@ async function sample(r: Request) {
         }
       }
       const message = await stream.result();
+      outputBudget.consume(message.usage?.output);
       // Private accounting frame; the host aggregates it and never forwards it.
       emit({
         type: "usage",
@@ -306,7 +310,7 @@ async function sample(r: Request) {
       const tools = message.content.filter(
         (c): c is ToolCall => c.type === "toolCall",
       );
-      if (!tools.length) {
+      if (!tools.length || outputBudget.remaining <= 0) {
         if (!visible.trim()) throw new Error("Empty completion");
         emit({
           type: "result",
@@ -315,7 +319,8 @@ async function sample(r: Request) {
             text: visible,
             thinking,
             finalText: roundText,
-            truncated: message.stopReason === "length",
+            truncated:
+              message.stopReason === "length" || outputBudget.remaining <= 0,
             modelTierApplied: r.options.modelTier,
             modelApplied: applied,
             modelUsed: model.provider + "/" + model.id,

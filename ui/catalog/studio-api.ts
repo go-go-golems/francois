@@ -14,7 +14,7 @@ export type StudioArtifact = {
   pageDraft?: Page;
   featured: boolean;
   sortOrder: number;
-  requiredPlan: string;
+  earlyAccessUntil?: string;
   demoEnabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -27,7 +27,7 @@ export type ArtifactRow = {
   visibility: string;
   featured: boolean;
   sortOrder: number;
-  requiredPlan: string;
+  earlyAccessUntil?: string;
   demoEnabled: boolean;
   cover: string;
   hasDraft: boolean;
@@ -55,7 +55,7 @@ export type Post = {
   createdBy: string;
   updatedAt: string;
 };
-export type ArtifactPatch = Partial<Pick<StudioArtifact, "title" | "description" | "tags" | "visibility" | "featured" | "sortOrder" | "requiredPlan" | "demoEnabled">> & {
+export type ArtifactPatch = Partial<Pick<StudioArtifact, "title" | "description" | "tags" | "visibility" | "featured" | "sortOrder" | "earlyAccessUntil" | "demoEnabled">> & {
   creators?: string[];
 };
 
@@ -161,7 +161,7 @@ export const studio = base.injectEndpoints({
       query: (id) => ({ url: `api/studio/creators/${id}`, method: "DELETE" }),
       invalidatesTags: ["Creators", "StudioMe"],
     }),
-    studioPlans: b.query<{ key: string; name: string; rank: number; public: boolean }[], void>({ query: () => "api/studio/plans" }),
+    studioPlans: b.query<{ key: string; name: string }[], void>({ query: () => "api/studio/plans" }),
     markdown: b.mutation<{ html: string }, string>({
       query: (markdown) => ({ url: "api/studio/markdown", method: "POST", body: { markdown } }),
     }),

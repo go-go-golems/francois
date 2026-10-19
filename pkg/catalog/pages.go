@@ -135,7 +135,7 @@ type card struct {
 	Version, ReleaseID     string
 	Published              *time.Time
 	Featured               bool
-	RequiredPlan           string
+	EarlyAccessUntil       *time.Time
 	DemoEnabled            bool
 }
 
@@ -298,7 +298,7 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 
 func cardOf(a store.Artifact, rel store.Release, creators []store.Creator) card {
 	return card{ID: a.ID, Title: a.Title, Description: a.Description, Tags: a.Tags, Capabilities: releaseCaps(rel), Creators: creators,
-		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, RequiredPlan: a.RequiredPlan, DemoEnabled: a.DemoEnabled}
+		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, EarlyAccessUntil: a.EarlyAccessUntil, DemoEnabled: a.DemoEnabled}
 }
 
 func find(arts []store.Artifact, id string) *store.Artifact {
@@ -505,7 +505,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			}
 			l.Attached = append(l.Attached, al)
 		}
-		if rel.FreeSample || mayDownload {
+		if !l.Locked {
 			for _, f := range rel.Files {
 				if f.Role != "html" {
 					continue
@@ -521,16 +521,9 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	doc := rev.Document
-	rank := doc.RequiredRank(a.RequiredPlan)
-	planName := ""
-	for _, pl := range doc.Plans {
-		if pl.Rank == rank {
-			planName = pl.Name
-		}
-	}
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
 		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
-			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "Plan": planName, "Rank": rank}}
+			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now())}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
 	} else if c.Cover != nil && c.Cover.Poster != "" {
@@ -768,15 +761,12 @@ func (s *Server) publicPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []map[string]any{}
 	for _, p := range rev.Document.Plans {
-		if !p.Public {
-			continue
-		}
 		prices := []map[string]string{}
 		for _, pr := range p.Prices {
 			prices = append(prices, map[string]string{"interval": pr.Interval, "label": pr.Label})
 		}
-		out = append(out, map[string]any{"key": p.Key, "name": p.Name, "rank": p.Rank, "description": p.Description, "highlights": p.Highlights,
-			"prices": prices, "instances": p.Instances, "membersPerInstance": p.MembersPerInstance, "monthlyCredits": p.MonthlyCredits})
+		out = append(out, map[string]any{"key": p.Key, "name": p.Name,
+			"prices": prices, "instances": p.Instances, "membersPerInstance": p.MembersPerInstance, "dailyTokens": p.DailyTokens})
 	}
 	httpx.OK(w, out)
 }

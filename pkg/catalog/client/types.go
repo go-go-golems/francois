@@ -72,39 +72,39 @@ type Page struct {
 }
 
 type Artifact struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	Tags         []string  `json:"tags"`
-	Visibility   string    `json:"visibility"`
-	Page         Page      `json:"page"`
-	PageDraft    *Page     `json:"pageDraft,omitempty"`
-	Featured     bool      `json:"featured"`
-	SortOrder    int       `json:"sortOrder"`
-	RequiredPlan string    `json:"requiredPlan"`
-	DemoEnabled  bool      `json:"demoEnabled"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Description      string     `json:"description"`
+	Tags             []string   `json:"tags"`
+	Visibility       string     `json:"visibility"`
+	Page             Page       `json:"page"`
+	PageDraft        *Page      `json:"pageDraft,omitempty"`
+	Featured         bool       `json:"featured"`
+	SortOrder        int        `json:"sortOrder"`
+	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
+	DemoEnabled      bool       `json:"demoEnabled"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 // ArtifactRow is a studio list row.
 type ArtifactRow struct {
-	ID            string    `json:"id"`
-	Title         string    `json:"title"`
-	Description   string    `json:"description"`
-	Tags          []string  `json:"tags"`
-	Visibility    string    `json:"visibility"`
-	Featured      bool      `json:"featured"`
-	SortOrder     int       `json:"sortOrder"`
-	RequiredPlan  string    `json:"requiredPlan"`
-	DemoEnabled   bool      `json:"demoEnabled"`
-	Cover         string    `json:"cover"`
-	HasDraft      bool      `json:"hasDraft"`
-	Creators      []string  `json:"creators"`
-	Releases      int       `json:"releases"`
-	DraftReleases int       `json:"draftReleases"`
-	LatestVersion string    `json:"latestVersion"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Description      string     `json:"description"`
+	Tags             []string   `json:"tags"`
+	Visibility       string     `json:"visibility"`
+	Featured         bool       `json:"featured"`
+	SortOrder        int        `json:"sortOrder"`
+	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
+	DemoEnabled      bool       `json:"demoEnabled"`
+	Cover            string     `json:"cover"`
+	HasDraft         bool       `json:"hasDraft"`
+	Creators         []string   `json:"creators"`
+	Releases         int        `json:"releases"`
+	DraftReleases    int        `json:"draftReleases"`
+	LatestVersion    string     `json:"latestVersion"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 // ArtifactDetail is GET /api/studio/artifacts/{id}.
@@ -124,15 +124,15 @@ func Int(n int) *int               { return &n }
 
 // ArtifactPatch changes only the fields that are set.
 type ArtifactPatch struct {
-	Title        *string   `json:"title,omitempty"`
-	Description  *string   `json:"description,omitempty"`
-	Tags         *[]string `json:"tags,omitempty"`
-	Visibility   *string   `json:"visibility,omitempty"`
-	Featured     *bool     `json:"featured,omitempty"`
-	SortOrder    *int      `json:"sortOrder,omitempty"`
-	RequiredPlan *string   `json:"requiredPlan,omitempty"`
-	DemoEnabled  *bool     `json:"demoEnabled,omitempty"`
-	Creators     *[]string `json:"creators,omitempty"`
+	Title            *string   `json:"title,omitempty"`
+	Description      *string   `json:"description,omitempty"`
+	Tags             *[]string `json:"tags,omitempty"`
+	Visibility       *string   `json:"visibility,omitempty"`
+	Featured         *bool     `json:"featured,omitempty"`
+	SortOrder        *int      `json:"sortOrder,omitempty"`
+	EarlyAccessUntil *string   `json:"earlyAccessUntil,omitempty"`
+	DemoEnabled      *bool     `json:"demoEnabled,omitempty"`
+	Creators         *[]string `json:"creators,omitempty"`
 }
 
 type ReleaseFile struct {
@@ -336,16 +336,19 @@ type AuditEntry struct {
 
 // UserRow is a row of GET /api/admin/users.
 type UserRow struct {
-	User    User             `json:"user"`
-	Access  billing.Decision `json:"access"`
-	Plan    string           `json:"plan"`
-	PlanKey string           `json:"planKey"`
-	Source  string           `json:"source"`
+	CustomerClass string           `json:"customerClass"`
+	Enabled       bool             `json:"enabled"`
+	User          User             `json:"user"`
+	Access        billing.Decision `json:"access"`
+	Plan          string           `json:"plan"`
+	PlanKey       string           `json:"planKey"`
+	Source        string           `json:"source"`
 }
 
 // Customer is GET /api/admin/users/{id}: everything an operator needs about
 // one account.
 type Customer struct {
+	Summary          json.RawMessage              `json:"summary"`
 	User             User                         `json:"user"`
 	Access           billing.Decision             `json:"access"`
 	Entitlement      json.RawMessage              `json:"entitlement"`
@@ -366,11 +369,10 @@ type UserPatch struct {
 	Disabled *bool   `json:"disabled,omitempty"`
 }
 
-// GrantRequest is a complimentary access grant; Plan "" means the highest plan.
+// GrantRequest gives complimentary Paying access.
 type GrantRequest struct {
 	Days   int    `json:"days"`
 	Reason string `json:"reason"`
-	Plan   string `json:"plan,omitempty"`
 }
 
 // Revoked is POST /api/admin/users/{id}/revoke-sessions.

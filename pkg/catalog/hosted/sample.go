@@ -131,11 +131,6 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		failErr(w, err)
 		return
 	}
-	if !budget.Allows(model.Selector) {
-		httpx.Fail(w, 403, "model_not_in_plan", "Model "+model.Selector+" is not included in your plan")
-		return
-	}
-	req.Options.Model = selector
 	req.MaxRounds = rev.Document.Allowance.MaxToolRounds
 	a := rev.Document.Allowance
 	if !rt.admit(p.User.ID, a.PerUserConcurrency, a.GlobalConcurrency) {
@@ -143,14 +138,13 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 		return
 	}
 	res, err := rt.Store.Reserve(r.Context(), store.ReserveRequest{UserID: p.User.ID, InstanceID: inst.ID, ArtifactID: inst.ArtifactID, CallID: req.CallID, Model: selector,
-		Credits: model.Credits, Included: budget.Monthly, Daily: budget.Daily, SettingsRevision: rev.Revision, Period: budget.Period,
+		Tokens: rev.Document.Allowance.MaxOutputTokens, Limit: budget.Limit, SettingsRevision: rev.Revision, Period: budget.Period,
 		Shared: budget.Shared, SharedLimit: budget.SharedLimit})
 	if err != nil {
 		rt.release(p.User.ID)
 		switch {
+
 		case errors.Is(err, store.ErrAllowance):
-			httpx.Fail(w, 402, "allowance_exhausted", "You have reached the limit for this period. Please come back later.")
-		case errors.Is(err, store.ErrDaily):
 			httpx.Fail(w, 429, "daily_limit", "You have reached today's limit. Please come back tomorrow.")
 		case errors.Is(err, store.ErrSharedBudget):
 			httpx.Fail(w, 429, "demo_limit", "Demos have used today's model budget; try again tomorrow")
@@ -164,6 +158,7 @@ func (rt *Runtime) sample(w http.ResponseWriter, r *http.Request, inst store.Ins
 	for _, t := range req.Tools {
 		c.names[t.Name] = true
 	}
+	req.MaxOutputTokens = res.Tokens
 	v.mu.Lock()
 	if !v.connected || v.calls[req.CallID] != nil {
 		v.mu.Unlock()

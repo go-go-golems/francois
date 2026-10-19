@@ -7,7 +7,6 @@ import { serviceNotice } from "./service-notice";
 type Plan = {
   key: string;
   name: string;
-  rank: number;
   source: string;
   paid: boolean;
   instances: number;
@@ -82,18 +81,27 @@ function fail(box: HTMLElement, message: string) {
 async function renderActions(box: HTMLElement) {
   const s = await getSession();
   const { release, title, demo } = box.dataset;
-  const required = Number(box.dataset.rank ?? "1");
+  const earlyAccess =
+    !!box.dataset.earlyAccessUntil &&
+    Date.parse(box.dataset.earlyAccessUntil) > Date.now();
   const plan = s.plan;
   const canRun =
     !!plan &&
     (plan.source === "staff" ||
       (plan.source !== "guest" &&
         plan.source !== "disabled" &&
-        plan.rank >= required &&
+        (!earlyAccess || plan.paid) &&
         plan.instances > 0));
   const runner = box.closest<HTMLElement>("[data-runner]");
   box.replaceChildren();
   if (!release) return;
+  if (earlyAccess && !plan?.paid) {
+    box.append(
+      el("a", { class: "site-button", href: "/pricing" }, "Get early access →"),
+    );
+    return;
+  }
+
   if (!canRun && demo !== "true") {
     box.append(
       el("a", { class: "site-button", href: loginHref() }, "Sign in to run"),

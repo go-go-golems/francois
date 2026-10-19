@@ -214,10 +214,9 @@ func (a Admin) Usage(ctx context.Context, userID string, limit int) (Usage, erro
 	return out, a.c.get(ctx, "/api/admin/usage", v, &out)
 }
 
-// AdjustCredits adds (or with a negative value removes) credits for the
-// current period.
-func (a Admin) AdjustCredits(ctx context.Context, userID string, credits int, reason string) error {
-	return a.c.send2(ctx, http.MethodPost, "/api/admin/usage/adjustments", map[string]any{"userId": userID, "credits": credits, "reason": reason}, nil)
+// SetTokenCeiling sets an absolute daily generated-token ceiling; nil resets it.
+func (a Admin) SetTokenCeiling(ctx context.Context, userID string, limit *int, reason string) error {
+	return a.c.send2(ctx, http.MethodPut, "/api/admin/users/"+esc(userID)+"/token-ceiling", map[string]any{"limit": limit, "reason": reason}, nil)
 }
 
 func (a Admin) Audit(ctx context.Context, q AuditQuery) ([]AuditEntry, error) {

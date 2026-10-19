@@ -36,7 +36,8 @@ type Request struct {
 	Options Options         `json:"options"`
 	Tools   []Tool          `json:"tools,omitempty"`
 	// MaxRounds bounds tool rounds; only the server sets it (0 = default 5).
-	MaxRounds int `json:"maxRounds,omitempty"`
+	MaxRounds       int `json:"maxRounds,omitempty"`
+	MaxOutputTokens int `json:"maxOutputTokens,omitempty"`
 }
 type Result struct {
 	Thinking         string  `json:"thinking,omitempty"`

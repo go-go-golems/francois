@@ -34,17 +34,17 @@ type Entitlement struct {
 // entitlement out.
 //
 //	disabled              → nothing
-//	creator or admin      → the highest plan (staff run everything)
+//	creator or admin      → Paying limits (staff permissions are separate)
 //	guest (demo visitor)  → the demo allowance, no workspaces
 //	standing subscription → the single subscriber tier
-//	complimentary grant   → the granted plan, or the highest plan
+//	complimentary grant   → Paying limits
 //	otherwise             → the free plan
 func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document) Entitlement {
 	switch {
 	case u.Disabled:
 		return Entitlement{Plan: doc.Free(), Source: SourceDisabled, Decision: d}
 	case u.Role == "admin" || u.Role == "creator":
-		return Entitlement{Plan: doc.Highest(), Source: SourceStaff, Decision: d}
+		return Entitlement{Plan: doc.Paying(), Source: SourceStaff, Decision: d}
 	case u.Role == "guest":
 		return Entitlement{Plan: demoPlan(doc), Source: SourceGuest, Decision: d}
 	}
@@ -56,14 +56,11 @@ func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document)
 				source = SourceTrial
 			}
 			plan, ok := doc.Plan("subscriber")
-			if ok && plan.Public {
+			if ok {
 				return Entitlement{Plan: plan, Source: source, Decision: d}
 			}
 		case billing.ReasonComplimentary:
-			p := doc.Highest()
-			if q, ok := doc.Plan(d.Plan); ok && d.Plan != "" {
-				p = q
-			}
+			p := doc.Paying()
 			return Entitlement{Plan: p, Source: SourceComplimentary, Decision: d}
 		}
 	}
@@ -72,8 +69,8 @@ func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document)
 
 // demoPlan is the allowance of a demo visitor.
 func demoPlan(doc settings.Document) settings.Plan {
-	return settings.Plan{Key: "demo", Name: "Demo", MembersPerInstance: 1, MonthlyCredits: doc.Demo.Credits, DailyCredits: doc.Demo.Credits,
-		Models: doc.Demo.Models, Highlights: []string{}, Prices: []settings.PlanPrice{}}
+	return settings.Plan{Key: "demo", Name: "Demo", MembersPerInstance: 1, DailyTokens: doc.Demo.Tokens,
+		Prices: []settings.PlanPrice{}}
 }
 
 // Paid reports access beyond the free plan (staff, subscription, grant).
@@ -93,21 +90,11 @@ func (e Entitlement) CanRun(a store.Artifact, doc settings.Document) bool {
 	case SourceStaff:
 		return true
 	}
-	return e.Plan.Rank >= doc.RequiredRank(a.RequiredPlan)
+	return !a.EarlyAccess(time.Now()) || e.Paid()
 }
 
 // AllowsModel reports whether the plan may use an approved selector.
-func (e Entitlement) AllowsModel(selector string) bool {
-	if len(e.Plan.Models) == 0 {
-		return true
-	}
-	for _, m := range e.Plan.Models {
-		if m == selector {
-			return true
-		}
-	}
-	return false
-}
+func (e Entitlement) AllowsModel(selector string) bool { return true }
 
 func (s *Server) policyFor(doc settings.Document) billing.Policy {
 	return billing.Policy{AcceptedPrices: doc.Prices(), TrialAllowed: s.Config.TrialAllowed}
@@ -142,12 +129,12 @@ func (s *Server) budget(ctx context.Context, u store.User, inst store.Instance) 
 	}
 	doc := rev.Document
 	if inst.Kind == "demo" {
-		return hosted.Budget{Monthly: doc.Demo.Credits, Models: doc.Demo.Models, Shared: true, SharedLimit: doc.Demo.DailyBudget,
+		return hosted.Budget{Limit: doc.Demo.Tokens, Shared: true, SharedLimit: doc.Demo.DailyBudget,
 			Period: "demo:" + inst.ID}, nil
 	}
 	e, err := s.entitlementIn(ctx, u, doc)
 	if err != nil {
 		return hosted.Budget{}, err
 	}
-	return hosted.Budget{Monthly: e.Plan.MonthlyCredits, Daily: e.Plan.DailyCredits, Models: e.Plan.Models}, nil
+	return hosted.Budget{Limit: e.Plan.DailyTokens}, nil
 }

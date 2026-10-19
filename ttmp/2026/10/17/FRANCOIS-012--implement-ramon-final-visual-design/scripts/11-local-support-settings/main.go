@@ -9,7 +9,7 @@ import (
 
 func main() {
 	doc := settings.Defaults()
-	doc.Plans = append(doc.Plans, settings.Plan{Key: "subscriber", Name: "Subscriber", Rank: 1, Public: true, Prices: []settings.PlanPrice{}, Highlights: []string{}, Models: []string{}, Instances: 10, MembersPerInstance: 10, MonthlyCredits: 2000})
+	doc.Plans[1] = settings.Plan{Key: "subscriber", Name: "Subscriber", Prices: []settings.PlanPrice{}, Instances: 10, MembersPerInstance: 10, DailyTokens: 2000}
 	if err := json.NewEncoder(os.Stdout).Encode(doc); err != nil {
 		panic(err)
 	}

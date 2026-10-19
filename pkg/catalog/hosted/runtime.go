@@ -31,30 +31,10 @@ type Authorizer func(ctx context.Context, user store.User, inst store.Instance) 
 
 // Budget is the caller's model allowance for a call in an instance.
 type Budget struct {
-	Monthly, Daily int
-	// Models lists the approved selectors the caller may use; empty allows
-	// every approved model.
-	Models []string
-	// Shared is a budget shared with other callers (demos): the call is
-	// refused when today's shared usage plus its credits would exceed
-	// SharedLimit (checked inside the reservation).
+	Limit       int
 	Shared      bool
 	SharedLimit int
-	// Period overrides the monthly allowance ledger (see store.ReserveRequest).
-	Period string
-}
-
-// Allows reports whether the budget includes a selector.
-func (b Budget) Allows(selector string) bool {
-	if len(b.Models) == 0 {
-		return true
-	}
-	for _, m := range b.Models {
-		if m == selector {
-			return true
-		}
-	}
-	return false
+	Period      string
 }
 
 // Budgeter resolves a caller's budget; supplied by the portal.

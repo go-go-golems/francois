@@ -68,7 +68,7 @@ export function AnalyticsPage() {
           <p className="sub">
             {tab === "traffic"
               ? "Understand how people find and explore the boutique."
-              : "Tokens, credits and provider cost across the catalog."}
+              : "Tokens and provider cost across the catalog."}
           </p>
         </div>
       </div>
@@ -209,10 +209,6 @@ export function AnalyticsPage() {
                   data.models.daily.reduce((sum, r) => sum + r.outputTokens, 0),
                 ),
                 "output tokens",
-              ],
-              [
-                count(data.models.daily.reduce((sum, r) => sum + r.credits, 0)),
-                "credits charged",
               ],
               [
                 `$${data.models.daily.reduce((sum, r) => sum + r.cost, 0).toFixed(2)}`,
@@ -470,7 +466,6 @@ function ModelTable({
             {[
               "Calls",
               "Failed",
-              "Credits",
               "Input",
               "Output",
               "Cache read",
@@ -491,7 +486,6 @@ function ModelTable({
               </th>
               <td>{count(row.calls)}</td>
               <td>{count(row.failed)}</td>
-              <td>{count(row.credits)}</td>
               <td>{count(row.inputTokens)}</td>
               <td>{count(row.outputTokens)}</td>
               <td>{count(row.cacheReadTokens)}</td>

@@ -30,11 +30,6 @@ func (e *env) publishArtifact(admin tactor, id, required string) string {
 	if code, out := e.portal(&admin, "POST", "/api/studio/releases/"+rel["id"].(string)+"/publish", nil); code != 200 {
 		e.t.Fatalf("publish %s: %d %v", id, code, out)
 	}
-	if required != "" {
-		if code, out := e.portal(&admin, "PATCH", "/api/studio/artifacts/"+id, map[string]string{"requiredPlan": required}); code != 200 {
-			e.t.Fatalf("plan %s: %d %v", id, code, out)
-		}
-	}
 	return rel["id"].(string)
 }
 
@@ -42,10 +37,7 @@ func TestPlans(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
 	doc := settings.Defaults()
-	doc.Plans = append(doc.Plans,
-		settings.Plan{Key: "supporter", Name: "Supporter", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup"}}, Instances: 1, MembersPerInstance: 2},
-		settings.Plan{Key: "subscriber", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio"}}, Instances: 5, MembersPerInstance: 10},
-	)
+	doc.Plans[1] = settings.Plan{Key: "subscriber", Name: "Paying", Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup"}, {Interval: "month", PriceID: "price_studio"}}, Instances: 5, MembersPerInstance: 10, DailyTokens: 100000}
 	if _, err := e.store.SaveSettings(ctx, "", doc); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +68,7 @@ func TestPlans(t *testing.T) {
 
 	// Plan rank gates artifacts; the free plan runs nothing paid.
 	code, out := create(free, basic)
-	expect("free creates", code, out, 403, "plan_required")
+	expect("free creates", code, out, 201, "")
 	code, supInst := create(sup, basic)
 	expect("supporter creates basic", code, supInst, 201, "")
 	code, out = create(sup, premium)
@@ -123,30 +115,30 @@ func TestPlans(t *testing.T) {
 	}
 
 	// Complimentary access can name a plan.
-	code, out = e.portal(&admin, "POST", "/api/admin/users/"+free.user.ID+"/access-grants", map[string]any{"days": 7, "reason": "friend", "plan": "supporter"})
+	code, out = e.portal(&admin, "POST", "/api/admin/users/"+free.user.ID+"/access-grants", map[string]any{"days": 7, "reason": "friend"})
 	expect("grant supporter", code, out, 200, "")
 	code, out = create(free, basic)
 	expect("granted supporter creates basic", code, out, 201, "")
 	code, out = create(free, premium)
-	expect("granted supporter creates premium", code, out, 403, "plan_required")
-	code, out = e.portal(&admin, "POST", "/api/admin/users/"+free.user.ID+"/access-grants", map[string]any{"days": 7, "reason": "x", "plan": "nope"})
-	expect("grant unknown plan", code, out, 400, "invalid_request")
+	expect("granted supporter creates premium", code, out, 201, "")
+	code, out = e.portal(&admin, "POST", "/api/admin/users/"+free.user.ID+"/access-grants", map[string]any{"days": 7, "reason": "x"})
+	expect("grant always gives Paying", code, out, 200, "")
 
 	// Pricing lists public plans and marks the caller's; the public API
 	// never exposes price IDs.
 	if code, b, _ := e.do(&sup, "portal.test", "GET", "/pricing", nil, nil); code != 200 || strings.Contains(string(b), `data-support-monthly`) || !strings.Contains(string(b), `Manage subscription`) {
 		t.Fatalf("pricing %d", code)
 	}
-	if _, b, _ := e.do(nil, "portal.test", "GET", "/api/plans", nil, nil); strings.Contains(string(b), "price_") || !strings.Contains(string(b), `"supporter"`) {
+	if _, b, _ := e.do(nil, "portal.test", "GET", "/api/plans", nil, nil); strings.Contains(string(b), "price_") || !strings.Contains(string(b), `"subscriber"`) {
 		t.Fatalf("public plans %s", b)
 	}
-	if _, b, _ := e.do(&sup, "portal.test", "GET", "/apps/premium", nil, nil); !strings.Contains(string(b), `data-rank="20"`) || !strings.Contains(string(b), `data-plan="Studio"`) || strings.Contains(string(b), "Studio plan") {
+	if _, b, _ := e.do(&sup, "portal.test", "GET", "/apps/premium", nil, nil); strings.Contains(string(b), `data-rank=`) || strings.Contains(string(b), "Studio plan") {
 		t.Fatalf("artifact access metadata/minimal copy %s", b)
 	}
 
 	// Account shows the plan and its allowance.
 	_, acct := e.portal(&free, "GET", "/api/account", nil)
-	if ent := acct["entitlement"].(map[string]any); ent["source"] != SourceComplimentary || ent["plan"].(map[string]any)["key"] != "supporter" {
+	if ent := acct["entitlement"].(map[string]any); ent["source"] != SourceComplimentary || ent["plan"].(map[string]any)["key"] != "subscriber" {
 		t.Fatalf("account entitlement %v", ent)
 	}
 }

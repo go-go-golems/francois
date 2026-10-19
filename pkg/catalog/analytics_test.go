@@ -91,14 +91,14 @@ func TestTrafficAnalytics(t *testing.T) {
 	e.do(nil, "boutique.test", "GET", "/", nil, nil)
 	from := time.Now().UTC().AddDate(0, 0, -1)
 	to := from.AddDate(0, 0, 2)
-	resv, err := e.store.Reserve(ctx, store.ReserveRequest{UserID: sub.user.ID, InstanceID: "test", CallID: "test", Model: "fake/model", Credits: 2, Included: 100, Period: "demo:test"})
+	resv, err := e.store.Reserve(ctx, store.ReserveRequest{UserID: sub.user.ID, InstanceID: "test", CallID: "test", Model: "fake/model", Tokens: 10, Limit: 100, Period: "demo:test"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = e.store.StartCall(ctx, resv); err != nil {
 		t.Fatal(err)
 	}
-	if err = e.store.SettleCall(ctx, resv, true, "", store.CallUsage{Input: 10, Output: 5, CacheRead: 3, CacheWrite: 2, Cost: 0.01, ModelUsed: "fake/actual"}); err != nil {
+	if err = e.store.SettleCall(ctx, resv, true, "", store.CallUsage{Input: 10, Output: 5, CacheRead: 3, CacheWrite: 2, Rounds: 1, Cost: 0.01, ModelUsed: "fake/actual"}); err != nil {
 		t.Fatal(err)
 	}
 	a, err := e.store.Analytics(ctx, from, to, store.TrafficFilter{Site: "http://portal.test"})
@@ -108,7 +108,7 @@ func TestTrafficAnalytics(t *testing.T) {
 	if a.Traffic.Views != 2 || a.Traffic.Visitors != 1 || a.Traffic.Sessions != 1 || a.Traffic.Users != 1 || a.Traffic.Bounces != 0 {
 		t.Fatalf("%+v", a.Traffic)
 	}
-	if a.Groups["referrers"][0].Key != "search.example" || a.Models["models"][0].CacheRead != 3 || a.Models["models"][0].Credits != 2 {
+	if a.Groups["referrers"][0].Key != "search.example" || a.Models["models"][0].CacheRead != 3 || a.Models["models"][0].Credits != 0 {
 		t.Fatalf("%+v", a)
 	}
 	all, err := e.store.Analytics(ctx, from, to, store.TrafficFilter{})

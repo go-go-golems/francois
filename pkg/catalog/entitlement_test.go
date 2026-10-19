@@ -11,14 +11,8 @@ import (
 
 func planDoc() settings.Document {
 	d := settings.Defaults()
-	d.Models.Allowed = []settings.Model{{Selector: "p/cheap", Label: "Cheap", Credits: 1}, {Selector: "p/big", Label: "Big", Credits: 5}}
-	d.Plans = append(d.Plans,
-		settings.Plan{Key: "supporter", Name: "Supporter", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup_m"}, {Interval: "year", PriceID: "price_sup_y"}},
-			Instances: 3, MembersPerInstance: 2, MonthlyCredits: 100, Models: []string{"p/cheap"}},
-		settings.Plan{Key: "subscriber", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio_m"}},
-			Instances: 10, MembersPerInstance: 10, MonthlyCredits: 1000},
-		settings.Plan{Key: "friends", Name: "Friends", Rank: 15, Instances: 5, MembersPerInstance: 5},
-	)
+	d.Models.Allowed = []settings.Model{{Selector: "p/cheap", Label: "Cheap"}, {Selector: "p/big", Label: "Big"}}
+	d.Plans[1] = settings.Plan{Key: "subscriber", Name: "Paying", Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup_m"}, {Interval: "year", PriceID: "price_sup_y"}, {Interval: "month", PriceID: "price_studio_m"}}, Instances: 10, MembersPerInstance: 10, DailyTokens: 1000}
 	if err := d.Validate(); err != nil {
 		panic(err)
 	}
@@ -47,7 +41,7 @@ func TestResolveEntitlement(t *testing.T) {
 		{"approved inline price", store.User{Role: "subscriber"}, sub("price_inline"), "subscriber", SourceSubscription},
 		{"trial", store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonTrial, PriceID: "price_sup_m"}, "subscriber", SourceTrial},
 		{"grant without plan", store.User{Role: "subscriber"}, comp(""), "subscriber", SourceComplimentary},
-		{"grant with plan", store.User{Role: "subscriber"}, comp("friends"), "friends", SourceComplimentary},
+		{"grant with plan", store.User{Role: "subscriber"}, comp("friends"), "subscriber", SourceComplimentary},
 		{"grant with unknown plan", store.User{Role: "subscriber"}, comp("gone"), "subscriber", SourceComplimentary},
 		{"creator", store.User{Role: "creator"}, billing.Decision{}, "subscriber", SourceStaff},
 		{"admin", store.User{Role: "admin"}, billing.Decision{}, "subscriber", SourceStaff},
@@ -65,46 +59,15 @@ func TestResolveEntitlement(t *testing.T) {
 
 func TestCanRunAndModels(t *testing.T) {
 	doc := planDoc()
-	art := func(required string) store.Artifact { return store.Artifact{RequiredPlan: required} }
-	e := func(plan, source string) Entitlement {
-		p, _ := doc.Plan(plan)
-		return Entitlement{Plan: p, Source: source}
-	}
-	free, sup, studio := e("free", SourceFree), e("supporter", SourceSubscription), e("subscriber", SourceSubscription)
-	staff := Entitlement{Plan: doc.Highest(), Source: SourceStaff}
-	guest := Entitlement{Plan: demoPlan(doc), Source: SourceGuest}
-	disabled := Entitlement{Plan: doc.Free(), Source: SourceDisabled}
-	checks := []struct {
-		name string
-		e    Entitlement
-		a    store.Artifact
-		want bool
-	}{
-		{"free runs default artifact", free, art(""), false},
-		{"supporter runs default artifact (lowest paid)", sup, art(""), true},
-		{"supporter runs studio artifact", sup, art("subscriber"), false},
-		{"studio runs studio artifact", studio, art("subscriber"), true},
-		{"free runs free artifact", free, art("free"), true},
-		{"unknown plan falls back to lowest paid", sup, art("gone"), true},
-		{"staff run everything", staff, art("subscriber"), true},
-		{"guests run no workspace", guest, art("free"), false},
-		{"disabled run nothing", disabled, art("free"), false},
-	}
-	for _, c := range checks {
-		if got := c.e.CanRun(c.a, doc); got != c.want {
-			t.Errorf("%s: %v", c.name, got)
+	for _, source := range []string{SourceFree, SourceSubscription, SourceComplimentary, SourceStaff, SourceGuest, SourceDisabled} {
+		e := Entitlement{Plan: doc.Free(), Source: source}
+		want := source != SourceGuest && source != SourceDisabled
+		if e.CanRun(store.Artifact{}, doc) != want {
+			t.Errorf("%s access", source)
 		}
-	}
-	if !sup.AllowsModel("p/cheap") || sup.AllowsModel("p/big") || !studio.AllowsModel("p/big") {
-		t.Error("plan model restriction")
-	}
-	if !staff.Paid() || free.Paid() || guest.Paid() || !sup.Paid() {
-		t.Error("paid")
-	}
-	// Without a paid plan, only staff can run artifacts that need one.
-	only := settings.Defaults()
-	if (Entitlement{Plan: only.Free(), Source: SourceFree}).CanRun(art(""), only) {
-		t.Error("free ran an artifact with no paid plan defined")
+		if !e.AllowsModel("p/big") {
+			t.Errorf("%s should use the global model policy", source)
+		}
 	}
 }
 
@@ -114,10 +77,10 @@ func TestCheckoutPrice(t *testing.T) {
 		plan, interval, want string
 		ok                   bool
 	}{
-		{"supporter", "month", "price_sup_m", true},
-		{"supporter", "year", "price_sup_y", true},
-		{"supporter", "", "price_sup_m", true},
-		{"subscriber", "year", "", false},
+		{"subscriber", "month", "price_sup_m", true},
+		{"subscriber", "year", "price_sup_y", true},
+		{"subscriber", "", "price_sup_m", true},
+
 		{"free", "", "", false},
 		{"friends", "", "", false},
 		{"nope", "", "", false},
@@ -132,19 +95,13 @@ func TestCheckoutPrice(t *testing.T) {
 
 func TestSubscriberNeverSelectsGrantOnlyPlan(t *testing.T) {
 	doc := planDoc()
-	doc.Plans = append(doc.Plans, settings.Plan{Key: "private", Name: "Private", Rank: 99, MembersPerInstance: 1, MonthlyCredits: 999999})
+	doc.Plans = append(doc.Plans, settings.Plan{Key: "private", Name: "Private", MembersPerInstance: 1, DailyTokens: 999999})
 	until := time.Now().Add(time.Hour)
 	got := resolveEntitlement(store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonSubscriber, Until: &until}, doc)
 	if got.Plan.Key != "subscriber" {
 		t.Fatalf("subscriber selected %q", got.Plan.Key)
 	}
-	for i := range doc.Plans {
-		if doc.Plans[i].Key == "subscriber" {
-			doc.Plans[i].Public = false
-		}
-	}
-	got = resolveEntitlement(store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonSubscriber, Until: &until}, doc)
-	if got.Source != SourceFree {
-		t.Fatal("private plan must not become subscriber tier")
+	if err := doc.Validate(); err == nil {
+		t.Fatal("private third class accepted")
 	}
 }

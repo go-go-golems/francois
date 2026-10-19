@@ -327,7 +327,11 @@ func (c *CatalogPublish) RunIntoGlazeProcessor(ctx context.Context, p *values.Va
 		return err
 	}
 	if !s.Draft {
-		if rel, err = db.PublishRelease(ctx, rel.ID, s.Actor); err != nil {
+		rev, err := db.ActiveSettings(ctx)
+		if err != nil {
+			return err
+		}
+		if rel, err = db.PublishRelease(ctx, rel.ID, s.Actor, rev.Document.Publishing.EarlyAccessDays); err != nil {
 			return err
 		}
 	}
