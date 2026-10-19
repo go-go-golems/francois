@@ -17,6 +17,8 @@ WhenToUse: ""
 
 # Restore Ramon’s Final support page
 
+The [single-tier and year-funding follow-up](03-single-subscriber-tier-and-one-time-year-funding.md) supersedes this document’s earlier Free-entitlement and year-contact decisions. The earlier rollout evidence remains historical.
+
 The authoritative reference is [Final in Ramon’s Paper file](https://app.paper.design/file/01M4XVT9C83GGYK57CMAAAEJJT/p-6-0), inspected directly through Paper MCP. Desktop and mobile exports specify a monthly USD input defaulting to 42, minus/plus controls, a pale-blue support action, five principles and a separate year-funding contact action. The current production page only loops over configured fixed-price plans; its single Subscriber plan has an empty label. That is why the intended amount is missing.
 
 ## Concrete implementation

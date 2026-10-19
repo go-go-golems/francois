@@ -688,3 +688,5 @@ select.btn { appearance: none; cursor: pointer; }
 .support-impact a { font-size:15px; }
 .support-thanks { font-size:14px; line-height:20px; color:var(--color-muted); }
 @media(max-width:900px) { .support-impact { gap:16px; align-items:flex-start; } .support-impact-count { font-size:80px; line-height:76px; } .support-impact p { font-size:17px; line-height:24px; } .site-nav .support-thanks { display:none; } }
+
+.support-year > form { margin-top:24px; font-size:15px; line-height:22px; }

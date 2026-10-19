@@ -53,7 +53,7 @@ func TestAttachments(t *testing.T) {
 	// Published: the release's download rule applies.
 	code, out = e.portal(&admin, "POST", "/api/studio/releases/"+relID+"/publish", nil)
 	expect("publish", code, out, 200, "")
-	code, out = e.portal(&admin, "PATCH", "/api/studio/artifacts/loom", map[string]string{"requiredPlan": "pro"})
+	code, out = e.portal(&admin, "PATCH", "/api/studio/artifacts/loom", map[string]string{"requiredPlan": "subscriber"})
 	expect("require pro", code, out, 200, "")
 	if code, _, _ := e.do(nil, "portal.test", "GET", pub, nil, nil); code != 401 {
 		t.Fatalf("anonymous download %d", code)

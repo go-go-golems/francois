@@ -15,7 +15,7 @@ func planDoc() settings.Document {
 	d.Plans = append(d.Plans,
 		settings.Plan{Key: "supporter", Name: "Supporter", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_sup_m"}, {Interval: "year", PriceID: "price_sup_y"}},
 			Instances: 3, MembersPerInstance: 2, MonthlyCredits: 100, Models: []string{"p/cheap"}},
-		settings.Plan{Key: "studio", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio_m"}},
+		settings.Plan{Key: "subscriber", Name: "Studio", Rank: 20, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_studio_m"}},
 			Instances: 10, MembersPerInstance: 10, MonthlyCredits: 1000},
 		settings.Plan{Key: "friends", Name: "Friends", Rank: 15, Instances: 5, MembersPerInstance: 5},
 	)
@@ -41,16 +41,16 @@ func TestResolveEntitlement(t *testing.T) {
 		plan, source string
 	}{
 		{"free", store.User{Role: "subscriber"}, billing.Decision{Reason: billing.ReasonRequired}, "free", SourceFree},
-		{"monthly supporter", store.User{Role: "subscriber"}, sub("price_sup_m"), "supporter", SourceSubscription},
-		{"yearly supporter", store.User{Role: "subscriber"}, sub("price_sup_y"), "supporter", SourceSubscription},
-		{"studio", store.User{Role: "subscriber"}, sub("price_studio_m"), "studio", SourceSubscription},
-		{"unknown price", store.User{Role: "subscriber"}, sub("price_gone"), "free", SourceFree},
-		{"trial", store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonTrial, PriceID: "price_sup_m"}, "supporter", SourceTrial},
-		{"grant without plan", store.User{Role: "subscriber"}, comp(""), "studio", SourceComplimentary},
+		{"monthly supporter", store.User{Role: "subscriber"}, sub("price_sup_m"), "subscriber", SourceSubscription},
+		{"yearly supporter", store.User{Role: "subscriber"}, sub("price_sup_y"), "subscriber", SourceSubscription},
+		{"subscriber", store.User{Role: "subscriber"}, sub("price_studio_m"), "subscriber", SourceSubscription},
+		{"approved inline price", store.User{Role: "subscriber"}, sub("price_inline"), "subscriber", SourceSubscription},
+		{"trial", store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonTrial, PriceID: "price_sup_m"}, "subscriber", SourceTrial},
+		{"grant without plan", store.User{Role: "subscriber"}, comp(""), "subscriber", SourceComplimentary},
 		{"grant with plan", store.User{Role: "subscriber"}, comp("friends"), "friends", SourceComplimentary},
-		{"grant with unknown plan", store.User{Role: "subscriber"}, comp("gone"), "studio", SourceComplimentary},
-		{"creator", store.User{Role: "creator"}, billing.Decision{}, "studio", SourceStaff},
-		{"admin", store.User{Role: "admin"}, billing.Decision{}, "studio", SourceStaff},
+		{"grant with unknown plan", store.User{Role: "subscriber"}, comp("gone"), "subscriber", SourceComplimentary},
+		{"creator", store.User{Role: "creator"}, billing.Decision{}, "subscriber", SourceStaff},
+		{"admin", store.User{Role: "admin"}, billing.Decision{}, "subscriber", SourceStaff},
 		{"guest", store.User{Role: "guest"}, billing.Decision{}, "demo", SourceGuest},
 		{"disabled subscriber", store.User{Role: "subscriber", Disabled: true}, sub("price_studio_m"), "free", SourceDisabled},
 		{"disabled admin", store.User{Role: "admin", Disabled: true}, billing.Decision{}, "free", SourceDisabled},
@@ -70,7 +70,7 @@ func TestCanRunAndModels(t *testing.T) {
 		p, _ := doc.Plan(plan)
 		return Entitlement{Plan: p, Source: source}
 	}
-	free, sup, studio := e("free", SourceFree), e("supporter", SourceSubscription), e("studio", SourceSubscription)
+	free, sup, studio := e("free", SourceFree), e("supporter", SourceSubscription), e("subscriber", SourceSubscription)
 	staff := Entitlement{Plan: doc.Highest(), Source: SourceStaff}
 	guest := Entitlement{Plan: demoPlan(doc), Source: SourceGuest}
 	disabled := Entitlement{Plan: doc.Free(), Source: SourceDisabled}
@@ -82,11 +82,11 @@ func TestCanRunAndModels(t *testing.T) {
 	}{
 		{"free runs default artifact", free, art(""), false},
 		{"supporter runs default artifact (lowest paid)", sup, art(""), true},
-		{"supporter runs studio artifact", sup, art("studio"), false},
-		{"studio runs studio artifact", studio, art("studio"), true},
+		{"supporter runs studio artifact", sup, art("subscriber"), false},
+		{"studio runs studio artifact", studio, art("subscriber"), true},
 		{"free runs free artifact", free, art("free"), true},
 		{"unknown plan falls back to lowest paid", sup, art("gone"), true},
-		{"staff run everything", staff, art("studio"), true},
+		{"staff run everything", staff, art("subscriber"), true},
 		{"guests run no workspace", guest, art("free"), false},
 		{"disabled run nothing", disabled, art("free"), false},
 	}
@@ -117,7 +117,7 @@ func TestCheckoutPrice(t *testing.T) {
 		{"supporter", "month", "price_sup_m", true},
 		{"supporter", "year", "price_sup_y", true},
 		{"supporter", "", "price_sup_m", true},
-		{"studio", "year", "", false},
+		{"subscriber", "year", "", false},
 		{"free", "", "", false},
 		{"friends", "", "", false},
 		{"nope", "", "", false},
@@ -127,5 +127,24 @@ func TestCheckoutPrice(t *testing.T) {
 		if got != c.want || ok != c.ok {
 			t.Errorf("%s/%s: %q %v", c.plan, c.interval, got, ok)
 		}
+	}
+}
+
+func TestSubscriberNeverSelectsGrantOnlyPlan(t *testing.T) {
+	doc := planDoc()
+	doc.Plans = append(doc.Plans, settings.Plan{Key: "private", Name: "Private", Rank: 99, MembersPerInstance: 1, MonthlyCredits: 999999})
+	until := time.Now().Add(time.Hour)
+	got := resolveEntitlement(store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonSubscriber, Until: &until}, doc)
+	if got.Plan.Key != "subscriber" {
+		t.Fatalf("subscriber selected %q", got.Plan.Key)
+	}
+	for i := range doc.Plans {
+		if doc.Plans[i].Key == "subscriber" {
+			doc.Plans[i].Public = false
+		}
+	}
+	got = resolveEntitlement(store.User{Role: "subscriber"}, billing.Decision{Allowed: true, Reason: billing.ReasonSubscriber, Until: &until}, doc)
+	if got.Source != SourceFree {
+		t.Fatal("private plan must not become subscriber tier")
 	}
 }

@@ -145,7 +145,7 @@ func TestClientContract(t *testing.T) {
 	ok("remove member", acc.RemoveMember(ctx, inst.ID, vera.user.ID))
 	_, err = acc.Instances(ctx)
 	ok("instances", err)
-	_, err = acc.Checkout(ctx, "pro", "month")
+	_, err = acc.Checkout(ctx, "subscriber", "month")
 	code("checkout without billing", err, "billing_unavailable")
 	_, err = sc.Studio.Artifacts(ctx)
 	code("account token on studio", err, "token_scope")
@@ -160,7 +160,7 @@ func TestClientContract(t *testing.T) {
 	ok("user", err)
 	off := false
 	ok("patch user", a.PatchUser(ctx, sam.user.ID, client.UserPatch{Disabled: &off}))
-	g, err := a.GrantAccess(ctx, sam.user.ID, client.GrantRequest{Days: 30, Reason: "beta", Plan: "pro"})
+	g, err := a.GrantAccess(ctx, sam.user.ID, client.GrantRequest{Days: 30, Reason: "beta", Plan: "subscriber"})
 	ok("grant", err)
 	_, err = a.RevokeGrant(ctx, g.ID)
 	ok("revoke grant", err)
@@ -181,10 +181,10 @@ func TestClientContract(t *testing.T) {
 	ok("resume", a.SetInstanceSuspended(ctx, inst.ID, false))
 	_, err = a.Settings(ctx)
 	ok("settings", err)
-	_, err = a.EditPlan(ctx, "pro", func(p *settings.Plan) error { p.MonthlyCredits = 777; return nil })
+	_, err = a.EditPlan(ctx, "subscriber", func(p *settings.Plan) error { p.MonthlyCredits = 777; return nil })
 	ok("edit plan", err)
 	cur, _ := a.Settings(ctx)
-	if p, _ := cur.Active.Document.Plan("pro"); p.MonthlyCredits != 777 {
+	if p, _ := cur.Active.Document.Plan("subscriber"); p.MonthlyCredits != 777 {
 		t.Fatalf("plan edit lost: %+v", p)
 	}
 	_, err = a.SaveSettings(ctx, cur.Active.Document, cur.Active.Revision-1)

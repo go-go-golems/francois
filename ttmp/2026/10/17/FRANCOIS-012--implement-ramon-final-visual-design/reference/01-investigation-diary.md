@@ -555,3 +555,208 @@ Rebased the completed feature onto the user-merged PR and deployed its official 
 - Release: https://github.com/go-go-golems/francois/actions/runs/39085953535
 - GitOps: https://github.com/wesen/2026-03-27--hetzner-k3s/pull/371
 - Public contribution page: https://slop.boutique/pricing
+
+## Step 10: Implement Stripe year funding and one Subscriber tier
+
+Investigated the follow-up against the deployed settings and aggregate billing records, then implemented the one-time year action and unified subscriber resolution. The previous adjustable-monthly flow intentionally retained Free access; the user now explicitly requests that every subscriber use the one paid tier, so that behavior is replaced. This checkpoint precedes qualification.
+
+### Prompt Context
+**User prompt (verbatim, JSON-encoded):** `"- fund a year also goes to stripe (it's the max price stripe supports). \n- now that we have only one subscription tier, we need to make every subscriber in that tier."`
+**Assistant interpretation:** Make the year action a real fixed-amount Stripe payment and make every confirmed subscriber resolve to the existing paid Subscriber plan.
+**Inferred user intent:** Complete both payment choices with one straightforward subscriber entitlement, without migrating or duplicating Stripe subscriptions.
+
+### What I did
+- Confirmed Stripe’s documented USD maximum is 999,999.99 and saved its primary-source reference in the new active guide.
+- Read production public plans and aggregate subscription counts only: one paid Subscriber plan, two active rows, one custom-monthly-support row. No emails or payment credentials were printed.
+- Added the year checkout option to the existing endpoint/service/gateway and replaced the contact link with a checkout action.
+- Reused checkout attempts for paid-at/paid-through projection, integrated owner-bound authoritative retrieval in the existing worker and added refund refresh handling.
+- Updated support summaries and UI to distinguish monthly recurrence from a one-time funded year. Updated monthly policy acceptance and subscriber resolution to the one paid tier.
+
+### Why
+- A role shared by free registrants and paying users cannot establish paid membership. Authoritative billing state can, with no destructive backfill or Stripe subscription rewrite.
+- A one-time payment needs a fixed paid-through boundary; treating it as another monthly subscription would misrepresent both charge recurrence and access.
+
+### What worked
+- Production configuration and aggregate counts establish the exact mismatch and the target tier. Existing checkout ownership/admission and refresh worker provide the needed integration points.
+
+### What didn't work
+- No qualification results yet. Earlier monthly checkout’s Free entitlement is now a superseded product decision, not a payment-delivery failure.
+
+### What I learned
+- The current production tier configuration already needs no structural migration. New monthly support only needs to participate in the same confirmed-subscriber policy.
+
+### What was tricky to build
+- Reuse one-time checkout identity and charge time so webhook retries cannot extend a funded year. Keep the year purchase available to an existing monthly subscriber without creating a second recurring subscription.
+
+### What warrants a second pair of eyes
+- Fixed maximum amount, payment/owner/metadata checks, refund revocation, one-year idempotency and the distinction between free role membership and paid subscriber standing.
+
+### What should be done in the future
+- Qualify the completed implementation and capture a real isolated sandbox journey. No production payment or deployment is claimed here.
+
+### Code review instructions
+- Read the new active single-tier/year-funding guide, migration 016, gateway year mode, worker projection and entitlement resolution before reviewing UI copy.
+
+### Technical details
+- Fixed year amount: 99,999,999 cents, USD, single payment. Monthly support keeps its selected amount and monthly recurrence.
+- Stripe source: https://docs.stripe.com/currencies
+
+## Step 11: Verify maximum Stripe payment, unified tier and refund revocation
+
+Qualified the complete follow-up with database tests and a real 999,999.99 USD Stripe sandbox payment. The same existing monthly supporter held the Subscriber tier before the year purchase, during its confirmed year standing and after its sandbox refund. Checkout used payment mode and created no recurring subscription. No production payment was submitted.
+
+### Prompt Context
+**User prompt:** See Step 10.
+**Assistant interpretation:** Finish the complete payment/tier correction, validate it once at the feature boundary and preserve reviewable evidence.
+**Inferred user intent:** Make the year action work end-to-end and put all confirmed subscribers in the same tier.
+**Commit (implementation):** 570439f — Unify subscriber entitlement and add one-time Stripe year funding.
+
+### What I did
+- Added Stripe payload/projection tests for exact 99,999,999-cent one-time payment, omitted recurrence, server metadata and refund visibility.
+- Added service/store tests for unpaid rejection, one-time checkout reuse, immutable paid-through date on replay, authoritative confirmation, refund revocation and purchase by an existing monthly subscriber.
+- Updated earlier tests that deliberately expected adjustable support to stay Free or payment prices to select different subscriber tiers.
+- Made return polling confirm the exact checkout attempt’s paid-through projection. An existing monthly supporter cannot prematurely confirm a new year purchase merely by already being active.
+- Added scripts 10–11 for the isolated sandbox journey/settings fixture. Captured confirmed year-funder pages at 1440/390px and refunded the test payment afterward.
+
+### Why
+- Payment mode and exact charge amount are insufficient unless the same owner-bound confirmation grants standing and refunds revoke it. Real Stripe validation covers those integration boundaries.
+- Computed entitlement mapping updates existing active subscribers without changing roles, charging again or rewriting Stripe objects.
+
+### What worked
+- Full database-backed `go test ./... -count=1` passed: catalog 28.318s, payments 3.991s; focused year/support tests passed separately.
+- `pnpm check`, nine frontend/worker tests, embedded frontend build, Go build, lint and logcopter checks passed.
+- Real sandbox receipt: amount 99,999,999 cents, mode payment, no recurring subscription, confirmed paid year, no support prompts and Subscriber tier before/during/after refund.
+- Sandbox refund removed year standing and preserved the existing monthly subscription’s Subscriber entitlement.
+- Both desktop/mobile screenshots fit without horizontal overflow; reviewed the mobile funded-year view visually.
+
+### What didn't work
+- Initial full suite failed three old presentation/policy tests: TestResolveEntitlement expected supporter or Free instead of the unified tier; TestPlans expected the old lower-tier workspace restrictions; TestSupporterPresentation reported `contribution unexpectedly grants paid privileges`. Updated those superseded expectations and reran the focused/final suite successfully.
+- First real-browser run stopped before payment with `actual: 'free', expected: 'subscriber'` for the preview plan. The settings fixture used `INSERT ... SELECT ... FROM platform_settings` on an empty table, so it inserted zero rows and the server kept Free-only defaults. Added a small generator using `settings.Defaults()` plus Subscriber and inserted the complete fixture document; the rerun passed.
+- Git whitespace checking flagged the preserved prompt’s trailing space. Kept its exact text in JSON-encoded form to preserve that whitespace without adding trailing file whitespace.
+
+### What I learned
+- Existing-supporter returns need attempt-specific confirmation. The general supporter boolean is true before a year purchase, so it cannot prove the new payment completed.
+- Default settings can be virtual revision zero with no database row; a fixture cannot assume an existing row to clone.
+
+### What was tricky to build
+- Keep the paid-through time anchored to the actual charge rather than webhook arrival or refresh time. The exact checkout row owns its projection, and replay cannot extend it.
+- A full refund clears only that year’s standing; another active monthly subscription still grants the single tier.
+
+### What warrants a second pair of eyes
+- Review maximum fixed charge, no recurrence, payment-owner validation, atomic projection, refund refresh and the exact-attempt UI gate. Review that free registrants still remain Free because role alone is not proof of payment.
+
+### What should be done in the future
+- Review and deploy the follow-up. Production currently remains on sha-08332bb until the new source image is merged/released.
+
+### Code review instructions
+- Start with year-funding-sandbox.json, the two year-funding-confirmed screenshots and the current single-tier guide. Then read gateway/service year handling, migration 016, store/year_support.go, policy acceptance and entitlement resolution.
+- Scripts 10–11 are fixed to the local preview and require a test-mode Stripe credential; they never accept a production payment path.
+
+### Technical details
+- Sandbox payment was refunded after evidence capture. Temporary cookies were revoked; no key, cookie or hosted checkout URL is stored in ticket evidence.
+- Production preflight aggregates: two active subscription rows, one marked custom-monthly support; one paid Subscriber configuration. Actual Stripe subscription objects require no migration.
+
+## Step 12: Address both PR 16 review findings
+
+Corrected two independent mistakes identified by automated review: a year-funded account hid the continuing monthly contract, and subscriber resolution used the highest configured plan. The account now shows existing recurring commitments alongside year standing, while paid customers select the designated public Subscriber tier.
+
+### Prompt Context
+**User prompts (verbatim):** “also address https://github.com/go-go-golems/francois/pull/16 status” and “also address https://github.com/go-go-golems/francois/pull/16 code review”.
+**Assistant interpretation:** Inspect CI/review status, correct actionable findings, test and push the same PR.
+**Inferred user intent:** Finish review without allowing the separate architecture study to stall the payment fixes.
+
+### What I did
+- Addressed review comments 4305397470 and 4305397478. Added `RecurringSupport`, using the existing account subscriptions rather than a new backend projection.
+- Displayed active recurring amount and next charge, or scheduled stop date, alongside year funding. Clarified that only the year payment does not renew automatically.
+- Selected `doc.Plan("subscriber")` only when public. Added a regression proving a higher private plan cannot be granted to an ordinary subscriber.
+- Updated test fixtures and admin filter queries to the designated Subscriber key. Rebuilt the tracked embedded frontend.
+
+### Why
+- One-off funding and monthly contracts coexist; presentation must disclose both. Generic highest-plan selection cannot express the single public Subscriber tier safely.
+
+### What worked
+- PostgreSQL-backed `go test ./pkg/catalog -count=1` passed in 18.187s after fixture correction.
+- `pnpm check`, ten frontend/worker tests and `pnpm build` passed. The new rendering test covers continued renewal and cancellation copy.
+- Final `make lint logcopter-check` passed with zero issues after gofmt.
+
+### What didn't work
+- Initial catalog test command using the isolated fixture on port 5437 failed with `connect: connection refused`; its PostgreSQL container had stopped. Restarted only `francois-email-013-postgres-1`.
+- The next catalog run exposed two old `plan=pro` URL fixtures: `TestCustomerManagement: plan filter 200 []` and `TestUserFiltersBeforeLimit: ... 200 []`. Updated those URLs to `plan=subscriber`; the suite passed.
+- Sandboxed lint could not load packages (`no go files to analyze`). With cache access, lint identified `admin_customers_test.go:162:1: File is not properly formatted (gofmt)` after the URL changes. Ran gofmt and repeated the required check.
+
+### What I learned
+- The existing subscription projection already has the recurring amount/date; a separate support summary must not obscure it.
+- Enforcing an explicit tier requires fixture keys to reflect the real configuration contract rather than silently relying on rank.
+
+### What was tricky to build
+- The year-payment sentence must not imply cancellation of a different ongoing contract. Scheduled cancellation must show a stop date rather than a next charge.
+
+### What warrants a second pair of eyes
+- Missing/private Subscriber configuration intentionally falls back to Free. Staff and named complimentary grants remain unchanged by this focused correction.
+
+### What should be done in the future
+- Push and request review. No merge or production deployment is authorized by these review requests.
+
+### Code review instructions
+- Read `ui/catalog/recurring-support.tsx`, its rendering test and `TestSubscriberNeverSelectsGrantOnlyPlan`, then the narrow account/entitlement diffs.
+
+### Technical details
+- Original PR head: d847ba4. Review IDs are GitHub inline comment identifiers, not new tickets. No payment was submitted during this correction.
+
+## Step 13: Fix the lifecycle mismatch behind the new P1s
+
+Investigated the common cause before patching the new comments. Checkout completion was being used as payment completion, while a missing paid-through date stood in for several different outcomes. Admission could therefore accept another purchase and reconciliation could stop checking the unresolved first payment. Added an explicit year payment state and one authoritative projection, with settlement and access dates committed together.
+
+The same investigation found a related retry issue: after a known Session's local expiry, reissuing CreateCheckout with an old idempotency key could create a second charge once Stripe discarded that key. Known Sessions are now retrieved/retired, and only authoritative failure/expiry releases an unsettled year purchase. Consolidated webhook delivery configuration to prevent the event-list drift identified by the P2.
+
+### Prompt Context
+**User prompts (verbatim):** “More P1s on https://github.com/go-go-golems/francois/pull/16”; “Check if there some systemic pattern underneath that might be the issue here and a refactor could simplify things (and thus make them more robust)?”
+**Assistant interpretation:** Diagnose the shared failure pattern, implement a small corrective refactor on PR 16, and carry it into the stacked simplification branch.
+**Inferred user intent:** Stop recurring payment defects by simplifying the underlying state model, while keeping changes concrete and reviewable.
+
+### What I did
+- Read comments 4309943413 (repeat async payment), 4309943417 (missed-webhook reconciliation) and 4309943422 (refund delivery configuration).
+- Verified Stripe's documented distinction between completed Checkout and delayed payment outcomes.
+- Added migration 017_year_payment_state.sql. Existing unconfirmed year completions become pending until Stripe resolves their actual outcome; no historical payment is silently assumed failed.
+- Added projectYearPayment and expanded PaymentIntent failure detection. Kept checkout status separate from pending/paid/failed/refunded payment status.
+- Made event completion write payment state, checkout state and access dates atomically, using the same user row lock as admission. Prevented pending snapshots from overwriting settled outcomes.
+- Kept completed-but-unpaid payments blocking new charges. Removed local-clock expiration of year attempts and stopped recreating known Sessions with old idempotency keys.
+- Unified known year payment reconciliation through the existing authoritative event path, with oldest-first batches of at most 50 customers and no age cutoff that would abandon pending funds.
+- Added one embedded/mounted event list shared by Go, Compose and production instructions, including async success/failure and refunds.
+- Added lifecycle regressions for a missed delayed-payment webhook, definitive failure releasing admission, local expiry while Stripe is complete, and single-projection invariants. No payment was submitted.
+
+### Why
+- Fixing isolated SQL predicates would leave the ambiguous meaning of completed intact. A separate payment state lets admission, reconciliation and access use the same explicit fact.
+- Retained the existing durable inbox and worker; no extra queue, scheduler, compatibility adapter or service is required.
+
+### What worked
+- Database-backed payment and catalog tests passed: payments 2.446s, catalog 18.430s. This includes the existing monthly/year/refund/ownership suite and the new async lifecycle cases.
+- The missed-webhook test settles a pending payment aged 40 days using scheduled reconciliation alone, without a browser return or success webhook.
+- Required lint and logcopter checks passed with zero issues.
+- `docker compose -f deploy/compose/compose.yaml config --quiet` passed without printing configuration or credentials.
+
+### What didn't work
+- The sandbox mount setup failed: `bwrap: Can't bind mount /oldroot/ ... /newroot/mnt/pico: No such device`. Used approved direct execution for the same read/edit/check operations.
+- `docker compose ... config --quiet --no-interpolate` rejected a pre-existing variable-containing bind mount with `too many colons`. Normal quiet Compose validation passed with standard interpolation.
+
+### What I learned
+- A local expiry timestamp is not proof that an asynchronous payment failed. Likewise, an event called completed is not proof of settled funds.
+- Independent webhook allowlists in source and deployment settings drift even when the application correctly supports an event.
+
+### What was tricky to build
+- Preserve idempotent reuse of an admitted open checkout while blocking a second payment after Checkout completion. Year-state projection and admission share the user-row lock so freeing the open index cannot race ahead of paid standing.
+- Refund and failure clear year standing without turning the row back into an ambiguous unconfirmed completion. Unknown/missing payment timestamps remain pending and retryable by reconciliation.
+
+### What warrants a second pair of eyes
+- Review the payment projection, user-row lock ordering, conditional update that rejects stale pending state, and the known-Session retry path. Check that a definitive failure releases admission but processing never does.
+- The repository/runbook now share webhook event configuration; an existing remote Stripe endpoint still needs that list applied when deploying. No remote endpoint was mutated here.
+
+### What should be done in the future
+- Push the corrections, reply to the findings, and merge the fix branch into the stacked simplification branch. No production deployment is included.
+
+### Code review instructions
+- Start with payments/year_payment.go and its lifecycle tests, then migration 017_year_payment_state.sql, Store.CompleteEvent/AdmitCheckout/CustomersToReconcile, and the shared webhook event file.
+
+### Technical details
+- Primary source: https://docs.stripe.com/payments/existing-customers?platform=web&ui=stripe-hosted
+- Tests use the isolated PostgreSQL fixture on port 5437, deterministic Stripe fakes, and no live payments or credentials.

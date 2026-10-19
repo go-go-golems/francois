@@ -18,7 +18,7 @@ func TestCustomerManagement(t *testing.T) {
 
 	// Revoke one complimentary grant, keep the other.
 	_, first := e.portal(&ada, "POST", "/api/admin/users/"+sam.user.ID+"/access-grants", map[string]any{"days": 30, "reason": "beta"})
-	_, second := e.portal(&ada, "POST", "/api/admin/users/"+sam.user.ID+"/access-grants", map[string]any{"days": 60, "reason": "press", "plan": "pro"})
+	_, second := e.portal(&ada, "POST", "/api/admin/users/"+sam.user.ID+"/access-grants", map[string]any{"days": 60, "reason": "press", "plan": "subscriber"})
 	if code, out := e.portal(&ada, "DELETE", "/api/admin/access-grants/"+first["id"].(string), nil); code != 200 || out["revokedAt"] == nil {
 		t.Fatalf("revoke one grant %d %v", code, out)
 	}
@@ -46,7 +46,7 @@ func TestCustomerManagement(t *testing.T) {
 		Subscription        struct{ ID, Status string }
 		UserID, Email, Plan string
 	}
-	if code != 200 || json.Unmarshal(raw, &subs) != nil || len(subs) != 1 || subs[0].Plan != "pro" || subs[0].Email != "sam@example.com" || subs[0].UserID != sam.user.ID {
+	if code != 200 || json.Unmarshal(raw, &subs) != nil || len(subs) != 1 || subs[0].Plan != "subscriber" || subs[0].Email != "sam@example.com" || subs[0].UserID != sam.user.ID {
 		t.Fatalf("subscriptions %d %s", code, raw)
 	}
 	// Without Stripe configured, cancellation is unavailable rather than faked.
@@ -60,7 +60,7 @@ func TestCustomerManagement(t *testing.T) {
 		t.Fatalf("role filter %d %s", code, raw)
 	}
 	// Staff resolve to the highest plan, so combine plan and role to find paying customers.
-	code, raw, _ = e.do(&ada, "portal.test", "GET", "/api/admin/users?plan=pro&role=subscriber", nil, nil)
+	code, raw, _ = e.do(&ada, "portal.test", "GET", "/api/admin/users?plan=subscriber&role=subscriber", nil, nil)
 	if code != 200 || !strings.Contains(string(raw), sam.user.ID) || strings.Contains(string(raw), `"`+cleo.user.ID+`"`) {
 		t.Fatalf("plan filter %d %s", code, raw)
 	}
@@ -159,9 +159,9 @@ func TestUserFiltersBeforeLimit(t *testing.T) {
 		e.user(n, "subscriber", false)
 	}
 	for path, want := range map[string]string{
-		"/api/admin/users?role=creator&limit=1":               cleo.user.ID,
-		"/api/admin/users?plan=pro&role=subscriber&limit=1":   sam.user.ID,
-		"/api/admin/users?plan=pro&role=subscriber&limit=500": sam.user.ID,
+		"/api/admin/users?role=creator&limit=1":                      cleo.user.ID,
+		"/api/admin/users?plan=subscriber&role=subscriber&limit=1":   sam.user.ID,
+		"/api/admin/users?plan=subscriber&role=subscriber&limit=500": sam.user.ID,
 	} {
 		code, raw, _ := e.do(&ada, "portal.test", "GET", path, nil, nil)
 		var rows []struct{ User struct{ ID string } }

@@ -67,7 +67,7 @@ func (f *fakeGateway) CreateCheckout(_ context.Context, r CheckoutRequest) (Chec
 	}
 	f.creates++
 	f.requests = append(f.requests, r)
-	s := CheckoutSession{ID: "cs_" + store.RandomHex(4), URL: "https://checkout.test/" + r.AttemptID, Status: "open", CustomerID: r.CustomerID, ExpiresAt: time.Now().Add(time.Hour)}
+	s := CheckoutSession{YearFunding: r.YearFunding, ID: "cs_" + store.RandomHex(4), URL: "https://checkout.test/" + r.AttemptID, Status: "open", CustomerID: r.CustomerID, ExpiresAt: time.Now().Add(time.Hour)}
 	f.sessions[r.IdempotencyKey] = s
 	if f.failOnce {
 		f.failOnce = false
@@ -525,5 +525,82 @@ func TestMonthlySupportCheckout(t *testing.T) {
 	g.subs[customer] = []billing.Subscription{{ID: "sub_support", SupportAmountCents: 4300, Status: "active"}}
 	if _, err = svc.Support(ctx, u, 4400, accepted, "https://portal.test"); !errors.Is(err, ErrSubscriptionOpen) {
 		t.Fatal("duplicate contribution allowed", err)
+	}
+}
+
+func TestYearFundingConfirmationAndRefund(t *testing.T) {
+	s := testStore(t)
+	g := newFake()
+	svc := NewService(g, s, Config{Deployment: "test"})
+	ctx := context.Background()
+	u := user(t, s, "year-funder")
+	first, err := svc.FundYear(ctx, u, "https://portal.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.FundYear(ctx, u, "https://portal.test")
+	if err != nil || first != again || g.creates != 1 {
+		t.Fatal("year checkout retry not idempotent", err)
+	}
+	req := g.requests[0]
+	if !req.YearFunding || req.SupportAmountCents != 0 {
+		t.Fatal("wrong year checkout choice")
+	}
+	cs := g.sessions[req.IdempotencyKey]
+	cs.Status = "complete"
+	cs.YearFunding = true
+	paidAt := time.Now().UTC().Truncate(time.Second)
+	cs.PaidAt = &paidAt
+	refresh := func() {
+		t.Helper()
+		if err := svc.Refresh(ctx, u, cs.ID); err != nil {
+			t.Fatal(err)
+		}
+		if did, err := svc.processOne(ctx); err != nil || !did {
+			t.Fatal("year refresh failed", err)
+		}
+	}
+	g.sessions[req.IdempotencyKey] = cs
+	refresh()
+	if _, err = s.YearSupport(ctx, u.ID, time.Now()); !errors.Is(err, store.ErrNotFound) {
+		t.Fatal("unpaid checkout granted standing", err)
+	}
+	cs.PaymentPaid = true
+	g.sessions[req.IdempotencyKey] = cs
+	refresh()
+	standing, err := s.YearSupport(ctx, u.ID, time.Now())
+	if err != nil || standing.Until == nil || !standing.Until.Equal(paidAt.AddDate(1, 0, 0)) {
+		t.Fatal("paid year not projected", err)
+	}
+	if _, err = svc.FundYear(ctx, u, "https://portal.test"); !errors.Is(err, store.ErrYearFunded) {
+		t.Fatal("overlapping year funding admitted", err)
+	}
+	refresh()
+	replayed, err := s.YearSupport(ctx, u.ID, time.Now())
+	if err != nil || !replayed.Until.Equal(*standing.Until) {
+		t.Fatal("replay extended year", err)
+	}
+	decision, err := s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, u, time.Now())
+	if err != nil || !decision.Allowed || decision.Reason != billing.ReasonSubscriber {
+		t.Fatal("year not in subscriber tier", err)
+	}
+	cs.Refunded = true
+	g.sessions[req.IdempotencyKey] = cs
+	refresh()
+	if _, err = s.YearSupport(ctx, u.ID, time.Now()); !errors.Is(err, store.ErrNotFound) {
+		t.Fatal("refunded year kept standing", err)
+	}
+	decision, err = s.Access(ctx, billing.Policy{AcceptedPrices: accepted}, u, time.Now())
+	if err != nil || decision.Allowed {
+		t.Fatal("refund retained paid access", err)
+	}
+	other := user(t, s, "monthly-year-funder")
+	customer, err := svc.ensureCustomer(ctx, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.subs[customer] = []billing.Subscription{{ID: "monthly", SupportAmountCents: 4200, Status: "active"}}
+	if _, err = svc.FundYear(ctx, other, "https://portal.test"); err != nil {
+		t.Fatal("monthly subscriber cannot fund year", err)
 	}
 }

@@ -52,3 +52,56 @@ func TestMonthlySupportProjection(t *testing.T) {
 		t.Fatal("foreign currency accepted as USD")
 	}
 }
+
+func TestYearFundingStripePayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+		}
+		for key, want := range map[string]string{"mode": "payment", "line_items[0][price_data][currency]": "usd", "line_items[0][price_data][unit_amount]": "99999999", "line_items[0][quantity]": "1", "metadata[francois_year_funding]": "true", "invoice_creation[enabled]": "true"} {
+			if r.Form.Get(key) != want {
+				t.Errorf("%s=%q want %q", key, r.Form.Get(key), want)
+			}
+		}
+		if r.Form.Get("line_items[0][price_data][recurring][interval]") != "" || r.Form.Get("subscription_data[metadata][francois_user_id]") != "" {
+			t.Error("year funding must not recur")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cs_year","url":"https://checkout.test/year","status":"open"}`))
+	}))
+	defer server.Close()
+	backend := stripe.GetBackendWithConfig(stripe.APIBackend, &stripe.BackendConfig{URL: stripe.String(server.URL), HTTPClient: server.Client()})
+	g := &stripeGateway{client: stripe.NewClient("sk_test_fixture", stripe.WithBackends(&stripe.Backends{API: backend}))}
+	if _, err := g.CreateCheckout(context.Background(), CheckoutRequest{CustomerID: "cus_year", YearFunding: true, IdempotencyKey: "year-one"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestYearFundingPaymentProjection(t *testing.T) {
+	s := &stripe.CheckoutSession{Mode: stripe.CheckoutSessionModePayment, Currency: stripe.CurrencyUSD, AmountTotal: 99999999, PaymentStatus: stripe.CheckoutSessionPaymentStatusPaid, Metadata: map[string]string{"francois_year_funding": "true"}, PaymentIntent: &stripe.PaymentIntent{LatestCharge: &stripe.Charge{Amount: 99999999, Created: 1700000000}}}
+	got := session(s)
+	if !got.YearFunding || !got.PaymentPaid || got.PaidAt == nil || got.Refunded {
+		t.Fatalf("wrong paid projection %+v", got)
+	}
+	s.AmountTotal = 4200
+	if session(s).YearFunding {
+		t.Fatal("wrong amount accepted")
+	}
+	s.AmountTotal = 99999999
+	s.PaymentIntent.LatestCharge.Refunded = true
+	if !session(s).Refunded {
+		t.Fatal("refund lost")
+	}
+}
+
+func TestYearPaymentFailureUsesAuthoritativeIntentStatus(t *testing.T) {
+	for _, status := range []stripe.PaymentIntentStatus{stripe.PaymentIntentStatusCanceled, stripe.PaymentIntentStatusRequiresPaymentMethod} {
+		got := session(&stripe.CheckoutSession{PaymentIntent: &stripe.PaymentIntent{Status: status}})
+		if !got.PaymentFailed {
+			t.Fatalf("terminal intent %s not recognized", status)
+		}
+	}
+	if session(&stripe.CheckoutSession{PaymentIntent: &stripe.PaymentIntent{Status: stripe.PaymentIntentStatusProcessing}}).PaymentFailed {
+		t.Fatal("processing intent treated as failed")
+	}
+}

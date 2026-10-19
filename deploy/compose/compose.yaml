@@ -103,11 +103,12 @@ services:
         stripe listen --api-key "$$STRIPE_API_KEY" --print-secret > /bootstrap/stripe-webhook-secret &&
         printf '%s' "$$STRIPE_API_KEY" > /bootstrap/stripe-secret-key &&
         exec stripe listen --api-key "$$STRIPE_API_KEY" --forward-to http://localhost:8090/webhooks/stripe \
-          --events customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,checkout.session.completed,checkout.session.expired,invoice.paid,invoice.payment_failed
+          --events "$$(cat /config/stripe-events.txt)"
     environment:
       STRIPE_API_KEY: ${STRIPE_API_KEY:-}
     volumes:
       - bootstrap:/bootstrap
+      - ../../pkg/catalog/payments/webhook-events.txt:/config/stripe-events.txt:ro
 
   francois:
     <<: *francois

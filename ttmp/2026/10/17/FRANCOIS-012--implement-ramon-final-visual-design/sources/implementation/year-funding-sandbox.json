@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-18T02:14:50.634Z",
+  "sandbox": true,
+  "oneTimeAmountCents": 99999999,
+  "mode": "payment",
+  "recurringSubscriptionCreated": false,
+  "monthlySubscriberTierBefore": "subscriber",
+  "yearFunderTier": "subscriber",
+  "paidYearConfirmed": true,
+  "paidThrough": "2027-10-17T22:14:39-04:00",
+  "noSupportPrompts": true,
+  "refundRemovedYearStanding": true,
+  "monthlySubscriberTierAfterRefund": "subscriber",
+  "productionPaymentSubmitted": false
+}

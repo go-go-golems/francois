@@ -144,6 +144,7 @@ export type Instance = {
   audit?: AuditEntry[];
 };
 export type Subscription = {
+  supportAmountCents: number;
   id: string;
   priceId: string;
   status: string;
@@ -173,7 +174,7 @@ export type AccessGrant = {
   revokedAt?: string;
 };
 export type Account = {
- support: {active:boolean; amountCents:number; startedAt?:string; until?:string; cancelScheduled:boolean; experiments:number};
+ support: {kind:"month"|"year"; active:boolean; amountCents:number; startedAt?:string; until?:string; cancelScheduled:boolean; experiments:number};
   user: SessionUser & { createdAt: string };
   access: Decision;
   entitlement: Entitlement;
@@ -182,7 +183,7 @@ export type Account = {
   allowance: Allowance;
   models: { selector: string; label: string; credits: number; thinking: string[] }[];
   hasCustomer: boolean;
-  checkouts: { id: string; state: string; createdAt: string }[];
+  checkouts: { id: string; state: string; price: string; sessionId?: string; supportUntil?: string; createdAt: string }[];
   sessions: number;
   billingEnabled: boolean;
   identityIssuer: string;

@@ -36,7 +36,7 @@ type Entitlement struct {
 //	disabled              → nothing
 //	creator or admin      → the highest plan (staff run everything)
 //	guest (demo visitor)  → the demo allowance, no workspaces
-//	standing subscription → the plan that owns its price
+//	standing subscription → the single subscriber tier
 //	complimentary grant   → the granted plan, or the highest plan
 //	otherwise             → the free plan
 func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document) Entitlement {
@@ -51,12 +51,13 @@ func resolveEntitlement(u store.User, d billing.Decision, doc settings.Document)
 	if d.Allowed {
 		switch d.Reason {
 		case billing.ReasonSubscriber, billing.ReasonTrial:
-			if p, ok := doc.PlanForPrice(d.PriceID); ok {
-				source := SourceSubscription
-				if d.Reason == billing.ReasonTrial {
-					source = SourceTrial
-				}
-				return Entitlement{Plan: p, Source: source, Decision: d}
+			source := SourceSubscription
+			if d.Reason == billing.ReasonTrial {
+				source = SourceTrial
+			}
+			plan, ok := doc.Plan("subscriber")
+			if ok && plan.Public {
+				return Entitlement{Plan: plan, Source: source, Decision: d}
 			}
 		case billing.ReasonComplimentary:
 			p := doc.Highest()

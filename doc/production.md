@@ -185,7 +185,11 @@ The client IDs are Terraform variable defaults; the secrets are only in Vault.
 | Product | `prod_VQpH0Crg2Ztp5I` (Terraform) |
 | Price | `price_1UPxdFLeHmcfmvuCg0zsScj5`, lookup key prefix `francois-subscriber` (Terraform); listed in the `subscriber` plan |
 | Webhook endpoint | `we_1UQ9zfLeHmcfmvuC639e6BPZ` → `https://francois.yolo.scapegoat.dev/webhooks/stripe` |
-| Webhook events | `checkout.session.completed`, `checkout.session.expired`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed` |
+| Webhook events | All events in [`pkg/catalog/payments/webhook-events.txt`](../pkg/catalog/payments/webhook-events.txt), including async checkout success/failure and `charge.refunded` |
+
+When creating or updating the Stripe endpoint, use the complete comma-separated
+list from that file. The Compose listener mounts the same file; application
+event acceptance alone does not update an existing remote Stripe endpoint.
 
 The sandbox account is shared with other deployments. Francois tags its
 customers with `francois_deployment` and ignores events for other customers.

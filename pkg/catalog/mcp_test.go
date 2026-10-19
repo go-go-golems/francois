@@ -110,7 +110,7 @@ func TestMCPTools(t *testing.T) {
 	if text, isErr := callTool(t, s, "find_customers", map[string]any{"query": "sam"}); isErr || !strings.Contains(text, sam.user.ID) {
 		t.Fatalf("find_customers %v %s", isErr, text)
 	}
-	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 30, "reason": "beta", "plan": "pro"}); isErr || !strings.Contains(text, "Granted pro") {
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 30, "reason": "beta", "plan": "subscriber"}); isErr || !strings.Contains(text, "Granted subscriber") {
 		t.Fatalf("grant %v %s", isErr, text)
 	}
 	entries, _ := e.store.AuditQuery(ctx, auditFilter("user.access_grant"))
@@ -206,7 +206,7 @@ func TestRemoteMCP(t *testing.T) {
 	if text, isErr := callTool(t, s, "whoami", nil); isErr || !strings.Contains(text, "admin") {
 		t.Fatalf("whoami %v %s", isErr, text)
 	}
-	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 7, "reason": "remote", "plan": "pro"}); isErr {
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 7, "reason": "remote", "plan": "subscriber"}); isErr {
 		t.Fatalf("grant %s", text)
 	}
 	entries, _ := e.store.AuditQuery(ctx, auditFilter("user.access_grant"))

@@ -37,8 +37,8 @@ func TestSupporterPresentation(t *testing.T) {
 	if sup["active"] != true || sup["amountCents"] != float64(4200) {
 		t.Fatalf("support summary %v", sup)
 	}
-	if a["entitlement"].(map[string]any)["source"] != "free" {
-		t.Fatal("contribution unexpectedly grants paid privileges")
+	if a["entitlement"].(map[string]any)["source"] != SourceSubscription {
+		t.Fatal("confirmed contribution did not enter the Subscriber tier")
 	}
 }
 
