@@ -215,3 +215,49 @@ Merged PR 16 correction `4be76a0` into the simplification branch as `d982ea0`. T
 - **Review evidence:** Replies posted to 4309943413, 4309943417 and 4309943422. The lifecycle test recovers a 40-day-old pending payment without a success webhook or browser return.
 - **External reference:** https://docs.stripe.com/api/idempotent_requests confirms that a pruned key can create a new request; stored Session IDs remain the identity of an existing payment attempt.
 - **Deployment:** No production application or Stripe webhook endpoint was mutated. Apply the shared event list to existing remote endpoints when configuring/deploying them.
+
+
+## Step 7: Rebase the simplification onto merged main and prepare PR 17 for review
+
+PR 16 was merged into main as `40072ce`. Rebased `feat/simple-customer-limits` onto that revision without conflicts, retaining the three simplification and documentation commits. The rebased application and documentation tree is byte-for-byte identical to the previously qualified branch at `55960de`; this step changes ancestry and review readiness rather than application behavior.
+
+### Prompt Context
+**User prompt (verbatim):** “ok, merged, rebase, and then open #17”
+**Assistant interpretation:** Rebase the existing draft PR 17 onto main, publish the rewritten branch and mark the PR ready for review.
+**Inferred user intent:** Review the customer simplification independently now that the payment corrections have landed.
+**Commit (code):** `4d14150` — “Simplify customer limits, enforce daily output budgets and add early access” (rebased from `8708cc4`).
+
+### What I did
+- Confirmed PR 16 is merged and PR 17 is open, draft and already based on main.
+- Fetched origin and ran `git rebase origin/main`. The rebased head before this diary entry is `15b17a9`.
+- Ran `git diff --exit-code 55960de HEAD` and `git diff --check origin/main...HEAD`; both passed.
+- Prepared an updated PR description removing the obsolete stacked-review instruction. Publication uses an explicit remote-head lease so an unexpected concurrent push cannot be overwritten.
+
+### Why
+- Main now contains the entire payment correction. A linear rebase leaves only the customer-limit and early-access changes in PR 17.
+
+### What worked
+- All three commits replayed without conflicts. Main is `40072ce7a3e694c02c9dcabcaf85da73dab6c8d2`.
+- File-tree equality establishes that the integration evidence in Steps 4 and 6 still describes the application being published. No application checks were repeated solely for this ancestry change.
+
+### What didn't work
+- No rebase or verification failures occurred. Repository discovery found no checked-in AGENTS.md files; the user-provided instructions remain applicable.
+
+### What I learned
+- GitHub had already retargeted PR 17 to main after PR 16 merged; no separate base change is needed.
+
+### What was tricky to build
+- The old simplification branch included a merge of PR 16. Rebasing onto the merged main correctly omitted that already-integrated ancestry and retained the three unique commits.
+
+### What warrants a second pair of eyes
+- The substantive review remains the daily-token accounting, worker output budget, early-access enforcement and admin presentation described in Steps 4–6.
+
+### What should be done in the future
+- Push with the recorded lease, mark PR 17 ready, and inspect GitHub's resulting head and readiness. No deployment or vault write is part of this request.
+
+### Code review instructions
+- Review PR 17 against main using the short design and the review starting points in Step 4. Payment settlement corrections are already part of the base.
+
+### Technical details
+- Previous remote head for the push lease: `55960de464148af9472f152df6595d6d372e60e5`.
+- Rebased unique commits: `4d14150`, `663420e`, `15b17a9`; this checkpoint adds documentation only.

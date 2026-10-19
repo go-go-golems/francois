@@ -19,3 +19,7 @@ Published implementation 8708cc4 in draft PR 17 stacked on PR 16; payment-fix CI
 ## 2026-10-18
 
 Integrated PR 16 settlement refactor 4be76a0 (merge d982ea0); combined PostgreSQL payment/catalog tests pass. No production deployment.
+
+## 2026-10-18
+
+Rebased PR 17 onto merged main 40072ce without conflicts; verified identical file tree against qualified head 55960de and prepared ready-for-review publication. No deployment.
