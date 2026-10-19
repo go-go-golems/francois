@@ -114,8 +114,8 @@ func testDoc(monthly int, models ...settings.Model) settings.Document {
 	if len(models) > 0 {
 		d.Models.Allowed = models
 	}
-	d.Plans = append(d.Plans, settings.Plan{Key: "subscriber", Name: "Pro", Rank: 10, Public: true, Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_test_pro", Label: "5 / month"}},
-		Instances: 10, MembersPerInstance: 10, MonthlyCredits: monthly})
+	d.Plans[1] = settings.Plan{Key: "subscriber", Name: "Pro", Prices: []settings.PlanPrice{{Interval: "month", PriceID: "price_test_pro", Label: "5 / month"}},
+		Instances: 10, MembersPerInstance: 10, DailyTokens: monthly}
 	return d
 }
 
@@ -377,7 +377,7 @@ func TestHostedPlatform(t *testing.T) {
 	if code, b, _ := e.do(nil, "portal.test", "GET", dl, nil, nil); code != 401 || bytes.Contains(b, []byte(marker)) {
 		t.Fatalf("anonymous download: %d %s", code, b)
 	}
-	if code, b, _ := e.do(&carol, "portal.test", "GET", dl, nil, nil); code != 403 || bytes.Contains(b, []byte(marker)) {
+	if code, b, _ := e.do(&carol, "portal.test", "GET", dl, nil, nil); code != 200 || !bytes.Contains(b, []byte(marker)) {
 		t.Fatalf("unentitled download: %d", code)
 	}
 	code, b, hdr := e.do(&alice, "portal.test", "GET", dl, nil, nil)
@@ -387,7 +387,7 @@ func TestHostedPlatform(t *testing.T) {
 	}
 
 	// Instances: entitlement required; private by default.
-	if code, out := e.portal(&carol, "POST", "/api/instances", map[string]string{"releaseId": releaseID}); code != 403 || errCode(out) != "plan_required" {
+	if code, out := e.portal(&carol, "POST", "/api/instances", map[string]string{"releaseId": releaseID}); code != 201 {
 		t.Fatalf("unentitled create: %d %v", code, out)
 	}
 	_, instA := e.portal(&alice, "POST", "/api/instances", map[string]string{"releaseId": releaseID})
@@ -518,9 +518,9 @@ func TestHostedPlatform(t *testing.T) {
 	}
 
 	// Model allowance: one credit admits exactly one of two racing calls.
-	doc := testDoc(1, settings.Model{Selector: "test/fake", Label: "Fake", Credits: 1})
+	doc := testDoc(1, settings.Model{Selector: "test/fake", Label: "Fake"})
 	doc.Models.Tiers = map[string]string{"default": "test/fake"}
-	doc.Allowance = settings.Allowance{PerUserConcurrency: 1, GlobalConcurrency: 6, MaxToolRounds: 3}
+	doc.Allowance = settings.Allowance{PerUserConcurrency: 1, GlobalConcurrency: 6, MaxToolRounds: 3, MaxOutputTokens: 8192}
 	_, err := e.store.SaveSettings(context.Background(), admin.user.ID, doc)
 	if err != nil {
 		t.Fatal(err)
@@ -552,7 +552,7 @@ func TestHostedPlatform(t *testing.T) {
 	for {
 		calls, _ := e.store.ModelCalls(context.Background(), alice.user.ID, 10)
 		if len(calls) == 1 && calls[0].State == "completed" {
-			if calls[0].OutputTokens == 0 || calls[0].Credits != 1 {
+			if calls[0].OutputTokens == 0 || calls[0].Credits != 0 {
 				t.Fatalf("usage not recorded: %+v", calls[0])
 			}
 			var artifact string
@@ -566,7 +566,7 @@ func TestHostedPlatform(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	allow, _ := e.store.AllowanceFor(context.Background(), alice.user.ID, 1, 0)
+	allow, _ := e.store.AllowanceFor(context.Background(), alice.user.ID, 1)
 	if allow.Used != 1 || allow.Reserved != 0 || allow.Remaining != 0 {
 		t.Fatalf("ledger: %+v", allow)
 	}

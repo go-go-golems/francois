@@ -19,9 +19,9 @@ WhenToUse: ""
 
 ## Overview
 
-Source-backed review of Free/Paying policy, actual token enforcement and admin predictability. The analysis is complete; the proposed broad simplification is not implemented.
+Source-backed review of Free/Paying policy, actual token enforcement and admin predictability. The analysis led to the implemented two-class policy, daily generated-token ceilings, simplified admin and time-based early access. Implementation is on `feat/simple-customer-limits`; payment review fixes are separate on PR 16. Not deployed.
 
-Read [the assessment](analysis/01-free-versus-paying-architecture-and-token-ceiling-complexity-assessment.md) and [the investigation diary](reference/01-investigation-diary.md).
+Read [the short implementation design](design-doc/01-two-customer-classes-daily-generated-token-ceilings-and-clear-administration.md), [the assessment](analysis/01-free-versus-paying-architecture-and-token-ceiling-complexity-assessment.md) and [the investigation diary](reference/01-investigation-diary.md).
 
 ## Key Links
 

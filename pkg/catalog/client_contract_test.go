@@ -160,7 +160,7 @@ func TestClientContract(t *testing.T) {
 	ok("user", err)
 	off := false
 	ok("patch user", a.PatchUser(ctx, sam.user.ID, client.UserPatch{Disabled: &off}))
-	g, err := a.GrantAccess(ctx, sam.user.ID, client.GrantRequest{Days: 30, Reason: "beta", Plan: "subscriber"})
+	g, err := a.GrantAccess(ctx, sam.user.ID, client.GrantRequest{Days: 30, Reason: "beta"})
 	ok("grant", err)
 	_, err = a.RevokeGrant(ctx, g.ID)
 	ok("revoke grant", err)
@@ -181,10 +181,10 @@ func TestClientContract(t *testing.T) {
 	ok("resume", a.SetInstanceSuspended(ctx, inst.ID, false))
 	_, err = a.Settings(ctx)
 	ok("settings", err)
-	_, err = a.EditPlan(ctx, "subscriber", func(p *settings.Plan) error { p.MonthlyCredits = 777; return nil })
+	_, err = a.EditPlan(ctx, "subscriber", func(p *settings.Plan) error { p.DailyTokens = 777; return nil })
 	ok("edit plan", err)
 	cur, _ := a.Settings(ctx)
-	if p, _ := cur.Active.Document.Plan("subscriber"); p.MonthlyCredits != 777 {
+	if p, _ := cur.Active.Document.Plan("subscriber"); p.DailyTokens != 777 {
 		t.Fatalf("plan edit lost: %+v", p)
 	}
 	_, err = a.SaveSettings(ctx, cur.Active.Document, cur.Active.Revision-1)
@@ -194,7 +194,7 @@ func TestClientContract(t *testing.T) {
 	code("reconcile without billing", a.Reconcile(ctx, sam.user.ID), "billing_unavailable")
 	_, err = a.Usage(ctx, "", 10)
 	ok("usage", err)
-	ok("adjust", a.AdjustCredits(ctx, sam.user.ID, 5, "goodwill"))
+	ok("adjust", a.SetTokenCeiling(ctx, sam.user.ID, new(int), "goodwill"))
 	_, err = a.Audit(ctx, client.AuditQuery{Actor: ada.user.ID, Limit: 5})
 	ok("audit", err)
 	ok("admin delete instance", a.DeleteInstance(ctx, inst.ID))

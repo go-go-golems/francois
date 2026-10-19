@@ -110,7 +110,7 @@ func TestMCPTools(t *testing.T) {
 	if text, isErr := callTool(t, s, "find_customers", map[string]any{"query": "sam"}); isErr || !strings.Contains(text, sam.user.ID) {
 		t.Fatalf("find_customers %v %s", isErr, text)
 	}
-	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 30, "reason": "beta", "plan": "subscriber"}); isErr || !strings.Contains(text, "Granted subscriber") {
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 30, "reason": "beta"}); isErr || !strings.Contains(text, "Granted Paying access") {
 		t.Fatalf("grant %v %s", isErr, text)
 	}
 	entries, _ := e.store.AuditQuery(ctx, auditFilter("user.access_grant"))
@@ -118,7 +118,7 @@ func TestMCPTools(t *testing.T) {
 		t.Fatalf("grant not attributed to the token: %+v", entries)
 	}
 	// API errors reach the model as tool errors with the code.
-	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 30, "reason": "x", "plan": "nope"}); !isErr || !strings.Contains(text, "invalid_request") {
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 0, "reason": "x"}); !isErr || !strings.Contains(text, "invalid_request") {
 		t.Fatalf("bad plan %v %s", isErr, text)
 	}
 
@@ -206,7 +206,7 @@ func TestRemoteMCP(t *testing.T) {
 	if text, isErr := callTool(t, s, "whoami", nil); isErr || !strings.Contains(text, "admin") {
 		t.Fatalf("whoami %v %s", isErr, text)
 	}
-	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 7, "reason": "remote", "plan": "subscriber"}); isErr {
+	if text, isErr := callTool(t, s, "grant_complimentary_access", map[string]any{"userId": sam.user.ID, "days": 7, "reason": "remote"}); isErr {
 		t.Fatalf("grant %s", text)
 	}
 	entries, _ := e.store.AuditQuery(ctx, auditFilter("user.access_grant"))

@@ -164,7 +164,7 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 		out["supporter"] = support.Active
 		out["csrfToken"] = p.Session.CSRF
 		out["access"] = e.Decision
-		out["plan"] = map[string]any{"key": e.Plan.Key, "name": e.Plan.Name, "rank": e.Plan.Rank, "source": e.Source, "paid": e.Paid(), "instances": e.Plan.Instances}
+		out["plan"] = map[string]any{"key": e.Plan.Key, "name": e.Plan.Name, "source": e.Source, "paid": e.Paid(), "instances": e.Plan.Instances}
 	}
 	httpx.OK(w, out)
 }
@@ -216,7 +216,7 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 			creators = append(creators, map[string]string{"slug": c.Slug, "name": c.Name})
 		}
 		out = append(out, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "updatedAt": a.UpdatedAt, "releases": counts[a.ID], "latest": publicRelease(rel),
-			"cover": a.Page.Cover, "creators": creators, "featured": a.Featured, "requiredPlan": a.RequiredPlan, "demo": a.DemoEnabled, "url": "/apps/" + a.ID})
+			"cover": a.Page.Cover, "creators": creators, "featured": a.Featured, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled, "url": "/apps/" + a.ID})
 	}
 	httpx.OK(w, out)
 }
@@ -240,7 +240,7 @@ func (s *Server) artifact(w http.ResponseWriter, r *http.Request) {
 	for _, rel := range rels {
 		list = append(list, publicRelease(rel))
 	}
-	httpx.OK(w, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "releases": list})
+	httpx.OK(w, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "earlyAccessUntil": a.EarlyAccessUntil, "releases": list})
 }
 
 var safeName = regexp.MustCompile(`[^A-Za-z0-9._-]`)
@@ -255,16 +255,16 @@ func (s *Server) mayDownload(w http.ResponseWriter, r *http.Request, rel store.R
 		httpx.Fail(w, 403, billing.ReasonDisabled, "This account is disabled")
 		return false
 	}
-	if rel.FreeSample {
-		return true
-	}
-	if p == nil {
-		httpx.Fail(w, 401, "login_required", "Sign in to download")
-		return false
-	}
 	a, err := s.Store.Artifact(r.Context(), rel.ArtifactID)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Access check failed")
+		return false
+	}
+	if rel.FreeSample && !a.EarlyAccess(time.Now()) {
+		return true
+	}
+	if p == nil {
+		httpx.Fail(w, 401, "login_required", "Sign in to download; early access requires Paying access")
 		return false
 	}
 	e, doc, err := s.entitlement(r.Context(), p.User)
@@ -273,7 +273,7 @@ func (s *Server) mayDownload(w http.ResponseWriter, r *http.Request, rel store.R
 		return false
 	}
 	if !e.CanRun(a, doc) {
-		httpx.Fail(w, 403, "plan_required", "Your plan does not include this application")
+		httpx.Fail(w, 403, "plan_required", "This artifact is in early access for Paying customers")
 		return false
 	}
 	return true
@@ -341,7 +341,7 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	allowance, err := s.Store.AllowanceFor(ctx, p.User.ID, e.Plan.MonthlyCredits, e.Plan.DailyCredits)
+	allowance, err := s.Store.AllowanceFor(ctx, p.User.ID, e.Plan.DailyTokens)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Account unavailable")
 		return
@@ -353,7 +353,7 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 	models := []map[string]any{}
 	for _, m := range doc.Models.Allowed {
 		if e.AllowsModel(m.Selector) {
-			models = append(models, map[string]any{"selector": m.Selector, "label": m.Label, "credits": m.Credits, "thinking": m.Thinking})
+			models = append(models, map[string]any{"selector": m.Selector, "label": m.Label, "thinking": m.Thinking})
 		}
 	}
 	httpx.OK(w, map[string]any{
@@ -440,7 +440,7 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 // The client never names a price.
 func checkoutPrice(doc settings.Document, key, interval string) (string, bool) {
 	p, ok := doc.Plan(key)
-	if !ok || !p.Public {
+	if !ok || p.Key != "subscriber" {
 		return "", false
 	}
 	for _, pr := range p.Prices {

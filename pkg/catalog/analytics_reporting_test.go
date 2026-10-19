@@ -119,14 +119,14 @@ func TestArtifactUsageSurvivesDeletionAndMigration(t *testing.T) {
 	}
 	reserve := func(call, instance, artifact string) {
 		t.Helper()
-		r, err := e.store.Reserve(ctx, store.ReserveRequest{UserID: admin.user.ID, InstanceID: instance, ArtifactID: artifact, CallID: call, Model: "fake/model", Credits: 2, Included: 100})
+		r, err := e.store.Reserve(ctx, store.ReserveRequest{UserID: admin.user.ID, InstanceID: instance, ArtifactID: artifact, CallID: call, Model: "fake/model", Tokens: 10, Limit: 100})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err = e.store.StartCall(ctx, r); err != nil {
 			t.Fatal(err)
 		}
-		if err = e.store.SettleCall(ctx, r, true, "", store.CallUsage{Input: 10, Output: 5, CacheRead: 3, Cost: 0.01}); err != nil {
+		if err = e.store.SettleCall(ctx, r, true, "", store.CallUsage{Input: 10, Output: 5, CacheRead: 3, Rounds: 1, Cost: 0.01}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -151,7 +151,7 @@ func TestArtifactUsageSurvivesDeletionAndMigration(t *testing.T) {
 	for _, g := range a.Models["artifacts"] {
 		groups[g.Key] = g
 	}
-	if groups["board"].Calls != 2 || groups["board"].Credits != 4 || groups["board"].Input != 20 || groups["board"].CacheRead != 6 || groups["board"].Label != "Board" || groups[""].Calls != 1 {
+	if groups["board"].Calls != 2 || groups["board"].Credits != 0 || groups["board"].Input != 20 || groups["board"].CacheRead != 6 || groups["board"].Label != "Board" || groups[""].Calls != 1 {
 		t.Fatalf("%+v", groups)
 	}
 }

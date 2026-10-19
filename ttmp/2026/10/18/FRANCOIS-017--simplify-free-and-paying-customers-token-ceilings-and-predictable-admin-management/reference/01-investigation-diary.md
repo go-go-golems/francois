@@ -124,3 +124,74 @@ The new review identifies repeat year funding during existing standing and outda
 
 ### Technical details
 - Source comments are tracked by GitHub numeric review IDs. This checkpoint does not claim broad simplification is complete.
+
+## Step 4: Implement fixed classes, atomic daily tokens and early-access dates
+
+Implemented the requested simplification across the backend, worker and admin interface. The customer page now explains effective access before exposing administrative details. Replaced per-call credit charging with a bounded generated-token budget for each logical run and a daily PostgreSQL reservation ledger.
+
+The user then specified that payment grants early access as well as higher limits. Implemented a concrete artifact end date, applied once on first publication and enforced consistently for workspaces, downloads, attachments and demos. Later releases cannot restart the window. Existing published artifacts stay available to Free accounts.
+
+### Prompt Context
+**User request:** See Step 3 for the implementation request and cancellation of the vault report.
+**Additional prompts (verbatim):** “there is no need for backwards compatibility btw”; “no need to be overly cautious while working, we care about the final result, not be perfect at each step”; “free accounts can download all normally published artifacts, but we can set a period for new artifacts to only be downloadable / runnable to be only used by paying subscribers”; “like, you pay for early access, and higher limits”.
+**Assistant interpretation:** Ship the simple policy, directly update current callers/schema, preserve evidence and run checks at the integration boundary.
+**Inferred user intent:** Understandable operations for a minimal site: early access and higher limits for Paying customers, ordinary access for Free customers, no product-catalog machinery.
+**Review correction commit:** 8f52e02; diary whitespace correction 7098eed. These were pushed to PR 16 separately from this implementation branch.
+
+### What I did
+- Replaced arbitrary plans with exactly Free and Paying resource entries. Removed rank, visibility/marketing fields, plan model lists, named-plan grants, per-model credit pricing and the retired artifact required-plan field from active contracts.
+- Added daily generated-token reservations, absolute per-user ceiling overrides/reset, UTC resets and conservative recovery. Historical credits and provider input/output/cache measurements remain historical data, not converted quotas.
+- Passed a server-only call-wide output budget to the worker. Every provider round consumes it; missing/invalid usage fails closed. The fake backend also respects the admitted budget.
+- Added a backend customer summary with class/source/expiry, enabled state, AI eligibility/reason, daily usage/reservation/ceiling and workspace limits. Missing core data produces an explicit error. Missing billing-customer records are normal for Free users.
+- Kept disabled state separate from payment standing in admin presentation: a disabled paying customer remains visibly Paying but is blocked from AI. Runtime authorization still checks the original disabled user.
+- Rebuilt Users/detail/settings UI around those facts. Moved payment contracts, identity, staff permissions and session controls under Details. Added direct ceiling preview/reset and complimentary Paying access, with independent form state.
+- Added default early-access days and editable per-artifact end date to Studio/CLI/MCP. Locked first publication, preserved the date across versions and checked the same window for running/download/demo paths, including free-sample releases.
+- Removed automatic oldest-N workspace freezing on downgrade. Creation quotas remain; existing saved workspaces do not get frozen solely by creation order.
+- Added concurrency/settlement/migration/admin/early-access tests and the real worker output-budget unit tests. Captured desktop/mobile browser fixtures and exercised primary customer controls.
+
+### Why
+- Two resource classes and one named daily accounting unit directly express the product. A concrete early-access date expresses the only artifact-specific commercial rule.
+- Transactions and recovery remain necessary for concurrent limits; no queue, service, distributed lock or new scheduling layer was added.
+- A provider error or cancellation does not prove zero usage. Conservatively charging the reserved budget keeps repeated uncertain calls from bypassing the limit.
+
+### What worked
+- Full database-backed `go test ./... -count=1` exercised the implementation; two obsolete expectations remained (removed CLI --plan flag and time-zone spelling). After correction, targeted CLI/catalog integration passed, including the real client contract and all changed policy paths.
+- New tests passed for simultaneous admission, measured settlement/replay, a smaller final run, override/reset, crash recovery and UTC day boundaries.
+- Early-access tests passed for paid/free running and downloads, demo rejection, free-sample enforcement, later releases preserving the clock, expiry and explicit clearing.
+- `pnpm check`, twelve frontend/worker tests, embedded frontend build and Go build passed. Final lint/logcopter checks passed with zero issues.
+- Browser fixtures passed at 1440px and 390px with no horizontal overflow or page errors; set/reset ceiling, disable/enable and complimentary grant all updated the actual bundled UI. These are explicitly mocked API fixtures, not production screenshots.
+
+### What didn't work
+- Initial Go check could not write the sandboxed Go cache (`read-only file system`); reran required checks with cache access.
+- Migration 017 initially failed with `operator is not unique: unknown - unknown (SQLSTATE 42725)` because JSON extraction/subtraction needed parentheses. Corrected the expression and reran the database gate.
+- New migration fixture initially used two parameterized statements in one pgx call: `cannot insert multiple commands into a prepared statement (SQLSTATE 42601)`. Split deletion and parameterized insertion.
+- Strict client decoding rejected the added `customerClass` field until the Go client contract was updated. The newly strict admin aggregate treated an absent Stripe customer as an error; made only ErrNotFound normal while retaining real failures.
+- Old tests expected plan-restricted Free downloads and named grants. Updated them to the requested two-class/time-window policy. A Studio test compared time-zone spellings; normalized stored early-access dates to UTC.
+- Lint found `SA4006: this value of owner is never used` after removing position-based freezing. Removed the unused initialization while preserving shared-owner authorization.
+- Automatic approval review rejected a broad automated rewrite and later a plan-gate removal because its policy scope was not explicit. The rejected rewrites did not run. Continued with bounded edits; the user's explicit early-access policy resolved the access question. No compatibility layer was added.
+
+### What I learned
+- Payment standing and enabled state must be independently represented; otherwise disabling an account misleadingly relabels a paying customer Free.
+- Provider output budgets must span the complete tool loop, rather than restarting at 8,192 per round.
+- First-publication dates must be established under the artifact lock so concurrent versions cannot independently extend early access.
+
+### What was tricky to build
+- Preserve real Stripe price acceptance when collapsing the old catalog, without preserving arbitrary ranks as active policy or translating credit balances into fictitious tokens.
+- Charge uncertain calls conservatively while releasing unused output reservation for successful measured calls. Settlement and recovery are idempotent; an old process must be stopped before running migrations/new worker.
+- Use the same early-access gate for free-sample files and demos, which previously had independent shortcuts.
+
+### What warrants a second pair of eyes
+- Review migrations 017–018, reservation/settlement/recovery, worker round budget and the download/demo early-access branches. The selected quota unit is generated/output tokens; total input/cache usage remains analytics.
+- The global six-call counter is still process-local. This change does not make a multi-replica deployment share six lanes.
+
+### What should be done in the future
+- Review the implementation branch and deploy when requested. No deployment or vault write is included in this task.
+
+### Code review instructions
+- Read the short design, then store/usage.go and migrations, worker/output-budget.ts and main.ts, entitlement/customer_summary, early-access publishing/access paths, and finally the admin controls.
+- Use token_ceiling_test.go and early_access_test.go as behavioral examples. Browser fixtures and screenshots are labelled separately from the database-backed API evidence.
+
+### Technical details
+- Free defaults: 10,000 generated tokens/UTC day, one saved workspace. Paying defaults: 100,000/day, ten workspaces. Default maximum output per logical run: 8,192; six global calls and one per user.
+- New API: `PUT /api/admin/users/{id}/token-ceiling` with `{limit: number|null, reason}`. A null ceiling restores the class default.
+- Artifact patch: `earlyAccessUntil` as RFC3339 or an empty string to clear. Publishing default: `publishing.earlyAccessDays`, 0–365. No scheduler is required for expiry; requests compare the stored date.

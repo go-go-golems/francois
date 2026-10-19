@@ -23,7 +23,12 @@ export function Studio() {
   const parts = path.split("/").filter(Boolean); // ["studio", section, id]
   const section = parts[1] === "a" ? "" : (parts[1] ?? "");
   const id = parts[2];
-  if (!session) return <main><Empty>Loading…</Empty></main>;
+  if (!session)
+    return (
+      <main>
+        <Empty>Loading…</Empty>
+      </main>
+    );
   const role = session.user?.role;
   if (role !== "creator" && role !== "admin")
     return (
@@ -38,7 +43,11 @@ export function Studio() {
     <main className="admin">
       <nav className="views admin-nav" aria-label="Studio">
         {sections.map(([s, label]) => (
-          <Link key={s} to={"/studio" + (s ? "/" + s : "")} aria-current={section === s ? "page" : undefined}>
+          <Link
+            key={s}
+            to={"/studio" + (s ? "/" + s : "")}
+            aria-current={section === s ? "page" : undefined}
+          >
             {label}
           </Link>
         ))}
@@ -56,7 +65,12 @@ export function Studio() {
 function ProfileNotice() {
   const { data } = studio.useStudioMeQuery();
   if (!data || data.creator || data.user.role === "admin") return null;
-  return <p className="notice">Your account is not linked to a creator profile yet. Ask an administrator to link it before creating artifacts.</p>;
+  return (
+    <p className="notice">
+      Your account is not linked to a creator profile yet. Ask an administrator
+      to link it before creating artifacts.
+    </p>
+  );
 }
 
 // Still shows a media item as a still: an image, a video's poster, or a
@@ -65,14 +79,25 @@ function Still({ id, className }: { id: string; className?: string }) {
   const { data = [] } = studio.useMediaQuery();
   const m = data.find((x) => x.id === id);
   if (m && m.mediaType.startsWith("video/")) {
-    return m.poster ? <img className={className} src={"/media/" + m.poster} alt="" /> : <video className={className} src={"/media/" + id} muted preload="metadata" />;
+    return m.poster ? (
+      <img className={className} src={"/media/" + m.poster} alt="" />
+    ) : (
+      <video
+        className={className}
+        src={"/media/" + id}
+        muted
+        preload="metadata"
+      />
+    );
   }
   return <img className={className} src={"/media/" + id} alt="" />;
 }
 
 function Thumb({ media, title }: { media?: string; title: string }) {
   if (media) return <Still className="lib-thumb" id={media} />;
-  return <div className="lib-thumb mono-mini">{title.slice(0, 2).toUpperCase()}</div>;
+  return (
+    <div className="lib-thumb mono-mini">{title.slice(0, 2).toUpperCase()}</div>
+  );
 }
 
 function Artifacts() {
@@ -93,8 +118,25 @@ function Artifacts() {
               if (a) navigate("/studio/a/" + a.id);
             }}
           >
-            <input placeholder="title" required value={form.title} onChange={(e) => setForm({ title: e.target.value, id: form.id || slugify(e.target.value) })} />
-            <input className="slug" placeholder="id" required pattern="[a-z0-9][a-z0-9_\-]*" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
+            <input
+              placeholder="title"
+              required
+              value={form.title}
+              onChange={(e) =>
+                setForm({
+                  title: e.target.value,
+                  id: form.id || slugify(e.target.value),
+                })
+              }
+            />
+            <input
+              className="slug"
+              placeholder="id"
+              required
+              pattern="[a-z0-9][a-z0-9_\-]*"
+              value={form.id}
+              onChange={(e) => setForm({ ...form, id: e.target.value })}
+            />
             <button className="btn btn-ink" disabled={creating}>
               New artifact
             </button>
@@ -103,11 +145,19 @@ function Artifacts() {
         {isLoading ? (
           <Empty>Loading…</Empty>
         ) : data.length === 0 ? (
-          <Empty>No artifacts yet. Create one, or upload a release for a new ID.</Empty>
+          <Empty>
+            No artifacts yet. Create one, or upload a release for a new ID.
+          </Empty>
         ) : (
           <div className="lib-list">
             {data.map((a: ArtifactRow) => (
-              <Link className={"lib-row" + (a.visibility === "hidden" ? " is-unlisted" : "")} key={a.id} to={"/studio/a/" + a.id}>
+              <Link
+                className={
+                  "lib-row" + (a.visibility === "hidden" ? " is-unlisted" : "")
+                }
+                key={a.id}
+                to={"/studio/a/" + a.id}
+              >
                 <Thumb media={a.cover} title={a.title} />
                 <span className="lib-main">
                   <strong>{a.title}</strong>
@@ -118,7 +168,9 @@ function Artifacts() {
                     {a.hasDraft ? " · unpublished page edits" : ""}
                   </span>
                 </span>
-                <span className="lib-status">{a.latestVersion ? "v" + a.latestVersion : "unreleased"}</span>
+                <span className="lib-status">
+                  {a.latestVersion ? "v" + a.latestVersion : "unreleased"}
+                </span>
                 <span className="lib-added">{date(a.updatedAt)}</span>
               </Link>
             ))}
@@ -144,40 +196,74 @@ function ArtifactEditor({ id }: { id: string }) {
   const { search } = useRoute();
   const tab = (new URLSearchParams(search).get("tab") as Tab) || "details";
   if (isLoading) return <Empty>Loading…</Empty>;
-  if (error || !data) return <Empty>{errorMessage(error, "Artifact not found")}</Empty>;
+  if (error || !data)
+    return <Empty>{errorMessage(error, "Artifact not found")}</Empty>;
   const a = data.artifact;
   return (
     <section className="sheet">
       <div className="stats-head">
         <h1 className="h-display">{a.title}</h1>
         <span className="actions">
-          <a className="u" href={"/apps/" + a.id} target="_blank" rel="noopener">
+          <a
+            className="u"
+            href={"/apps/" + a.id}
+            target="_blank"
+            rel="noopener"
+          >
             Public page
           </a>
-          <a className="u" href={"/apps/" + a.id + "?draft=1"} target="_blank" rel="noopener">
+          <a
+            className="u"
+            href={"/apps/" + a.id + "?draft=1"}
+            target="_blank"
+            rel="noopener"
+          >
             Preview draft
           </a>
         </span>
       </div>
       <nav className="seg editor-tabs" aria-label="Editor">
         {tabs.map((t) => (
-          <button key={t} aria-pressed={tab === t} onClick={() => navigate(`/studio/a/${a.id}?tab=${t}`, true)}>
-            {{ details: "Details", page: "Page", releases: "Releases", demo: "Demo" }[t]}
+          <button
+            key={t}
+            aria-pressed={tab === t}
+            onClick={() => navigate(`/studio/a/${a.id}?tab=${t}`, true)}
+          >
+            {
+              {
+                details: "Details",
+                page: "Page",
+                releases: "Releases",
+                demo: "Demo",
+              }[t]
+            }
           </button>
         ))}
       </nav>
       {tab === "details" && <Details key={a.updatedAt} data={data} />}
-      {tab === "page" && <PageEditor key={a.id} id={a.id} initial={a.pageDraft ?? a.page} hasDraft={!!a.pageDraft} />}
-      {tab === "releases" && <Releases artifact={a.id} releases={data.releases} />}
+      {tab === "page" && (
+        <PageEditor
+          key={a.id}
+          id={a.id}
+          initial={a.pageDraft ?? a.page}
+          hasDraft={!!a.pageDraft}
+        />
+      )}
+      {tab === "releases" && (
+        <Releases artifact={a.id} releases={data.releases} />
+      )}
       {tab === "demo" && <Demo id={a.id} enabled={a.demoEnabled} />}
     </section>
   );
 }
 
-function Details({ data }: { data: { artifact: import("./studio-api").StudioArtifact; creators: string[] } }) {
+function Details({
+  data,
+}: {
+  data: { artifact: import("./studio-api").StudioArtifact; creators: string[] };
+}) {
   const a = data.artifact;
   const { data: creators = [] } = studio.useCreatorsQuery();
-  const { data: plans = [] } = studio.useStudioPlansQuery();
   const [patch, { isLoading }] = studio.usePatchArtifactMutation();
   const act = useAct();
   const [f, setF] = useState({
@@ -187,17 +273,33 @@ function Details({ data }: { data: { artifact: import("./studio-api").StudioArti
     visibility: a.visibility,
     featured: a.featured,
     sortOrder: a.sortOrder,
-    requiredPlan: a.requiredPlan,
+    earlyAccessUntil: a.earlyAccessUntil
+      ? new Date(a.earlyAccessUntil).toISOString()
+      : "",
     creators: data.creators,
   });
-  const toggle = (c: string) => setF({ ...f, creators: f.creators.includes(c) ? f.creators.filter((x) => x !== c) : [...f.creators, c] });
+  const toggle = (c: string) =>
+    setF({
+      ...f,
+      creators: f.creators.includes(c)
+        ? f.creators.filter((x) => x !== c)
+        : [...f.creators, c],
+    });
   return (
     <form
       className="form editor-form"
       onSubmit={(e) => {
         e.preventDefault();
         void act(
-          patch({ id: a.id, ...f, tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean), sortOrder: Number(f.sortOrder) }).unwrap(),
+          patch({
+            id: a.id,
+            ...f,
+            tags: f.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean),
+            sortOrder: Number(f.sortOrder),
+          }).unwrap(),
           "Saved",
         );
       }}
@@ -205,56 +307,100 @@ function Details({ data }: { data: { artifact: import("./studio-api").StudioArti
       <div className="row2">
         <div className="field">
           <label htmlFor="d-title">Title</label>
-          <input id="d-title" required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+          <input
+            id="d-title"
+            required
+            value={f.title}
+            onChange={(e) => setF({ ...f, title: e.target.value })}
+          />
         </div>
         <div className="field">
           <label htmlFor="d-vis">Visibility</label>
-          <select id="d-vis" value={f.visibility} onChange={(e) => setF({ ...f, visibility: e.target.value as "listed" | "hidden" })}>
+          <select
+            id="d-vis"
+            value={f.visibility}
+            onChange={(e) =>
+              setF({ ...f, visibility: e.target.value as "listed" | "hidden" })
+            }
+          >
             <option value="listed">Listed in the catalog</option>
             <option value="hidden">Hidden</option>
           </select>
         </div>
       </div>
+      <label className="field">
+        <span>Early access ends (UTC)</span>
+        <input
+          type="datetime-local"
+          value={f.earlyAccessUntil.slice(0, 16)}
+          onChange={(e) =>
+            setF({
+              ...f,
+              earlyAccessUntil: e.target.value
+                ? new Date(e.target.value + "Z").toISOString()
+                : "",
+            })
+          }
+        />
+        <span className="muted small">
+          Paying access is required to run or download before this date. Clear
+          to end early access. Before first publication, a blank date uses the
+          default publishing period.
+        </span>
+      </label>
       <div className="field">
         <label htmlFor="d-desc">Short description</label>
-        <textarea id="d-desc" rows={2} maxLength={2000} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-        <span className="muted small">Shown on cards and in link previews.</span>
+        <textarea
+          id="d-desc"
+          rows={2}
+          maxLength={2000}
+          value={f.description}
+          onChange={(e) => setF({ ...f, description: e.target.value })}
+        />
+        <span className="muted small">
+          Shown on cards and in link previews.
+        </span>
       </div>
       <div className="row2">
         <div className="field">
           <label htmlFor="d-tags">Tags</label>
-          <input id="d-tags" placeholder="tools, writing" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
-        </div>
-        <div className="field">
-          <label htmlFor="d-plan">Required plan</label>
-          <select id="d-plan" value={f.requiredPlan} onChange={(e) => setF({ ...f, requiredPlan: e.target.value })}>
-            <option value="">Lowest paid plan</option>
-            {[...plans]
-              .sort((x, y) => x.rank - y.rank)
-              .map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.name}
-                  {p.key === "free" ? " (anyone signed in)" : ""}
-                  {p.public ? "" : " (grant only)"}
-                </option>
-              ))}
-          </select>
+          <input
+            id="d-tags"
+            placeholder="tools, writing"
+            value={f.tags}
+            onChange={(e) => setF({ ...f, tags: e.target.value })}
+          />
         </div>
       </div>
       <div className="row2">
         <label className="check">
-          <input type="checkbox" checked={f.featured} onChange={(e) => setF({ ...f, featured: e.target.checked })} /> Featured on the front page
+          <input
+            type="checkbox"
+            checked={f.featured}
+            onChange={(e) => setF({ ...f, featured: e.target.checked })}
+          />{" "}
+          Featured on the front page
         </label>
         <div className="field">
           <label htmlFor="d-sort">Sort order</label>
-          <input id="d-sort" type="number" value={f.sortOrder} onChange={(e) => setF({ ...f, sortOrder: Number(e.target.value) })} />
+          <input
+            id="d-sort"
+            type="number"
+            value={f.sortOrder}
+            onChange={(e) => setF({ ...f, sortOrder: Number(e.target.value) })}
+          />
         </div>
       </div>
       <div className="field">
         <span>Creators</span>
         <div className="seg">
           {creators.map((c: Creator) => (
-            <button type="button" key={c.id} aria-pressed={f.creators.includes(c.id)} onClick={() => toggle(c.id)}>
+            <button
+              type="button"
+              key={c.id}
+              aria-pressed={f.creators.includes(c.id)}
+              onClick={() => toggle(c.id)}
+            >
               {c.name}
             </button>
           ))}
@@ -287,28 +433,61 @@ function useMarkdownPreview(source: string) {
   return html;
 }
 
-function MarkdownField({ value, onChange, rows = 18, label }: { value: string; onChange: (v: string) => void; rows?: number; label: string }) {
+function MarkdownField({
+  value,
+  onChange,
+  rows = 18,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+  label: string;
+}) {
   const html = useMarkdownPreview(value);
   return (
     <div className="md-editor">
       <div className="field">
         <label>{label}</label>
-        <textarea className="slug" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} spellCheck />
+        <textarea
+          className="slug"
+          rows={rows}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          spellCheck
+        />
       </div>
       {/* Rendered by the server's Markdown renderer, which emits no raw HTML. */}
-      <div className="md md-preview" dangerouslySetInnerHTML={{ __html: html }} />
+      <div
+        className="md md-preview"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </div>
   );
 }
 
-function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasDraft: boolean }) {
-  const [page, setPage] = useState<Page>({ body: initial.body ?? "", cover: initial.cover, gallery: initial.gallery ?? [] });
+function PageEditor({
+  id,
+  initial,
+  hasDraft,
+}: {
+  id: string;
+  initial: Page;
+  hasDraft: boolean;
+}) {
+  const [page, setPage] = useState<Page>({
+    body: initial.body ?? "",
+    cover: initial.cover,
+    gallery: initial.gallery ?? [],
+  });
   const [dirty, setDirty] = useState(false);
   const [save, { isLoading: saving }] = studio.useSaveDraftMutation();
   const [publish] = studio.usePublishDraftMutation();
   const [discard] = studio.useDiscardDraftMutation();
   const act = useAct();
-  const [picking, setPicking] = useState<"" | "cover" | "gallery" | "insert">("");
+  const [picking, setPicking] = useState<"" | "cover" | "gallery" | "insert">(
+    "",
+  );
   const set = (p: Partial<Page>) => {
     setPage({ ...page, ...p });
     setDirty(true);
@@ -321,22 +500,37 @@ function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasD
   const pick = (m: Media) => {
     if (picking === "cover") set({ cover: m.id });
     if (picking === "gallery") set({ gallery: [...page.gallery, m.id] });
-    if (picking === "insert") set({ body: page.body + `\n\n![${m.alt}](/media/${m.id})\n` });
+    if (picking === "insert")
+      set({ body: page.body + `\n\n![${m.alt}](/media/${m.id})\n` });
     setPicking("");
   };
   return (
     <div className="form editor-form">
       <p className="muted small">
-        {dirty ? "Unsaved changes." : hasDraft ? "A draft is saved; visitors still see the published page." : "Showing the published page."} Save a draft, check it
-        with <em>Preview draft</em>, then publish.
+        {dirty
+          ? "Unsaved changes."
+          : hasDraft
+            ? "A draft is saved; visitors still see the published page."
+            : "Showing the published page."}{" "}
+        Save a draft, check it with <em>Preview draft</em>, then publish.
       </p>
-      <MarkdownField label="Write-up (Markdown)" value={page.body} onChange={(body) => set({ body })} />
+      <MarkdownField
+        label="Write-up (Markdown)"
+        value={page.body}
+        onChange={(body) => set({ body })}
+      />
       <div className="row2">
         <div className="field">
           <span>Cover</span>
           <div className="media-strip">
-            {page.cover && <MediaThumb id={page.cover} onRemove={() => set({ cover: "" })} />}
-            <button type="button" className="btn btn-soft" onClick={() => setPicking("cover")}>
+            {page.cover && (
+              <MediaThumb id={page.cover} onRemove={() => set({ cover: "" })} />
+            )}
+            <button
+              type="button"
+              className="btn btn-soft"
+              onClick={() => setPicking("cover")}
+            >
               {page.cover ? "Change cover" : "Choose cover"}
             </button>
           </div>
@@ -344,7 +538,11 @@ function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasD
         <div className="field">
           <span>Insert into the write-up</span>
           <div className="media-strip">
-            <button type="button" className="btn btn-soft" onClick={() => setPicking("insert")}>
+            <button
+              type="button"
+              className="btn btn-soft"
+              onClick={() => setPicking("insert")}
+            >
               Insert image
             </button>
           </div>
@@ -354,9 +552,19 @@ function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasD
         <span>Gallery</span>
         <div className="media-strip">
           {page.gallery.map((g, i) => (
-            <MediaThumb key={g + i} id={g} onRemove={() => set({ gallery: page.gallery.filter((_, j) => j !== i) })} />
+            <MediaThumb
+              key={g + i}
+              id={g}
+              onRemove={() =>
+                set({ gallery: page.gallery.filter((_, j) => j !== i) })
+              }
+            />
           ))}
-          <button type="button" className="btn btn-soft" onClick={() => setPicking("gallery")}>
+          <button
+            type="button"
+            className="btn btn-soft"
+            onClick={() => setPicking("gallery")}
+          >
             Add to gallery
           </button>
         </div>
@@ -367,12 +575,20 @@ function PageEditor({ id, initial, hasDraft }: { id: string; initial: Page; hasD
           type="button"
           className="btn btn-soft"
           disabled={!hasDraft}
-          onClick={() => confirm("Discard the saved draft?") && act(discard(id).unwrap(), "Draft discarded")}
+          onClick={() =>
+            confirm("Discard the saved draft?") &&
+            act(discard(id).unwrap(), "Draft discarded")
+          }
         >
           Discard draft
         </button>
         <span className="actions">
-          <button type="button" className="btn btn-soft" disabled={saving} onClick={saveDraft}>
+          <button
+            type="button"
+            className="btn btn-soft"
+            disabled={saving}
+            onClick={saveDraft}
+          >
             Save draft
           </button>
           <button
@@ -404,7 +620,15 @@ function MediaThumb({ id, onRemove }: { id: string; onRemove?: () => void }) {
   );
 }
 
-function MediaPicker({ onPick, onClose, images }: { onPick: (m: Media) => void; onClose: () => void; images?: boolean }) {
+function MediaPicker({
+  onPick,
+  onClose,
+  images,
+}: {
+  onPick: (m: Media) => void;
+  onClose: () => void;
+  images?: boolean;
+}) {
   const { data: all = [] } = studio.useMediaQuery();
   const data = images ? all.filter((m) => !isVideo(m)) : all;
   return (
@@ -418,7 +642,12 @@ function MediaPicker({ onPick, onClose, images }: { onPick: (m: Media) => void; 
       <Uploader />
       <div className="media-grid">
         {data.map((m) => (
-          <button type="button" className="media-tile" key={m.id} onClick={() => onPick(m)}>
+          <button
+            type="button"
+            className="media-tile"
+            key={m.id}
+            onClick={() => onPick(m)}
+          >
             <MediaPreview m={m} />
             <span className="muted small">{m.alt || m.id}</span>
           </button>
@@ -432,7 +661,12 @@ const isVideo = (m: Media) => m.mediaType.startsWith("video/");
 
 function MediaPreview({ m }: { m: Media }) {
   return isVideo(m) ? (
-    <video src={"/media/" + m.id} poster={m.poster ? "/media/" + m.poster : undefined} muted preload="metadata" />
+    <video
+      src={"/media/" + m.id}
+      poster={m.poster ? "/media/" + m.poster : undefined}
+      muted
+      preload="metadata"
+    />
   ) : (
     <img src={"/media/" + m.id} alt={m.alt} loading="lazy" />
   );
@@ -445,7 +679,14 @@ function captureFrame(v: HTMLVideoElement): Promise<Blob> {
   c.width = v.videoWidth;
   c.height = v.videoHeight;
   c.getContext("2d")?.drawImage(v, 0, 0);
-  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not capture the frame"))), "image/jpeg", 0.9));
+  return new Promise((resolve, reject) =>
+    c.toBlob(
+      (b) =>
+        b ? resolve(b) : reject(new Error("Could not capture the frame")),
+      "image/jpeg",
+      0.9,
+    ),
+  );
 }
 
 // VideoTile lets the editor scrub to a frame and use it as the poster, or
@@ -468,17 +709,38 @@ function VideoTile({ m, editable }: { m: Media; editable: boolean }) {
   };
   return (
     <>
-      <video ref={video} src={"/media/" + m.id} poster={m.poster ? "/media/" + m.poster : undefined} controls muted preload="metadata" />
+      <video
+        ref={video}
+        src={"/media/" + m.id}
+        poster={m.poster ? "/media/" + m.poster : undefined}
+        controls
+        muted
+        preload="metadata"
+      />
       {editable && (
         <span className="actions">
-          <button type="button" className="tlink" onClick={() => act(frameAsPoster(), "Poster set from this frame")}>
+          <button
+            type="button"
+            className="tlink"
+            onClick={() => act(frameAsPoster(), "Poster set from this frame")}
+          >
             Use this frame as poster
           </button>
-          <button type="button" className="tlink" onClick={() => setPicking(true)}>
+          <button
+            type="button"
+            className="tlink"
+            onClick={() => setPicking(true)}
+          >
             Choose poster
           </button>
           {m.poster && (
-            <button type="button" className="tlink quiet" onClick={() => act(patch({ id: m.id, poster: "" }).unwrap(), "Poster removed")}>
+            <button
+              type="button"
+              className="tlink quiet"
+              onClick={() =>
+                act(patch({ id: m.id, poster: "" }).unwrap(), "Poster removed")
+              }
+            >
               No poster
             </button>
           )}
@@ -518,7 +780,9 @@ function Uploader() {
       role="button"
       tabIndex={0}
       onClick={() => input.current?.click()}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
+      onKeyDown={(e) =>
+        (e.key === "Enter" || e.key === " ") && input.current?.click()
+      }
       onDragOver={(e) => {
         e.preventDefault();
         setOver(true);
@@ -530,9 +794,21 @@ function Uploader() {
         void send(e.dataTransfer.files);
       }}
     >
-      <span>{isLoading ? "Uploading…" : "Drop images or videos, or click to choose"}</span>
-      <span className="muted small">PNG, JPEG, GIF, WebP, MP4, WebM{me ? " · up to " + bytes(me.limits.maxMediaBytes) : ""}</span>
-      <input ref={input} type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" hidden onChange={(e) => send(e.target.files)} />
+      <span>
+        {isLoading ? "Uploading…" : "Drop images or videos, or click to choose"}
+      </span>
+      <span className="muted small">
+        PNG, JPEG, GIF, WebP, MP4, WebM
+        {me ? " · up to " + bytes(me.limits.maxMediaBytes) : ""}
+      </span>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
+        hidden
+        onChange={(e) => send(e.target.files)}
+      />
     </div>
   );
 }
@@ -540,7 +816,8 @@ function Uploader() {
 function MediaLibrary() {
   const { data: session } = api.useSessionQuery();
   const { data = [], isLoading } = studio.useMediaQuery();
-  const mine = (m: Media) => session?.user?.role === "admin" || m.uploadedBy === session?.user?.id;
+  const mine = (m: Media) =>
+    session?.user?.role === "admin" || m.uploadedBy === session?.user?.id;
   const [patch] = studio.usePatchMediaMutation();
   const [del] = studio.useDeleteMediaMutation();
   const act = useAct();
@@ -559,13 +836,23 @@ function MediaLibrary() {
         <div className="media-grid">
           {data.map((m) => (
             <div className="media-tile" key={m.id}>
-              {isVideo(m) ? <VideoTile m={m} editable={mine(m)} /> : <MediaPreview m={m} />}
+              {isVideo(m) ? (
+                <VideoTile m={m} editable={mine(m)} />
+              ) : (
+                <MediaPreview m={m} />
+              )}
               <input
                 aria-label="Alt text"
                 disabled={!mine(m)}
                 defaultValue={m.alt}
                 placeholder="alt text"
-                onBlur={(e) => e.target.value !== m.alt && act(patch({ id: m.id, alt: e.target.value }).unwrap(), "Alt text saved")}
+                onBlur={(e) =>
+                  e.target.value !== m.alt &&
+                  act(
+                    patch({ id: m.id, alt: e.target.value }).unwrap(),
+                    "Alt text saved",
+                  )
+                }
               />
               <span className="muted small">
                 {m.width ? `${m.width}×${m.height} · ` : ""}
@@ -576,14 +863,23 @@ function MediaLibrary() {
                   type="button"
                   className="tlink"
                   onClick={() => {
-                    void navigator.clipboard.writeText(`![${m.alt}](/media/${m.id})`);
+                    void navigator.clipboard.writeText(
+                      `![${m.alt}](/media/${m.id})`,
+                    );
                     dispatch(show({ text: "Markdown copied" }));
                   }}
                 >
                   Copy Markdown
                 </button>
                 {mine(m) && (
-                  <button type="button" className="tlink quiet danger" onClick={() => confirm("Delete this media?") && act(del(m.id).unwrap(), "Deleted")}>
+                  <button
+                    type="button"
+                    className="tlink quiet danger"
+                    onClick={() =>
+                      confirm("Delete this media?") &&
+                      act(del(m.id).unwrap(), "Deleted")
+                    }
+                  >
                     Delete
                   </button>
                 )}
@@ -596,9 +892,16 @@ function MediaLibrary() {
   );
 }
 
-const defaultManifest = '{\n  "sample": {},\n  "db": {},\n  "user": {"scopes": ["profile"]},\n  "room": {}\n}';
+const defaultManifest =
+  '{\n  "sample": {},\n  "db": {},\n  "user": {"scopes": ["profile"]},\n  "room": {}\n}';
 
-function Releases({ artifact, releases }: { artifact: string; releases: Release[] }) {
+function Releases({
+  artifact,
+  releases,
+}: {
+  artifact: string;
+  releases: Release[];
+}) {
   const [check, { isLoading: checking }] = studio.useCheckReleaseMutation();
   const [upload, { isLoading: uploading }] = studio.useUploadReleaseMutation();
   const [action] = studio.useReleaseActionMutation();
@@ -607,12 +910,24 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
   const dispatch = useDispatch();
   const [file, setFile] = useState<File>();
   const [over, setOver] = useState(false);
-  const [form, setForm] = useState({ version: "", changelog: "", manifest: "", freeSample: false });
+  const [form, setForm] = useState({
+    version: "",
+    changelog: "",
+    manifest: "",
+    freeSample: false,
+  });
   const [checks, setChecks] = useState<Check[] | null>(null);
   const [open, setOpen] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  const latestManifest = useMemo(() => releases.find((r) => r.manifest)?.manifest, [releases]);
-  const manifest = form.manifest || (latestManifest ? JSON.stringify(latestManifest, null, 2) : defaultManifest);
+  const latestManifest = useMemo(
+    () => releases.find((r) => r.manifest)?.manifest,
+    [releases],
+  );
+  const manifest =
+    form.manifest ||
+    (latestManifest
+      ? JSON.stringify(latestManifest, null, 2)
+      : defaultManifest);
   const set = (k: keyof typeof form, v: string | boolean) => {
     setForm({ ...form, [k]: v });
     setChecks(null);
@@ -631,7 +946,11 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
     try {
       const rel = await upload(formData()).unwrap();
       setChecks(rel.checks ?? []);
-      dispatch(show({ text: `Draft v${rel.version} saved. Preview it, then publish.` }));
+      dispatch(
+        show({
+          text: `Draft v${rel.version} saved. Preview it, then publish.`,
+        }),
+      );
       setFile(undefined);
       setForm({ version: "", changelog: "", manifest: "", freeSample: false });
     } catch (e: any) {
@@ -648,7 +967,9 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
             role="button"
             tabIndex={0}
             onClick={() => input.current?.click()}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
+            onKeyDown={(e) =>
+              (e.key === "Enter" || e.key === " ") && input.current?.click()
+            }
             onDragOver={(e) => {
               e.preventDefault();
               setOver(true);
@@ -662,13 +983,26 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
             }}
           >
             <span className="drop-icon">↥</span>
-            <span>{file ? file.name : "Drop an HTML file, or click to choose"}</span>
-            <span className="muted small">{file ? bytes(file.size) : "single-file application, authored source"}</span>
-            <input ref={input} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => (setFile(e.target.files?.[0]), setChecks(null))} />
+            <span>
+              {file ? file.name : "Drop an HTML file, or click to choose"}
+            </span>
+            <span className="muted small">
+              {file
+                ? bytes(file.size)
+                : "single-file application, authored source"}
+            </span>
+            <input
+              ref={input}
+              type="file"
+              accept=".html,.htm,text/html"
+              hidden
+              onChange={(e) => (setFile(e.target.files?.[0]), setChecks(null))}
+            />
           </div>
           <p className="muted small">
-            Uploading creates a <em>draft</em>. Nobody sees it until you preview it on an isolated origin and publish. Published files are immutable; corrections
-            are new versions.
+            Uploading creates a <em>draft</em>. Nobody sees it until you preview
+            it on an isolated origin and publish. Published files are immutable;
+            corrections are new versions.
           </p>
           {checks && (
             <div className="queue">
@@ -679,7 +1013,11 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
               )}
               {checks.map((c, i) => (
                 <div className="qrow" key={i}>
-                  <span className={"qstatus " + (c.level === "error" ? "warn" : "")}>{c.level}</span>
+                  <span
+                    className={"qstatus " + (c.level === "error" ? "warn" : "")}
+                  >
+                    {c.level}
+                  </span>
                   <span className="qname">{c.message}</span>
                 </div>
               ))}
@@ -695,22 +1033,54 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
         >
           <div className="field">
             <label htmlFor="r-version">Version</label>
-            <input id="r-version" className="slug" required placeholder="1.0.0" value={form.version} onChange={(e) => set("version", e.target.value)} />
+            <input
+              id="r-version"
+              className="slug"
+              required
+              placeholder="1.0.0"
+              value={form.version}
+              onChange={(e) => set("version", e.target.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="r-notes">Release notes</label>
-            <textarea id="r-notes" rows={3} value={form.changelog} onChange={(e) => set("changelog", e.target.value)} />
+            <textarea
+              id="r-notes"
+              rows={3}
+              value={form.changelog}
+              onChange={(e) => set("changelog", e.target.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="r-manifest">Capabilities manifest</label>
-            <textarea id="r-manifest" className="slug" rows={7} spellCheck={false} value={manifest} onChange={(e) => set("manifest", e.target.value)} />
+            <textarea
+              id="r-manifest"
+              className="slug"
+              rows={7}
+              spellCheck={false}
+              value={manifest}
+              onChange={(e) => set("manifest", e.target.value)}
+            />
           </div>
           <label className="check">
-            <input type="checkbox" checked={form.freeSample} onChange={(e) => set("freeSample", e.target.checked)} /> Free sample (downloadable without a
-            subscription)
+            <input
+              type="checkbox"
+              checked={form.freeSample}
+              onChange={(e) => set("freeSample", e.target.checked)}
+            />{" "}
+            Free sample (downloadable without a subscription)
           </label>
           <div className="form-foot">
-            <button type="button" className="btn btn-soft" disabled={!file || checking} onClick={async () => setChecks((await act(check(formData()).unwrap()))?.checks ?? null)}>
+            <button
+              type="button"
+              className="btn btn-soft"
+              disabled={!file || checking}
+              onClick={async () =>
+                setChecks(
+                  (await act(check(formData()).unwrap()))?.checks ?? null,
+                )
+              }
+            >
               {checking ? "Checking…" : "Check"}
             </button>
             <button className="btn btn-ink" disabled={!file || uploading}>
@@ -731,59 +1101,127 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
               const html = r.files.find((f) => f.role === "html");
               return (
                 <Fragment key={r.id}>
-                <div className={"lib-row" + (r.state === "withdrawn" ? " is-unlisted" : "")}>
-                  <div className="lib-main">
-                    <strong>v{r.version}</strong>
-                    <span className="muted small">
-                      {r.capabilities.join(" · ")}
-                      {r.freeSample ? " · free sample" : ""}
+                  <div
+                    className={
+                      "lib-row" +
+                      (r.state === "withdrawn" ? " is-unlisted" : "")
+                    }
+                  >
+                    <div className="lib-main">
+                      <strong>v{r.version}</strong>
+                      <span className="muted small">
+                        {r.capabilities.join(" · ")}
+                        {r.freeSample ? " · free sample" : ""}
+                      </span>
+                    </div>
+                    <span className="lib-size">
+                      {html ? bytes(html.size) : ""}
                     </span>
-                  </div>
-                  <span className="lib-size">{html ? bytes(html.size) : ""}</span>
-                  <span className="lib-added">{date(r.publishedAt ?? r.createdAt)}</span>
-                  <span className={"lib-status" + (r.state === "published" ? " on" : r.state === "withdrawn" ? " bad" : "")}>
-                    {r.state}
-                    {r.pinnedInstances ? ` · ${r.pinnedInstances} pinned` : ""}
-                  </span>
-                  <div className="lib-actions">
-                    <button
-                      className="btn btn-soft"
-                      onClick={async () => {
-                        const inst = await act(preview(r.id).unwrap());
-                        if (inst) navigate("/instances/" + inst.id);
-                      }}
+                    <span className="lib-added">
+                      {date(r.publishedAt ?? r.createdAt)}
+                    </span>
+                    <span
+                      className={
+                        "lib-status" +
+                        (r.state === "published"
+                          ? " on"
+                          : r.state === "withdrawn"
+                            ? " bad"
+                            : "")
+                      }
                     >
-                      Preview
-                    </button>
-                    {r.state === "draft" && (
-                      <>
-                        <button className="btn btn-ink" onClick={() => act(action({ artifact, id: r.id, action: "publish" }).unwrap(), `Published v${r.version}`)}>
-                          Publish
-                        </button>
-                        <button className="btn btn-soft" onClick={() => confirm("Delete this draft?") && act(action({ artifact, id: r.id, action: "delete" }).unwrap(), "Draft deleted")}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                    {r.state === "published" && (
+                      {r.state}
+                      {r.pinnedInstances
+                        ? ` · ${r.pinnedInstances} pinned`
+                        : ""}
+                    </span>
+                    <div className="lib-actions">
                       <button
                         className="btn btn-soft"
-                        onClick={() => {
-                          const n = r.pinnedInstances ?? 0;
-                          if (!confirm(`Withdraw v${r.version} from the catalog?`)) return;
-                          const suspend = n > 0 && confirm(`${n} instance(s) are pinned to this release. Suspend them too? (Cancel keeps them running.)`);
-                          void act(action({ artifact, id: r.id, action: "withdraw", suspendPinned: suspend }).unwrap(), "Release withdrawn");
+                        onClick={async () => {
+                          const inst = await act(preview(r.id).unwrap());
+                          if (inst) navigate("/instances/" + inst.id);
                         }}
                       >
-                        Withdraw
+                        Preview
                       </button>
-                    )}
-                    <button className="btn btn-soft" aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? "" : r.id)}>
-                      Attachments ({r.attachments.length})
-                    </button>
+                      {r.state === "draft" && (
+                        <>
+                          <button
+                            className="btn btn-ink"
+                            onClick={() =>
+                              act(
+                                action({
+                                  artifact,
+                                  id: r.id,
+                                  action: "publish",
+                                }).unwrap(),
+                                `Published v${r.version}`,
+                              )
+                            }
+                          >
+                            Publish
+                          </button>
+                          <button
+                            className="btn btn-soft"
+                            onClick={() =>
+                              confirm("Delete this draft?") &&
+                              act(
+                                action({
+                                  artifact,
+                                  id: r.id,
+                                  action: "delete",
+                                }).unwrap(),
+                                "Draft deleted",
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {r.state === "published" && (
+                        <button
+                          className="btn btn-soft"
+                          onClick={() => {
+                            const n = r.pinnedInstances ?? 0;
+                            if (
+                              !confirm(
+                                `Withdraw v${r.version} from the catalog?`,
+                              )
+                            )
+                              return;
+                            const suspend =
+                              n > 0 &&
+                              confirm(
+                                `${n} instance(s) are pinned to this release. Suspend them too? (Cancel keeps them running.)`,
+                              );
+                            void act(
+                              action({
+                                artifact,
+                                id: r.id,
+                                action: "withdraw",
+                                suspendPinned: suspend,
+                              }).unwrap(),
+                              "Release withdrawn",
+                            );
+                          }}
+                        >
+                          Withdraw
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-soft"
+                        aria-expanded={open === r.id}
+                        onClick={() => setOpen(open === r.id ? "" : r.id)}
+                      >
+                        Attachments ({r.attachments.length})
+                      </button>
+                    </div>
                   </div>
-                </div>
-                {open === r.id && <Attachments artifact={artifact} release={r} />}
+                  {open === r.id && (
+                    <Attachments artifact={artifact} release={r} />
+                  )}
                 </Fragment>
               );
             })}
@@ -797,7 +1235,13 @@ function Releases({ artifact, releases }: { artifact: string; releases: Release[
 // Attachments are supplementary files on a release. Unlike the HTML they
 // can change after publishing; visitors download them under the release's
 // download rule.
-function Attachments({ artifact, release }: { artifact: string; release: Release }) {
+function Attachments({
+  artifact,
+  release,
+}: {
+  artifact: string;
+  release: Release;
+}) {
   const [upload, { isLoading }] = studio.useUploadAttachmentMutation();
   const [patch] = studio.usePatchAttachmentMutation();
   const [del] = studio.useDeleteAttachmentMutation();
@@ -809,7 +1253,10 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
     for (const f of Array.from(files ?? [])) {
       const form = new FormData();
       form.set("file", f);
-      await act(upload({ artifact, release: release.id, form }).unwrap(), "Attached " + f.name);
+      await act(
+        upload({ artifact, release: release.id, form }).unwrap(),
+        "Attached " + f.name,
+      );
     }
   };
   const list = release.attachments;
@@ -817,7 +1264,15 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
   const move = (i: number, d: number) => {
     const order = [...list];
     [order[i], order[i + d]] = [order[i + d], order[i]];
-    void act(Promise.all(order.flatMap((a, pos) => (a.position === pos ? [] : [patch({ artifact, id: a.id, position: pos }).unwrap()]))));
+    void act(
+      Promise.all(
+        order.flatMap((a, pos) =>
+          a.position === pos
+            ? []
+            : [patch({ artifact, id: a.id, position: pos }).unwrap()],
+        ),
+      ),
+    );
   };
   return (
     <div className="attach-panel">
@@ -826,7 +1281,9 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
         role="button"
         tabIndex={0}
         onClick={() => input.current?.click()}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
+        onKeyDown={(e) =>
+          (e.key === "Enter" || e.key === " ") && input.current?.click()
+        }
         onDragOver={(e) => {
           e.preventDefault();
           setOver(true);
@@ -838,12 +1295,23 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
           void send(e.dataTransfer.files);
         }}
       >
-        <span>{isLoading ? "Uploading…" : `Drop files to attach to v${release.version}, or click to choose`}</span>
-        <span className="muted small">
-          Manuals, archives, notes · up to 20 files{me ? ", " + bytes(me.limits.maxAttachmentBytes) + " each" : ""} · downloadable by whoever may download this
-          release
+        <span>
+          {isLoading
+            ? "Uploading…"
+            : `Drop files to attach to v${release.version}, or click to choose`}
         </span>
-        <input ref={input} type="file" multiple hidden onChange={(e) => send(e.target.files)} />
+        <span className="muted small">
+          Manuals, archives, notes · up to 20 files
+          {me ? ", " + bytes(me.limits.maxAttachmentBytes) + " each" : ""} ·
+          downloadable by whoever may download this release
+        </span>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => send(e.target.files)}
+        />
       </div>
       {list.length === 0 ? (
         <Empty>No attachments.</Empty>
@@ -856,7 +1324,17 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
                   aria-label={"Label for " + a.name}
                   defaultValue={a.label}
                   placeholder={a.name}
-                  onBlur={(e) => e.target.value !== a.label && act(patch({ artifact, id: a.id, label: e.target.value }).unwrap(), "Label saved")}
+                  onBlur={(e) =>
+                    e.target.value !== a.label &&
+                    act(
+                      patch({
+                        artifact,
+                        id: a.id,
+                        label: e.target.value,
+                      }).unwrap(),
+                      "Label saved",
+                    )
+                  }
                 />
                 <span className="muted small">
                   {a.name} · {a.mediaType}
@@ -864,16 +1342,32 @@ function Attachments({ artifact, release }: { artifact: string; release: Release
               </div>
               <span className="lib-size">{bytes(a.size)}</span>
               <div className="lib-actions">
-                <button className="tlink" disabled={i === 0} aria-label="Move up" onClick={() => move(i, -1)}>
+                <button
+                  className="tlink"
+                  disabled={i === 0}
+                  aria-label="Move up"
+                  onClick={() => move(i, -1)}
+                >
                   ↑
                 </button>
-                <button className="tlink" disabled={i === list.length - 1} aria-label="Move down" onClick={() => move(i, 1)}>
+                <button
+                  className="tlink"
+                  disabled={i === list.length - 1}
+                  aria-label="Move down"
+                  onClick={() => move(i, 1)}
+                >
                   ↓
                 </button>
                 <a className="tlink" href={a.href} download={a.name}>
                   Download
                 </a>
-                <button className="tlink quiet danger" onClick={() => confirm(`Remove ${a.name}?`) && act(del({ artifact, id: a.id }).unwrap(), "Removed")}>
+                <button
+                  className="tlink quiet danger"
+                  onClick={() =>
+                    confirm(`Remove ${a.name}?`) &&
+                    act(del({ artifact, id: a.id }).unwrap(), "Removed")
+                  }
+                >
                   Remove
                 </button>
               </div>
@@ -892,11 +1386,22 @@ function Demo({ id, enabled }: { id: string; enabled: boolean }) {
     <div className="form editor-form">
       <Row label="Visitor demo" sub="no account needed">
         <label className="check">
-          <input type="checkbox" checked={enabled} onChange={(e) => act(patch({ id, demoEnabled: e.target.checked }).unwrap(), "Saved")} /> Offer a demo of the latest
-          published release
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) =>
+              act(
+                patch({ id, demoEnabled: e.target.checked }).unwrap(),
+                "Saved",
+              )
+            }
+          />{" "}
+          Offer a demo of the latest published release
         </label>
         <p className="muted">
-          Visitors get a short-lived private instance with a small model budget. Demos also need to be enabled globally by an administrator in Settings.
+          Visitors get a short-lived private instance with a small model budget.
+          Demos also need to be enabled globally by an administrator in
+          Settings.
         </p>
       </Row>
     </div>
@@ -916,11 +1421,19 @@ function Journal() {
           className="inline-form"
           onSubmit={async (e) => {
             e.preventDefault();
-            const p = await act(create({ title, slug: slugify(title) }).unwrap(), "Post created");
+            const p = await act(
+              create({ title, slug: slugify(title) }).unwrap(),
+              "Post created",
+            );
             if (p) navigate("/studio/journal/" + p.id);
           }}
         >
-          <input placeholder="title of a new post" required value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input
+            placeholder="title of a new post"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
           <button className="btn btn-ink">New post</button>
         </form>
       </div>
@@ -937,8 +1450,16 @@ function Journal() {
                 <strong>{p.title}</strong>
                 <span className="muted small">/journal/{p.slug}</span>
               </span>
-              <span className={"lib-status" + (p.state === "published" ? " on" : "")}>{p.state}</span>
-              <span className="lib-added">{date(p.publishedAt ?? p.updatedAt)}</span>
+              <span
+                className={
+                  "lib-status" + (p.state === "published" ? " on" : "")
+                }
+              >
+                {p.state}
+              </span>
+              <span className="lib-added">
+                {date(p.publishedAt ?? p.updatedAt)}
+              </span>
             </Link>
           ))}
         </div>
@@ -959,12 +1480,28 @@ function PostForm({ post }: { post: Post }) {
   const [patch, { isLoading }] = studio.usePatchPostMutation();
   const [action] = studio.usePostActionMutation();
   const act = useAct();
-  const [f, setF] = useState({ title: post.title, slug: post.slug, summary: post.summary, body: post.body, cover: post.cover ?? "", tags: post.tags.join(", "), authorId: post.authorId ?? "" });
+  const [f, setF] = useState({
+    title: post.title,
+    slug: post.slug,
+    summary: post.summary,
+    body: post.body,
+    cover: post.cover ?? "",
+    tags: post.tags.join(", "),
+    authorId: post.authorId ?? "",
+  });
   const [picking, setPicking] = useState<"" | "cover" | "insert">("");
   const isAdmin = session?.user?.role === "admin";
   const save = () =>
     act(
-      patch({ id: post.id, ...f, tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean), ...(isAdmin ? {} : { authorId: undefined }) }).unwrap(),
+      patch({
+        id: post.id,
+        ...f,
+        tags: f.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        ...(isAdmin ? {} : { authorId: undefined }),
+      }).unwrap(),
       "Saved",
     );
   return (
@@ -972,10 +1509,19 @@ function PostForm({ post }: { post: Post }) {
       <div className="stats-head">
         <h1 className="h-display">{post.title}</h1>
         <span className="actions">
-          <a className="u" href={"/journal/" + post.slug} target="_blank" rel="noopener">
+          <a
+            className="u"
+            href={"/journal/" + post.slug}
+            target="_blank"
+            rel="noopener"
+          >
             {post.state === "published" ? "Public page" : "Preview"}
           </a>
-          <span className={"status" + (post.state === "published" ? " on" : "")}>{post.state}</span>
+          <span
+            className={"status" + (post.state === "published" ? " on" : "")}
+          >
+            {post.state}
+          </span>
         </span>
       </div>
       <form
@@ -988,25 +1534,50 @@ function PostForm({ post }: { post: Post }) {
         <div className="row2">
           <div className="field">
             <label htmlFor="p-title">Title</label>
-            <input id="p-title" required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+            <input
+              id="p-title"
+              required
+              value={f.title}
+              onChange={(e) => setF({ ...f, title: e.target.value })}
+            />
           </div>
           <div className="field">
             <label htmlFor="p-slug">Slug</label>
-            <input id="p-slug" className="slug" required value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} />
+            <input
+              id="p-slug"
+              className="slug"
+              required
+              value={f.slug}
+              onChange={(e) => setF({ ...f, slug: e.target.value })}
+            />
           </div>
         </div>
         <div className="field">
           <label htmlFor="p-summary">Summary</label>
-          <input id="p-summary" maxLength={400} value={f.summary} onChange={(e) => setF({ ...f, summary: e.target.value })} />
+          <input
+            id="p-summary"
+            maxLength={400}
+            value={f.summary}
+            onChange={(e) => setF({ ...f, summary: e.target.value })}
+          />
         </div>
         <div className="row2">
           <div className="field">
             <label htmlFor="p-tags">Tags</label>
-            <input id="p-tags" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
+            <input
+              id="p-tags"
+              value={f.tags}
+              onChange={(e) => setF({ ...f, tags: e.target.value })}
+            />
           </div>
           <div className="field">
             <label htmlFor="p-author">Author</label>
-            <select id="p-author" disabled={!isAdmin} value={f.authorId} onChange={(e) => setF({ ...f, authorId: e.target.value })}>
+            <select
+              id="p-author"
+              disabled={!isAdmin}
+              value={f.authorId}
+              onChange={(e) => setF({ ...f, authorId: e.target.value })}
+            >
               <option value="">—</option>
               {creators.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -1016,15 +1587,32 @@ function PostForm({ post }: { post: Post }) {
             </select>
           </div>
         </div>
-        <MarkdownField label="Body (Markdown)" value={f.body} onChange={(body) => setF({ ...f, body })} />
+        <MarkdownField
+          label="Body (Markdown)"
+          value={f.body}
+          onChange={(body) => setF({ ...f, body })}
+        />
         <div className="field">
           <span>Cover</span>
           <div className="media-strip">
-            {f.cover && <MediaThumb id={f.cover} onRemove={() => setF({ ...f, cover: "" })} />}
-            <button type="button" className="btn btn-soft" onClick={() => setPicking("cover")}>
+            {f.cover && (
+              <MediaThumb
+                id={f.cover}
+                onRemove={() => setF({ ...f, cover: "" })}
+              />
+            )}
+            <button
+              type="button"
+              className="btn btn-soft"
+              onClick={() => setPicking("cover")}
+            >
               {f.cover ? "Change cover" : "Choose cover"}
             </button>
-            <button type="button" className="btn btn-soft" onClick={() => setPicking("insert")}>
+            <button
+              type="button"
+              className="btn btn-soft"
+              onClick={() => setPicking("insert")}
+            >
               Insert image
             </button>
           </div>
@@ -1034,7 +1622,11 @@ function PostForm({ post }: { post: Post }) {
             onClose={() => setPicking("")}
             onPick={(m) => {
               if (picking === "cover") setF({ ...f, cover: m.id });
-              else setF({ ...f, body: f.body + `\n\n![${m.alt}](/media/${m.id})\n` });
+              else
+                setF({
+                  ...f,
+                  body: f.body + `\n\n![${m.alt}](/media/${m.id})\n`,
+                });
               setPicking("");
             }}
           />
@@ -1045,7 +1637,13 @@ function PostForm({ post }: { post: Post }) {
             className="btn btn-soft"
             onClick={async () => {
               if (!confirm("Delete this post?")) return;
-              if ((await act(action({ id: post.id, action: "delete" }).unwrap(), "Post deleted")) !== undefined) navigate("/studio/journal");
+              if (
+                (await act(
+                  action({ id: post.id, action: "delete" }).unwrap(),
+                  "Post deleted",
+                )) !== undefined
+              )
+                navigate("/studio/journal");
             }}
           >
             Delete
@@ -1059,10 +1657,19 @@ function PostForm({ post }: { post: Post }) {
               className="btn btn-ink"
               onClick={async () => {
                 if ((await save()) === undefined) return;
-                await act(action({ id: post.id, action: post.state === "published" ? "unpublish" : "publish" }).unwrap(), post.state === "published" ? "Unpublished" : "Published");
+                await act(
+                  action({
+                    id: post.id,
+                    action:
+                      post.state === "published" ? "unpublish" : "publish",
+                  }).unwrap(),
+                  post.state === "published" ? "Unpublished" : "Published",
+                );
               }}
             >
-              {post.state === "published" ? "Save and unpublish" : "Save and publish"}
+              {post.state === "published"
+                ? "Save and unpublish"
+                : "Save and publish"}
             </button>
           </span>
         </div>
@@ -1089,14 +1696,22 @@ function Creators() {
             className="inline-form"
             onSubmit={async (e) => {
               e.preventDefault();
-              const c = await act(create({ name, slug: slugify(name) }).unwrap(), "Profile created");
+              const c = await act(
+                create({ name, slug: slugify(name) }).unwrap(),
+                "Profile created",
+              );
               if (c) {
                 setName("");
                 setEditing(c.id);
               }
             }}
           >
-            <input placeholder="name" required value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              placeholder="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
             <button className="btn btn-ink">New profile</button>
           </form>
         )}
@@ -1117,17 +1732,32 @@ function Creators() {
                   </span>
                 </span>
                 <div className="lib-actions">
-                  <a className="btn btn-soft" href={"/creators/" + c.slug} target="_blank" rel="noopener">
+                  <a
+                    className="btn btn-soft"
+                    href={"/creators/" + c.slug}
+                    target="_blank"
+                    rel="noopener"
+                  >
                     View
                   </a>
                   {editable(c) && (
-                    <button className="btn btn-soft" onClick={() => setEditing(editing === c.id ? "" : c.id)}>
+                    <button
+                      className="btn btn-soft"
+                      onClick={() => setEditing(editing === c.id ? "" : c.id)}
+                    >
                       {editing === c.id ? "Close" : "Edit"}
                     </button>
                   )}
                 </div>
               </div>
-              {editing === c.id && <CreatorForm key={c.id} creator={c} isAdmin={isAdmin} onDone={() => setEditing("")} />}
+              {editing === c.id && (
+                <CreatorForm
+                  key={c.id}
+                  creator={c}
+                  isAdmin={isAdmin}
+                  onDone={() => setEditing("")}
+                />
+              )}
             </React.Fragment>
           ))}
         </div>
@@ -1136,12 +1766,29 @@ function Creators() {
   );
 }
 
-function CreatorForm({ creator, isAdmin, onDone }: { creator: Creator; isAdmin: boolean; onDone: () => void }) {
+function CreatorForm({
+  creator,
+  isAdmin,
+  onDone,
+}: {
+  creator: Creator;
+  isAdmin: boolean;
+  onDone: () => void;
+}) {
   const [patch, { isLoading }] = studio.usePatchCreatorMutation();
   const [del] = studio.useDeleteCreatorMutation();
   const act = useAct();
-  const [f, setF] = useState({ name: creator.name, slug: creator.slug, bio: creator.bio, avatar: creator.avatar ?? "", userId: creator.userId ?? "", sortOrder: creator.sortOrder });
-  const [links, setLinks] = useState(creator.links.map((l) => `${l.label} ${l.url}`).join("\n"));
+  const [f, setF] = useState({
+    name: creator.name,
+    slug: creator.slug,
+    bio: creator.bio,
+    avatar: creator.avatar ?? "",
+    userId: creator.userId ?? "",
+    sortOrder: creator.sortOrder,
+  });
+  const [links, setLinks] = useState(
+    creator.links.map((l) => `${l.label} ${l.url}`).join("\n"),
+  );
   const [picking, setPicking] = useState(false);
   return (
     <form
@@ -1156,30 +1803,70 @@ function CreatorForm({ creator, isAdmin, onDone }: { creator: Creator; isAdmin: 
             const i = l.lastIndexOf(" ");
             return { label: l.slice(0, i).trim(), url: l.slice(i + 1) };
           });
-        const body = { id: creator.id, name: f.name, slug: f.slug, bio: f.bio, avatar: f.avatar, links: parsed, ...(isAdmin ? { userId: f.userId, sortOrder: Number(f.sortOrder) } : {}) };
-        if ((await act(patch(body).unwrap(), "Profile saved")) !== undefined) onDone();
+        const body = {
+          id: creator.id,
+          name: f.name,
+          slug: f.slug,
+          bio: f.bio,
+          avatar: f.avatar,
+          links: parsed,
+          ...(isAdmin
+            ? { userId: f.userId, sortOrder: Number(f.sortOrder) }
+            : {}),
+        };
+        if ((await act(patch(body).unwrap(), "Profile saved")) !== undefined)
+          onDone();
       }}
     >
       <div className="row2">
         <div className="field">
           <label>Name</label>
-          <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <input
+            required
+            value={f.name}
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
         </div>
         <div className="field">
           <label>Slug</label>
-          <input className="slug" required value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} />
+          <input
+            className="slug"
+            required
+            value={f.slug}
+            onChange={(e) => setF({ ...f, slug: e.target.value })}
+          />
         </div>
       </div>
-      <MarkdownField label="Bio (Markdown)" rows={6} value={f.bio} onChange={(bio) => setF({ ...f, bio })} />
+      <MarkdownField
+        label="Bio (Markdown)"
+        rows={6}
+        value={f.bio}
+        onChange={(bio) => setF({ ...f, bio })}
+      />
       <div className="field">
         <label>Links, one per line: label then URL</label>
-        <textarea className="slug" rows={3} placeholder="site https://example.com" value={links} onChange={(e) => setLinks(e.target.value)} />
+        <textarea
+          className="slug"
+          rows={3}
+          placeholder="site https://example.com"
+          value={links}
+          onChange={(e) => setLinks(e.target.value)}
+        />
       </div>
       <div className="field">
         <span>Avatar</span>
         <div className="media-strip">
-          {f.avatar && <MediaThumb id={f.avatar} onRemove={() => setF({ ...f, avatar: "" })} />}
-          <button type="button" className="btn btn-soft" onClick={() => setPicking(true)}>
+          {f.avatar && (
+            <MediaThumb
+              id={f.avatar}
+              onRemove={() => setF({ ...f, avatar: "" })}
+            />
+          )}
+          <button
+            type="button"
+            className="btn btn-soft"
+            onClick={() => setPicking(true)}
+          >
             Choose avatar
           </button>
         </div>
@@ -1197,18 +1884,39 @@ function CreatorForm({ creator, isAdmin, onDone }: { creator: Creator; isAdmin: 
         <div className="row2">
           <div className="field">
             <label>Linked account (user ID)</label>
-            <input className="slug" placeholder="usr_…" value={f.userId} onChange={(e) => setF({ ...f, userId: e.target.value })} />
-            <span className="muted small">The linked account may edit this profile and every artifact credited to it.</span>
+            <input
+              className="slug"
+              placeholder="usr_…"
+              value={f.userId}
+              onChange={(e) => setF({ ...f, userId: e.target.value })}
+            />
+            <span className="muted small">
+              The linked account may edit this profile and every artifact
+              credited to it.
+            </span>
           </div>
           <div className="field">
             <label>Sort order</label>
-            <input type="number" value={f.sortOrder} onChange={(e) => setF({ ...f, sortOrder: Number(e.target.value) })} />
+            <input
+              type="number"
+              value={f.sortOrder}
+              onChange={(e) =>
+                setF({ ...f, sortOrder: Number(e.target.value) })
+              }
+            />
           </div>
         </div>
       )}
       <div className="form-foot">
         {isAdmin ? (
-          <button type="button" className="btn btn-soft" onClick={() => confirm("Delete this profile? Credits are removed.") && act(del(creator.id).unwrap(), "Profile deleted")}>
+          <button
+            type="button"
+            className="btn btn-soft"
+            onClick={() =>
+              confirm("Delete this profile? Credits are removed.") &&
+              act(del(creator.id).unwrap(), "Profile deleted")
+            }
+          >
             Delete profile
           </button>
         ) : (
@@ -1235,7 +1943,8 @@ function Tokens() {
         <Link className="u" to="/account#api-tokens">
           account page
         </Link>
-        . Give a token the <span className="mono">studio</span> scope to use it with <span className="mono">francois catalog releases push</span>.
+        . Give a token the <span className="mono">studio</span> scope to use it
+        with <span className="mono">francois catalog releases push</span>.
       </p>
     </section>
   );

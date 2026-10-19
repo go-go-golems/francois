@@ -53,12 +53,10 @@ func TestAttachments(t *testing.T) {
 	// Published: the release's download rule applies.
 	code, out = e.portal(&admin, "POST", "/api/studio/releases/"+relID+"/publish", nil)
 	expect("publish", code, out, 200, "")
-	code, out = e.portal(&admin, "PATCH", "/api/studio/artifacts/loom", map[string]string{"requiredPlan": "subscriber"})
-	expect("require pro", code, out, 200, "")
 	if code, _, _ := e.do(nil, "portal.test", "GET", pub, nil, nil); code != 401 {
 		t.Fatalf("anonymous download %d", code)
 	}
-	if code, b, _ := e.do(&free, "portal.test", "GET", pub, nil, nil); code != 403 || !strings.Contains(string(b), "plan_required") {
+	if code, b, _ := e.do(&free, "portal.test", "GET", pub, nil, nil); code != 200 || string(b) != "%PDF-1.4 the manual" {
 		t.Fatalf("free plan download %d %s", code, b)
 	}
 	code, body, h = e.do(&sub, "portal.test", "GET", pub, nil, map[string]string{"Range": "bytes=0-3"})
@@ -75,7 +73,7 @@ func TestAttachments(t *testing.T) {
 		t.Fatalf("relabel %d %v", code, out)
 	}
 	_, page, _ := e.do(nil, "portal.test", "GET", "/apps/loom", nil, nil)
-	for _, want := range []string{"Plate pack", "User manual", "plates.zip · 2 KB", "Attachments are included with the Pro plan."} {
+	for _, want := range []string{"Plate pack", "User manual", "plates.zip · 2 KB", "Sign in to download attachments."} {
 		if !bytes.Contains(page, []byte(want)) {
 			t.Fatalf("anonymous artifact page lacks %q", want)
 		}

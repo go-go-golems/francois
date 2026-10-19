@@ -19,7 +19,7 @@ func main() {
 		os.Exit(1)
 	}
 	for _, p := range d.Plans {
-		fmt.Printf("plan %s rank=%d prices=%v instances=%d members=%d credits=%d/%d\n", p.Key, p.Rank, p.Prices, p.Instances, p.MembersPerInstance, p.MonthlyCredits, p.DailyCredits)
+		fmt.Printf("class %s prices=%v instances=%d members=%d dailyTokens=%d\n", p.Key, p.Prices, p.Instances, p.MembersPerInstance, p.DailyTokens)
 	}
 	fmt.Printf("limits=%+v allowance=%+v demo.enabled=%v\n", d.Limits, d.Allowance, d.Demo.Enabled)
 }

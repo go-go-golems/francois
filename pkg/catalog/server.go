@@ -283,6 +283,19 @@ func (s *Server) authorizeInstance(ctx context.Context, u store.User, inst store
 		if inst.ExpiresAt == nil || !time.Now().Before(*inst.ExpiresAt) {
 			return hosted.Denied(403, "demo_expired", "This demo has ended")
 		}
+		a, err := s.Store.Artifact(ctx, rel.ArtifactID)
+		if err != nil {
+			return err
+		}
+		if a.EarlyAccess(time.Now()) {
+			e, _, err := s.entitlement(ctx, u)
+			if err != nil {
+				return err
+			}
+			if !e.Paid() {
+				return hosted.Denied(403, "early_access", "This artifact is in early access for Paying customers")
+			}
+		}
 		return nil
 	}
 	rev, err := s.Store.ActiveSettings(ctx)
@@ -302,30 +315,24 @@ func (s *Server) authorizeInstance(ctx context.Context, u store.User, inst store
 		return err
 	}
 	if !caller.CanRun(a, doc) {
-		return hosted.Denied(403, "plan_required", "Your plan does not include this application")
+		return hosted.Denied(403, "plan_required", "This artifact is in early access for Paying customers")
 	}
-	owner := caller
 	if inst.OwnerUserID != u.ID {
 		ou, err := s.Store.User(ctx, inst.OwnerUserID)
 		if err != nil {
 			return err
 		}
-		if owner, err = s.entitlementIn(ctx, ou, doc); err != nil {
+		owner, err := s.entitlementIn(ctx, ou, doc)
+		if err != nil {
 			return err
 		}
 		if !owner.CanRun(a, doc) {
 			return hosted.Denied(403, "owner_inactive", "The instance owner's plan does not include this application; the instance is frozen")
 		}
 	}
-	if owner.Source != SourceStaff {
-		pos, err := s.Store.WorkspacePosition(ctx, inst)
-		if err != nil {
-			return err
-		}
-		if pos > owner.Plan.Instances {
-			return hosted.Denied(403, "over_plan_limit", "This instance is beyond the owner's plan limit; upgrade or delete other instances")
-		}
-	}
+	// Workspace limits govern creation; a downgrade does not freeze an
+	// arbitrary older/newer subset of already-saved workspaces.
+
 	return nil
 }
 

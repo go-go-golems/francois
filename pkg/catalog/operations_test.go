@@ -43,7 +43,7 @@ func TestOperationsAffectOpenViewsAndPreserveData(t *testing.T) {
 	}
 	_, out = e.rpc(v, "assets.list", nil)
 	blob := out["assets"].([]any)[0].(map[string]any)["url"].(string)
-	d := testDoc(100, settings.Model{Selector: "test/fake", Credits: 1})
+	d := testDoc(100, settings.Model{Selector: "test/fake"})
 	d.Models.Tiers["default"] = "test/fake"
 	save := func() {
 		t.Helper()

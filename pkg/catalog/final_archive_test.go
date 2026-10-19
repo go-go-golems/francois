@@ -20,7 +20,7 @@ func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rel, err = e.store.PublishRelease(ctx, rel.ID, admin.user.ID)
+		rel, err = e.store.PublishRelease(ctx, rel.ID, admin.user.ID, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

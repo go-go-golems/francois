@@ -58,9 +58,10 @@ func TestDemos(t *testing.T) {
 	e := setup(t)
 	e.srv.Config.TrustProxyHeaders = true
 	ctx := context.Background()
-	doc := testDoc(100, settings.Model{Selector: "test/fake", Label: "Fake", Credits: 1})
+	doc := testDoc(100, settings.Model{Selector: "test/fake", Label: "Fake"})
 	doc.Models.Tiers = map[string]string{"default": "test/fake"}
-	doc.Demo = settings.Demo{PerUserPerHour: 3, Enabled: true, TTLMinutes: 30, MaxActive: 3, PerAddressPerHour: 2, Credits: 2, DailyBudget: 3, Models: []string{}}
+	doc.Allowance.MaxOutputTokens = 1
+	doc.Demo = settings.Demo{PerUserPerHour: 3, Enabled: true, TTLMinutes: 30, MaxActive: 3, PerAddressPerHour: 2, Tokens: 2, DailyBudget: 3}
 	if _, err := e.store.SaveSettings(ctx, "", doc); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +107,7 @@ func TestDemos(t *testing.T) {
 
 	// The demo ledger allows demo.credits; the shared budget demo.dailyBudget.
 	v := e.view(g, true)
-	for i, want := range []int{202, 202, 402} {
+	for i, want := range []int{202, 202, 429} {
 		if code, out := e.call(g, v, "g"+string(rune('a'+i))); code != want {
 			t.Fatalf("guest call %d: %d %v", i, code, out)
 		}
@@ -126,7 +127,7 @@ func TestDemos(t *testing.T) {
 	if code, out := e.call(sg, sv, "s2"); code != 429 || errCode(out) != "demo_limit" {
 		t.Fatalf("shared daily budget: %d %v", code, out)
 	}
-	if a, _ := e.store.AllowanceFor(ctx, sub.user.ID, 100, 0); a.Used != 0 || a.Reserved != 0 {
+	if a, _ := e.store.AllowanceFor(ctx, sub.user.ID, 100); a.Used != 0 || a.Reserved != 0 {
 		t.Fatalf("demo charged the monthly allowance: %+v", a)
 	}
 
@@ -192,7 +193,7 @@ func TestSharedDemoBudgetUnderConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, errs[i] = e.store.Reserve(t.Context(), store.ReserveRequest{UserID: v.user.ID, InstanceID: "inst" + strconv.Itoa(i), CallID: "c", Model: "test/fake",
-				Credits: 1, Included: 2, Period: "demo:inst" + strconv.Itoa(i), Shared: true, SharedLimit: limit})
+				Tokens: 1, Limit: 2, Period: "demo:inst" + strconv.Itoa(i), Shared: true, SharedLimit: limit})
 		}()
 	}
 	wg.Wait()

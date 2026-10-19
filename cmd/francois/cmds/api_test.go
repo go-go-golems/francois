@@ -76,13 +76,13 @@ func TestAPICommandsCallTheAPI(t *testing.T) {
 	if err != nil || len(rows) != 1 || rows[0]["user"].(map[string]any)["role"] != "admin" {
 		t.Fatalf("whoami %v %v", rows, err)
 	}
-	rows, err = executeJSON(t, "catalog", "users", "grant", "usr_s", "--days", "30", "--reason", "beta", "--plan", "pro", "--format", "json")
+	rows, err = executeJSON(t, "catalog", "users", "grant", "usr_s", "--days", "30", "--reason", "beta", "--format", "json")
 	if err != nil || len(rows) != 1 || rows[0]["id"] != "agr_1" {
 		t.Fatalf("grant %v %v", rows, err)
 	}
 	var body map[string]any
 	_ = json.Unmarshal([]byte(f.bodies["POST /api/admin/users/usr_s/access-grants"]), &body)
-	if body["days"] != float64(30) || body["reason"] != "beta" || body["plan"] != "pro" {
+	if body["days"] != float64(30) || body["reason"] != "beta" || body["plan"] != nil {
 		t.Fatalf("grant body %v", body)
 	}
 
