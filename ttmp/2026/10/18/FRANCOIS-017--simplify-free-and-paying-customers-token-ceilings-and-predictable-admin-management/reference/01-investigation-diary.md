@@ -195,3 +195,12 @@ The user then specified that payment grants early access as well as higher limit
 - Free defaults: 10,000 generated tokens/UTC day, one saved workspace. Paying defaults: 100,000/day, ten workspaces. Default maximum output per logical run: 8,192; six global calls and one per user.
 - New API: `PUT /api/admin/users/{id}/token-ceiling` with `{limit: number|null, reason}`. A null ceiling restores the class default.
 - Artifact patch: `earlyAccessUntil` as RFC3339 or an empty string to clear. Publishing default: `publishing.earlyAccessDays`, 0–365. No scheduler is required for expiry; requests compare the stored date.
+
+## Step 5: Publish the simplification separately from the payment fixes
+
+Committed the implementation as `8708cc4` and pushed `feat/simple-customer-limits`. Opened draft PR 17, stacked on PR 16, so the original payment review fixes remain focused. PR 16 is green at `7098eed`; both new findings have explicit replies. PR 17 CI was running at publication.
+
+- **Prompt context:** See Steps 3–4. No vault report was written and no deployment was performed.
+- **Validation:** Ticket doctor and Git whitespace checks passed. Local implementation checks are recorded in Step 4; screenshots and the browser receipt explicitly identify mocked API fixtures.
+- **Review:** [PR 17](https://github.com/go-go-golems/francois/pull/17), short design, migrations 017–018 and the provider output budget are the starting points. [PR 16](https://github.com/go-go-golems/francois/pull/16) contains the separate overlap/copy corrections.
+- **Next:** Review and deploy when requested. No additional infrastructure or compatibility layer is needed.

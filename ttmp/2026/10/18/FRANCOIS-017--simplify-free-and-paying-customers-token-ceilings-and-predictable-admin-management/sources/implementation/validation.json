@@ -1,0 +1,18 @@
+{
+  "implementationCommit": "8708cc4",
+  "pullRequest": 17,
+  "paymentFixPullRequest": 16,
+  "deployed": false,
+  "vaultReportWritten": false,
+  "checks": {
+    "postgresIntegration": "passed affected tests after correcting two obsolete full-suite expectations",
+    "frontendTypes": "passed",
+    "frontendWorkerTests": 12,
+    "frontendBuild": "passed",
+    "goBuild": "passed",
+    "lint": "zero issues",
+    "logcopter": "passed",
+    "docmgrDoctor": "passed"
+  },
+  "browserEvidence": "explicit mocked API fixtures; actual policy covered by PostgreSQL integration tests"
+}
