@@ -375,6 +375,8 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) billingFailure(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, store.ErrYearFunded):
+		httpx.Fail(w, 409, "year_funded", "Your year funding is already active; no additional payment is needed")
 	case errors.Is(err, payments.ErrSubscriptionOpen):
 		httpx.Fail(w, 409, "subscription_open", "You already have a subscription; manage it from billing")
 	case errors.Is(err, payments.ErrNoCustomer):

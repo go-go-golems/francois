@@ -126,6 +126,9 @@ WHERE billing_subscriptions.user_id=EXCLUDED.user_id`,
 	return nil
 }
 
+// ErrYearFunded rejects a second payment during confirmed year standing.
+var ErrYearFunded = errors.New("year funding is already active")
+
 // Checkout attempts.
 
 type CheckoutAttempt struct {
@@ -154,19 +157,39 @@ func scanAttempt(r pgx.Row) (CheckoutAttempt, error) {
 // for price when none is open. created reports whether this call reserved
 // it; an existing attempt may be for another price.
 func (s *Store) AdmitCheckout(ctx context.Context, user, price string) (CheckoutAttempt, bool, error) {
-	// Expire open attempts whose Session lifetime has passed.
-	if _, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state='expired',updated_at=now() WHERE user_id=$1 AND state='open' AND expires_at < now()`, user); err != nil {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
 		return CheckoutAttempt{}, false, err
 	}
-	a, err := scanAttempt(s.Pool.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,price,state) VALUES($1,$2,$3,'pending') ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, price))
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, user); err != nil {
+		return CheckoutAttempt{}, false, err
+	}
+	if price == billing.YearFundingKey {
+		var active bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM checkout_attempts WHERE user_id=$1 AND price=$2 AND support_until>now())`, user, price).Scan(&active); err != nil {
+			return CheckoutAttempt{}, false, err
+		}
+		if active {
+			return CheckoutAttempt{}, false, ErrYearFunded
+		}
+	}
+	// Expire open attempts whose Session lifetime has passed.
+	if _, err := tx.Exec(ctx, `UPDATE checkout_attempts SET state='expired',updated_at=now() WHERE user_id=$1 AND state='open' AND expires_at < now()`, user); err != nil {
+		return CheckoutAttempt{}, false, err
+	}
+	a, err := scanAttempt(tx.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,price,state) VALUES($1,$2,$3,'pending') ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, price))
 	if err == nil {
-		return a, true, nil
+		return a, true, tx.Commit(ctx)
 	}
 	if !errors.Is(err, ErrNotFound) {
 		return a, false, err
 	}
-	a, err = scanAttempt(s.Pool.QueryRow(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE user_id=$1 AND state IN ('pending','open')`, user))
-	return a, false, err
+	a, err = scanAttempt(tx.QueryRow(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE user_id=$1 AND state IN ('pending','open')`, user))
+	if err != nil {
+		return a, false, err
+	}
+	return a, false, tx.Commit(ctx)
 }
 
 // OpenCheckout records the Session of an admitted attempt. ErrNotFound means

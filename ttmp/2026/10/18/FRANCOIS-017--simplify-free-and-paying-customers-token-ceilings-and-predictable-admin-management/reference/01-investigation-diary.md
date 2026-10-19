@@ -80,3 +80,48 @@ The analysis and diary are complete and docmgr validation passes. Kept the broad
 - **What changed:** Added the 3,400-word assessment, focused source relations, completed investigation task and an explicit pending design-review task.
 - **Validation:** `docmgr doctor --ticket FRANCOIS-017` passed; `git diff --check` passed. The proposal is not an implemented policy migration.
 - **Review:** Start with the conclusion, token-unit recommendation and admin summary example. No production deployment is included.
+
+## Step 3: Address the new payment review and fix the implementation scope
+
+The new review identifies repeat year funding during existing standing and outdated support copy. Added an admission-time check under the existing per-user checkout transaction and clarified the purchase description. Wrote a short design for two fixed classes, generated-token ceilings and an admin summary before changing that behavior.
+
+### Prompt Context
+**User prompt (verbatim):** “let's address the new code review comments, and then go through the simplication (write a short design doc), then implement  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      
+ Commit and push the bsidian vault when done (go-go-parc vault).”
+**Correction (verbatim):** “sorry, no project reort, but commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)”
+**Assistant interpretation:** Implement the review fixes and the simplification with focused commits and a detailed diary. Do not write a vault report.
+**Inferred user intent:** Ship an understandable Free/Paying administration and actual token ceilings without expanding infrastructure.
+
+### What I did
+- Read PR 16's latest comments: 4309640585 (year overlap) and 4309640592 (support promise).
+- Added `ErrYearFunded` and checked current year standing while admitting checkout under a user-row transaction lock. Exposed a clear HTTP 409 error.
+- Changed support copy to describe additional saved workspaces and model allowance.
+- Authored the short design in this ticket before implementing policy changes.
+
+### Why
+- Rejecting overlap is simpler than stacking payments and preserves the existing expiry semantics. Monthly subscribers may still fund their first year.
+
+### What worked
+- `TestYearFundingConfirmationAndRefund` passed against isolated PostgreSQL, including the new overlap rejection and existing monthly-customer path.
+- Prior PR head 1029788 has green CI; GitOps opening is skipped on pull requests as expected.
+
+### What didn't work
+- No new validation failure at this checkpoint.
+
+### What I learned
+- Checkout admission is the correct place to reject repeat confirmed year standing while preserving idempotent unpaid attempts.
+
+### What was tricky to build
+- Keep ordinary checkout retry behavior while adding the year-only guard; do not accidentally reject monthly subscribers' first year contribution.
+
+### What warrants a second pair of eyes
+- Admission and year projection remain separate transactions. Existing admitted attempts prevent a second open checkout; confirmed standing prevents a new one.
+
+### What should be done in the future
+- Implement the short design, then run the integration gate. No vault write or deployment.
+
+### Code review instructions
+- Review store/billing.go AdmitCheckout, routes.go billingFailure and the year regression test, then the short design.
+
+### Technical details
+- Source comments are tracked by GitHub numeric review IDs. This checkpoint does not claim broad simplification is complete.

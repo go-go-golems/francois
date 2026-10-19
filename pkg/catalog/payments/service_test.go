@@ -572,6 +572,9 @@ func TestYearFundingConfirmationAndRefund(t *testing.T) {
 	if err != nil || standing.Until == nil || !standing.Until.Equal(paidAt.AddDate(1, 0, 0)) {
 		t.Fatal("paid year not projected", err)
 	}
+	if _, err = svc.FundYear(ctx, u, "https://portal.test"); !errors.Is(err, store.ErrYearFunded) {
+		t.Fatal("overlapping year funding admitted", err)
+	}
 	refresh()
 	replayed, err := s.YearSupport(ctx, u.ID, time.Now())
 	if err != nil || !replayed.Until.Equal(*standing.Until) {
