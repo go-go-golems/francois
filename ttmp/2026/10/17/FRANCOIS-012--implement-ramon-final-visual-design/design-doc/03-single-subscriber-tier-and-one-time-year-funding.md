@@ -84,3 +84,23 @@ The return flow also checks confirmation for the exact owner-bound checkout atte
 Subscriber resolution selects the explicit public `subscriber` key; it does not select the highest ranked plan. A higher private/grant-only tier must never become the default for a paying customer. Missing or private Subscriber configuration leaves the customer on Free.
 
 Year funding is a separate payment and does not cancel an existing recurring subscription. The funded-year account view also lists ongoing monthly support, its amount and next payment date, or its scheduled stop date. The sentence about no automatic renewal applies only to the year payment.
+
+## Settlement refactor after the second P1 review
+
+The underlying defect was a lifecycle mismatch: `checkout_attempts.state=completed` described Checkout completion, but admission and reconciliation implicitly treated it as completed payment. Stripe can complete a Checkout while its payment is still processing. A null `support_until` also cannot distinguish unpaid, failed and refunded payments.
+
+Keep the Checkout lifecycle and add a separate year `payment_state`: `pending`, `paid`, `failed`, `refunded`. One pure projection (`payments.projectYearPayment`) interprets a retrieved Stripe Session and expanded PaymentIntent. The event name is a refresh trigger, not proof of settlement. `Store.CompleteEvent` writes both states and the paid-through dates together under the same per-user row lock used for checkout admission. Pending snapshots cannot overwrite an already-settled projection.
+
+| Checkout state | Payment state | Meaning |
+| --- | --- | --- |
+| open | pending | Reuse the admitted Checkout; no access yet |
+| completed | pending | Payment is settling; block another charge and keep reconciling |
+| completed | paid | Confirmed year access through the stored date |
+| completed | failed/refunded | No year access; a new purchase may be admitted |
+| expired | failed | Stripe confirmed expiry; no pending payment |
+
+Year attempts with known Session IDs are resolved through the same authoritative refresh path. Scheduling selects pending year payments regardless of age, plus active paid years for refund checks, ordered oldest-first and capped at 50 customers per reconciliation pass. The local Session expiry clock cannot prove settlement failure. Once a Session ID is known, checkout retries retrieve/retire that Session instead of issuing CreateCheckout again with a potentially expired idempotency key.
+
+Webhook event names have one source: `pkg/catalog/payments/webhook-events.txt`. Go embeds it, Compose mounts it, and the production endpoint instructions reference it. This includes async checkout success/failure and refunds. Updating application acceptance alone does not change an existing Stripe endpoint; apply the same file's list when configuring that endpoint.
+
+Primary reference: [Stripe payment fulfillment and delayed outcomes](https://docs.stripe.com/payments/existing-customers?platform=web&ui=stripe-hosted). This is a small domain correction, not a new queue, framework or billing service.

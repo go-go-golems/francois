@@ -126,12 +126,16 @@ WHERE billing_subscriptions.user_id=EXCLUDED.user_id`,
 	return nil
 }
 
+// ErrPaymentPending blocks a new charge while a year payment is unresolved.
+var ErrPaymentPending = errors.New("a year payment is still settling")
+
 // ErrYearFunded rejects a second payment during confirmed year standing.
 var ErrYearFunded = errors.New("year funding is already active")
 
 // Checkout attempts.
 
 type CheckoutAttempt struct {
+	PaymentState  *string    `json:"paymentState,omitempty"`
 	SupportPaidAt *time.Time `json:"supportPaidAt,omitempty"`
 	SupportUntil  *time.Time `json:"supportUntil,omitempty"`
 	ID            string     `json:"id"`
@@ -145,11 +149,11 @@ type CheckoutAttempt struct {
 	CreatedAt     time.Time  `json:"createdAt"`
 }
 
-const attemptColumns = `id,user_id,price,state,session_id,session_url,expires_at,error_code,created_at,support_paid_at,support_until`
+const attemptColumns = `id,user_id,price,state,session_id,session_url,expires_at,error_code,created_at,support_paid_at,support_until,payment_state`
 
 func scanAttempt(r pgx.Row) (CheckoutAttempt, error) {
 	var a CheckoutAttempt
-	err := r.Scan(&a.ID, &a.UserID, &a.Price, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt, &a.SupportPaidAt, &a.SupportUntil)
+	err := r.Scan(&a.ID, &a.UserID, &a.Price, &a.State, &a.SessionID, &a.SessionURL, &a.ExpiresAt, &a.ErrorCode, &a.CreatedAt, &a.SupportPaidAt, &a.SupportUntil, &a.PaymentState)
 	return a, notFound(err)
 }
 
@@ -165,6 +169,13 @@ func (s *Store) AdmitCheckout(ctx context.Context, user, price string) (Checkout
 	if _, err = tx.Exec(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, user); err != nil {
 		return CheckoutAttempt{}, false, err
 	}
+	var settling bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM checkout_attempts WHERE user_id=$1 AND payment_state='pending' AND state='completed')`, user).Scan(&settling); err != nil {
+		return CheckoutAttempt{}, false, err
+	}
+	if settling {
+		return CheckoutAttempt{}, false, ErrPaymentPending
+	}
 	if price == billing.YearFundingKey {
 		var active bool
 		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM checkout_attempts WHERE user_id=$1 AND price=$2 AND support_until>now())`, user, price).Scan(&active); err != nil {
@@ -174,11 +185,13 @@ func (s *Store) AdmitCheckout(ctx context.Context, user, price string) (Checkout
 			return CheckoutAttempt{}, false, ErrYearFunded
 		}
 	}
-	// Expire open attempts whose Session lifetime has passed.
-	if _, err := tx.Exec(ctx, `UPDATE checkout_attempts SET state='expired',updated_at=now() WHERE user_id=$1 AND state='open' AND expires_at < now()`, user); err != nil {
+	// A year Session may have completed with delayed settlement. Its local
+	// expires_at cannot prove the payment expired; only Stripe can resolve it.
+	// Subscription attempts retain their existing local expiry behavior.
+	if _, err := tx.Exec(ctx, `UPDATE checkout_attempts SET state='expired',updated_at=now() WHERE user_id=$1 AND state='open' AND payment_state IS NULL AND expires_at < now()`, user); err != nil {
 		return CheckoutAttempt{}, false, err
 	}
-	a, err := scanAttempt(tx.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,price,state) VALUES($1,$2,$3,'pending') ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, price))
+	a, err := scanAttempt(tx.QueryRow(ctx, `INSERT INTO checkout_attempts(id,user_id,price,state,payment_state) VALUES($1,$2,$3,'pending',CASE WHEN $3=$4 THEN 'pending' END) ON CONFLICT DO NOTHING RETURNING `+attemptColumns, NewID("chk_"), user, price, billing.YearFundingKey))
 	if err == nil {
 		return a, true, tx.Commit(ctx)
 	}
@@ -203,7 +216,7 @@ func (s *Store) OpenCheckout(ctx context.Context, id, session, url string, expir
 }
 
 func (s *Store) FinishCheckout(ctx context.Context, id, state, code string) error {
-	_, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state=$2,error_code=NULLIF($3,''),updated_at=now() WHERE id=$1 AND state IN ('pending','open')`, id, state, code)
+	_, err := s.Pool.Exec(ctx, `UPDATE checkout_attempts SET state=$2,error_code=NULLIF($3,''),payment_state=CASE WHEN $2 IN ('failed','expired') AND payment_state='pending' THEN 'failed' ELSE payment_state END,updated_at=now() WHERE id=$1 AND state IN ('pending','open')`, id, state, code)
 	return err
 }
 
@@ -221,7 +234,7 @@ func (s *Store) CheckoutAttempts(ctx context.Context, user string, limit int) ([
 
 // DueCheckouts lists pending/open attempts for reconciliation.
 func (s *Store) DueCheckouts(ctx context.Context) ([]CheckoutAttempt, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE state IN ('pending','open') AND updated_at < now() - interval '2 minutes' LIMIT 50`)
+	rows, err := s.Pool.Query(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE state IN ('pending','open') AND (price<>$1 OR session_id IS NULL) AND updated_at < now() - interval '2 minutes' ORDER BY updated_at,id LIMIT 50`, billing.YearFundingKey)
 	if err != nil {
 		return nil, err
 	}
@@ -298,12 +311,15 @@ func (s *Store) CompleteEvent(ctx context.Context, e StripeEvent, user string, s
 		return errors.Wrap(ErrConflict, "event lease lost")
 	}
 	if user != "" {
+		if _, err = tx.Exec(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, user); err != nil {
+			return err
+		}
 		if err = upsertSubscriptions(ctx, tx, user, subs, e.Livemode); err != nil {
 			return err
 		}
 	}
 	for _, year := range years {
-		if _, err = tx.Exec(ctx, `UPDATE checkout_attempts SET support_paid_at=$3,support_until=$4,updated_at=now() WHERE id=$1 AND user_id=$2 AND price=$5`, year.AttemptID, user, year.PaidAt, year.Until, billing.YearFundingKey); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE checkout_attempts SET support_paid_at=$3,support_until=$4,state=$6,payment_state=$7,updated_at=now() WHERE id=$1 AND user_id=$2 AND price=$5 AND (payment_state='pending' OR $7<>'pending')`, year.AttemptID, user, year.PaidAt, year.Until, billing.YearFundingKey, year.CheckoutState, year.PaymentState); err != nil {
 			return err
 		}
 	}
@@ -370,7 +386,16 @@ func (s *Store) BillingHealth(ctx context.Context) (BillingHealth, error) {
 
 // KnownCustomers with nonterminal subscriptions, for scheduled reconciliation.
 func (s *Store) CustomersToReconcile(ctx context.Context) ([]string, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT stripe_customer_id FROM billing_subscriptions WHERE status NOT IN ('canceled','incomplete_expired') AND refreshed_at < now() - interval '6 hours' UNION SELECT c.stripe_customer_id FROM billing_customers c JOIN checkout_attempts a ON a.user_id=c.user_id WHERE a.support_until>now() AND a.updated_at<now()-interval '6 hours'`)
+	rows, err := s.Pool.Query(ctx, `SELECT customer FROM (
+ SELECT stripe_customer_id AS customer,refreshed_at AS due FROM billing_subscriptions
+ WHERE status NOT IN ('canceled','incomplete_expired') AND refreshed_at<now()-interval '6 hours'
+ UNION ALL
+ SELECT c.stripe_customer_id,a.updated_at FROM billing_customers c JOIN checkout_attempts a ON a.user_id=c.user_id
+ WHERE a.session_id IS NOT NULL AND (
+ (a.payment_state='pending' AND a.updated_at<now()-interval '2 minutes') OR
+ (a.support_until>now() AND a.updated_at<now()-interval '6 hours'))
+ ) due GROUP BY customer ORDER BY min(due),customer LIMIT 50`)
+
 	if err != nil {
 		return nil, err
 	}

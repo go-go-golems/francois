@@ -702,3 +702,61 @@ Corrected two independent mistakes identified by automated review: a year-funded
 
 ### Technical details
 - Original PR head: d847ba4. Review IDs are GitHub inline comment identifiers, not new tickets. No payment was submitted during this correction.
+
+## Step 13: Fix the lifecycle mismatch behind the new P1s
+
+Investigated the common cause before patching the new comments. Checkout completion was being used as payment completion, while a missing paid-through date stood in for several different outcomes. Admission could therefore accept another purchase and reconciliation could stop checking the unresolved first payment. Added an explicit year payment state and one authoritative projection, with settlement and access dates committed together.
+
+The same investigation found a related retry issue: after a known Session's local expiry, reissuing CreateCheckout with an old idempotency key could create a second charge once Stripe discarded that key. Known Sessions are now retrieved/retired, and only authoritative failure/expiry releases an unsettled year purchase. Consolidated webhook delivery configuration to prevent the event-list drift identified by the P2.
+
+### Prompt Context
+**User prompts (verbatim):** “More P1s on https://github.com/go-go-golems/francois/pull/16”; “Check if there some systemic pattern underneath that might be the issue here and a refactor could simplify things (and thus make them more robust)?”
+**Assistant interpretation:** Diagnose the shared failure pattern, implement a small corrective refactor on PR 16, and carry it into the stacked simplification branch.
+**Inferred user intent:** Stop recurring payment defects by simplifying the underlying state model, while keeping changes concrete and reviewable.
+
+### What I did
+- Read comments 4309943413 (repeat async payment), 4309943417 (missed-webhook reconciliation) and 4309943422 (refund delivery configuration).
+- Verified Stripe's documented distinction between completed Checkout and delayed payment outcomes.
+- Added migration 017_year_payment_state.sql. Existing unconfirmed year completions become pending until Stripe resolves their actual outcome; no historical payment is silently assumed failed.
+- Added projectYearPayment and expanded PaymentIntent failure detection. Kept checkout status separate from pending/paid/failed/refunded payment status.
+- Made event completion write payment state, checkout state and access dates atomically, using the same user row lock as admission. Prevented pending snapshots from overwriting settled outcomes.
+- Kept completed-but-unpaid payments blocking new charges. Removed local-clock expiration of year attempts and stopped recreating known Sessions with old idempotency keys.
+- Unified known year payment reconciliation through the existing authoritative event path, with oldest-first batches of at most 50 customers and no age cutoff that would abandon pending funds.
+- Added one embedded/mounted event list shared by Go, Compose and production instructions, including async success/failure and refunds.
+- Added lifecycle regressions for a missed delayed-payment webhook, definitive failure releasing admission, local expiry while Stripe is complete, and single-projection invariants. No payment was submitted.
+
+### Why
+- Fixing isolated SQL predicates would leave the ambiguous meaning of completed intact. A separate payment state lets admission, reconciliation and access use the same explicit fact.
+- Retained the existing durable inbox and worker; no extra queue, scheduler, compatibility adapter or service is required.
+
+### What worked
+- Database-backed payment and catalog tests passed: payments 2.446s, catalog 18.430s. This includes the existing monthly/year/refund/ownership suite and the new async lifecycle cases.
+- The missed-webhook test settles a pending payment aged 40 days using scheduled reconciliation alone, without a browser return or success webhook.
+- Required lint and logcopter checks passed with zero issues.
+- `docker compose -f deploy/compose/compose.yaml config --quiet` passed without printing configuration or credentials.
+
+### What didn't work
+- The sandbox mount setup failed: `bwrap: Can't bind mount /oldroot/ ... /newroot/mnt/pico: No such device`. Used approved direct execution for the same read/edit/check operations.
+- `docker compose ... config --quiet --no-interpolate` rejected a pre-existing variable-containing bind mount with `too many colons`. Normal quiet Compose validation passed with standard interpolation.
+
+### What I learned
+- A local expiry timestamp is not proof that an asynchronous payment failed. Likewise, an event called completed is not proof of settled funds.
+- Independent webhook allowlists in source and deployment settings drift even when the application correctly supports an event.
+
+### What was tricky to build
+- Preserve idempotent reuse of an admitted open checkout while blocking a second payment after Checkout completion. Year-state projection and admission share the user-row lock so freeing the open index cannot race ahead of paid standing.
+- Refund and failure clear year standing without turning the row back into an ambiguous unconfirmed completion. Unknown/missing payment timestamps remain pending and retryable by reconciliation.
+
+### What warrants a second pair of eyes
+- Review the payment projection, user-row lock ordering, conditional update that rejects stale pending state, and the known-Session retry path. Check that a definitive failure releases admission but processing never does.
+- The repository/runbook now share webhook event configuration; an existing remote Stripe endpoint still needs that list applied when deploying. No remote endpoint was mutated here.
+
+### What should be done in the future
+- Push the corrections, reply to the findings, and merge the fix branch into the stacked simplification branch. No production deployment is included.
+
+### Code review instructions
+- Start with payments/year_payment.go and its lifecycle tests, then migration 017_year_payment_state.sql, Store.CompleteEvent/AdmitCheckout/CustomersToReconcile, and the shared webhook event file.
+
+### Technical details
+- Primary source: https://docs.stripe.com/payments/existing-customers?platform=web&ui=stripe-hosted
+- Tests use the isolated PostgreSQL fixture on port 5437, deterministic Stripe fakes, and no live payments or credentials.

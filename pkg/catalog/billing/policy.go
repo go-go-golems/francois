@@ -144,7 +144,9 @@ const YearFundingCents int64 = 99999999
 const YearFundingKey = "support:year:99999999"
 
 type YearSupport struct {
-	AttemptID string
-	PaidAt    *time.Time
-	Until     *time.Time
+	CheckoutState string
+	PaymentState  string
+	AttemptID     string
+	PaidAt        *time.Time
+	Until         *time.Time
 }

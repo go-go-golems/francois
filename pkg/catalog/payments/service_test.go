@@ -67,7 +67,7 @@ func (f *fakeGateway) CreateCheckout(_ context.Context, r CheckoutRequest) (Chec
 	}
 	f.creates++
 	f.requests = append(f.requests, r)
-	s := CheckoutSession{ID: "cs_" + store.RandomHex(4), URL: "https://checkout.test/" + r.AttemptID, Status: "open", CustomerID: r.CustomerID, ExpiresAt: time.Now().Add(time.Hour)}
+	s := CheckoutSession{YearFunding: r.YearFunding, ID: "cs_" + store.RandomHex(4), URL: "https://checkout.test/" + r.AttemptID, Status: "open", CustomerID: r.CustomerID, ExpiresAt: time.Now().Add(time.Hour)}
 	f.sessions[r.IdempotencyKey] = s
 	if f.failOnce {
 		f.failOnce = false

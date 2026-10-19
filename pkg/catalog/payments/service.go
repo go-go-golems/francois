@@ -15,6 +15,7 @@ var (
 	// second Checkout.
 	ErrSubscriptionOpen = errors.New("an open subscription already exists")
 	ErrNoCustomer       = errors.New("no billing account yet")
+	ErrCheckoutExpired  = errors.New("the earlier checkout expired; try again")
 	ErrForeignSession   = errors.New("checkout session does not belong to this account")
 	// ErrCheckoutSuperseded: a concurrent request for another plan replaced
 	// this Checkout.
@@ -123,6 +124,14 @@ func (s *Service) checkout(ctx context.Context, u store.User, price string, acce
 	if attempt.State == "open" && attempt.SessionURL != nil && attempt.ExpiresAt != nil && time.Now().Before(*attempt.ExpiresAt) {
 		return *attempt.SessionURL, nil
 	}
+	// Once a Session ID is known, never recreate it with the old idempotency
+	// key: Stripe can evict that key while an async payment is still settling.
+	if attempt.SessionID != nil {
+		if err = s.supersede(ctx, attempt); err != nil {
+			return "", err
+		}
+		return "", ErrCheckoutExpired
+	}
 	// Pending: first try or an uncertain earlier try; the same key returns
 	// the same Session from Stripe.
 	successPath := "/account"
@@ -169,6 +178,9 @@ func (s *Service) supersede(ctx context.Context, a store.CheckoutAttempt) error 
 			if cs.CustomerID != "" {
 				_ = s.Store.EnqueueRefresh(ctx, cs.CustomerID, "checkout")
 				s.Wake()
+			}
+			if a.Price == billing.YearFundingKey {
+				return store.ErrPaymentPending
 			}
 			return ErrSubscriptionOpen
 		case "open":
@@ -321,17 +333,16 @@ func (s *Service) processOne(ctx context.Context) (bool, error) {
 		if cs.CustomerID != customer {
 			return true, s.Store.FailEvent(ctx, e, "checkout_owner_mismatch", backoff, terminal)
 		}
-		year := billing.YearSupport{AttemptID: attempt.ID}
-		if cs.Status == "complete" && cs.YearFunding && cs.PaymentPaid && !cs.Refunded && cs.PaidAt != nil {
-			until := cs.PaidAt.AddDate(1, 0, 0)
-			year.PaidAt = cs.PaidAt
-			year.Until = &until
+		year, err := projectYearPayment(attempt.ID, cs)
+		if err != nil {
+			return true, s.Store.FailEvent(ctx, e, "invalid_year_checkout", backoff, terminal)
 		}
+
 		years = append(years, year)
 	}
 
 	if e.SessionID != "" {
-		if a, aerr := s.Store.CheckoutBySession(ctx, e.SessionID); aerr == nil {
+		if a, aerr := s.Store.CheckoutBySession(ctx, e.SessionID); aerr == nil && a.Price != billing.YearFundingKey {
 			state := "completed"
 			if e.Type == "checkout.session.expired" {
 				state = "expired"

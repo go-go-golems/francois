@@ -375,6 +375,10 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) billingFailure(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, payments.ErrCheckoutExpired):
+		httpx.Fail(w, 409, "checkout_expired", "The earlier checkout expired; please try again")
+	case errors.Is(err, store.ErrPaymentPending):
+		httpx.Fail(w, 409, "payment_pending", "Your year payment is still processing; no additional payment is needed")
 	case errors.Is(err, store.ErrYearFunded):
 		httpx.Fail(w, 409, "year_funded", "Your year funding is already active; no additional payment is needed")
 	case errors.Is(err, payments.ErrSubscriptionOpen):

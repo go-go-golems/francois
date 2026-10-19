@@ -35,3 +35,7 @@ Implemented one-time Stripe Fund a year at 999999.99 USD and unified confirmed s
 ## 2026-10-18
 
 Address PR 16 review: disclose continuing monthly renewal alongside year funding and select the explicit public Subscriber tier; catalog/frontend/lint checks pass.
+
+## 2026-10-18
+
+Address systemic async-payment lifecycle mismatch in PR 16: explicit settlement state, atomic access projection, bounded reconciliation, safe known-session retries and one shared webhook event list.

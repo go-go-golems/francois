@@ -8,7 +8,7 @@ import (
 
 // YearCheckouts are owner-bound attempts needing authoritative payment refresh.
 func (s *Store) YearCheckouts(ctx context.Context, user string) ([]CheckoutAttempt, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE user_id=$1 AND price=$2 AND session_id IS NOT NULL AND state IN ('open','completed') AND (support_until IS NULL OR support_until>now())`, user, billing.YearFundingKey)
+	rows, err := s.Pool.Query(ctx, `SELECT `+attemptColumns+` FROM checkout_attempts WHERE user_id=$1 AND price=$2 AND session_id IS NOT NULL AND (payment_state='pending' OR support_until>now())`, user, billing.YearFundingKey)
 	if err != nil {
 		return nil, err
 	}

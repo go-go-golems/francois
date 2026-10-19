@@ -93,3 +93,15 @@ func TestYearFundingPaymentProjection(t *testing.T) {
 		t.Fatal("refund lost")
 	}
 }
+
+func TestYearPaymentFailureUsesAuthoritativeIntentStatus(t *testing.T) {
+	for _, status := range []stripe.PaymentIntentStatus{stripe.PaymentIntentStatusCanceled, stripe.PaymentIntentStatusRequiresPaymentMethod} {
+		got := session(&stripe.CheckoutSession{PaymentIntent: &stripe.PaymentIntent{Status: status}})
+		if !got.PaymentFailed {
+			t.Fatalf("terminal intent %s not recognized", status)
+		}
+	}
+	if session(&stripe.CheckoutSession{PaymentIntent: &stripe.PaymentIntent{Status: stripe.PaymentIntentStatusProcessing}}).PaymentFailed {
+		t.Fatal("processing intent treated as failed")
+	}
+}

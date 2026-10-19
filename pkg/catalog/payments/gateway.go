@@ -5,6 +5,7 @@ package payments
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"strings"
 	"time"
@@ -22,16 +23,17 @@ type CheckoutRequest struct {
 }
 
 type CheckoutSession struct {
-	YearFunding bool
-	PaymentPaid bool
-	Refunded    bool
-	AmountCents int64
-	PaidAt      *time.Time
-	ID          string
-	URL         string
-	Status      string // open|complete|expired
-	CustomerID  string
-	ExpiresAt   time.Time
+	YearFunding   bool
+	PaymentPaid   bool
+	PaymentFailed bool
+	Refunded      bool
+	AmountCents   int64
+	PaidAt        *time.Time
+	ID            string
+	URL           string
+	Status        string // open|complete|expired
+	CustomerID    string
+	ExpiresAt     time.Time
 }
 
 // Event is the minimal routing data extracted from a verified webhook.
@@ -100,6 +102,9 @@ func session(s *stripe.CheckoutSession) CheckoutSession {
 	out := CheckoutSession{ID: s.ID, URL: s.URL, Status: string(s.Status), ExpiresAt: time.Unix(s.ExpiresAt, 0).UTC()}
 	if s.Customer != nil {
 		out.CustomerID = s.Customer.ID
+	}
+	if s.PaymentIntent != nil {
+		out.PaymentFailed = s.PaymentIntent.Status == stripe.PaymentIntentStatusCanceled || s.PaymentIntent.Status == stripe.PaymentIntentStatusRequiresPaymentMethod
 	}
 	out.AmountCents = s.AmountTotal
 	out.YearFunding = s.Mode == stripe.CheckoutSessionModePayment && s.Currency == stripe.CurrencyUSD && s.AmountTotal == billing.YearFundingCents && s.Metadata["francois_year_funding"] == "true"
@@ -250,14 +255,20 @@ func (g *stripeGateway) CustomerSubscriptions(ctx context.Context, customer stri
 	return out, nil
 }
 
-var supported = map[string]bool{
-	"charge.refunded":               true,
-	"customer.subscription.created": true, "customer.subscription.updated": true, "customer.subscription.deleted": true,
-	"customer.subscription.paused": true, "customer.subscription.resumed": true,
-	"checkout.session.completed": true, "checkout.session.expired": true,
-	"checkout.session.async_payment_succeeded": true, "checkout.session.async_payment_failed": true,
-	"invoice.paid": true, "invoice.payment_failed": true, "invoice.payment_action_required": true, "invoice.finalization_failed": true,
-}
+//go:embed webhook-events.txt
+var webhookEvents string
+
+// WebhookEventsCSV is also mounted by the Compose Stripe listener. Keep the
+// application's allowlist and delivery configuration on one source.
+func WebhookEventsCSV() string { return strings.TrimSpace(webhookEvents) }
+
+var supported = func() map[string]bool {
+	m := map[string]bool{}
+	for _, name := range strings.Split(WebhookEventsCSV(), ",") {
+		m[name] = true
+	}
+	return m
+}()
 
 func (g *stripeGateway) ConstructEvent(payload []byte, signature string) (Event, error) {
 	var last error
