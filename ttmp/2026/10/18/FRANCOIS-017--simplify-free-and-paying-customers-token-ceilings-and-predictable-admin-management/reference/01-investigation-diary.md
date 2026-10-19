@@ -241,7 +241,7 @@ PR 16 was merged into main as `40072ce`. Rebased `feat/simple-customer-limits` o
 - File-tree equality establishes that the integration evidence in Steps 4 and 6 still describes the application being published. No application checks were repeated solely for this ancestry change.
 
 ### What didn't work
-- No rebase or verification failures occurred. Repository discovery found no checked-in AGENTS.md files; the user-provided instructions remain applicable.
+- No rebase or verification failures occurred. `gh pr edit 17 --repo go-go-golems/francois --body-file /tmp/francois-pr17-ready-body.md` failed because this gh version queries deprecated `repository.pullRequest.projectCards` (Projects classic). Updated the description through the REST pulls endpoint instead. Repository discovery found no checked-in AGENTS.md files; the user-provided instructions remain applicable.
 
 ### What I learned
 - GitHub had already retargeted PR 17 to main after PR 16 merged; no separate base change is needed.
@@ -253,7 +253,7 @@ PR 16 was merged into main as `40072ce`. Rebased `feat/simple-customer-limits` o
 - The substantive review remains the daily-token accounting, worker output budget, early-access enforcement and admin presentation described in Steps 4–6.
 
 ### What should be done in the future
-- Push with the recorded lease, mark PR 17 ready, and inspect GitHub's resulting head and readiness. No deployment or vault write is part of this request.
+- PR 17 is published against main and marked ready for review (`isDraft=false`, state OPEN), verified through GitHub. No deployment or vault write is part of this request.
 
 ### Code review instructions
 - Review PR 17 against main using the short design and the review starting points in Step 4. Payment settlement corrections are already part of the base.
