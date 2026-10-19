@@ -204,3 +204,14 @@ Committed the implementation as `8708cc4` and pushed `feat/simple-customer-limit
 - **Validation:** Ticket doctor and Git whitespace checks passed. Local implementation checks are recorded in Step 4; screenshots and the browser receipt explicitly identify mocked API fixtures.
 - **Review:** [PR 17](https://github.com/go-go-golems/francois/pull/17), short design, migrations 017–018 and the provider output budget are the starting points. [PR 16](https://github.com/go-go-golems/francois/pull/16) contains the separate overlap/copy corrections.
 - **Next:** Review and deploy when requested. No additional infrastructure or compatibility layer is needed.
+
+## Step 6: Integrate the systemic payment settlement correction
+
+Merged PR 16 correction `4be76a0` into the simplification branch as `d982ea0`. The new payment-state migration composes with the daily-token and early-access migrations; the complete payment/catalog integration tests pass on the combined branch.
+
+- **Prompt context:** The new review and systemic-refactor requests are recorded verbatim in ticket 012, Step 13.
+- **Change:** Checkout completion and year payment settlement are independent. Pending funds block another purchase and remain scheduled for authoritative reconciliation. Known Stripe Sessions are retrieved/retired instead of recreated. Application and Compose use one webhook event list.
+- **Validation:** Combined PostgreSQL tests passed: payments 4.433s, catalog 22.111s. PR 16's lint/logcopter and quiet Compose checks passed before merging. Fresh PR CI was running at publication.
+- **Review evidence:** Replies posted to 4309943413, 4309943417 and 4309943422. The lifecycle test recovers a 40-day-old pending payment without a success webhook or browser return.
+- **External reference:** https://docs.stripe.com/api/idempotent_requests confirms that a pruned key can create a new request; stored Session IDs remain the identity of an existing payment attempt.
+- **Deployment:** No production application or Stripe webhook endpoint was mutated. Apply the shared event list to existing remote endpoints when configuring/deploying them.
