@@ -86,8 +86,7 @@ The analysis and diary are complete and docmgr validation passes. Kept the broad
 The new review identifies repeat year funding during existing standing and outdated support copy. Added an admission-time check under the existing per-user checkout transaction and clarified the purchase description. Wrote a short design for two fixed classes, generated-token ceilings and an admin summary before changing that behavior.
 
 ### Prompt Context
-**User prompt (verbatim):** “let's address the new code review comments, and then go through the simplication (write a short design doc), then implement  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      
- Commit and push the bsidian vault when done (go-go-parc vault).”
+**User prompt (verbatim, JSON-encoded to preserve whitespace):** "let's address the new code review comments, and then go through the simplication (write a short design doc), then implement  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      \n Commit and push the bsidian vault when done (go-go-parc vault)."
 **Correction (verbatim):** “sorry, no project reort, but commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)”
 **Assistant interpretation:** Implement the review fixes and the simplification with focused commits and a detailed diary. Do not write a vault report.
 **Inferred user intent:** Ship an understandable Free/Paying administration and actual token ceilings without expanding infrastructure.
