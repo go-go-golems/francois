@@ -497,7 +497,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	}
 	lines := []releaseLine{}
 	for _, rel := range rels {
-		l := releaseLine{Release: rel, Locked: (!rel.FreeSample || a.EarlyAccess(time.Now())) && !mayDownload}
+		l := releaseLine{Release: rel, Locked: !rel.FreeSample && !mayDownload}
 		for _, a := range rel.Attachments {
 			al := attachmentLine{Title: firstNonEmpty(a.Label, a.Name), Name: a.Name, Size: a.Size}
 			if !l.Locked {
@@ -505,7 +505,7 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			}
 			l.Attached = append(l.Attached, al)
 		}
-		if rel.FreeSample || mayDownload {
+		if !l.Locked {
 			for _, f := range rel.Files {
 				if f.Role != "html" {
 					continue

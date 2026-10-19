@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,12 +50,37 @@ func TestEarlyAccessAcrossRunDownloadAndDemo(t *testing.T) {
 	if code, out := e.portal(&free, "POST", "/api/demos", map[string]string{"artifactId": "early"}); code != 403 || errCode(out) != "early_access" {
 		t.Fatalf("early demo %d %v", code, out)
 	}
-	// Free samples cannot bypass the artifact's explicit early-access window.
+	// An explicit free sample remains downloadable during early access;
+	// hosted runs and demos still require Paying access.
+	code, attachment := e.multipartTo(admin, "/api/studio/releases/"+release+"/attachments", nil, "file", "manual.txt", []byte("sample manual"))
+	if code != 201 {
+		t.Fatal(code, attachment)
+	}
+	attachmentPath := "/api/releases/" + release + "/attachments/" + attachment["id"].(string) + "/download"
+	filePath := downloadPath(t, e, release)
+	for _, actor := range []*tactor{nil, &free} {
+		if code, page, _ := e.do(actor, "portal.test", "GET", "/apps/early", nil, nil); code != 200 || strings.Contains(string(page), `href="`+filePath+`"`) || strings.Contains(string(page), `href="`+attachmentPath+`"`) {
+			t.Fatalf("restricted page advertises downloads: %d %s", code, page)
+		}
+	}
 	if _, err = e.store.Pool.Exec(ctx, `UPDATE releases SET free_sample=true WHERE id=$1`, release); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, _ := e.do(&free, "portal.test", "GET", downloadPath(t, e, release), nil, nil); code != 403 {
-		t.Fatal("free sample bypassed early access", code)
+	for _, actor := range []*tactor{nil, &free, &paid} {
+		for _, path := range []string{filePath, attachmentPath} {
+			if code, _, _ := e.do(actor, "portal.test", "GET", path, nil, nil); code != 200 {
+				t.Fatalf("free sample download %s: %d", path, code)
+			}
+		}
+		if code, page, _ := e.do(actor, "portal.test", "GET", "/apps/early", nil, nil); code != 200 || !strings.Contains(string(page), `href="`+filePath+`"`) || !strings.Contains(string(page), `href="`+attachmentPath+`"`) {
+			t.Fatalf("sample page missing downloads: %d %s", code, page)
+		}
+	}
+	if code, out := e.portal(&free, "POST", "/api/instances", map[string]string{"releaseId": release}); code != 403 {
+		t.Fatalf("free sample hosted run during early access: %d %v", code, out)
+	}
+	if code, out := e.portal(&free, "POST", "/api/demos", map[string]string{"artifactId": "early"}); code != 403 || errCode(out) != "early_access" {
+		t.Fatalf("free sample hosted demo during early access: %d %v", code, out)
 	}
 	// A later release never restarts the artifact's early-access clock.
 	code, rel := e.release(admin, "early", "1.1.0")

@@ -261,3 +261,49 @@ PR 16 was merged into main as `40072ce`. Rebased `feat/simple-customer-limits` o
 ### Technical details
 - Previous remote head for the push lease: `55960de464148af9472f152df6595d6d372e60e5`.
 - Rebased unique commits: `4d14150`, `663420e`, `15b17a9`; this checkpoint adds documentation only.
+
+
+## Step 8: Keep explicitly marked free samples downloadable during early access
+
+The reviewer identified an inconsistency: the public page exposed an HTML download while the early-access gate rejected it. The user clarified that a free sample should be downloadable. Corrected the underlying policy instead of hiding a deliberately public sample. This supersedes the free-sample restriction described in Step 4; that earlier entry remains historical evidence.
+
+### Prompt Context
+**User prompt (verbatim, policy clarification):** “Do we actualy need to tighten? if it's a free sample it should be downloadable”
+**Assistant interpretation:** Preserve explicit free-sample downloads throughout early access and align HTML and attachment link presentation with that policy.
+**Inferred user intent:** An editor's free-sample flag is a deliberate public-download choice, independent of Paying early access to the hosted application.
+
+### What I did
+- Moved the `rel.FreeSample` success branch ahead of the artifact early-access lookup in `mayDownload`. Existing disabled-account denial remains first.
+- Restored `!rel.FreeSample && !mayDownload` for page locking and used `!l.Locked` for HTML download population, matching attachment link rendering.
+- Expanded the existing early-access integration test to check anonymous, Free and Paying sample downloads for both HTML and an attachment, plus matching public-page links. Ordinary restricted releases do not advertise downloads. Hosted Free runs and demos remain denied during early access.
+- Updated the short design to state the explicit sample exception. No migration or new configuration is needed.
+
+### Why
+- The reported mismatch exposed an overly broad implementation decision. Hiding the link would preserve the wrong sample policy; restoring the explicit download exception satisfies the user's clarification.
+
+### What worked
+- Source edits, `gofmt` and `git diff --check` completed. Diff review confirms both download kinds use the existing shared endpoint rule and one page lock condition.
+- `GOCACHE=/tmp/francois-go-cache go test ./pkg/catalog -run 'TestEarlyAccessAcrossRunDownloadAndDemo|TestArtifactPageLatestDownload|TestAttachments' -count=1 -v` compiled successfully (package 0.032s). All three integration tests were explicitly skipped because `TEST_DATABASE_URL` was unset; this is compile evidence, not behavioral validation.
+
+### What didn't work
+- Automatic approval review twice rejected execution because its reviewer was unavailable: `Selected model is at capacity. Please try a different model.` This was an approval infrastructure failure, not an unsafe-action determination. The first read-only inspection succeeded through the normal sandbox; Docker access remained unavailable.
+- `docker ps --format '{{.Names}}\t{{.Ports}}'` in the sandbox failed with `connect: operation not permitted`. PostgreSQL probes on ports 5437 and 5435 reported `no response`; database-backed behavior has not yet been qualified in this checkpoint.
+- Initial `go test ./pkg/catalog -run 'TestEarlyAccessAcrossRunDownloadAndDemo|TestArtifactPageLatestDownload|TestAttachments' -count=1 -v` failed writing `/home/manuel/.cache/go-build`: `read-only file system`. Retried with `GOCACHE=/tmp/francois-go-cache`; results are recorded below when available.
+
+### What I learned
+- Early-access restrictions and an explicit public sample serve separate decisions. The download exception does not imply free hosted compute.
+
+### What was tricky to build
+- HTML links and attachment links previously used separate Boolean expressions. Both now use the release line's lock state, while the endpoint recognizes the same public-sample exception.
+
+### What warrants a second pair of eyes
+- Check the ordinary-release early-access denials alongside sample HTML and attachment permissions. Hosted runtime and demo gates were intentionally left unchanged.
+
+### What should be done in the future
+- Complete the focused database test, commit and publish this correction when infrastructure permits. No production deployment is included.
+
+### Code review instructions
+- Start with `routes.go:mayDownload`, the release loop in `pages.go:artifactPage`, then `TestEarlyAccessAcrossRunDownloadAndDemo`. The short design explicitly documents the updated exception.
+
+### Technical details
+- `freeSample=true`: public release-file and attachment downloads, including during early access. Other releases retain sign-in and early-access authorization. Saved workspace creation and demos still apply the artifact's early-access date.

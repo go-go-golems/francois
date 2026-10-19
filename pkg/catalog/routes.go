@@ -255,13 +255,13 @@ func (s *Server) mayDownload(w http.ResponseWriter, r *http.Request, rel store.R
 		httpx.Fail(w, 403, billing.ReasonDisabled, "This account is disabled")
 		return false
 	}
+	if rel.FreeSample {
+		return true
+	}
 	a, err := s.Store.Artifact(r.Context(), rel.ArtifactID)
 	if err != nil {
 		httpx.Fail(w, 503, "unavailable", "Access check failed")
 		return false
-	}
-	if rel.FreeSample && !a.EarlyAccess(time.Now()) {
-		return true
 	}
 	if p == nil {
 		httpx.Fail(w, 401, "login_required", "Sign in to download; early access requires Paying access")

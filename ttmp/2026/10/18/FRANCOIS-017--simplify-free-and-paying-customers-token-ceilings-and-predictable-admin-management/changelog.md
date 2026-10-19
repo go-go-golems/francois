@@ -23,3 +23,7 @@ Integrated PR 16 settlement refactor 4be76a0 (merge d982ea0); combined PostgreSQ
 ## 2026-10-18
 
 Rebased PR 17 onto merged main 40072ce without conflicts; verified identical file tree against qualified head 55960de and prepared ready-for-review publication. No deployment.
+
+## 2026-10-19
+
+Clarified free-sample policy: explicitly marked releases and attachments remain publicly downloadable during early access; aligned page links, endpoint authorization, design and regression coverage. Hosted run/demo restrictions remain.
