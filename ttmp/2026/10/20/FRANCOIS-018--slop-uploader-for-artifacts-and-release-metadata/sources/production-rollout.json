@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-21T03:40:53.681056+00:00",
+  "sourceCommit": "21b8458cbe75cb34e2219d75bd6536a5f38df80d",
+  "image": "ghcr.io/go-go-golems/francois:sha-21b8458",
+  "readyReplicas": 1,
+  "argoRevision": "73f03d45212561022275e2b8257474c150a757a5",
+  "argoSync": "Synced",
+  "argoHealth": "Healthy",
+  "checks": [
+    {
+      "site": "https://slop.boutique",
+      "health": true,
+      "uploaderShell": true,
+      "exactAssets": {
+        "catalog.js": "88f818963c24017a9d2b9bec38ebfe198140c223794be15b58a612317986cfa6",
+        "catalog.css": "885309f7fef01ab0ec8fce8ec52a743b3ab6208dc59754389504bc62c7b13fff"
+      },
+      "authenticated": false
+    },
+    {
+      "site": "https://francois.yolo.scapegoat.dev",
+      "health": true,
+      "uploaderShell": true,
+      "exactAssets": {
+        "catalog.js": "88f818963c24017a9d2b9bec38ebfe198140c223794be15b58a612317986cfa6",
+        "catalog.css": "885309f7fef01ab0ec8fce8ec52a743b3ab6208dc59754389504bc62c7b13fff"
+      },
+      "authenticated": false
+    }
+  ],
+  "productionMutationsInSmokeTest": false
+}
