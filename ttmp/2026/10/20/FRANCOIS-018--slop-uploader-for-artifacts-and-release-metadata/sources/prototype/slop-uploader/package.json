@@ -1,0 +1,11 @@
+{
+  "name": "slop-uploader",
+  "private": true,
+  "description": "Localhost form for uploading prototypes to slop.boutique",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  }
+}

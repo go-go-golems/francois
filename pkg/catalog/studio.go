@@ -110,7 +110,7 @@ func (s *Server) studioMe(w http.ResponseWriter, r *http.Request) {
 		unavailable(w, err)
 		return
 	}
-	out["limits"] = map[string]int64{"maxMediaBytes": rev.Document.Limits.MaxMediaBytes, "maxAttachmentBytes": rev.Document.Limits.MaxAttachmentBytes}
+	out["limits"] = map[string]int64{"maxHTMLBytes": rev.Document.Limits.MaxHTMLBytes, "maxMediaBytes": rev.Document.Limits.MaxMediaBytes, "maxAttachmentBytes": rev.Document.Limits.MaxAttachmentBytes, "maxGalleryItems": maxGallery, "maxAttachments": maxAttachments}
 	if c, ok, err := s.ownProfile(r.Context(), u); err != nil {
 		unavailable(w, err)
 		return

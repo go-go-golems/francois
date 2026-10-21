@@ -6,3 +6,5 @@ import "./instance-launch.test";
 import "./recurring-support.test";
 
 import "./output-budget.test";
+
+import "./uploader.test";

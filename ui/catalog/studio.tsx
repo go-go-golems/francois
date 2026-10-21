@@ -9,8 +9,20 @@ import { bytes, date, Empty, Link, Row, useAct, useRoute } from "./ui";
 // content: artifacts (details, page write-up, releases, demo), journal
 // posts, creator profiles and the media library.
 
+import {
+  Still,
+  MarkdownField,
+  MediaThumb,
+  MediaPicker,
+  MediaPreview,
+  Uploader,
+  isVideo,
+} from "./studio-fields";
+import { SlopUploader } from "./uploader";
+
 const sections: [string, string][] = [
   ["", "Artifacts"],
+  ["upload", "Upload"],
   ["journal", "Journal"],
   ["creators", "Creators"],
   ["media", "Media"],
@@ -57,6 +69,7 @@ export function Studio() {
       {section === "journal" && (id ? <PostEditor id={id} /> : <Journal />)}
       {section === "creators" && <Creators />}
       {section === "media" && <MediaLibrary />}
+      {section === "upload" && <SlopUploader />}
       {section === "tokens" && <Tokens />}
     </main>
   );
@@ -75,24 +88,6 @@ function ProfileNotice() {
 
 // Still shows a media item as a still: an image, a video's poster, or a
 // video's first frame when it has no poster.
-function Still({ id, className }: { id: string; className?: string }) {
-  const { data = [] } = studio.useMediaQuery();
-  const m = data.find((x) => x.id === id);
-  if (m && m.mediaType.startsWith("video/")) {
-    return m.poster ? (
-      <img className={className} src={"/media/" + m.poster} alt="" />
-    ) : (
-      <video
-        className={className}
-        src={"/media/" + id}
-        muted
-        preload="metadata"
-      />
-    );
-  }
-  return <img className={className} src={"/media/" + id} alt="" />;
-}
-
 function Thumb({ media, title }: { media?: string; title: string }) {
   if (media) return <Still className="lib-thumb" id={media} />;
   return (
@@ -110,6 +105,9 @@ function Artifacts() {
       <section className="library">
         <div className="lib-head">
           <h2>Artifacts</h2>
+          <Link className="btn btn-ink" to="/studio/upload">
+            Upload artifact
+          </Link>
           <form
             className="inline-form"
             onSubmit={async (e) => {
@@ -418,54 +416,6 @@ function Details({
 
 // useMarkdownPreview renders Markdown with the server's public renderer,
 // debounced, so the preview matches the published page exactly.
-function useMarkdownPreview(source: string) {
-  const [render] = studio.useMarkdownMutation();
-  const [html, setHTML] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => {
-      render(source)
-        .unwrap()
-        .then((r) => setHTML(r.html))
-        .catch(() => undefined);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [source]);
-  return html;
-}
-
-function MarkdownField({
-  value,
-  onChange,
-  rows = 18,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  rows?: number;
-  label: string;
-}) {
-  const html = useMarkdownPreview(value);
-  return (
-    <div className="md-editor">
-      <div className="field">
-        <label>{label}</label>
-        <textarea
-          className="slug"
-          rows={rows}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          spellCheck
-        />
-      </div>
-      {/* Rendered by the server's Markdown renderer, which emits no raw HTML. */}
-      <div
-        className="md md-preview"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    </div>
-  );
-}
-
 function PageEditor({
   id,
   initial,
@@ -607,71 +557,6 @@ function PageEditor({
   );
 }
 
-function MediaThumb({ id, onRemove }: { id: string; onRemove?: () => void }) {
-  return (
-    <span className="media-thumb">
-      <Still id={id} />
-      {onRemove && (
-        <button type="button" className="tlink quiet" onClick={onRemove}>
-          remove
-        </button>
-      )}
-    </span>
-  );
-}
-
-function MediaPicker({
-  onPick,
-  onClose,
-  images,
-}: {
-  onPick: (m: Media) => void;
-  onClose: () => void;
-  images?: boolean;
-}) {
-  const { data: all = [] } = studio.useMediaQuery();
-  const data = images ? all.filter((m) => !isVideo(m)) : all;
-  return (
-    <div className="picker">
-      <div className="lib-head">
-        <h2>Choose media</h2>
-        <button type="button" className="tlink" onClick={onClose}>
-          Close
-        </button>
-      </div>
-      <Uploader />
-      <div className="media-grid">
-        {data.map((m) => (
-          <button
-            type="button"
-            className="media-tile"
-            key={m.id}
-            onClick={() => onPick(m)}
-          >
-            <MediaPreview m={m} />
-            <span className="muted small">{m.alt || m.id}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const isVideo = (m: Media) => m.mediaType.startsWith("video/");
-
-function MediaPreview({ m }: { m: Media }) {
-  return isVideo(m) ? (
-    <video
-      src={"/media/" + m.id}
-      poster={m.poster ? "/media/" + m.poster : undefined}
-      muted
-      preload="metadata"
-    />
-  ) : (
-    <img src={"/media/" + m.id} alt={m.alt} loading="lazy" />
-  );
-}
-
 // captureFrame draws the video's current frame to a canvas. Media is
 // same-origin, so the canvas is not tainted and can be exported.
 function captureFrame(v: HTMLVideoElement): Promise<Blob> {
@@ -757,59 +642,6 @@ function VideoTile({ m, editable }: { m: Media; editable: boolean }) {
         />
       )}
     </>
-  );
-}
-
-function Uploader() {
-  const [upload, { isLoading }] = studio.useUploadMediaMutation();
-  const { data: me } = studio.useStudioMeQuery();
-  const act = useAct();
-  const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
-  const send = async (files?: FileList | null) => {
-    for (const f of Array.from(files ?? [])) {
-      const fd = new FormData();
-      fd.set("file", f);
-      fd.set("alt", f.name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " "));
-      await act(upload(fd).unwrap(), "Uploaded " + f.name);
-    }
-  };
-  return (
-    <div
-      className={"drop drop-small" + (over ? " is-over" : "")}
-      role="button"
-      tabIndex={0}
-      onClick={() => input.current?.click()}
-      onKeyDown={(e) =>
-        (e.key === "Enter" || e.key === " ") && input.current?.click()
-      }
-      onDragOver={(e) => {
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        void send(e.dataTransfer.files);
-      }}
-    >
-      <span>
-        {isLoading ? "Uploading…" : "Drop images or videos, or click to choose"}
-      </span>
-      <span className="muted small">
-        PNG, JPEG, GIF, WebP, MP4, WebM
-        {me ? " · up to " + bytes(me.limits.maxMediaBytes) : ""}
-      </span>
-      <input
-        ref={input}
-        type="file"
-        multiple
-        accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
-        hidden
-        onChange={(e) => send(e.target.files)}
-      />
-    </div>
   );
 }
 
@@ -960,6 +792,14 @@ function Releases({
   };
   return (
     <>
+      <p>
+        <Link
+          className="btn btn-ink"
+          to={"/studio/upload?artifact=" + encodeURIComponent(artifact)}
+        >
+          Upload new version
+        </Link>
+      </p>
       <section className="publish">
         <div className="publish-left">
           <div

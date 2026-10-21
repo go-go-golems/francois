@@ -270,6 +270,9 @@ type StudioMe struct {
 	User    struct{ ID, Name, Role string } `json:"user"`
 	Creator *Creator                        `json:"creator"`
 	Limits  struct {
+		MaxHTMLBytes       int64 `json:"maxHTMLBytes"`
+		MaxGalleryItems    int64 `json:"maxGalleryItems"`
+		MaxAttachments     int64 `json:"maxAttachments"`
 		MaxMediaBytes      int64 `json:"maxMediaBytes"`
 		MaxAttachmentBytes int64 `json:"maxAttachmentBytes"`
 	} `json:"limits"`

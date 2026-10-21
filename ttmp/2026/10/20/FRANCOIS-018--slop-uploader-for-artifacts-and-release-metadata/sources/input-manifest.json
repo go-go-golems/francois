@@ -1,0 +1,14 @@
+{
+  "inputs": [
+    {
+      "file": "slop-uploader.jpeg",
+      "sha256": "384b6db8e77274b82594ecbfee4ae9b5995f48eba9ee1d474a7f4db2b5f750fa",
+      "bytes": 111422
+    },
+    {
+      "file": "slop-uploader.zip",
+      "sha256": "ef1301b182d7189f85d5f67411c0937796cfd7fb102315ea12deb9af08de4f6e",
+      "bytes": 17287
+    }
+  ]
+}

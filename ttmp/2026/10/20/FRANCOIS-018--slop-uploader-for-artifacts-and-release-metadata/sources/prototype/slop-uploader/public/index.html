@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="uploader-secret" content="{{SECRET}}">
+  <meta name="uploader-server" content="{{SERVER}}">
+  <title>slop uploader</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>slop uploader</h1>
+    <span id="who" class="muted">connecting…</span>
+  </header>
+
+  <main>
+    <form id="form" novalidate>
+      <section>
+        <h2>Prototype</h2>
+        <label class="row">
+          <span>Artifact</span>
+          <select id="artifact">
+            <option value="">New artifact</option>
+          </select>
+        </label>
+        <div class="drop" id="html-drop" data-accept=".html,.htm,text/html">
+          <strong>Drop the HTML file here</strong> <span class="muted">or click to choose</span>
+          <div class="picked" id="html-picked"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Details</h2>
+        <div class="grid">
+          <label>Title <input id="title" maxlength="120" required></label>
+          <label>Artifact ID <input id="id" pattern="[a-z0-9][a-z0-9_\-]{0,63}" maxlength="64" spellcheck="false" required></label>
+          <label>Version <input id="version" maxlength="40" spellcheck="false" required></label>
+          <label>Tags <input id="tags" placeholder="graphics, webgl"></label>
+        </div>
+        <label>Short description <input id="description" maxlength="500" placeholder="One or two sentences for the catalog card"></label>
+        <label>What changed <input id="changelog" maxlength="2000" placeholder="Optional release notes"></label>
+      </section>
+
+      <section>
+        <h2>What the app can use</h2>
+        <div class="caps" id="caps"></div>
+        <label class="check"><input type="checkbox" id="freeSample"> Free sample <span class="muted">— anyone with an account can run it and download its attachments</span></label>
+      </section>
+
+      <section>
+        <h2>Storefront page</h2>
+        <div class="grid two">
+          <div>
+            <div class="label">Cover image or video</div>
+            <div class="drop small" id="cover-drop" data-accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm">
+              <span class="muted">Drop or click · PNG, JPEG, GIF, WebP, MP4, WebM</span>
+              <div class="thumbs" id="cover-thumbs"></div>
+            </div>
+          </div>
+          <div>
+            <div class="label">Gallery <span class="muted">(up to 24)</span></div>
+            <div class="drop small" id="gallery-drop" data-accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-multiple>
+              <span class="muted">Drop or click · several at once is fine</span>
+              <div class="thumbs" id="gallery-thumbs"></div>
+            </div>
+          </div>
+        </div>
+        <div class="label spread">
+          <span>Write-up <span class="muted">(Markdown)</span></span>
+          <button type="button" class="link" id="preview-toggle">Preview</button>
+        </div>
+        <textarea id="body" rows="10" placeholder="What is it, how do you use it, what's interesting about it…"></textarea>
+        <div id="preview" class="preview" hidden></div>
+      </section>
+
+      <section>
+        <h2>Attachments <span class="muted">(optional)</span></h2>
+        <div class="drop small" id="attach-drop" data-multiple>
+          <span class="muted">Manuals, archives, notes · drop or click</span>
+          <div class="picked" id="attach-picked"></div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="button" id="check" class="secondary">Check</button>
+        <span class="spacer"></span>
+        <button type="button" id="draft" class="secondary">Save as draft</button>
+        <button type="button" id="publish">Publish</button>
+      </div>
+    </form>
+
+    <aside id="result" hidden>
+      <h2>Progress</h2>
+      <ol id="log"></ol>
+      <div id="links"></div>
+    </aside>
+  </main>
+</body>
+</html>
