@@ -20,6 +20,9 @@ func (s *Server) tokenRoutes(m *http.ServeMux) {
 	m.HandleFunc("GET /api/tokens", s.guard(session, noToken, s.tokens))
 	m.HandleFunc("POST /api/tokens", s.guard(enabled, noToken, s.createToken))
 	m.HandleFunc("DELETE /api/tokens/{id}", s.guard(session, noToken, s.revokeToken))
+	// The one exception: a token may revoke itself (CLI logout), which can
+	// only reduce access.
+	m.HandleFunc("DELETE /api/me/token", s.guard(session, anyToken, s.revokeSelf))
 }
 
 // apiMe tells a client who it is acting as and, for a token, what the token
@@ -133,5 +136,20 @@ func (s *Server) revokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.Audit(r.Context(), actor(r), "token.revoke", r.PathValue("id"), nil)
+	httpx.OK(w, map[string]bool{"revoked": true})
+}
+
+// revokeSelf revokes the token the request was made with.
+func (s *Server) revokeSelf(w http.ResponseWriter, r *http.Request) {
+	p := principal(r.Context())
+	if p.Token == nil {
+		httpx.Fail(w, 400, "token_required", "Only an API token can revoke itself; manage tokens on the account page")
+		return
+	}
+	if err := s.Store.RevokeToken(r.Context(), p.User.ID, p.Token.ID); err != nil {
+		unavailable(w, err)
+		return
+	}
+	_ = s.Store.Audit(r.Context(), p.User.ID, "token.revoke_self", p.Token.ID, map[string]any{"name": p.Token.Name})
 	httpx.OK(w, map[string]bool{"revoked": true})
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-go-golems/francois/pkg/catalog/client"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
 )
 
@@ -237,5 +238,68 @@ func TestDeviceAuthorizeRateLimit(t *testing.T) {
 	}
 	if code, out := e.portalAt("portal.test", nil, "POST", "/api/device/authorize", map[string]any{"clientName": "cli"}); code != 429 || errCode(out) != "rate_limited" {
 		t.Fatalf("21st start %d %v", code, out)
+	}
+}
+
+func TestTokenRevokesItself(t *testing.T) {
+	e := setup(t)
+	cleo := e.user("cleo", "creator", false)
+	mint := func() string {
+		code, out := e.portal(&cleo, "POST", "/api/tokens", map[string]any{"name": "t", "days": 1, "scopes": []string{"studio"}})
+		if code != 201 {
+			t.Fatalf("mint %d %v", code, out)
+		}
+		return out["token"].(string)
+	}
+	a, b := mint(), mint()
+	bearer := func(tok, method, path string) (int, string) {
+		c, body, _ := e.do(nil, "portal.test", method, path, nil, map[string]string{"Authorization": "Bearer " + tok})
+		return c, string(body)
+	}
+	if code, body := bearer(a, "DELETE", "/api/me/token"); code != 200 {
+		t.Fatalf("revoke self %d %s", code, body)
+	}
+	if code, body := bearer(a, "GET", "/api/me"); code != 401 || !strings.Contains(body, "token_invalid") {
+		t.Fatalf("revoked token still works %d %s", code, body)
+	}
+	if code, body := bearer(b, "GET", "/api/me"); code != 200 {
+		t.Fatalf("other token affected %d %s", code, body)
+	}
+	if code, out := e.portal(&cleo, "DELETE", "/api/me/token", nil); code != 400 || errCode(out) != "token_required" {
+		t.Fatalf("session %d %v", code, out)
+	}
+}
+
+// TestDeviceLoginClient drives the flow through the typed client with strict
+// decoding, so the client types follow the server's responses.
+func TestDeviceLoginClient(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	cleo := e.user("cleo", "creator", false)
+	c := client.New(e.ts.URL, "", client.WithHost("portal.test"), client.WithStrictDecoding())
+	dc, err := c.DeviceAuthorize(ctx, "francois CLI on laptop", nil, nil)
+	if err != nil || dc.Interval != 5 || dc.UserCode == "" {
+		t.Fatalf("authorize %+v %v", dc, err)
+	}
+	if _, err = c.DevicePoll(ctx, dc.DeviceCode); !client.IsCode(err, "authorization_pending") {
+		t.Fatalf("pending %v", err)
+	}
+	if code, out := e.portal(&cleo, "POST", "/api/device/requests/"+dc.UserCode+"/approve", map[string]any{"scopes": []string{"studio", "account"}, "days": 90}); code != 200 {
+		t.Fatalf("approve %d %v", code, out)
+	}
+	_, _ = e.store.Pool.Exec(ctx, `UPDATE device_authorizations SET last_polled_at = now() - interval '1 hour'`)
+	tok, err := c.DevicePoll(ctx, dc.DeviceCode)
+	if err != nil || tok.User.Role != "creator" || len(tok.Info.Scopes) != 2 || tok.Info.ExpiresAt == nil {
+		t.Fatalf("issued %+v %v", tok, err)
+	}
+	authed := client.New(e.ts.URL, tok.Token, client.WithHost("portal.test"), client.WithStrictDecoding())
+	if me, err := authed.Me(ctx); err != nil || me.Token == nil || me.Token.ID != tok.Info.ID {
+		t.Fatalf("me %+v %v", me, err)
+	}
+	if err = authed.RevokeSelf(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = authed.Me(ctx); !client.IsCode(err, "token_invalid") {
+		t.Fatalf("after revoke %v", err)
 	}
 }
