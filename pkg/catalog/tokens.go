@@ -28,7 +28,7 @@ func (s *Server) apiMe(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	u := p.User
 	out := map[string]any{
-		"user":    map[string]any{"id": u.ID, "name": u.DisplayName, "email": u.Email, "role": u.Role, "disabled": u.Disabled},
+		"user":    meUser(u),
 		"token":   p.Token,
 		"creator": nil,
 	}
@@ -39,6 +39,11 @@ func (s *Server) apiMe(w http.ResponseWriter, r *http.Request) {
 		out["creator"] = c
 	}
 	httpx.OK(w, out)
+}
+
+// meUser is the user as GET /api/me and device logins describe it.
+func meUser(u store.User) map[string]any {
+	return map[string]any{"id": u.ID, "name": u.DisplayName, "email": u.Email, "role": u.Role, "disabled": u.Disabled}
 }
 
 func (s *Server) tokens(w http.ResponseWriter, r *http.Request) {

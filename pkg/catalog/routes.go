@@ -98,6 +98,7 @@ func (s *Server) routes() http.Handler {
 	s.adminRoutes(m)
 	s.studioRoutes(m)
 	s.tokenRoutes(m)
+	s.deviceRoutes(m)
 	if s.Config.MCP {
 		if err := s.mountMCP(m); err != nil {
 			log.Error().Err(err).Msg("mount /mcp")
