@@ -2,7 +2,7 @@ module github.com/go-go-golems/francois
 
 go 1.26.3
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/go-go-golems/glazed v1.4.4-0.20260823170018-a7fdfda5e3c6
