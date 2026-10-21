@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -32,12 +34,18 @@ func authCommands() (*cobra.Command, error) {
 	for _, c := range []glazed.Command{
 		&authLogin{glazed.NewCommandDescription("login",
 			glazed.WithShort("Log in and store a personal API token for a server"),
-			glazed.WithLong("With --with-token, reads an existing token from stdin (or a hidden prompt), checks it with the server and stores it. "+
-				"The token is saved per server in the credentials file ($FRANCOIS_CONFIG_DIR, $XDG_CONFIG_HOME/francois or ~/.config/francois, mode 0600). "+
+			glazed.WithLong("Prints a code and a link: open it in a browser where you are signed in, check the code, choose scopes and approve. "+
+				"The new token (by default with every scope your role allows, for 90 days) is saved per server in the credentials file "+
+				"($FRANCOIS_CONFIG_DIR, $XDG_CONFIG_HOME/francois or ~/.config/francois, mode 0600). "+
+				"With --with-token, reads an existing token from stdin (or a hidden prompt) instead. "+
 				"FRANCOIS_TOKEN and --token-file still take precedence over stored logins."),
 			glazed.WithFlags(
 				flag("server", "Portal origin, e.g. https://slop.boutique (default: $FRANCOIS_SERVER, then the default stored login)"),
 				flag("host", "Host header override, for tunnels; stored with the login"),
+				list("scopes", "Scopes to pre-select for approval (default: every scope your role allows)"),
+				flag("days", "Token lifetime to pre-select, 0 = no expiry (default 90; admin scopes need 1-90)"),
+				flag("name", "Token name shown on the account page (default: francois CLI on <hostname>)"),
+				boolean("no-browser", "Only print the link; do not open a browser"),
 				boolean("with-token", "Read an existing token from stdin instead of approving a new one in the browser"),
 				boolean("no-default", "Do not make this server the default"),
 			))},
@@ -54,10 +62,11 @@ func authCommands() (*cobra.Command, error) {
 				boolean("yes", "Print even when stdout is a terminal"),
 			))},
 		&authLogout{glazed.NewCommandDescription("logout",
-			glazed.WithShort("Forget the stored token for a server"),
+			glazed.WithShort("Revoke and forget the stored token for a server"),
 			glazed.WithFlags(
 				flag("server", "Portal origin (default: $FRANCOIS_SERVER, then the default stored login)"),
 				boolean("all", "Log out of every stored server"),
+				boolean("keep-token", "Only forget the token locally; do not revoke it"),
 			))},
 	} {
 		cmd, err := cli.BuildCobraCommandFromCommand(c)
@@ -80,7 +89,7 @@ func (c *authLogin) RunIntoGlazeProcessor(ctx context.Context, v *values.Values,
 		return err
 	}
 	if !a.B("with-token") {
-		return errors.New("browser login is not available yet; pass --with-token")
+		return c.device(ctx, a, out, srv.Server)
 	}
 	token, err := readToken(os.Stdin)
 	if err != nil {
@@ -94,6 +103,105 @@ func (c *authLogin) RunIntoGlazeProcessor(ctx context.Context, v *values.Values,
 		return errors.New("the server did not describe the token")
 	}
 	return saveLogin(ctx, out, srv.Server, entryFor(token, me.User, *me.Token, a.S("host")), !a.B("no-default"))
+}
+
+// devicePollFloor is the shortest wait between polls and deviceSlowDown what
+// a slow_down answer adds (RFC 8628 §3.5); tests lower both.
+var (
+	devicePollFloor = time.Second
+	deviceSlowDown  = 5 * time.Second
+)
+
+// device logs in through the browser: the server issues a code pair, the user
+// approves the code at the printed link, and polling then yields the token.
+func (c *authLogin) device(ctx context.Context, a in, out middlewares.Processor, origin string) error {
+	days, err := a.optI("days")
+	if err != nil {
+		return err
+	}
+	name := a.S("name")
+	if name == "" {
+		host, _ := os.Hostname()
+		name = strings.TrimSpace("francois CLI on " + host)
+	}
+	if len(name) > 80 {
+		name = name[:80]
+	}
+	api := client.New(origin, "", hostOption(a.S("host"))...)
+	dc, err := api.DeviceAuthorize(ctx, name, a.L("scopes"), days)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "To authorize this terminal, open\n  %s\nand check that it shows the code  %s  (expires in %d minutes).\n",
+		dc.VerificationURIComplete, dc.UserCode, dc.ExpiresIn/60)
+	if shouldOpenBrowser(a.B("no-browser")) && strings.HasPrefix(dc.VerificationURIComplete, origin+"/") {
+		_ = openBrowser(dc.VerificationURIComplete)
+	}
+	fmt.Fprintln(os.Stderr, "Waiting for approval...")
+	tok, err := pollDevice(ctx, api, dc)
+	if err != nil {
+		return err
+	}
+	return saveLogin(ctx, out, origin, entryFor(tok.Token, tok.User, tok.Info, a.S("host")), !a.B("no-default"))
+}
+
+// pollDevice polls until the login is approved, denied or expired. Ctrl-C
+// cancels ctx and stops it.
+func pollDevice(ctx context.Context, api *client.Client, dc client.DeviceCode) (client.DeviceToken, error) {
+	interval := max(time.Duration(dc.Interval)*time.Second, devicePollFloor)
+	deadline := time.Now().Add(time.Duration(dc.ExpiresIn) * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return client.DeviceToken{}, ctx.Err()
+		case <-time.After(interval):
+		}
+		tok, err := api.DevicePoll(ctx, dc.DeviceCode)
+		var apiErr *client.Error
+		switch {
+		case err == nil:
+			return tok, nil
+		case client.IsCode(err, "authorization_pending"):
+		case client.IsCode(err, "slow_down"):
+			interval += deviceSlowDown
+		case client.IsCode(err, "access_denied"):
+			return tok, errors.New("the login was denied in the browser")
+		case client.IsCode(err, "expired_token"):
+			return tok, errors.New("the code expired; run francois catalog auth login again")
+		case errors.As(err, &apiErr):
+			return tok, err
+		default: // network trouble: keep trying until the code expires
+			fmt.Fprintln(os.Stderr, "francois: "+err.Error()+"; retrying")
+		}
+		if time.Now().After(deadline) {
+			return tok, errors.New("the code expired; run francois catalog auth login again")
+		}
+	}
+}
+
+// shouldOpenBrowser is true on an interactive desktop session.
+func shouldOpenBrowser(disabled bool) bool {
+	if disabled || os.Getenv("SSH_CONNECTION") != "" || !term.IsTerminal(int(os.Stderr.Fd())) { // #nosec G115 -- a file descriptor fits in int
+		return false
+	}
+	switch runtime.GOOS {
+	case "darwin", "windows":
+		return true
+	}
+	return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
+}
+
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url) // #nosec G204 -- our server's URL, passed as one argument
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url) // #nosec G204
+	default:
+		cmd = exec.Command("xdg-open", url) // #nosec G204
+	}
+	return cmd.Start()
 }
 
 // readToken reads a token from a hidden prompt on a terminal, else from r.
@@ -287,10 +395,28 @@ func (c *authLogout) RunIntoGlazeProcessor(ctx context.Context, v *values.Values
 		targets = []string{srv.Server}
 	}
 	for _, o := range targets {
+		revoked := "kept"
+		if !a.B("keep-token") {
+			revoked = revoke(ctx, o, f.Servers[o])
+		}
 		f.Remove(o)
-		if err := out.AddRow(ctx, types.NewRow(types.MRP("server", o), types.MRP("logged_out", true))); err != nil {
+		if err := out.AddRow(ctx, types.NewRow(types.MRP("server", o), types.MRP("logged_out", true), types.MRP("token", revoked))); err != nil {
 			return err
 		}
 	}
 	return credentials.Save(f)
+}
+
+// revoke revokes a stored token on its server: "revoked", "already invalid",
+// or "not revoked" with a warning when the server cannot be reached.
+func revoke(ctx context.Context, origin string, e credentials.Entry) string {
+	err := client.New(origin, e.Token, hostOption(e.Host)...).RevokeSelf(ctx)
+	switch {
+	case err == nil:
+		return "revoked"
+	case client.IsCode(err, "token_invalid"):
+		return "already invalid"
+	}
+	fmt.Fprintf(os.Stderr, "francois: could not revoke the token on %s (%v); revoke %q on the account page\n", origin, err, e.Name)
+	return "not revoked"
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -66,7 +67,7 @@ func executeText(t *testing.T, args ...string) (string, error) {
 
 func TestAuthLoginWithTokenStoresAndLoads(t *testing.T) {
 	dir := isolateConfig(t)
-	f := &fakeAPI{bodies: map[string]string{}, reply: map[string]string{"GET /api/me": meReply}}
+	f := &fakeAPI{bodies: map[string]string{}, reply: map[string]string{"GET /api/me": meReply, "DELETE /api/me/token": `{"revoked":true}`}}
 	srv := f.server(t)
 
 	withStdin(t, "frt_test\n")
@@ -104,7 +105,7 @@ func TestAuthLoginWithTokenStoresAndLoads(t *testing.T) {
 	}
 	t.Setenv("FRANCOIS_TOKEN", "")
 
-	if rows, err = executeJSON(t, "catalog", "auth", "logout", "--format", "json"); err != nil || len(rows) != 1 || rows[0]["logged_out"] != true {
+	if rows, err = executeJSON(t, "catalog", "auth", "logout", "--format", "json"); err != nil || len(rows) != 1 || rows[0]["logged_out"] != true || rows[0]["token"] != "revoked" {
 		t.Fatalf("logout %v %v", rows, err)
 	}
 	if file, _, _ = credentials.Load(); len(file.Servers) != 0 || file.Default != "" {
@@ -158,4 +159,76 @@ func ptrTime(s string) *time.Time {
 		panic(err)
 	}
 	return &t
+}
+
+// deviceAPI scripts the device endpoints: polls answer from replies in order.
+func deviceAPI(t *testing.T, replies ...string) (*httptest.Server, *[]string) {
+	t.Helper()
+	var calls []string
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		b, _ := io.ReadAll(r.Body)
+		calls = append(calls, r.Method+" "+r.URL.Path+" "+r.Header.Get("Authorization")+" "+string(b))
+		switch r.URL.Path {
+		case "/api/device/authorize":
+			w.WriteHeader(201)
+			_, _ = w.Write([]byte(`{"deviceCode":"fdc_x","userCode":"WDJB-MJHT","verificationUri":"http://` + r.Host + `/device",` +
+				`"verificationUriComplete":"http://` + r.Host + `/device?code=WDJB-MJHT","expiresIn":600,"interval":0}`))
+		case "/api/device/token":
+			reply := replies[0]
+			replies = replies[1:]
+			if strings.HasPrefix(reply, "{\"token\"") {
+				_, _ = w.Write([]byte(reply))
+				return
+			}
+			w.WriteHeader(400)
+			_, _ = w.Write([]byte(`{"error":{"code":"` + reply + `","message":"m"}}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+func fastPolls(t *testing.T) {
+	floor, slow := devicePollFloor, deviceSlowDown
+	devicePollFloor, deviceSlowDown = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { devicePollFloor, deviceSlowDown = floor, slow })
+}
+
+func TestAuthLoginDevice(t *testing.T) {
+	isolateConfig(t)
+	fastPolls(t)
+	issued := `{"token":"frt_new","info":{"id":"tok_9","name":"cli","scopes":["studio","account"],"createdAt":"2026-10-21T00:00:00Z","expiresAt":"2099-01-01T00:00:00Z"},` +
+		`"user":{"id":"usr_a","name":"Ada","email":"a@x","role":"creator","disabled":false}}`
+	srv, calls := deviceAPI(t, "authorization_pending", "slow_down", "authorization_pending", issued)
+	rows, err := executeJSON(t, "catalog", "auth", "login", "--server", srv.URL, "--no-browser", "--name", "cli", "--days", "30", "--format", "json")
+	if err != nil || len(rows) != 1 || rows[0]["user"] != "Ada" || rows[0]["expires"] != "2099-01-01" {
+		t.Fatalf("login %v %v", rows, err)
+	}
+	if len(*calls) != 5 || !strings.Contains((*calls)[0], `"clientName":"cli"`) || !strings.Contains((*calls)[0], `"days":30`) ||
+		!strings.Contains((*calls)[0], `"scopes":null`) || strings.Contains((*calls)[0], "Bearer") || !strings.Contains((*calls)[1], `"deviceCode":"fdc_x"`) {
+		t.Fatalf("calls %q", *calls)
+	}
+	f, _, _ := credentials.Load()
+	if e := f.Servers[srv.URL]; e.Token != "frt_new" || e.TokenID != "tok_9" || f.Default != srv.URL {
+		t.Fatalf("stored %+v", f)
+	}
+}
+
+func TestAuthLoginDeviceRefusals(t *testing.T) {
+	fastPolls(t)
+	for reply, want := range map[string]string{"access_denied": "denied", "expired_token": "expired"} {
+		isolateConfig(t)
+		srv, _ := deviceAPI(t, "authorization_pending", reply)
+		if _, err := executeJSON(t, "catalog", "auth", "login", "--server", srv.URL, "--no-browser", "--format", "json"); err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("%s: %v", reply, err)
+		}
+		if f, _, _ := credentials.Load(); len(f.Servers) != 0 {
+			t.Fatalf("%s stored %+v", reply, f)
+		}
+	}
 }
