@@ -193,3 +193,119 @@ its usage limit before any implementation code was written.
 
 ### Technical details
 - Test database: `postgres://francois:francois@127.0.0.1:55439/postgres?sslmode=disable` (container `francois-019-pg`).
+
+## Step 4: Phase 0 refactors (no behavior change)
+
+Resumed after the usage limit. Phase 0 prepares the code base: the token rules
+of `POST /api/tokens` became a reusable function, the store can mint a token
+inside a transaction, the client stops sending an empty bearer header, and
+`releases push` now uses the shared connection code. All existing tests pass
+unchanged, which was the acceptance criterion.
+
+### Prompt Context
+
+**User prompt (verbatim):** "continue" (resuming the implementation request in Step 3)
+**Assistant interpretation:** Continue implementing phases 0-6 with commits and diary entries.
+**Inferred user intent:** Finish the feature.
+**Commit (code):** 3c36520 — "refactor(catalog): share token grant rules, transactional token insert, push uses connect"
+
+### What I did
+- `pkg/catalog/tokens.go`: new `grantError` and `tokenGrant(role, scopes, days)`; `createToken` keeps only its name check and calls `tokenGrant`.
+- `pkg/catalog/store/tokens.go`: `rowQuerier` interface (`var _ rowQuerier = (pgx.Tx)(nil)`), `insertToken(ctx, db, …)`; `CreateToken` delegates with `s.Pool`.
+- `pkg/catalog/client/client.go`: set `Authorization` only when the token is non-empty.
+- `cmd/francois/cmds/push.go`: removed the `server`/`token-file` flags and the copied token loading; appended `connectionFlags()` and call `connect(in{p})`; new help text.
+- `pkg/catalog/token_grant_test.go`: table test for `tokenGrant` (no database).
+
+### Why
+- Device approval and device minting must apply exactly the account page's rules; one function prevents drift.
+- Minting at poll time requires "insert token + delete request" in one transaction (design §7.3).
+
+### What worked
+- `GOWORK=off go test ./cmd/... ./pkg/catalog/ ./pkg/catalog/client/ -count=1` with `TEST_DATABASE_URL` → all ok (catalog 18.0 s).
+- `~/go/bin/golangci-lint run ./cmd/... ./pkg/catalog/...` → `0 issues.`
+
+### What didn't work
+- First build after the push edit:
+  ```
+  cmd/francois/cmds/push.go:6:2: "strings" imported and not used
+  cmd/francois/cmds/push.go:65:12: cannot use 1st function result (value of type *"github.com/go-go-golems/francois/pkg/catalog/client".Client) as *CatalogPush value in multiple assignment
+  cmd/francois/cmds/push.go:81:14: c.Studio undefined (type *CatalogPush has no field or method Studio)
+  ```
+  The method receiver is named `c`; renamed the local client to `api` and dropped the import.
+
+### What I learned
+- `push` was the only command not built through `single()`, which is why it had drifted.
+
+### What was tricky to build
+- Nothing substantial; keeping `createToken`'s original combined name/days error message preserved the existing test expectations.
+
+### What warrants a second pair of eyes
+- `releases push --server` is no longer required. That is a relaxation (it now also reads `FRANCOIS_SERVER`), not a break.
+
+### What should be done in the future
+- N/A
+
+### Code review instructions
+- `git show 3c36520`; run `go test ./pkg/catalog/ -run 'TestToken'` with `TEST_DATABASE_URL`.
+
+### Technical details
+- `tokenGrant` error codes: `invalid_request` (days), `tokens_unavailable` (role without scopes), `invalid_scopes`.
+
+## Step 5: Phase 1, credentials store and `catalog auth` commands
+
+This phase delivers "store and load" on its own: a token pasted once with
+`francois catalog auth login --with-token` is kept per server and used by every
+hosted-API command without flags or environment variables. Browser approval
+(the device flow) is still missing; `auth login` without `--with-token` reports
+that for now.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 4)
+**Assistant interpretation:** Implement design phase 1.
+**Inferred user intent:** Stop exporting tokens by hand.
+**Commit (code):** c5240b0 — "feat(cli): store logins per server and add catalog auth commands"
+
+### What I did
+- New package `pkg/catalog/credentials`: `Dir`, `Path`, `Load` (missing file = empty, permission warning, rejects newer versions), `Save` (0700 dir, temp file + `Sync` + `chmod 0600` + `rename`), `File.Put/Remove`, `NormalizeOrigin`, `ResolveServer`, `Resolve` with `Source` values.
+- `cmd/francois/cmds/api.go`: `connect` now calls `credentials.Resolve`, prints warnings, fails early on an expired stored token, warns when it expires within 72 h; new `hostOption` and `loginHint` (wraps `token_invalid`). Applied `loginHint` in `apiCommand`, `push` and `mcp`.
+- `cmd/francois/cmds/auth.go`: `auth login --with-token` (hidden prompt on a TTY, else stdin; must start with `frt_`; verified with `GET /api/me`), `auth status [--check]` with a `used` column, `auth token` (refuses a terminal without `--yes`, decision 4), `auth logout [--all]`.
+- Tests: `credentials_test.go` (normalization table, round trip, modes, no temp leftovers, version guard, precedence table), `auth_test.go` (login → whoami → status → token → env override → logout; bad input; rejected-token hint; expired stored token).
+- Help topic `pkg/doc/topics/01-catalog-api.md` "Connecting".
+
+### Why
+- The file is read lazily, only when a flag or the environment leaves the server or token open, so explicit environments (CI, existing tests) never depend on the developer's real credentials file.
+- `NormalizeOrigin` makes `https://Slop.Boutique:443/` and `https://slop.boutique` the same login; a bare host means https.
+
+### What worked
+- `GOWORK=off go test ./cmd/francois/cmds/ ./pkg/catalog/credentials/ -count=1` → ok.
+- Manual: with an empty `FRANCOIS_CONFIG_DIR`, `catalog auth status` prints "Not logged in. Run francois catalog auth login --server URL." and `catalog whoami` explains how to log in.
+
+### What didn't work
+- `GOWORK=off go generate ./...` (to create the logcopter file) also runs the UI build and failed: `Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'esbuild' imported from …/scripts/build.mjs` (no `node_modules`). Ran only the generator: `GOWORK=off go tool logcopter-gen -area-prefix go-go-golems.francois -strip-prefix github.com/go-go-golems/francois ./pkg/...`, then `-check` passed.
+- Lint, first pass:
+  ```
+  cmd/francois/cmds/auth.go:224:2: missing cases in switch of type credentials.Source: credentials.FromFlag, credentials.FromFile (exhaustive)
+  cmd/francois/cmds/auth.go:296:1: File is not properly formatted (gofmt)
+  pkg/catalog/credentials/credentials.go:81:1: named return "f" with type "File" found (nonamedreturns)
+  ```
+  Fixed all three; second run `0 issues.`
+
+### What I learned
+- The repository lint config enforces `exhaustive` switches and forbids named returns.
+
+### What was tricky to build
+- Status needs to explain precedence: a stored login can exist yet be unused because `FRANCOIS_TOKEN` wins. `auth status` resolves exactly as a command would and marks each stored row `yes` or `no, overridden by FRANCOIS_TOKEN`, and adds a row when an environment token targets a server with no stored login.
+
+### What warrants a second pair of eyes
+- `NormalizeOrigin` now rejects `--server` values with a path (`https://host/prefix`). Previously the client would have used such a prefix. The portal is always served at the origin root, so this should only catch mistakes.
+
+### What should be done in the future
+- Device mode for `auth login` (phase 4) and server-side revocation in `logout` (phase 5).
+
+### Code review instructions
+- `pkg/catalog/credentials/credentials.go` `Resolve`; `cmd/francois/cmds/api.go` `connect`; `cmd/francois/cmds/auth.go`.
+- `go test ./pkg/catalog/credentials/ ./cmd/francois/cmds/`.
+
+### Technical details
+- File format: `{"version":1,"default":"<origin>","servers":{"<origin>":{"token","tokenId","name","user":{id,name,email,role},"scopes","expiresAt","savedAt","host"}}}`.
