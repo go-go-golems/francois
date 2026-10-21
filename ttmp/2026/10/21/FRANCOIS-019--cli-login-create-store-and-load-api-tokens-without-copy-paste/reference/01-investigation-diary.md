@@ -8,12 +8,18 @@ Topics:
 DocType: reference
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/credentials/credentials.go
+      Note: Credentials file and resolution
+    - Path: repo://pkg/catalog/store/device.go
+      Note: Device store and PollDevice
+    - Path: repo://ui/catalog/device.tsx
+      Note: Approval page
 ExternalSources: []
-Summary: "Chronological record of the FRANCOIS-019 investigation: current token creation and loading, and the device-login design."
+Summary: 'Chronological record of the FRANCOIS-019 investigation: current token creation and loading, and the device-login design.'
 LastUpdated: 2026-10-21T10:26:53.536977-04:00
-WhatFor: "Tracing how the FRANCOIS-019 design was derived and what evidence backs it."
-WhenToUse: "When resuming FRANCOIS-019 or reviewing the design doc's claims."
+WhatFor: Tracing how the FRANCOIS-019 design was derived and what evidence backs it.
+WhenToUse: When resuming FRANCOIS-019 or reviewing the design doc's claims.
 ---
 
 # Investigation diary
@@ -414,3 +420,75 @@ with `auth logout` revoking the token on the server.
 
 ### Technical details
 - Login request body: `{"clientName":"francois CLI on <host>","scopes":null|[…],"days":N?}`. Without `--days` the field is omitted and the server uses 90.
+
+## Step 8: Phase 3 approval page and end-to-end check
+
+Added the `/device` page and checked the whole flow with the real binary: a
+catalog server on a scratch database, a creator and browser session inserted
+with SQL, `auth login` running in the background, and an approval posted the
+way the page posts it.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 4)
+**Assistant interpretation:** Phase 3, then prove the pieces work together.
+**Inferred user intent:** A login that works in practice, not only in unit tests.
+**Commit (code):** ed1e596 — "feat(ui): /device page to approve CLI logins"
+
+### What I did
+- `ui/catalog/device.tsx`: `Device` (signed-out → sign in with return to the same URL; no code → `EnterCode`; else `Approve`). `Approve` shows client, user, site, the code, requester address and expiry, scope checkboxes initialized from `suggestedScopes`, days with the account page's limits, a warning, Approve and Deny, and a done state.
+- `ui/catalog/api.ts`: `DeviceRequest` type, `deviceRequest` query (`keepUnusedDataFor: 0`), `approveDevice` and `denyDevice` mutations. `tokens.tsx` exports `scopeInfo`. `main.tsx` route. `routes.go` adds `GET /device` to the SPA paths. `catalog.css` adds `.device-panel`, `.device-code`, `.device-actions`.
+- `pnpm install --frozen-lockfile`, `pnpm run check`, `pnpm run build`. Only `catalog.js` changed among the built files.
+- `scripts/01-device-login-e2e.sh`; output saved to `sources/01-device-login-e2e-output.txt`.
+
+### Why
+- The page reads `allowedScopes` and `suggestedScopes` from the server instead of its own copy of the role table, so decision 3 lives in one place (`suggestGrant`).
+
+### What worked
+- E2E (exit 0): code `FKBH-SFFG` printed; request data showed `"requestedScopes":[]` and `"suggestedScopes":["studio","account"]`; approve with `studio`, 7 days → `{"approved":true}`; login row `scopes: studio`, `expires: 2026-10-28`; file `-rw-------`; `whoami` with no flags or env shows token "e2e laptop"; `auth status --check` → `used yes`, `check valid`; `auth token | cut -c1-8` → `frt_…`; `auth logout` → `token revoked`; database shows the token revoked; audit lists `token.device_approve`, `token.create`, `token.revoke_self`.
+
+### What didn't work
+- First script write failed with `(eval):1: no such file or directory: …/scripts/01-device-login-e2e.sh`: the empty `scripts/` directory was never committed, so it did not exist in the worktree. Created it.
+- First run: `unknown flag: --output`. Glazed's flag is `--format`; fixed the script.
+
+### What I learned
+- `pnpm -s` is rejected by this pnpm build (`unexpected argument '-s' found`); use `pnpm run <script>`.
+
+### What was tricky to build
+- Seeding a session without an identity provider: `sessions.token_hash` is SHA-256 of the cookie value, so `sha256('e2e-session'::bytea)` in SQL matches the cookie `francois_session_dev=e2e-session` on an http origin.
+
+### What warrants a second pair of eyes
+- The page has not been looked at in a browser: no browser tool was available in this session. Check its layout manually at `/device?code=…` on the compose stack.
+
+### What should be done in the future
+- A visual pass on `/device` in light and dark themes.
+
+### Code review instructions
+- `ui/catalog/device.tsx`; run `scripts/01-device-login-e2e.sh` (needs the test Postgres container).
+
+### Technical details
+- The approval page query key is the raw `code` parameter; the server normalizes it.
+
+## Step 9: Documentation and validation gate
+
+Updated the user and operator documentation and ran the repository's full
+checks.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 4)
+**Assistant interpretation:** Phase 6 and final validation.
+**Inferred user intent:** Ship-ready branch.
+**Commit (code):** 9de3bd7 — "docs: CLI device login in README, production guide, help topics and account page"
+
+### Evidence and commits
+- Docs: `README.md` (token paragraph and push example), `doc/production.md` §5.3 (login, device audit entries, self-revocation exception), `pkg/doc/topics/01-catalog-api.md` (Connecting), `02-catalog-mcp.md` (setup via stored login; separate narrower agent token via `FRANCOIS_CONFIG_DIR`), account page hints in `tokens.tsx` (rebuilt `catalog.js`).
+- `golangci-lint fmt --diff`: no diff. `golangci-lint run`: `0 issues.` logcopter `-check`: ok. `go build ./...`: ok.
+- `go test ./... -count=1` with `TEST_DATABASE_URL`: every package ok except the existing `pkg/catalog/mcpserver` `TestLocalPathAllowDirs` failure (Step 3).
+- `pnpm run test`: 18 pass, 0 fail.
+
+### Noteworthy decisions or failures
+- None beyond the existing macOS path failure.
+
+### Remaining requirements and next action
+- Visual review of `/device` (Step 8). Open a PR from `feat/cli-auth` when wanted. Decide what to do with the other session's uncommitted FRANCOIS-021 work in the original checkout (branch `feat/cli-auth-login`).

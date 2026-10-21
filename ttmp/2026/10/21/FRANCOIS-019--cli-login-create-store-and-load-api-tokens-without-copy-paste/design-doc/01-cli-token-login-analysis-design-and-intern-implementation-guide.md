@@ -64,6 +64,13 @@ The work is split into phases so that the storage half (useful on its own, with
 changes behavior, the existing token table is reused unchanged, and one new
 table holds short-lived pending device authorizations.
 
+**Implementation status (2026-10-21):** implemented on branch `feat/cli-auth`
+(commits 3c36520 … 9de3bd7) as designed, with the owner decisions of §11. Small
+differences from the sketch: the store type is `DevicePoll` (not `PollResult`);
+`GET /api/device/requests/{code}` also returns `suggestedScopes` and
+`suggestedDays` (the role-maximum default of decision 3); `auth login --days`
+is optional and the server defaults to 90. See the diary for evidence.
+
 ## 2. Problem statement and scope
 
 ### 2.1 What the user asked for

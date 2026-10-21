@@ -15,3 +15,12 @@ Investigated token creation, validation and CLI loading; wrote the device-login 
 ## 2026-10-21
 
 Recorded owner decisions (self-revoke yes, auth login, admin scopes with role-max defaults, auth token refuses terminal output); created branch feat/cli-auth-login; baseline tests recorded
+
+## 2026-10-21
+
+Implemented phases 0-6 on feat/cli-auth (3c36520..9de3bd7): tokenGrant/insertToken refactor, credentials store and auth commands, device endpoints and migration 019, self-revocation, CLI device login, /device page, docs; e2e script passes
+
+### Related Files
+
+- /Users/manuel.odendahl/code/go-go-golems/francois-cli-auth/cmd/francois/cmds/auth.go — CLI auth commands
+- /Users/manuel.odendahl/code/go-go-golems/francois-cli-auth/pkg/catalog/device.go — Device login handlers

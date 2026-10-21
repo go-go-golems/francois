@@ -1,0 +1,69 @@
+== /device serves the portal app
+ok
+== auth login (background)
+To authorize this terminal, open
+  http://localhost:18093/device?code=FKBH-SFFG
+and check that it shows the code  FKBH-SFFG  (expires in 10 minutes).
+Waiting for approval...
+== approval page data for FKBH-SFFG
+{"allowedScopes":["studio","account"],"clientName":"e2e laptop","createdAt":"2026-10-21T12:08:44.207856-04:00","expiresAt":"2026-10-21T12:18:44.207856-04:00","maxAdminDays":90,"requestedDays":90,"requestedFrom":"127.0.0.1","requestedScopes":[],"suggestedDays":90,"suggestedScopes":["studio","account"],"userCode":"FKBH-SFFG"}
+
+== approve (studio only, 7 days)
+{"approved":true}
+
+== login result
+[
+{
+  "default": true,
+  "email": "e2e@example.com",
+  "expires": "2026-10-28",
+  "role": "creator",
+  "scopes": "studio",
+  "server": "http://localhost:18093",
+  "token_id": "tok_894760215f43df96a8419bb2",
+  "user": "Eve Tester"
+}
+]
+Saved to /var/folders/bs/y8xvljb55cq_t3jb_2zfs2rw0000gp/T/tmp.gGVvmqgrI9/config/credentials.json
+-rw-------@ 1 manuel.odendahl  staff  547 Oct 21 12:08 /var/folders/bs/y8xvljb55cq_t3jb_2zfs2rw0000gp/T/tmp.gGVvmqgrI9/config/credentials.json
+== whoami with the stored login (no flags, no env)
+[
+{
+  "creator": null,
+  "token": {
+    "createdAt": "2026-10-21T12:08:49.214648-04:00",
+    "expiresAt": "2026-10-28T12:08:49.220904-04:00",
+    "id": "tok_894760215f43df96a8419bb2",
+    "lastUsedAt": "2026-10-21T12:08:49.33082-04:00",
+    "name": "e2e laptop",
+    "scopes": [
+      "studio"
+    ]
+  },
+  "user": {
+    "disabled": false,
+    "email": "e2e@example.com",
+    "id": "usr_e2e",
+    "name": "Eve Tester",
+    "role": "creator"
+  }
+}
+]
+== auth status --check
++------------------------+---------+------------+-----------------+---------+--------+------------+------------------------------+------+-------+
+| server                 | default | user       | email           | role    | scopes | expires    | token_id                     | used | check |
++------------------------+---------+------------+-----------------+---------+--------+------------+------------------------------+------+-------+
+| http://localhost:18093 | true    | Eve Tester | e2e@example.com | creator | studio | 2026-10-28 | tok_894760215f43df96a8419bb2 | yes  | valid |
++------------------------+---------+------------+-----------------+---------+--------+------------+------------------------------+------+-------+
+== auth token to a pipe (first 8 characters)
+frt_aPKo
+== logout revokes
++------------------------+------------+---------+
+| server                 | logged_out | token   |
++------------------------+------------+---------+
+| http://localhost:18093 | true       | revoked |
++------------------------+------------+---------+
+tok_894760215f43df96a8419bb2|t
+token.device_approve
+token.create
+token.revoke_self
