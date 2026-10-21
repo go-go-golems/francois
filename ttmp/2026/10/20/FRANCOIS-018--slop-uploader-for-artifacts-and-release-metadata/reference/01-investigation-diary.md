@@ -432,3 +432,48 @@ Paused deployment as requested and replaced the uploader's independent hero/card
 ### Technical details
 - Local URL: http://localhost:8090/studio/upload.
 - Tmux session: francois-uploader-aligned. No production writes were made.
+
+## Step 9: Protect unsaved uploads during browser history navigation
+
+Addressed PR #18's P2 review about Back/Forward bypassing the uploader's click and beforeunload guards. Navigation approval now belongs to the SPA router and runs before its route state changes. Cancelling a traversal restores the previous history position without unmounting the uploader or replacing its staged File objects.
+
+### Prompt Context
+**User prompt (review excerpt):** "When the form is dirty, browser Back/Forward navigation bypasses both guards registered here ... register a route/history guard in addition to the anchor-click handler."
+**Assistant interpretation:** Fix the reported data-loss path and verify it through real browser history traversal.
+**Inferred user intent:** Preserve staged edits consistently regardless of how the user navigates away.
+
+### What I did
+- Added registerNavigationGuard to the existing router, used by both navigate() and popstate.
+- Recorded positions on router-owned history entries. A rejected popstate returns to the previous position while keeping Redux route state and the form unchanged; restoration events do not prompt again.
+- Replaced the uploader's document-click handler with a registered guard and cleanup. Kept beforeunload for document navigation/reload.
+- Added browser scenarios with a history entry on each side of the uploader: cancel Back, cancel Forward, cancel a link, accept Back, follow Forward, and verify guard cleanup.
+- Verified the exact staged filename and edited title survive both cancelled history moves.
+
+### Why
+- The router is the common boundary for SPA links, programmatic navigation and history traversal. Handling only clicks misses Back/Forward; dispatching before confirmation would already destroy the form.
+
+### What worked
+- pnpm check, pnpm build and all 18 frontend tests passed.
+- Browser navigation scenarios and the complete existing uploader browser suite passed with zero page errors. Evidence is in sources/history-guard/browser.json.
+
+### What didn't work
+- The initial browser script awaited click completion before dismissing its synchronous confirmation dialog, leaving the test blocked. Starting the click promise, dismissing the dialog and then awaiting completion corrected the harness.
+
+### What I learned
+- popstate is delivered after the address changes. Cancelling must restore the browser history position as well as refrain from updating the application route.
+
+### What was tricky to build
+- Restoration itself emits popstate. A restoration flag prevents a second prompt and prevents new application navigation from racing the return traversal.
+
+### What warrants a second pair of eyes
+- Review route state dispatch timing and guard cleanup, especially that a cancelled traversal retains the mounted component.
+
+### What should be done in the future
+- Keep all same-document application navigation routed through navigate(). Production deployment remains on hold.
+
+### Code review instructions
+- Start with ui/catalog/store.ts, then the uploader effect. Reproduce the browser check with output directory ../sources/history-guard/.
+
+### Technical details
+- Existing history state is preserved on replaceState; newly pushed SPA entries carry francoisRoutePosition.
+- No dependency or new router framework was introduced.

@@ -1,0 +1,83 @@
+{
+  "mockedAPI": true,
+  "realBuiltUI": true,
+  "viewports": [
+    1440,
+    390
+  ],
+  "actions": [
+    "cancel Back preserves edits and files",
+    "cancel Forward preserves edits and files",
+    "cancel SPA link",
+    "accept Back discards form",
+    "clean Forward and guard cleanup",
+    "HTML title and ID autofill",
+    "edit capabilities and details",
+    "publish",
+    "attachment failure",
+    "reconcile draft",
+    "block replay",
+    "switch artifacts clears staged files",
+    "prefill next version and full manifest",
+    "save draft"
+  ],
+  "pageErrors": [],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/studio/markdown"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases/check"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/media"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/studio/artifacts/lattice-notebook/draft"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/artifacts/lattice-notebook/draft/publish"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases/rel_fixture/publish"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases/check"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/media"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases/rel_fixture/attachments"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/markdown"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases/check"
+    },
+    {
+      "method": "POST",
+      "path": "/api/studio/releases"
+    }
+  ]
+}

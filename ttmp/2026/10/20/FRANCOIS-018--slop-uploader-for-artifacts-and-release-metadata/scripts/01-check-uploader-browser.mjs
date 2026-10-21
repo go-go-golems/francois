@@ -48,6 +48,42 @@ async function fill() {
   await page.getByLabel('The write-up (Markdown)').fill('## A notebook for connected ideas\n\nCollect notes, explore relationships, and keep the useful parts.');
 }
 try {
+  // Build a same-document history entry on each side of the uploader.
+  await page.goto('http://fixture.test/studio/media');
+  await page.getByRole('link', { name: 'Upload', exact: true }).click();
+  await page.getByRole('heading', { name: 'Upload artifact', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Media', exact: true }).click();
+  await page.getByRole('heading', { name: 'Media', exact: true }).waitFor();
+  await page.evaluate(() => history.back());
+  await page.getByRole('heading', { name: 'Upload artifact', exact: true }).waitFor();
+  await page.locator('[data-field=html]').setInputFiles({ name: 'unsaved.html', mimeType: 'text/html', buffer: Buffer.from('<!doctype html><title>Unsaved history test</title>') });
+  await page.waitForFunction(() => document.querySelector('[data-field=title]').value === 'Unsaved history test');
+  await page.getByLabel('Title', { exact: true }).fill('Keep this edit');
+  for (const direction of ['back', 'forward']) {
+    const dialogSeen = page.waitForEvent('dialog');
+    await page.evaluate(direction => history[direction](), direction);
+    await (await dialogSeen).dismiss();
+    await page.waitForURL('http://fixture.test/studio/upload');
+    assert.equal(await page.getByLabel('Title', { exact: true }).inputValue(), 'Keep this edit');
+    assert.equal(await page.locator('[data-field=html]').evaluate(el => el.files[0].name), 'unsaved.html');
+  }
+  const linkDialog = page.waitForEvent('dialog');
+  const clickingLink = page.getByRole('link', { name: 'Media', exact: true }).click();
+  await (await linkDialog).dismiss();
+  await clickingLink;
+  assert.equal(new URL(page.url()).pathname, '/studio/upload');
+  const accepted = page.waitForEvent('dialog');
+  await page.evaluate(() => history.back());
+  await (await accepted).accept();
+  await page.getByRole('heading', { name: 'Media', exact: true }).waitFor();
+  await page.evaluate(() => history.forward());
+  await page.getByRole('heading', { name: 'Upload artifact', exact: true }).waitFor();
+  assert.equal(await page.locator('[data-field=html]').inputValue(), '');
+  await page.getByRole('link', { name: 'Media', exact: true }).click();
+  await page.getByRole('heading', { name: 'Media', exact: true }).waitFor();
+  // The unmounted uploader must unregister its guard.
+  await page.evaluate(() => history.back());
+  await page.getByRole('heading', { name: 'Upload artifact', exact: true }).waitFor();
   await page.goto('http://fixture.test/studio/media');
   const referenceTitle = page.getByRole('heading', { name: 'Media', exact: true });
   await referenceTitle.waitFor();
@@ -98,7 +134,7 @@ try {
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.getByText('Draft saved', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  const receipt = { mockedAPI: true, realBuiltUI: true, viewports: [1440, 390], actions: ['HTML title and ID autofill', 'edit capabilities and details', 'publish', 'attachment failure', 'reconcile draft', 'block replay', 'switch artifacts clears staged files', 'prefill next version and full manifest', 'save draft'], pageErrors: errors, writes };
+  const receipt = { mockedAPI: true, realBuiltUI: true, viewports: [1440, 390], actions: ['cancel Back preserves edits and files', 'cancel Forward preserves edits and files', 'cancel SPA link', 'accept Back discards form', 'clean Forward and guard cleanup', 'HTML title and ID autofill', 'edit capabilities and details', 'publish', 'attachment failure', 'reconcile draft', 'block replay', 'switch artifacts clears staged files', 'prefill next version and full manifest', 'save draft'], pageErrors: errors, writes };
   await writeFile(new URL('browser.json', out), JSON.stringify(receipt, null, 2) + '\n');
   console.log(JSON.stringify(receipt));
 } catch (error) { console.log(JSON.stringify({ errors, writes, text: await page.locator('body').innerText() })); throw error; } finally { await browser.close(); }

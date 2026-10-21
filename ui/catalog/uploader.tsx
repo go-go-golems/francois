@@ -1,3 +1,4 @@
+import { registerNavigationGuard } from "./store";
 import React, { useEffect, useRef, useState } from "react";
 import { errorMessage } from "./api";
 import { studio, type Limits, type StudioDetail } from "./studio-api";
@@ -197,36 +198,23 @@ function UploadForm({
         e.returnValue = "";
       }
     };
-    const navigate = (event: MouseEvent) => {
-      const link = (event.target as Element).closest?.("a[href]");
+    const unregister = registerNavigationGuard(() => {
+      if (busyRef.current) return false;
       if (
-        !link ||
-        event.defaultPrevented ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        event.button !== 0
+        dirty.current &&
+        !window.confirm(
+          "Leave this upload and discard unsaved changes? Completed server writes will remain saved.",
+        )
       )
-        return;
-      if (
-        busyRef.current ||
-        (dirty.current &&
-          !window.confirm(
-            "Leave this upload and discard unsaved changes? Completed server writes will remain saved.",
-          ))
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      } else {
-        dirty.current = false;
-      }
-    };
-    document.addEventListener("click", navigate, true);
+        return false;
+      dirty.current = false;
+      return true;
+    });
     window.addEventListener("beforeunload", prevent);
     return () => {
       generation.current++;
       window.removeEventListener("beforeunload", prevent);
-      document.removeEventListener("click", navigate, true);
+      unregister();
     };
   }, []);
   async function chooseHTML(file?: File) {
