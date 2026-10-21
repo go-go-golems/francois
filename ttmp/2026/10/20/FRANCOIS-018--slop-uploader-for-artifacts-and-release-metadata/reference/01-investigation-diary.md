@@ -250,3 +250,50 @@ Exercised the built React bundle in Chromium with deterministic API fixtures, th
 - [Published release](../sources/implementation/uploader-published-1440.png)
 - [Interrupted upload](../sources/implementation/uploader-recovery-1440.png)
 - [Machine-readable browser receipt](../sources/implementation/browser.json)
+
+## Step 5: Deliver the technical report to go-go-parc
+
+Wrote a 3,613-word textbook-style article covering the implemented data model, component boundaries, API sequence, validation, manifest preservation, browser file lifetimes, partial-write recovery and verification. Copied all six screenshots into the vault's dated `_assets` directory and pushed the report to origin/main.
+
+### Prompt Context
+**User prompt:** See Step 3.
+**Assistant interpretation:** Produce a self-contained technical deep dive, commit it and push the vault.
+**Inferred user intent:** Preserve the implementation knowledge and visual evidence in the normal Obsidian project archive.
+**Commit (code):** 16ad125 — "fix(studio): retain staged attachments and verify uploader workflows".
+**Commit (vault):** 87fe8c0 — "docs: explain Slop Uploader implementation and recovery with screenshots".
+
+### What I did
+- Followed the obsidian-vault-writing and textbook-authoring skills: new dated article, prose-first explanation, concrete example, diagrams, pseudocode, API table and source map.
+- Updated the clean vault from origin/main before adding the report.
+- Verified embedded image paths and committed only the report plus its six prefixed screenshots.
+- Pushed vault main; remote receipt was `23e13eb..87fe8c0 main -> main`.
+
+### Why
+- The report explains durable implementation choices rather than repeating a chronological change list. Screenshots are copied into the vault so the article remains self-contained.
+
+### What worked
+- Vault push succeeded and `git status --short --branch` reports `main...origin/main` with no local changes.
+- All implementation tasks are checked. The source repository's unrelated FRANCOIS-017 diary remains untouched and unstaged by this task.
+
+### What didn't work
+- The first staging command combined git -C with an unquoted relative screenshot glob; zsh expanded the glob in the Francois directory and reported `no matches found`. No files were staged by that command. Running from the vault working directory resolved it.
+
+### What I learned
+- Shell glob expansion occurs before git applies its -C directory option. Set the tool's working directory for commands with repository-relative globs.
+
+### What was tricky to build
+- The article distinguishes real server tests from mocked-API browser evidence and explicitly records the lack of production deployment.
+
+### What warrants a second pair of eyes
+- Review the publication boundaries and the scope of the test evidence before merging the implementation branch.
+
+### What should be done in the future
+- Merge and deploy the implementation when requested. No remaining work is required for this implementation/report delivery.
+
+### Code review instructions
+- Read the article and diary alongside commits 0bd8a10 and 16ad125. Screenshot reproduction and its receipt are under scripts/ and sources/implementation/ in this ticket.
+
+### Technical details
+- Vault note: `Projects/2026/10/20/ARTICLE - Slop Uploader - A Small Publication Workflow with Explicit Recovery.md`.
+- Vault root: `/home/manuel/code/wesen/go-go-golems/go-go-parc`.
+- Assets: six `Projects/2026/10/20/_assets/francois-uploader-*.png` files.

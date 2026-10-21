@@ -36,3 +36,7 @@ One form for HTML, metadata, capabilities, media, write-up and attachments. Exis
 ## Delivery
 
 The guide was uploaded to reMarkable cloud at `/ai/2026/10/20/FRANCOIS-018` as **FRANCOIS-018 Slop Uploader Implementation Guide**. See [delivery receipt](sources/remarkable-delivery.json).
+
+## Implementation report
+
+The 3,613-word technical report and six screenshots are committed and pushed to go-go-parc (`87fe8c0`): `Projects/2026/10/20/ARTICLE - Slop Uploader - A Small Publication Workflow with Explicit Recovery.md`. Application commits are `0bd8a10` and `16ad125` on `feat/slop-uploader`; production deployment has not been performed by this task.
