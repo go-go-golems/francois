@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { Account } from "./account";
 import { Admin } from "./admin";
+import { Device } from "./device";
 import { Instances, Launcher } from "./instances";
 import { store } from "./store";
 import { Studio } from "./studio";
@@ -17,6 +18,7 @@ function Routes() {
   else if (parts[0] === "account" || parts[0] === "thank-you")
     page = <Account />;
   else if (parts[0] === "admin") page = <Admin />;
+  else if (parts[0] === "device") page = <Device />;
   else if (parts[0] === "studio") page = <Studio />;
   else
     page = (

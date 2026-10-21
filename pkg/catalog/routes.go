@@ -25,7 +25,7 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(web.PortalIndex)
 	}
-	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
+	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/", "GET /device"} {
 		m.HandleFunc(p, spa)
 	}
 	// Server-rendered storefront.

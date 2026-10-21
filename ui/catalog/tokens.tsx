@@ -4,7 +4,7 @@ import { date, Empty, useAct } from "./ui";
 
 // What each scope lets a token do. The server enforces the same list per role
 // (store.ScopesForRole) and never lets a scope exceed the owner's role.
-const scopeInfo: Record<TokenScope, string> = {
+export const scopeInfo: Record<TokenScope, string> = {
   account: "your account, billing links and instances",
   studio: "artifacts, releases, media, journal posts and creators you may edit",
   "admin:read": "read customers, instances, billing, usage, settings and the audit log",
