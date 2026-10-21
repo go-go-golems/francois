@@ -8,8 +8,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-go-golems/francois/pkg/catalog/client"
+	"github.com/go-go-golems/francois/pkg/catalog/credentials"
 	"github.com/go-go-golems/glazed/pkg/cli"
 	glazed "github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/fields"
@@ -28,8 +30,8 @@ import (
 
 func connectionFlags() []*fields.Definition {
 	return []*fields.Definition{
-		fields.New("server", fields.TypeString, fields.WithHelp("Portal origin, e.g. https://slop.boutique (default: $FRANCOIS_SERVER)")),
-		fields.New("token-file", fields.TypeString, fields.WithHelp("File containing the API token (default: $FRANCOIS_TOKEN holds the token itself)")),
+		fields.New("server", fields.TypeString, fields.WithHelp("Portal origin, e.g. https://slop.boutique (default: $FRANCOIS_SERVER, then the default stored login)")),
+		fields.New("token-file", fields.TypeString, fields.WithHelp("File containing the API token (default: $FRANCOIS_TOKEN holds the token itself, then the stored login for the server)")),
 		fields.New("host", fields.TypeString, fields.WithHelp("Host header override, for tunnels")),
 	}
 }
@@ -126,36 +128,44 @@ func (cmd *apiCommand) RunIntoGlazeProcessor(ctx context.Context, v *values.Valu
 	}
 	res, err := cmd.run(ctx, c, a)
 	if err != nil {
-		return err
+		return loginHint(err)
 	}
 	return emit(ctx, out, res)
 }
 
-// connect builds a client from the connection flags and the environment.
+// connect builds a client from the connection flags, the environment and the
+// stored login, in that order (see credentials.Resolve).
 func connect(a in) (*client.Client, error) {
-	server := a.S("server")
-	if server == "" {
-		server = os.Getenv("FRANCOIS_SERVER")
+	res, err := credentials.Resolve(credentials.Inputs{Server: a.S("server"), TokenFile: a.S("token-file"), Host: a.S("host")})
+	for _, w := range res.Warnings {
+		fmt.Fprintln(os.Stderr, "francois: "+w)
 	}
-	if server == "" {
-		return nil, errors.New("set --server or FRANCOIS_SERVER to the portal origin, e.g. https://slop.boutique")
+	if err != nil {
+		return nil, err
 	}
-	token := os.Getenv("FRANCOIS_TOKEN")
-	if f := a.S("token-file"); f != "" {
-		raw, err := os.ReadFile(f) // #nosec G304 -- the operator names the token file
-		if err != nil {
-			return nil, errors.Wrap(err, "read token file")
+	if e := res.Entry; e != nil && e.ExpiresAt != nil {
+		if left := time.Until(*e.ExpiresAt); left <= 0 {
+			return nil, errors.Errorf("the stored token for %s expired on %s; run francois catalog auth login --server %s", res.Server, e.ExpiresAt.Format(time.DateOnly), res.Server)
+		} else if left < 72*time.Hour {
+			fmt.Fprintf(os.Stderr, "francois: the stored token for %s expires %s; run francois catalog auth login to renew it\n", res.Server, e.ExpiresAt.Local().Format(time.DateTime))
 		}
-		token = strings.TrimSpace(string(raw))
 	}
-	if token == "" {
-		return nil, errors.New("an API token is required (--token-file or FRANCOIS_TOKEN); create one on the account page")
+	return client.New(res.Server, res.Token, hostOption(res.Host)...), nil
+}
+
+func hostOption(host string) []client.Option {
+	if host == "" {
+		return nil
 	}
-	var opts []client.Option
-	if h := a.S("host"); h != "" {
-		opts = append(opts, client.WithHost(h))
+	return []client.Option{client.WithHost(host)}
+}
+
+// loginHint tells the user how to replace a token the server rejected.
+func loginHint(err error) error {
+	if client.IsCode(err, "token_invalid") {
+		return errors.Wrap(err, "the server rejected the token (revoked or expired); run francois catalog auth login, or update FRANCOIS_TOKEN or --token-file")
 	}
-	return client.New(server, token, opts...), nil
+	return err
 }
 
 // confirm asks on a terminal; elsewhere the caller must pass --yes.

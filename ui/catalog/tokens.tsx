@@ -4,7 +4,7 @@ import { date, Empty, useAct } from "./ui";
 
 // What each scope lets a token do. The server enforces the same list per role
 // (store.ScopesForRole) and never lets a scope exceed the owner's role.
-const scopeInfo: Record<TokenScope, string> = {
+export const scopeInfo: Record<TokenScope, string> = {
   account: "your account, billing links and instances",
   studio: "artifacts, releases, media, journal posts and creators you may edit",
   "admin:read": "read customers, instances, billing, usage, settings and the audit log",
@@ -76,7 +76,8 @@ export function ApiTokens({ role }: { role: SessionUser["role"] }) {
         <div className="notice token-once">
           <p>Copy this token now; it is not shown again. Store it somewhere safe, such as a password manager or Vault.</p>
           <pre className="code-inline">{secret.token}</pre>
-          <pre className="code-inline">{`export FRANCOIS_TOKEN=…   # the token above
+          <pre className="code-inline">{`francois catalog auth login --with-token --server ${location.origin}   # paste it
+export FRANCOIS_TOKEN=…   # or use it from the environment
 curl -H "Authorization: Bearer $FRANCOIS_TOKEN" ${location.origin}/api/me`}</pre>
           {secret.scopes.includes("studio") && (
             <pre className="code-inline">{`francois catalog releases push --server ${location.origin} \\\n  --artifact-id <id> --version 1.0.0 --html dist/app.html --publish`}</pre>
@@ -89,7 +90,10 @@ curl -H "Authorization: Bearer $FRANCOIS_TOKEN" ${location.origin}/api/me`}</pre
       {isLoading ? (
         <Empty>Loading…</Empty>
       ) : data.length === 0 ? (
-        <Empty>No tokens. A token lets a script or an agent act as you, limited to the scopes you choose.</Empty>
+        <Empty>
+          No tokens. A token lets a script or an agent act as you, limited to the scopes you choose. From a terminal,{" "}
+          <span className="mono">francois catalog auth login --server {location.origin}</span> creates one without copying.
+        </Empty>
       ) : (
         <div className="lib-list">
           {data.map((t) => (

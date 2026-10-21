@@ -745,3 +745,8 @@ select.btn { appearance: none; cursor: pointer; }
 .slop-uploader input:focus-visible, .slop-uploader select:focus-visible, .slop-uploader textarea:focus-visible { outline: 1.5px solid var(--color-ink); outline-offset: 3px; }
 .slop-uploader .md-preview { min-height: 120px; }
 @media(max-width:480px) { .upload-selector select { width:100%; max-width:none; } }
+
+/* CLI device login approval (/device). */
+.device-panel { display: grid; gap: 20px; max-width: 640px; padding: 0 0 120px; }
+.device-code { font-family: var(--font-mono); font-size: 34px; line-height: 40px; letter-spacing: 0.12em; color: var(--color-ink); }
+.device-actions { display: flex; gap: 12px; flex-wrap: wrap; }

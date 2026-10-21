@@ -25,7 +25,7 @@ func (s *Server) routes() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(web.PortalIndex)
 	}
-	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/"} {
+	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/", "GET /device"} {
 		m.HandleFunc(p, spa)
 	}
 	// Server-rendered storefront.
@@ -98,6 +98,7 @@ func (s *Server) routes() http.Handler {
 	s.adminRoutes(m)
 	s.studioRoutes(m)
 	s.tokenRoutes(m)
+	s.deviceRoutes(m)
 	if s.Config.MCP {
 		if err := s.mountMCP(m); err != nil {
 			log.Error().Err(err).Msg("mount /mcp")

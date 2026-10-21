@@ -57,6 +57,21 @@ export type Token = {
   revokedAt?: string;
 };
 
+// A pending CLI device login, as the approval page sees it.
+export type DeviceRequest = {
+  userCode: string;
+  clientName: string;
+  requestedScopes: TokenScope[];
+  requestedDays: number;
+  requestedFrom: string;
+  createdAt: string;
+  expiresAt: string;
+  allowedScopes: TokenScope[];
+  suggestedScopes: TokenScope[];
+  suggestedDays: number;
+  maxAdminDays: number;
+};
+
 export type SessionUser = {
   id: string;
   name: string;
@@ -651,6 +666,27 @@ export const api = createApi({
     revokeToken: b.mutation<unknown, string>({
       query: (id) => ({ url: `api/tokens/${id}`, method: "DELETE" }),
       invalidatesTags: ["Tokens"],
+    }),
+    deviceRequest: b.query<DeviceRequest, string>({
+      query: (code) => `api/device/requests/${encodeURIComponent(code)}`,
+      keepUnusedDataFor: 0,
+    }),
+    approveDevice: b.mutation<
+      { approved: boolean },
+      { code: string; scopes: TokenScope[]; days: number }
+    >({
+      query: ({ code, ...body }) => ({
+        url: `api/device/requests/${encodeURIComponent(code)}/approve`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Tokens"],
+    }),
+    denyDevice: b.mutation<{ denied: boolean }, string>({
+      query: (code) => ({
+        url: `api/device/requests/${encodeURIComponent(code)}/deny`,
+        method: "POST",
+      }),
     }),
   }),
 });

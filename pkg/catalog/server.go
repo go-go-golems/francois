@@ -150,19 +150,20 @@ func (c Config) Validate() error {
 func (c Config) primary() *Site { return &c.Sites[0] }
 
 type Server struct {
-	Config       Config
-	Store        *store.Store
-	Publisher    *releases.Publisher
-	Payments     *payments.Service // nil when billing is not configured
-	Backend      piworker.Backend
-	Runtime      *hosted.Runtime
-	portal       http.Handler
-	legal        *template.Template
-	pages        map[string]*template.Template
-	md           *content.Markdown
-	emailLimiter *limiter
-	demoLimiter  *limiter
-	fonts        *fonts
+	Config        Config
+	Store         *store.Store
+	Publisher     *releases.Publisher
+	Payments      *payments.Service // nil when billing is not configured
+	Backend       piworker.Backend
+	Runtime       *hosted.Runtime
+	portal        http.Handler
+	legal         *template.Template
+	pages         map[string]*template.Template
+	md            *content.Markdown
+	emailLimiter  *limiter
+	demoLimiter   *limiter
+	deviceLimiter *limiter
+	fonts         *fonts
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -180,7 +181,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 		}
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
-		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter()}
+		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter()}
 	var err error
 	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {
 		// Validate already checked the directory; serve no fonts rather than fail.

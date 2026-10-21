@@ -14,7 +14,7 @@ import (
 // registerAPI adds the API command groups under `francois catalog`.
 func registerAPI(catalog *cobra.Command) error {
 	builders := []func() (*cobra.Command, error){
-		whoamiCommand, artifactCommands, releaseCommands, attachmentCommands, mediaCommands, postCommands, creatorCommands,
+		authCommands, whoamiCommand, artifactCommands, releaseCommands, attachmentCommands, mediaCommands, postCommands, creatorCommands,
 		userCommands, subscriptionCommands, instanceCommands, planCommands, settingsCommands, billingCommands, usageCommands,
 		auditCommands, accountCommands,
 	}

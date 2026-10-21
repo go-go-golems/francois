@@ -69,12 +69,24 @@ func scanToken(r pgx.Row) (APIToken, error) {
 // CreateToken issues a token with the given scopes; expires may be nil for no
 // expiry. Callers validate scopes against the owner's role.
 func (s *Store) CreateToken(ctx context.Context, user, name string, scopes []string, expires *time.Time) (string, APIToken, error) {
+	return insertToken(ctx, s.Pool, user, name, scopes, expires)
+}
+
+type rowQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+var _ rowQuerier = (pgx.Tx)(nil)
+
+// insertToken issues a token on db, so a caller's transaction can create a
+// token together with other changes.
+func insertToken(ctx context.Context, db rowQuerier, user, name string, scopes []string, expires *time.Time) (string, APIToken, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", APIToken{}, err
 	}
 	secret := TokenPrefix + base64.RawURLEncoding.EncodeToString(b)
-	t, err := scanToken(s.Pool.QueryRow(ctx, `INSERT INTO api_tokens(id,user_id,name,scopes,token_hash,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING `+tokenColumns,
+	t, err := scanToken(db.QueryRow(ctx, `INSERT INTO api_tokens(id,user_id,name,scopes,token_hash,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING `+tokenColumns,
 		NewID("tok_"), user, name, scopes, Hash(secret), expires))
 	return secret, t, err
 }

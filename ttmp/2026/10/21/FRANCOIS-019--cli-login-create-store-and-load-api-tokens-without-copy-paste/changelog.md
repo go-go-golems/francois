@@ -1,0 +1,26 @@
+# Changelog
+
+## 2026-10-21
+
+- Initial workspace created
+
+## 2026-10-21
+
+Investigated token creation, validation and CLI loading; wrote the device-login and credentials-store design and intern implementation guide
+
+### Related Files
+
+- /Users/manuel.odendahl/code/go-go-golems/francois/ttmp/2026/10/21/FRANCOIS-019--cli-login-create-store-and-load-api-tokens-without-copy-paste/design-doc/01-cli-token-login-analysis-design-and-intern-implementation-guide.md — Primary design deliverable
+
+## 2026-10-21
+
+Recorded owner decisions (self-revoke yes, auth login, admin scopes with role-max defaults, auth token refuses terminal output); created branch feat/cli-auth-login; baseline tests recorded
+
+## 2026-10-21
+
+Implemented phases 0-6 on feat/cli-auth (3c36520..ed4c200): tokenGrant/insertToken refactor, credentials store and auth commands, device endpoints and migration 019, self-revocation, CLI device login, /device page, docs; e2e script passes
+
+### Related Files
+
+- /Users/manuel.odendahl/code/go-go-golems/francois-cli-auth/cmd/francois/cmds/auth.go — CLI auth commands
+- /Users/manuel.odendahl/code/go-go-golems/francois-cli-auth/pkg/catalog/device.go — Device login handlers

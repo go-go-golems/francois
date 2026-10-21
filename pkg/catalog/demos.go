@@ -54,6 +54,25 @@ func (l *limiter) available(key string, limit int, window time.Duration, now tim
 	return len(kept) < limit
 }
 
+// left reports whether key has a hit left in its window, without spending it.
+func (l *limiter) left(key string, limit int, window time.Duration) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.available(key, limit, window, time.Now())
+}
+
+// take spends one of key's hits, or reports that none are left.
+func (l *limiter) take(key string, limit int, window time.Duration) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	if !l.available(key, limit, window, now) {
+		return false
+	}
+	l.hits[key] = append(l.hits[key], now)
+	return true
+}
+
 // clientAddress is the visitor's address: the reverse proxy's X-Real-Ip
 // (or first X-Forwarded-For hop) when the deployment trusts proxy headers,
 // otherwise the connection's remote address.

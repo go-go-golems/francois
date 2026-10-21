@@ -23,18 +23,30 @@ apply and the audit log records the token.
 
 ## Setup with Claude Code
 
-Create a token on the site's account page with the scopes the agent should
-have, store it in a file only you can read, and register the server:
+Log in once; `francois mcp` then uses the stored token for that server:
 
 ```bash
-umask 077; printf '%s' 'frt_…' > ~/.config/francois/agent-token
+francois catalog auth login --server https://slop.boutique
+claude mcp add francois -- francois mcp --server https://slop.boutique \
+  --allow-dir ~/code/my-artifacts
+```
+
+To give the agent fewer scopes than your own login, approve a separate token
+for it and keep it in its own file:
+
+```bash
+umask 077
+FRANCOIS_CONFIG_DIR=~/.config/francois-agent francois catalog auth login \
+  --server https://slop.boutique --scopes studio --name "claude code agent"
+FRANCOIS_CONFIG_DIR=~/.config/francois-agent francois catalog auth token \
+  > ~/.config/francois/agent-token
 claude mcp add francois -- francois mcp \
   --server https://slop.boutique --token-file ~/.config/francois/agent-token \
   --allow-dir ~/code/my-artifacts
 ```
 
-Prefer `--token-file` over an environment variable in the MCP configuration:
-the configuration file is stored in plain text.
+Prefer a stored login or `--token-file` over an environment variable in the
+MCP configuration: the configuration file is stored in plain text.
 
 ## Choosing what the agent may do
 
