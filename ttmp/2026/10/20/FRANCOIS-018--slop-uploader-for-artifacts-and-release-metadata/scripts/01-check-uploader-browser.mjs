@@ -48,7 +48,16 @@ async function fill() {
   await page.getByLabel('The write-up (Markdown)').fill('## A notebook for connected ideas\n\nCollect notes, explore relationships, and keep the useful parts.');
 }
 try {
+  await page.goto('http://fixture.test/studio/media');
+  const referenceTitle = page.getByRole('heading', { name: 'Media', exact: true });
+  await referenceTitle.waitFor();
+  const titleStyle = element => { const s = getComputedStyle(element); return { fontSize: s.fontSize, fontWeight: s.fontWeight, lineHeight: s.lineHeight, letterSpacing: s.letterSpacing, left: element.getBoundingClientRect().left, top: element.getBoundingClientRect().top }; };
+  const referenceStyle = await referenceTitle.evaluate(titleStyle);
+  await page.screenshot({ path: new URL('studio-media-reference-1440.png', out).pathname });
   await fill();
+  await page.evaluate(() => window.scrollTo(0,0));
+  assert.deepEqual(await page.getByRole('heading', { name: 'Upload artifact', exact: true }).evaluate(titleStyle), referenceStyle);
+
   await page.getByRole('heading', { name: 'A notebook for connected ideas', exact: true }).waitFor();
   await page.evaluate(() => window.scrollTo(0,0));
   await page.screenshot({ path: new URL('uploader-overview-1440.png', out).pathname });

@@ -385,3 +385,50 @@ Corrected the uploader's remaining browser-default controls. Primary and seconda
 ### Technical details
 - Local server: http://localhost:8090/studio/upload, tmux session `francois-uploader-style`.
 - Existing local admin session, database and uploaded files are preserved.
+
+## Step 8: Align the whole page with Studio's layout and typography
+
+Paused deployment as requested and replaced the uploader's independent hero/card layout with the existing Studio page structure. The title is now “Upload artifact” in a shared lib-head; the editor uses the shared editor-form width, aligns with the page's left edge and uses simple section dividers with regular-weight headings.
+
+### Prompt Context
+**User prompt (verbatim):** "hold on, stick to the design language of the other pages as well. Like the title, the font weights, the width, etc..."
+**User continuation (verbatim):** "continue"
+**Assistant interpretation:** Continue the visual alignment, keeping deployment paused.
+**Inferred user intent:** Make the uploader part of the existing site rather than an independently styled landing page.
+
+### What I did
+- Compared Artifacts, Media, API tokens and ArtifactEditor markup and CSS.
+- Reused library/lib-head and editor-form instead of the centered 1180px wrapper and custom hero typography.
+- Removed the eyebrow, promotional heading, numbered uppercase section labels and enclosing card borders.
+- Used shared spacing/color tokens, body-size section headings, 500-weight capability labels and the editor's 1240px maximum width.
+- Added a Media-page reference screenshot and compared computed title typography and positioning against the uploader. Saved all captures under sources/studio-alignment/.
+- Rebuilt and restarted the local server, preserving its database and login.
+
+### Why
+- Reusing existing layout classes makes the title and width follow the same rules as adjacent Studio screens. Adjusting only button styles had left the larger visual hierarchy inconsistent.
+
+### What worked
+- TypeScript and build passed. Chromium's comparison verified identical title font size (40px), weight (500), line height (42px), letter spacing (-1.2px), and desktop position (40px left, 204px top).
+- Workflow and no-overflow checks passed at 1440/390 pixels. Visually inspected the new overview.
+
+### What didn't work
+- The first position comparison ran after form filling had scrolled the uploader; its top coordinate was -1676px versus the reference's 204px. Resetting both pages to the top before measurement corrected the test setup.
+
+### What I learned
+- Page-level layout conventions matter as much as control styling. The shared Studio header already supplies the required type scale and spacing.
+
+### What was tricky to build
+- Visual comparisons must use the same scroll position and viewport. Browser automation scrolls focused fields into view automatically.
+
+### What warrants a second pair of eyes
+- Review the new Media reference and uploader overview together; production deployment is still on hold.
+
+### What should be done in the future
+- Resume deployment only after the user releases the hold.
+
+### Code review instructions
+- Review the uploader header and editor-form classes, then scoped CSS changes. Reproduce the browser script with output directory ../sources/studio-alignment/.
+
+### Technical details
+- Local URL: http://localhost:8090/studio/upload.
+- Tmux session: francois-uploader-aligned. No production writes were made.

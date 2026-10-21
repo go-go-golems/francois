@@ -38,14 +38,13 @@ export function SlopUploader() {
     setDirty(false);
   }
   return (
-    <div className="slop-uploader">
-      <header>
-        <p className="eyebrow">SLOP.BOUTIQUE / STUDIO</p>
-        <h1>Upload something good.</h1>
-        <p className="muted">
-          One HTML file. A few details. Ready for the boutique.
+    <div className="slop-uploader library">
+      <div className="lib-head">
+        <h2>Upload artifact</h2>
+        <p className="muted small">
+          HTML, release details and storefront content.
         </p>
-      </header>
+      </div>
       <label className="upload-selector">
         Artifact
         <select
@@ -369,7 +368,7 @@ function UploadForm({
   return (
     <form
       ref={formRef}
-      className="upload-layout"
+      className="upload-layout editor-form"
       onSubmit={(e) => {
         e.preventDefault();
         void send("draft");
@@ -377,7 +376,7 @@ function UploadForm({
     >
       <fieldset disabled={locked} className="upload-fields">
         <section className="upload-panel">
-          <h2>01 / Prototype</h2>
+          <h2>Prototype</h2>
           <label
             className="upload-drop"
             onDragOver={(e) => e.preventDefault()}
@@ -401,7 +400,7 @@ function UploadForm({
           {errors.html && <p role="alert">{errors.html}</p>}
         </section>
         <section className="upload-panel">
-          <h2>02 / Details</h2>
+          <h2>Details</h2>
           {detail && (
             <p className="upload-notice">
               Title, description and tags update the live catalog even when
@@ -419,7 +418,7 @@ function UploadForm({
           {field("changelog", "Release notes", true)}
         </section>
         <section className="upload-panel">
-          <h2>03 / What does it need?</h2>
+          <h2>Capabilities</h2>
           <div className="upload-capabilities">
             {capabilities.map(([key, label, hint]) => (
               <label key={key}>
@@ -464,7 +463,7 @@ function UploadForm({
           </p>
         </section>
         <section className="upload-panel">
-          <h2>04 / Storefront</h2>
+          <h2>Storefront</h2>
           {(["cover", "gallery"] as const).map((kind) => (
             <div className="upload-media" key={kind}>
               <h3>{kind === "cover" ? "Cover" : "Gallery"}</h3>
@@ -551,7 +550,7 @@ function UploadForm({
           {errors.body && <p role="alert">{errors.body}</p>}
         </section>
         <section className="upload-panel">
-          <h2>05 / Attachments</h2>
+          <h2>Attachments</h2>
           <p className="muted small">
             Source files, notes or extras · up to {limits.maxAttachments} files
             · {bytes(limits.maxAttachmentBytes)} each.
@@ -586,7 +585,7 @@ function UploadForm({
         </section>
       </fieldset>
       <aside className="upload-summary">
-        <h2>Ready when you are.</h2>
+        <h2>Publish</h2>
         <p>{values.title || "Your next artifact"}</p>
         <p className="muted small">
           {values.version || "Choose a version"} ·{" "}
