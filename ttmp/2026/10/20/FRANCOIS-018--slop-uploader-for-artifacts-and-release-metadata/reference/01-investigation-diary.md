@@ -340,3 +340,48 @@ Started the current Go application in tmux against an isolated local PostgreSQL 
 ### Technical details
 - Listener: 127.0.0.1:8090. Database: francois_uploader_preview on local PostgreSQL port 5437.
 - Temporary browser handoff helper: `/tmp/francois-uploader-open.py`; session secrets were generated in memory and not committed.
+
+## Step 7: Match Studio styling across every uploader control
+
+Corrected the uploader's remaining browser-default controls. Primary and secondary actions now use Studio's existing button variants; file picker buttons, the artifact selector, checkbox accents, focus rings and section labels follow the same visual system. Replaced incidental gray values with the site's color tokens.
+
+### Prompt Context
+**User prompt (verbatim):** "make sure the style matches, your buttons are not styled and stuff"
+**Assistant interpretation:** Review the entire form's controls against the existing Studio styles and fix the inconsistencies.
+**Inferred user intent:** A finished, consistent interface rather than a working form with browser-default widgets.
+
+### What I did
+- Applied `btn btn-soft` to secondary actions and `btn btn-ink` to Publish, including media, attachment and recovery actions.
+- Styled native `::file-selector-button` controls without replacing accessible file inputs. Styled the artifact selector with the existing underline treatment and a dropdown indicator.
+- Aligned checkbox color, field-label typography, section headings, borders and focus outlines with the existing design tokens.
+- Captured fresh screenshots under `sources/style-review/`, preserving the original implementation evidence.
+- Rebuilt embedded assets and restarted the real local server against the same preview database.
+
+### Why
+- Existing button classes provide consistent padding, hover states, disabled states and typography. A scoped CSS adjustment preserves native input behavior and avoids another component abstraction.
+
+### What worked
+- TypeScript check and build passed. Browser workflow checks passed at 1440/390 pixels with zero page errors or horizontal overflow.
+- Visually inspected the desktop overview: file chooser and action buttons now have deliberate flat styling, with one dark primary action.
+
+### What didn't work
+- The earlier implementation left secondary buttons and native file controls unstyled. This review corrected that omission; no new verification failure occurred.
+
+### What I learned
+- Styling only the primary action was insufficient: media actions, file-selector pseudo-elements and recovery controls need the same review.
+
+### What was tricky to build
+- File inputs require styling their native button pseudo-element; applying a button class to the input alone does not style its internal chooser button.
+
+### What warrants a second pair of eyes
+- Compare `sources/style-review/` with the original evidence and the surrounding Studio controls.
+
+### What should be done in the future
+- No remaining work for this styling correction. The prior vault report remains a historical record of the initial implementation.
+
+### Code review instructions
+- Review uploader.tsx button classes and the scoped uploader section of catalog.css. The screenshot script accepts an optional output directory for later visual comparisons.
+
+### Technical details
+- Local server: http://localhost:8090/studio/upload, tmux session `francois-uploader-style`.
+- Existing local admin session, database and uploaded files are preserved.

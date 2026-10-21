@@ -115,11 +115,11 @@ function Choice({
       <span>{item.file?.name ?? item.id}</span>
       <div>
         {move && (
-          <button type="button" onClick={move}>
+          <button className="btn btn-soft" type="button" onClick={move}>
             Move left
           </button>
         )}
-        <button type="button" onClick={remove}>
+        <button className="btn btn-soft" type="button" onClick={remove}>
           Remove
         </button>
       </div>
@@ -489,7 +489,11 @@ function UploadForm({
                   e.target.value = "";
                 }}
               />
-              <button type="button" onClick={() => setPicker(kind)}>
+              <button
+                className="btn btn-soft"
+                type="button"
+                onClick={() => setPicker(kind)}
+              >
                 Choose from library
               </button>
               <div className="upload-media-list">
@@ -567,6 +571,7 @@ function UploadForm({
             <p key={i}>
               {f.name} <span className="muted">{bytes(f.size)}</span>{" "}
               <button
+                className="btn btn-soft"
                 type="button"
                 onClick={() => {
                   change();
@@ -599,18 +604,23 @@ function UploadForm({
         )}
         <div className="upload-actions">
           <button
+            className="btn btn-soft"
             type="button"
             disabled={locked}
             onClick={() => void send("check")}
           >
             Check HTML
           </button>
-          <button type="submit" disabled={locked || !allowed}>
+          <button
+            className="btn btn-soft"
+            type="submit"
+            disabled={locked || !allowed}
+          >
             Save draft
           </button>
           <button
             type="button"
-            className="btn"
+            className="btn btn-ink"
             disabled={locked || !allowed}
             onClick={() => void send("publish")}
           >
@@ -674,7 +684,11 @@ function UploadForm({
                       <Link to={`/apps/${values.id}`}>View artifact →</Link>
                     </p>
                   )}
-                  <button type="button" onClick={onReset}>
+                  <button
+                    className="btn btn-soft"
+                    type="button"
+                    onClick={onReset}
+                  >
                     Upload another
                   </button>
                 </>

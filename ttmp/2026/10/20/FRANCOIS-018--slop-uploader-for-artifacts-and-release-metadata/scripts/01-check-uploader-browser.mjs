@@ -4,7 +4,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const require = createRequire('/home/manuel/.npm/_npx/420ff84f11983ee5/node_modules/playwright/package.json');
 const { chromium } = require('playwright');
-const out = new URL('../sources/implementation/', import.meta.url);
+const out = new URL(process.argv[2] ?? '../sources/implementation/', import.meta.url);
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });

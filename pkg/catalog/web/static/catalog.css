@@ -696,18 +696,18 @@ select.btn { appearance: none; cursor: pointer; }
 .slop-uploader header { margin: 20px 0 32px; }
 .slop-uploader h1 { font-size: clamp(28px, 4vw, 44px); letter-spacing: -.04em; }
 .upload-selector { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
-.upload-selector select { max-width: 100%; padding: 10px; }
+.upload-selector select { flex: 1; max-width: 480px; appearance: none; border: 0; border-bottom: 1px solid var(--color-ink); border-radius: 0; padding: 12px 32px 12px 0; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23111111'/%3E%3C/svg%3E") no-repeat right 8px center; cursor: pointer; }
 .upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; align-items: start; }
 .upload-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
-.upload-panel { border: 1px solid #deded8; padding: 24px; margin-bottom: 20px; background: #fff; }
+.upload-panel { border: 1px solid var(--color-line); padding: 24px; margin-bottom: 20px; background: var(--color-wall); }
 .upload-panel h2 { font-size: 17px; margin: 0 0 22px; }
 .upload-panel h3 { font-size: 14px; }
 .upload-two, .upload-capabilities { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .slop-uploader .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
 .slop-uploader input:not([type=checkbox]), .slop-uploader textarea { width: 100%; min-width: 0; box-sizing: border-box; }
-.upload-drop { display: flex; flex-direction: column; gap: 18px; border: 1px dashed #aaa; padding: 28px; background: #fafaf7; }
+.upload-drop { display: flex; flex-direction: column; gap: 18px; border: 1px dashed var(--color-faint); padding: 28px; background: var(--color-plinth); }
 .upload-capabilities label { display: flex; gap: 9px; align-items: flex-start; padding: 10px 0; }
-.upload-capabilities small { display: block; color: #74746b; margin-top: 5px; }
+.upload-capabilities small { display: block; color: var(--color-muted); margin-top: 5px; }
 .upload-public { display: block; margin-top: 24px; }
 .upload-notice { background: #f8f3e7; padding: 12px; font-size: 13px; line-height: 1.5; }
 .upload-media { margin-bottom: 24px; }
@@ -715,16 +715,35 @@ select.btn { appearance: none; cursor: pointer; }
 .upload-media-item { width: 150px; font-size: 12px; overflow-wrap: anywhere; }
 .upload-media-item img, .upload-media-item video { width: 150px; height: 100px; object-fit: cover; display: block; margin-bottom: 8px; }
 .upload-media-item button { font-size: 11px; margin: 8px 4px 0 0; }
-.upload-summary { border-top: 2px solid #282820; padding-top: 18px; position: sticky; top: 24px; overflow-wrap: anywhere; }
+.upload-summary { border-top: 2px solid var(--color-ink); padding-top: 18px; position: sticky; top: 24px; overflow-wrap: anywhere; }
 .upload-summary h2 { font-size: 21px; }
 .upload-actions { display: grid; gap: 10px; margin: 24px 0; }
 .upload-actions button { padding: 12px; }
 .upload-progress { list-style: none; padding: 0; font-size: 13px; line-height: 1.8; }
-.upload-progress [data-state=failed], .slop-uploader [role=alert] { color: #a03225; }
-.upload-result { border-top: 1px solid #ddd; padding-top: 16px; }
-.slop-uploader [aria-invalid=true] { border-color: #a03225; }
+.upload-progress [data-state=failed], .slop-uploader [role=alert] { color: var(--color-warn); }
+.upload-result { border-top: 1px solid var(--color-line); padding-top: 16px; }
+.slop-uploader [aria-invalid=true] { border-color: var(--color-warn); }
 .slop-uploader .md-editor { grid-template-columns: 1fr; }
 @media(max-width: 850px) { .upload-layout { grid-template-columns: 1fr; } .upload-summary { position: static; } }
 @media(max-width: 480px) { .upload-panel { padding: 16px; } .upload-two, .upload-capabilities { grid-template-columns: 1fr; } .upload-selector { align-items: stretch; flex-direction: column; } }
-.slop-uploader .upload-actions .btn { background: var(--color-ink); color: white; }
 .slop-uploader .upload-result > button { display: block; margin-top: 16px; }
+
+.slop-uploader input[type="file"] { display: block; color: var(--color-muted); font-size: var(--text-caption); line-height: 20px; padding: 0; border: 0; background: none; }
+.slop-uploader input[type="file"]::file-selector-button { border: 0; border-radius: 0; background: var(--color-plinth); color: var(--color-ink); font: inherit; padding: 10px 16px; margin: 0 12px 0 0; cursor: pointer; }
+.slop-uploader input[type="file"]::file-selector-button:hover { background: var(--color-table); }
+.upload-drop input[type="file"]::file-selector-button { background: var(--color-wall); }
+.upload-drop { cursor: pointer; transition: border-color .15s; }
+.upload-drop:hover, .upload-drop:focus-within { border-color: var(--color-ink); }
+.upload-media > .btn { margin-top: 12px; }
+.upload-media-item .btn { padding: 6px 8px; font-size: var(--text-caption); }
+.slop-uploader input[type="checkbox"] { accent-color: var(--color-ink); width: 16px; height: 16px; flex-shrink: 0; margin: 3px 0 0; }
+.upload-public { display: flex; align-items: center; gap: 10px; }
+.slop-uploader details { border-top: 1px solid var(--color-line); margin-top: 20px; padding-top: 16px; }
+.slop-uploader summary { cursor: pointer; font-size: var(--text-small); color: var(--color-muted); }
+.slop-uploader details[open] summary { margin-bottom: 16px; color: var(--color-ink); }
+.slop-uploader .upload-panel h2 { font-size: var(--text-caption); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--color-muted); }
+.slop-uploader .field { color: var(--color-muted); font-size: var(--text-small); }
+.slop-uploader .field input, .slop-uploader .field textarea { color: var(--color-ink); }
+.slop-uploader input:focus-visible, .slop-uploader select:focus-visible, .slop-uploader textarea:focus-visible { outline: 1.5px solid var(--color-ink); outline-offset: 3px; }
+.slop-uploader .md-preview { min-height: 120px; }
+@media(max-width:480px) { .upload-selector select { width:100%; max-width:none; } }
