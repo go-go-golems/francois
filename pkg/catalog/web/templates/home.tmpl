@@ -11,7 +11,7 @@
 </form>
 <div class="archive-list">
 {{range .Body.Rows}}<a class="archive-row" href="/apps/{{.ID}}" data-archive-row>
-<span class="archive-number">{{ordinal .Number}}</span><div class="archive-main"><h2>{{.Title}}</h2><p>{{join .Tags ", "}}{{if .Tags}} · {{end}}{{shortDate .FirstPublished}}</p></div><span class="archive-tags">{{join .Tags ", "}}</span><time class="archive-date">{{shortDate .FirstPublished}}</time><span class="archive-thumb"><span class="archive-monogram">{{monogram .Title}}</span>{{if .Cover}}{{template "thumb" .Cover}}{{end}}</span>
+<span class="archive-number">{{ordinal .Number}}</span><div class="archive-main"><h2>{{.Title}}</h2><p>{{join .Tags ", "}}{{if .Tags}} · {{end}}{{shortDate .FirstPublished}}</p></div><span class="archive-tags">{{join .Tags ", "}}</span><time class="archive-date">{{shortDate .FirstPublished}}</time><span class="archive-thumb"><span class="archive-monogram">{{monogram .Title}}</span>{{if .Cover}}{{template "mini" .Cover}}{{end}}</span>
 </a>{{else}}<div class="archive-empty"><p>No experiments match your search.</p><a class="u" href="/">Clear filters</a></div>{{end}}
 <div class="archive-preview" data-archive-preview hidden aria-hidden="true"></div>
 </div>

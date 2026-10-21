@@ -140,7 +140,7 @@ Sitemap: <portal origin>/sitemap.xml
 
 - **`og:type`.** `website`, or `article` on journal posts.
 - **`twitter:card`.** `summary_large_image` when there is an image, otherwise `summary`.
-- **Default share image (deferred).** There is no site-wide 1200×630 image to use yet; this needs a designed asset (see Deferred).
+- **Default share image.** See §11.
 - **Icons.** `favicon.ico` (16 and 32 px), `apple-touch-icon.png` (180 px) and `icon-512.png`.
   - They are rendered once from `icon.svg` with `rsvg-convert` and `magick` and embedded with the other portal assets.
   - Served at `/favicon.ico`, `/apple-touch-icon.png` and as versioned `/static/` URLs.
@@ -175,12 +175,39 @@ Sitemap: <portal origin>/sitemap.xml
 - **Monogram text** changes from `--color-muted` (#737373 on #ededed, contrast about 4.2) to a darker gray that meets 4.5:1.
 - **The mobile sort label** is visually hidden instead of `display:none`, so the `<select>` keeps its accessible name.
 
+## 11. Responsive images and the share image
+
+Added in a second commit after review of the first.
+
+**Resized variants.**
+
+- `GET /media/{id}?w=N` serves the image resized to width N, for N in a fixed set: 160, 320, 640, 1200. A fixed set bounds the derived files; any other `w` gets the original.
+- Only PNG, JPEG and WebP with known dimensions, at most 40 megapixels, are resized. GIFs keep their animation, and smaller images and videos are served as uploaded.
+- The variant is created on first request and cached on the volume under `<release-dir>/variants/`, keyed by content hash and width. Deleting that directory only costs recomputation.
+- Opaque images become JPEG at quality 82; images with transparency stay PNG. Go cannot encode WebP or AVIF without cgo, and JPEG already turns an 1800×1125 PNG thumbnail into a few kilobytes.
+- Concurrent requests for the same variant share one resize (`singleflight`), and at most two resizes run at a time.
+- Uploads now read WebP dimensions, so WebP gets variants too. A WebP the decoder cannot parse, such as an animated one, is still accepted without dimensions.
+
+**Templates.**
+
+- List thumbnails (76 px) request `?w=160`.
+- Card thumbnails get `srcset` with `sizes="(max-width: 767px) 100vw, 380px"`.
+- Covers and gallery images get `srcset` with the original as the largest candidate.
+- Video posters use the 640 or 1200 variant.
+- `og:image` for covers, posters and journal covers uses `?w=1200`.
+
+**Default share image.**
+
+- Pages without an image get `og:image` set to `/share.png?v=<hash>`, a 1200×630 PNG generated from the configured brand, tagline and host, with the mark from `icon.svg`.
+- It is drawn with the Go fonts, because the licensed web fonts are WOFF2, which Go cannot rasterize.
+- The `v` hash changes with the brand or tagline, so link-preview caches refresh. A matching `v` is served immutable.
+- It is rendered once per brand and cached in memory.
+- Those pages send `og:image:width` and `og:image:height` and use `twitter:card summary_large_image`.
+
 ## Deferred (not in this change)
 
 | Item | Why deferred | Next step |
 | --- | --- | --- |
-| Responsive thumbnails and cover sizes | Needs an image pipeline. The Go standard library cannot encode WebP; this is a choice between a cgo libwebp, an external tool at upload, or AVIF/JPEG derivatives. | Its own ticket. Store derived sizes and dimensions at upload, emit `srcset`. |
-| Default `og:image` | Needs a designed 1200×630 asset. | Add it to the portal assets and use it when a page has no image. |
 | Uptime and error alerting, certificate expiry alert | Platform monitoring, outside this repository. | External check on `/readyz` and `/`, plus alerting. |
 | Restore drill | Operational. | Restore the nightly dump and S3 blobs into a scratch namespace. |
 | Same-site instance origins, Stripe live mode, Google sign-in check, e2e users | Product and ops decisions in `doc/production.md` §12. | Decide before announcing. |

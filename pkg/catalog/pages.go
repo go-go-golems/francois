@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -43,6 +44,10 @@ var pageFuncs = template.FuncMap{
 		return t.UTC().Format("2 January 2006")
 	},
 	"isVideo": content.IsVideo,
+	// variant is the URL of a still image resized to width w; the server
+	// falls back to the original when it does not resize that file.
+	"variant": func(id string, w int) string { return content.MediaPrefix + id + "?w=" + strconv.Itoa(w) },
+	"srcset":  srcset,
 	// period ends a title with a full stop unless it already ends in
 	// punctuation ("Polis IDE." but "What is Polis?").
 	"period": func(s string) string {
@@ -124,6 +129,9 @@ type pageData struct {
 	// OGType is the Open Graph type: "article" for journal posts, else
 	// "website".
 	OGType string
+	// DefaultImage marks Image as the generated share card, whose size is
+	// known.
+	DefaultImage bool
 	// Contact is the configured public contact address, if any.
 	Contact string
 	// FontCSS and FontPreloads are versioned web-font URLs.
@@ -199,6 +207,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	d.Nav = nav
 	if d.Description == "" {
 		d.Description = rev.Document.Storefront.Tagline
+	}
+	if d.Image == "" {
+		d.Image, d.DefaultImage = s.shareURL(r, rev.Document), true
 	}
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout", d); err != nil {
@@ -563,9 +574,9 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now())}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
-		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
+		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID + "?w=1200"
 	} else if c.Cover != nil && c.Cover.Poster != "" {
-		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.Poster
+		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.Poster + "?w=1200"
 	}
 	s.render(w, r, http.StatusOK, "artifact", d)
 }
@@ -678,7 +689,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
 			if !content.IsVideo(m.MediaType) {
-				d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + m.ID
+				d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + m.ID + "?w=1200"
 			}
 		}
 	}
@@ -785,12 +796,69 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	w.Header().Set("Content-Type", m.MediaType)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	if width, _ := strconv.Atoi(r.URL.Query().Get("w")); content.VariantWidth(width) && content.Resizable(m.MediaType, m.Width, m.Height) {
+		if data, err := s.variant(m, f, width); err == nil {
+			w.Header().Set("Content-Type", http.DetectContentType(data))
+			w.Header().Set("ETag", `"`+m.SHA256+"-w"+strconv.Itoa(width)+`"`)
+			http.ServeContent(w, r, "", m.CreatedAt, bytes.NewReader(data))
+			return
+		} else if !errors.Is(err, content.ErrNoVariant) {
+			log.Warn().Err(err).Str("media", m.ID).Int("width", width).Msg("media variant failed; serving original")
+		}
+		if _, err = f.Seek(0, io.SeekStart); err != nil {
+			http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", m.MediaType)
 	w.Header().Set("ETag", `"`+m.SHA256+`"`)
 	// ServeContent answers Range requests by seeking, so videos stream.
 	http.ServeContent(w, r, "", m.CreatedAt, f)
+}
+
+// srcset lists the resized widths of a still image smaller than the
+// original, then the original itself. It is empty when the image is not
+// resized, so the template keeps a plain src.
+func srcset(m store.Media) string {
+	if !content.Resizable(m.MediaType, m.Width, m.Height) {
+		return ""
+	}
+	var parts []string
+	for _, w := range content.VariantWidths {
+		if w < m.Width {
+			parts = append(parts, fmt.Sprintf("%s%s?w=%d %dw", content.MediaPrefix, m.ID, w, w))
+		}
+	}
+	return strings.Join(append(parts, fmt.Sprintf("%s%s %dw", content.MediaPrefix, m.ID, m.Width)), ", ")
+}
+
+// variant returns the cached resized copy of an image, creating it on first
+// request. Concurrent requests for the same variant share one resize, and
+// resizes run at most two at a time, so a burst of thumbnails cannot exhaust
+// memory.
+func (s *Server) variant(m store.Media, f io.ReadSeeker, width int) ([]byte, error) {
+	name := m.SHA256 + "-w" + strconv.Itoa(width)
+	if data, err := s.Publisher.Blobs.Variant(name); err == nil {
+		return data, nil
+	}
+	v, err, _ := s.resizes.Do(name, func() (any, error) {
+		s.resizeSlots <- struct{}{}
+		defer func() { <-s.resizeSlots }()
+		data, _, err := content.Resize(f, width)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.Publisher.Blobs.PutVariant(name, data); err != nil {
+			log.Warn().Err(err).Str("variant", name).Msg("media variant not cached")
+		}
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]byte), nil
 }
 
 // pricingPage presents contributions; render supplies confirmed supporter state.

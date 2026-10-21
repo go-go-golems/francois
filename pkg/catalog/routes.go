@@ -68,6 +68,7 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /robots.txt", s.robots)
 	m.HandleFunc("GET /sitemap.xml", s.sitemap)
 	m.HandleFunc("GET /manifest.webmanifest", s.manifest)
+	m.HandleFunc("GET /share.png", s.shareImage)
 	m.HandleFunc("GET /favicon.ico", rootAsset("favicon.ico"))
 	m.HandleFunc("GET /apple-touch-icon.png", rootAsset("apple-touch-icon.png"))
 	m.HandleFunc("GET /fonts/fonts.css", s.fontCSS)

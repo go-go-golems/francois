@@ -25,6 +25,7 @@ import (
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
 
 // Site is one portal origin and the application domain whose instance
@@ -188,6 +189,9 @@ type Server struct {
 	demoLimiter   *limiter
 	deviceLimiter *limiter
 	fonts         *fonts
+	resizes       singleflight.Group
+	resizeSlots   chan struct{}
+	share         shareCache
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -205,7 +209,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 		}
 	}
 	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Funcs(pageFuncs).Parse(web.LegalTemplate)),
-		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter()}
+		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter(), resizeSlots: make(chan struct{}, 2)}
 	var err error
 	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {
 		// Validate already checked the directory; serve no fonts rather than fail.

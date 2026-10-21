@@ -20,3 +20,12 @@ Design doc 01 and implementation on feat/launch-readiness: --redirect-host retir
 
 - /Users/manuel.odendahl/code/go-go-golems/francois-launch/doc/production.md — New flags and host retirement procedure
 - /Users/manuel.odendahl/code/go-go-golems/francois-launch/pkg/catalog/seo.go — Crawl files
+
+## 2026-10-21
+
+Responsive images (/media/{id}?w= variants cached under variants/, srcset in templates, og:image ?w=1200) and a generated default share image (/share.png from brand/tagline/host). Added followup-todo.md with the remaining deploy, ops, DNS, product, content and code items.
+
+### Related Files
+
+- /Users/manuel.odendahl/code/go-go-golems/francois-launch/pkg/catalog/content/resize.go — Image resizing
+- /Users/manuel.odendahl/code/go-go-golems/francois-launch/pkg/catalog/share.go — Generated share image

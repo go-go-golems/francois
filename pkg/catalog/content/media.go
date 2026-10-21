@@ -32,7 +32,7 @@ type MediaInfo struct {
 }
 
 // DetectMedia sniffs the type from the first 512 bytes and, for PNG, JPEG
-// and GIF, decodes the dimensions. It leaves r positioned at the start.
+// GIF and WebP, decodes the dimensions. It leaves r positioned at the start.
 func DetectMedia(r io.ReadSeeker) (MediaInfo, error) {
 	head := make([]byte, 512)
 	n, err := io.ReadFull(r, head)
@@ -51,9 +51,11 @@ func DetectMedia(r io.ReadSeeker) (MediaInfo, error) {
 		return MediaInfo{}, err
 	}
 	switch t {
-	case "image/png", "image/jpeg", "image/gif":
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
 		cfg, _, err := image.DecodeConfig(r)
-		if err != nil {
+		// WebP variants the decoder does not know (such as animation) are
+		// still accepted, without dimensions, as before WebP was decoded.
+		if err != nil && t != "image/webp" {
 			return MediaInfo{}, errors.Wrap(err, "the image could not be read")
 		}
 		info.Width, info.Height = cfg.Width, cfg.Height

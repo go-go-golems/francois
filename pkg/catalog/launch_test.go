@@ -1,11 +1,19 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
+	"html"
+	"image"
+	"image/color"
+	"image/draw"
+	stdgif "image/gif"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -162,7 +170,7 @@ func TestPageMetadata(t *testing.T) {
 	e := setup(t)
 	code, b, _ := e.do(nil, "portal.test", "GET", "/", nil, nil)
 	page := string(b)
-	for _, want := range []string{`<meta property="og:type" content="website">`, `<meta name="twitter:card" content="summary">`, `<link rel="manifest" href="/manifest.webmanifest">`, `rel="apple-touch-icon"`, `<link rel="stylesheet" href="/fonts/fonts.css?v=`} {
+	for _, want := range []string{`<meta property="og:type" content="website">`, `<meta name="twitter:card" content="summary_large_image">`, `<link rel="manifest" href="/manifest.webmanifest">`, `rel="apple-touch-icon"`, `<link rel="stylesheet" href="/fonts/fonts.css?v=`} {
 		if code != 200 || !strings.Contains(page, want) {
 			t.Fatalf("home lacks %s", want)
 		}
@@ -209,5 +217,90 @@ func TestPageMetadata(t *testing.T) {
 	}
 	if _, b, _ = withContact.do(nil, "portal.test", "GET", "/api/session", nil, nil); !strings.Contains(string(b), `"contact":"hello@example.test"`) {
 		t.Fatalf("session contact: %s", b)
+	}
+}
+
+func encodePNG(t *testing.T, img image.Image) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// TestMediaVariants resizes still images to the fixed widths on request,
+// caches the result, and serves the original whenever no variant applies.
+func TestMediaVariants(t *testing.T) {
+	e := setup(t)
+	admin := e.user("ada", "admin", false)
+	opaque := image.NewRGBA(image.Rect(0, 0, 800, 500))
+	draw.Draw(opaque, opaque.Bounds(), image.NewUniform(color.RGBA{200, 100, 50, 255}), image.Point{}, draw.Src)
+	upload := func(name string, data []byte) string {
+		code, out := e.multipartTo(admin, "/api/studio/media", map[string]string{"alt": name}, "file", name, data)
+		if code != 201 {
+			t.Fatalf("upload %s: %d %v", name, code, out)
+		}
+		return out["id"].(string)
+	}
+	id := upload("a.png", encodePNG(t, opaque))
+	get := func(id, query string) (image.Config, string, http.Header, []byte) {
+		code, b, h := e.do(nil, "portal.test", "GET", "/media/"+id+query, nil, nil)
+		cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+		if code != 200 || err != nil {
+			t.Fatalf("%s%s: %d %v", id, query, code, err)
+		}
+		return cfg, format, h, b
+	}
+	cfg, format, h, first := get(id, "?w=320")
+	if format != "jpeg" || cfg.Width != 320 || cfg.Height != 200 || h.Get("Content-Type") != "image/jpeg" || !strings.HasSuffix(h.Get("ETag"), `-w320"`) {
+		t.Fatalf("variant: %s %dx%d %q %q", format, cfg.Width, cfg.Height, h.Get("Content-Type"), h.Get("ETag"))
+	}
+	if _, _, _, again := get(id, "?w=320"); !bytes.Equal(first, again) {
+		t.Fatal("variant not served from cache")
+	}
+	for _, q := range []string{"?w=999", "?w=1200", "?w=x", ""} {
+		if cfg, format, _, _ := get(id, q); format != "png" || cfg.Width != 800 {
+			t.Fatalf("%s: want the original, got %s %d", q, format, cfg.Width)
+		}
+	}
+	transparent := upload("b.png", encodePNG(t, image.NewNRGBA(image.Rect(0, 0, 400, 400))))
+	if cfg, format, _, _ := get(transparent, "?w=160"); format != "png" || cfg.Width != 160 {
+		t.Fatalf("transparent variant: %s %d", format, cfg.Width)
+	}
+	var gif bytes.Buffer
+	_ = stdgif.Encode(&gif, image.NewPaletted(image.Rect(0, 0, 400, 300), color.Palette{color.Black, color.White}), nil)
+	if _, format, _, _ := get(upload("c.gif", gif.Bytes()), "?w=160"); format != "gif" {
+		t.Fatalf("GIF resized to %s", format)
+	}
+
+	want := "/media/m?w=160 160w, /media/m?w=320 320w, /media/m?w=640 640w, /media/m 800w"
+	if got := srcset(store.Media{ID: "m", MediaType: "image/png", Width: 800, Height: 500}); got != want {
+		t.Fatalf("srcset %q", got)
+	}
+	if got := srcset(store.Media{ID: "m", MediaType: "image/gif", Width: 800, Height: 500}); got != "" {
+		t.Fatalf("GIF srcset %q", got)
+	}
+}
+
+// TestShareImage gives pages without an image a generated 1200×630 card
+// named after the configured brand.
+func TestShareImage(t *testing.T) {
+	e := setup(t)
+	_, b, _ := e.do(nil, "portal.test", "GET", "/pricing", nil, nil)
+	page := string(b)
+	i := strings.Index(page, `<meta property="og:image" content="http://portal.test/share.png?v=`)
+	if i < 0 || !strings.Contains(page, `<meta property="og:image:width" content="1200">`) || !strings.Contains(page, `content="summary_large_image"`) {
+		t.Fatal("default share image missing from head")
+	}
+	u := page[i+len(`<meta property="og:image" content="http://portal.test`):]
+	u = html.UnescapeString(u[:strings.Index(u, `"`)])
+	code, img, h := e.do(nil, "portal.test", "GET", u, nil, nil)
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(img))
+	if code != 200 || err != nil || format != "png" || cfg.Width != 1200 || cfg.Height != 630 || !strings.Contains(h.Get("Cache-Control"), "immutable") {
+		t.Fatalf("share image: %d %v %s %dx%d %q", code, err, format, cfg.Width, cfg.Height, h.Get("Cache-Control"))
+	}
+	if p := os.Getenv("SHARE_IMAGE_OUT"); p != "" {
+		_ = os.WriteFile(p, img, 0o600)
 	}
 }

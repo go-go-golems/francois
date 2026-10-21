@@ -108,6 +108,9 @@ Launch-readiness flags (FRANCOIS-020):
   `X-Forwarded-Proto: http` is redirected (308) to `https`.
 - `--contact-email` is shown in the footer, `/pricing` and the SPA; without it
   no contact link is rendered.
+- Resized images (`/media/{id}?w=160|320|640|1200`) are cached under
+  `<release-dir>/variants/` on the PVC. The directory is a cache: it can be
+  deleted and is not needed in backups.
 
 **Retiring `francois.yolo.scapegoat.dev`** (planned; the table above is still
 the live state). Target flags: `--public-url=https://slop.boutique
