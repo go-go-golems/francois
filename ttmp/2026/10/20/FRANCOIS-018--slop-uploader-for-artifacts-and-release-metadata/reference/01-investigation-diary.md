@@ -297,3 +297,46 @@ Wrote a 3,613-word textbook-style article covering the implemented data model, c
 - Vault note: `Projects/2026/10/20/ARTICLE - Slop Uploader - A Small Publication Workflow with Explicit Recovery.md`.
 - Vault root: `/home/manuel/code/wesen/go-go-golems/go-go-parc`.
 - Assets: six `Projects/2026/10/20/_assets/francois-uploader-*.png` files.
+
+## Step 6: Run the real local uploader and open it
+
+Started the current Go application in tmux against an isolated local PostgreSQL database and opened the real uploader in the user's browser with a disposable local admin session. This is a functioning local server, not the screenshot fixture.
+
+### Prompt Context
+**User prompt (verbatim):** "run locally and open for me"
+**Assistant interpretation:** Start the implemented app and open its uploader ready to use.
+**Inferred user intent:** Try the new workflow interactively.
+
+### What I did
+- Reused the running local PostgreSQL container and created `francois_uploader_preview`.
+- Ran `go run ./cmd/francois catalog serve` in tmux session `francois-uploader`, with localhost:8090, backend fake, migrations enabled and release files under `/tmp/francois-uploader-preview/releases`.
+- Inserted a local admin and a one-day session into this isolated database. A one-time loopback HTTP helper set the HttpOnly development cookie and redirected the browser to `/studio/upload`, then stopped.
+
+### Why
+- The isolated database permits actual uploads without production changes. A disposable local session avoids needing external identity infrastructure for this preview.
+
+### What worked
+- All migrations applied; the server logged readiness.
+- Authenticated `/api/studio/me` returned the admin role. Browser handoff completed and `/studio/upload` returned HTTP 200.
+
+### What didn't work
+- Initial tmux inspection required execution outside the restricted sandbox; approved escalation resolved it. No server failure occurred.
+
+### What I learned
+- Only PostgreSQL was running from the earlier local stack; the app needed a new tmux session.
+
+### What was tricky to build
+- Local session handoff uses a random single-use URL on loopback and stops after delivery; no authentication shortcut was added to application code.
+
+### What warrants a second pair of eyes
+- The model backend is deterministic fake; this preview does not exercise live LLM providers or billing.
+
+### What should be done in the future
+- Stop the preview when no longer needed; production remains unchanged.
+
+### Code review instructions
+- Inspect `tmux capture-pane -t francois-uploader -p`. The uploader is at http://localhost:8090/studio/upload.
+
+### Technical details
+- Listener: 127.0.0.1:8090. Database: francois_uploader_preview on local PostgreSQL port 5437.
+- Temporary browser handoff helper: `/tmp/francois-uploader-open.py`; session secrets were generated in memory and not committed.
