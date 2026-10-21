@@ -37,14 +37,22 @@ can do.
 
 ## Connecting
 
-Store a token once per server; later commands find it without flags:
+Log in once per server; later commands find the token without flags:
 
 ```bash
-francois catalog auth login --with-token --server https://slop.boutique < token.txt
+francois catalog auth login --server https://slop.boutique
 francois catalog whoami
 francois catalog auth status       # stored logins and which one commands use
-francois catalog auth logout       # forget the token
+francois catalog auth logout       # revoke and forget the token
 ```
+
+`auth login` prints a link and a code. Open the link in a browser where you are
+signed in, check that the code matches, choose scopes (by default every scope
+your role allows) and a lifetime (default 90 days), and approve; the terminal
+receives the token within seconds. `--scopes`, `--days` and `--name`
+pre-select the form; `--no-browser` only prints the link (the default over
+SSH). To store a token you already have, use
+`francois catalog auth login --with-token --server URL < token.txt`.
 
 Logins live in `credentials.json` under `$FRANCOIS_CONFIG_DIR`,
 `$XDG_CONFIG_HOME/francois` or `~/.config/francois` (mode 0600), one per

@@ -416,11 +416,13 @@ yet.
 
 Creators publish their own artifacts; administrators publish any. In the
 studio (`/studio`): artifact → Releases → upload HTML → check → draft →
-preview on an isolated origin → publish. From a laptop, with a personal API
-token with the `studio` scope, created on the account page (`/account` → API tokens):
+preview on an isolated origin → publish. From a laptop, log in once (approve the
+printed code at `/device` with at least the `studio` scope), or use a token created
+on the account page (`/account` → API tokens) with `--token-file`:
 
 ```bash
-francois catalog releases push --server https://slop.boutique --token-file ~/.config/francois/token \
+francois catalog auth login --server https://slop.boutique
+francois catalog releases push \
   --artifact-id polis --version 1.2.0 --html dist/polis.html \
   [--manifest polis.manifest.json] [--changelog "…"] [--check] [--publish] \
   [--attach docs/manual.pdf --attach plates.zip]
@@ -433,7 +435,12 @@ A token reaches only the surfaces its scopes name: `studio` (`/api/studio/*`),
 `account` (the owner's account, billing links and instances; not instance
 launch), `admin:read` (admin GETs) and `admin:write` (all admin routes). Scopes
 never exceed the owner's role; admin-scoped tokens must expire within 90 days.
-No token can create tokens. Owners revoke tokens on the account page;
+No token can create tokens: `francois catalog auth login` (device login,
+`/api/device/*`) mints a token only after a signed-in user approves its code at
+`/device`, binding it to that site; codes expire after 10 minutes and the
+approval, the token creation (`via: device`) and a later `auth logout`
+(`token.revoke_self`, the one call by which a token may revoke itself) are
+audited. Owners revoke tokens on the account page;
 administrators list a user's tokens with `GET /api/admin/users/{id}/tokens`,
 revoke one with `DELETE /api/admin/tokens/{id}`, or all of them with
 `POST /api/admin/users/{id}/revoke-sessions {"tokens": true}`. Audit entries

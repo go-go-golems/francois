@@ -226,13 +226,19 @@ scopes: `account` (the owner's account, billing links and instances),
 and `admin:write` (the admin API; these tokens expire within 90 days). A scope
 never exceeds the owner's role, `GET /api/me` reports a token's identity and
 scopes, and changes made through a token name it in the audit log.
-`francois catalog releases push` uploads releases with a `studio` token, without
-database access:
+`francois catalog auth login --server https://catalog.example` gets a token
+without copying it: it prints a code and a link to `/device`, where the
+signed-in user checks the code, picks scopes and approves; the CLI stores the
+token in `~/.config/francois/credentials.json` (mode 0600) and every
+`francois catalog` command, `releases push` and `francois mcp` use it.
+`FRANCOIS_TOKEN` and `--token-file` still take precedence, and
+`auth logout` revokes the token. `francois catalog releases push` uploads
+releases with a `studio` token, without database access:
 
 ```sh
-francois catalog releases push --server https://catalog.example --token-file token \
-  --artifact-id polis --version 1.2.0 --html dist/polis.html \
-  --attach docs/manual.pdf --publish
+francois catalog auth login --server https://catalog.example
+francois catalog releases push --artifact-id polis --version 1.2.0 \
+  --html dist/polis.html --attach docs/manual.pdf --publish
 ```
 
 The admin UI (`/admin`) covers users (roles, disable, session revocation,
