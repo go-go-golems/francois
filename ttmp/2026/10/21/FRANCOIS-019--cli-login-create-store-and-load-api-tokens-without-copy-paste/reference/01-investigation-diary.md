@@ -309,3 +309,108 @@ that for now.
 
 ### Technical details
 - File format: `{"version":1,"default":"<origin>","servers":{"<origin>":{"token","tokenId","name","user":{id,name,email,role},"scopes","expiresAt","savedAt","host"}}}`.
+
+## Step 6: Phase 2 server device flow, and moving to a separate worktree
+
+I implemented the device endpoints, store and migration. While building, the
+compile failed in a file I had not touched, which revealed another agent
+session editing the same working tree (ticket FRANCOIS-021, "made-at dates").
+To avoid mixing work, I moved my uncommitted Phase 2 files into a new git
+worktree on a new branch and continued there.
+
+### Prompt Context
+
+**User prompt (verbatim):** "continue" (see Step 4)
+**Assistant interpretation:** Continue phases 2-5.
+**Inferred user intent:** Finish the feature.
+**Commit (code):** 6e72bfa — "feat(catalog): device login endpoints that mint tokens from a browser approval"
+
+### What I did
+- `pkg/catalog/store/migrations/019_device_authorizations.sql` (table of design §8.3, `interval_seconds` without default: the server always sets it).
+- `pkg/catalog/store/device.go`: `NewUserCode`, `NormalizeUserCode`, `FormatUserCode`, `CreateDeviceAuthorization` (returns `ErrConflict` on a user-code collision), `DeviceRequest`, `ApproveDevice`, `DenyDevice`, `PollDevice` with a `DeviceGrant` callback, `issueDevice`.
+- `pkg/catalog/device.go`: `deviceRoutes`, `deviceAuthorize`, `deviceToken`, `findDevice`, `suggestGrant`, `deviceRequest`, `deviceApprove`, `deviceDeny`.
+- `pkg/catalog/demos.go`: `limiter.left` and `limiter.take`. `server.go`: `deviceLimiter`. `routes.go`: `s.deviceRoutes(m)`. `tokens.go`: `meUser`.
+- `pkg/catalog/device_test.go`: `TestUserCodes`, `TestSuggestGrant`, `TestDeviceLogin`, `TestDeviceLoginRefusals`, `TestDeviceAuthorizeRateLimit`.
+- Worktree: `git worktree add -b feat/cli-auth ../francois-cli-auth HEAD`, copied my seven changed or new files there, restored them in the original tree (`git checkout --` on my four modified files, `rm` on my three new ones).
+
+### Why
+- Decision 3: when the CLI requests no scopes, `suggestGrant` pre-selects every scope the role allows, admin scopes included, and raises the lifetime to 90 days when admin scopes need one.
+- `slow_down` and expiry use the database's `now()` in SQL, so the app server's clock does not matter.
+
+### What worked
+- `go test ./pkg/catalog/ -run 'TestDevice|TestUserCodes|TestSuggestGrant' -v`: all five PASS. Full `./pkg/catalog/` ok (15.1 s). Lint `0 issues.`
+
+### What didn't work
+- `GOWORK=off go build ./...` in the shared tree:
+  ```
+  pkg/catalog/client/types.go:89:2: MadeAt redeclared
+  	pkg/catalog/client/types.go:86:2: other declaration of MadeAt
+  ```
+  `git status` showed changes I did not make (`client/types.go`, `pages.go`, `store/releases.go`, `studio.go`, templates, `ui/catalog/studio*.ts(x)`, migration `020_artifact_made_at.sql`, ticket FRANCOIS-021). I left them untouched.
+
+### What I learned
+- Two agents can share one checkout. A worktree per ticket keeps commits and builds separate.
+
+### What was tricky to build
+- Tests poll twice within the 5-second interval, which correctly returns `slow_down`. `devicePoll` in the tests moves `last_polled_at` an hour back before each poll that should not count as too fast. One test asserts the `slow_down` path itself.
+- `tokenGrant` returns `*grantError`. The grant callback returns it as `error` only when it is non-nil, avoiding a non-nil interface that wraps a nil pointer.
+
+### What warrants a second pair of eyes
+- `PollDevice` deletes an approved row before re-checking the approver. A denial at that point (role or disabled change) therefore consumes the request; the CLI sees `access_denied`.
+- Rate limits: 20 starts per hour per address, 600 per hour globally, 1200 polls per hour per address, and 30 unknown-code lookups per hour per user.
+
+### What should be done in the future
+- The other session's work in the original tree is not mine. Merging the branches is a human decision.
+
+### Code review instructions
+- `git show 6e72bfa`; start at `PollDevice` in `pkg/catalog/store/device.go`.
+
+### Technical details
+- The worktree is at `/Users/manuel.odendahl/code/go-go-golems/francois-cli-auth`, branch `feat/cli-auth`, branched from `5503396`. `feat/cli-auth-login` stays at `5503396` in the original tree.
+
+## Step 7: Self-revocation, client calls, CLI device login
+
+These steps finish the server and CLI halves: `DELETE /api/me/token` (decision
+1), typed client calls, and `auth login` running the device flow by default,
+with `auth logout` revoking the token on the server.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 4)
+**Assistant interpretation:** Phases 4 and 5.
+**Inferred user intent:** One command to log in and one to log out.
+**Commit (code):** 5b30603 — "feat(catalog): tokens may revoke themselves; client calls for device login"; ba9761c — "feat(cli): browser device login and revoking logout"
+
+### What I did
+- `pkg/catalog/tokens.go`: route `DELETE /api/me/token` (`session`, `anyToken`) and `revokeSelf` (`400 token_required` for sessions, audit `token.revoke_self`).
+- `pkg/catalog/client/device.go`: `DeviceAuthorize`, `DevicePoll`, `RevokeSelf`. `TestDeviceLoginClient` runs the whole flow through the client with `WithStrictDecoding`. `TestTokenRevokesItself` checks that another token is unaffected and that a session is refused.
+- `cmd/francois/cmds/auth.go`: `authLogin.device`, `pollDevice`, `shouldOpenBrowser`, `openBrowser`, `revoke`; new flags `--scopes --days --name --no-browser` for login and `--keep-token` for logout.
+- `cmd/francois/cmds/auth_test.go`: `deviceAPI` scripted fake, `TestAuthLoginDevice` (pending, slow_down, pending, issued; checks the request body and that no bearer header is sent), `TestAuthLoginDeviceRefusals`.
+
+### Why
+- The browser opens only for interactive desktop sessions (no `SSH_CONNECTION`, stderr is a TTY, macOS or Windows or a display), and only for a URL under the server's own origin.
+- Logout still removes the local entry when the server is unreachable, and prints a warning that names the token to revoke on the account page.
+
+### What worked
+- `go test ./cmd/francois/cmds/` ok (1.07 s); catalog device and revoke tests PASS; lint `0 issues.`
+
+### What didn't work
+- The first `TestAuthLoginDevice` run took 10.02 s: after `slow_down` the real 5-second increment applied to every later poll. Made `deviceSlowDown` a package variable next to `devicePollFloor`; tests lower both.
+
+### What I learned
+- The scripted fake must return `interval: 0` and rely on `devicePollFloor`. Otherwise the client's one-second floor makes the tests slow.
+
+### What was tricky to build
+- `pollDevice` must tell API refusals apart from network errors. Known codes are handled first, any other `*client.Error` aborts, and transport errors are retried until the code expires.
+
+### What warrants a second pair of eyes
+- `DELETE /api/me/token` is the agreed exception to "tokens never revoke tokens" (owner decision 1).
+
+### What should be done in the future
+- Phase 3 UI (`/device` page), then documentation.
+
+### Code review instructions
+- `git show 5b30603 ba9761c`; `go test ./cmd/francois/cmds/ -run TestAuth -v`.
+
+### Technical details
+- Login request body: `{"clientName":"francois CLI on <host>","scopes":null|[…],"days":N?}`. Without `--days` the field is omitted and the server uses 90.
