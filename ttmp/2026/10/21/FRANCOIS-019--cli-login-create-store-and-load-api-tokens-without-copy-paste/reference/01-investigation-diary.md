@@ -329,7 +329,7 @@ worktree on a new branch and continued there.
 **User prompt (verbatim):** "continue" (see Step 4)
 **Assistant interpretation:** Continue phases 2-5.
 **Inferred user intent:** Finish the feature.
-**Commit (code):** 6e72bfa — "feat(catalog): device login endpoints that mint tokens from a browser approval"
+**Commit (code):** 0e396ba — "feat(catalog): device login endpoints that mint tokens from a browser approval"
 
 ### What I did
 - `pkg/catalog/store/migrations/019_device_authorizations.sql` (table of design §8.3, `interval_seconds` without default: the server always sets it).
@@ -369,7 +369,7 @@ worktree on a new branch and continued there.
 - The other session's work in the original tree is not mine. Merging the branches is a human decision.
 
 ### Code review instructions
-- `git show 6e72bfa`; start at `PollDevice` in `pkg/catalog/store/device.go`.
+- `git show 0e396ba`; start at `PollDevice` in `pkg/catalog/store/device.go`.
 
 ### Technical details
 - The worktree is at `/Users/manuel.odendahl/code/go-go-golems/francois-cli-auth`, branch `feat/cli-auth`, branched from `5503396`. `feat/cli-auth-login` stays at `5503396` in the original tree.
@@ -385,7 +385,7 @@ with `auth logout` revoking the token on the server.
 **User prompt (verbatim):** (see Step 4)
 **Assistant interpretation:** Phases 4 and 5.
 **Inferred user intent:** One command to log in and one to log out.
-**Commit (code):** 5b30603 — "feat(catalog): tokens may revoke themselves; client calls for device login"; ba9761c — "feat(cli): browser device login and revoking logout"
+**Commit (code):** e5e2ed4 — "feat(catalog): tokens may revoke themselves; client calls for device login"; 17b0386 — "feat(cli): browser device login and revoking logout"
 
 ### What I did
 - `pkg/catalog/tokens.go`: route `DELETE /api/me/token` (`session`, `anyToken`) and `revokeSelf` (`400 token_required` for sessions, audit `token.revoke_self`).
@@ -416,7 +416,7 @@ with `auth logout` revoking the token on the server.
 - Phase 3 UI (`/device` page), then documentation.
 
 ### Code review instructions
-- `git show 5b30603 ba9761c`; `go test ./cmd/francois/cmds/ -run TestAuth -v`.
+- `git show e5e2ed4 17b0386`; `go test ./cmd/francois/cmds/ -run TestAuth -v`.
 
 ### Technical details
 - Login request body: `{"clientName":"francois CLI on <host>","scopes":null|[…],"days":N?}`. Without `--days` the field is omitted and the server uses 90.
@@ -433,7 +433,7 @@ way the page posts it.
 **User prompt (verbatim):** (see Step 4)
 **Assistant interpretation:** Phase 3, then prove the pieces work together.
 **Inferred user intent:** A login that works in practice, not only in unit tests.
-**Commit (code):** ed1e596 — "feat(ui): /device page to approve CLI logins"
+**Commit (code):** 8ed195b — "feat(ui): /device page to approve CLI logins"
 
 ### What I did
 - `ui/catalog/device.tsx`: `Device` (signed-out → sign in with return to the same URL; no code → `EnterCode`; else `Approve`). `Approve` shows client, user, site, the code, requester address and expiry, scope checkboxes initialized from `suggestedScopes`, days with the account page's limits, a warning, Approve and Deny, and a done state.
@@ -479,7 +479,7 @@ checks.
 **User prompt (verbatim):** (see Step 4)
 **Assistant interpretation:** Phase 6 and final validation.
 **Inferred user intent:** Ship-ready branch.
-**Commit (code):** 9de3bd7 — "docs: CLI device login in README, production guide, help topics and account page"
+**Commit (code):** ed4c200 — "docs: CLI device login in README, production guide, help topics and account page"
 
 ### Evidence and commits
 - Docs: `README.md` (token paragraph and push example), `doc/production.md` §5.3 (login, device audit entries, self-revocation exception), `pkg/doc/topics/01-catalog-api.md` (Connecting), `02-catalog-mcp.md` (setup via stored login; separate narrower agent token via `FRANCOIS_CONFIG_DIR`), account page hints in `tokens.tsx` (rebuilt `catalog.js`).
@@ -492,3 +492,31 @@ checks.
 
 ### Remaining requirements and next action
 - Visual review of `/device` (Step 8). Open a PR from `feat/cli-auth` when wanted. Decide what to do with the other session's uncommitted FRANCOIS-021 work in the original checkout (branch `feat/cli-auth-login`).
+
+## Step 10: Remove another session's commits from the branch
+
+`git log main..HEAD` on `feat/cli-auth` listed two commits I did not write:
+`8a438a2 feat: add made dates to experiments` and `fb69533 docs: record
+experiment date implementation` (11:13–11:14). The other session had committed
+them onto `feat/cli-auth-login` on top of my phase 1 commits, before I created
+the worktree from that HEAD. The same work also lives on its own branch,
+`feat/experiment-made-at`.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 4)
+**Assistant interpretation:** Keep the branch to this ticket's work.
+**Inferred user intent:** A reviewable branch.
+
+### Evidence and commits
+- `git branch -a --contains 8a438a2` → `feat/cli-auth`, `feat/cli-auth-login`, `feat/experiment-made-at`.
+- `git rebase --onto 5503396 fb69533 feat/cli-auth` → "Successfully rebased"; the branch now has only FRANCOIS-019 commits on top of `main`, and migration `020_artifact_made_at.sql` is gone from it.
+- Rebuilt `catalog.js`: the committed bundle had been built with the other session's studio changes in the tree, so it differed after the rebase; committed the clean build.
+- Rewrote hashes in this diary, the design doc and the changelog: 6e72bfa→0e396ba, 5b30603→e5e2ed4, ba9761c→17b0386, ed1e596→8ed195b, 9de3bd7→ed4c200 (3c36520 and c5240b0 unchanged).
+- After the rebase: `go test ./pkg/catalog/ ./pkg/catalog/client/ ./pkg/catalog/credentials/ ./cmd/...` all ok; `pnpm run check` ok.
+
+### Noteworthy decisions or failures
+- `feat/cli-auth-login` was left as it is (it holds the other session's commits). Nothing was pushed.
+
+### Remaining requirements and next action
+- See Step 9.

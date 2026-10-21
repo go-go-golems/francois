@@ -18,7 +18,7 @@ Recorded owner decisions (self-revoke yes, auth login, admin scopes with role-ma
 
 ## 2026-10-21
 
-Implemented phases 0-6 on feat/cli-auth (3c36520..9de3bd7): tokenGrant/insertToken refactor, credentials store and auth commands, device endpoints and migration 019, self-revocation, CLI device login, /device page, docs; e2e script passes
+Implemented phases 0-6 on feat/cli-auth (3c36520..ed4c200): tokenGrant/insertToken refactor, credentials store and auth commands, device endpoints and migration 019, self-revocation, CLI device login, /device page, docs; e2e script passes
 
 ### Related Files
 
