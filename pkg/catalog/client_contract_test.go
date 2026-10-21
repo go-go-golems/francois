@@ -46,8 +46,11 @@ func TestClientContract(t *testing.T) {
 
 	// Studio.
 	s := c.Studio
-	_, err = s.Me(ctx)
+	studioMe, err := s.Me(ctx)
 	ok("studio me", err)
+	if studioMe.Limits.MaxHTMLBytes <= 0 || studioMe.Limits.MaxMediaBytes <= 0 || studioMe.Limits.MaxAttachmentBytes <= 0 || studioMe.Limits.MaxGalleryItems != 24 || studioMe.Limits.MaxAttachments != 20 {
+		t.Fatalf("incomplete uploader limits: %+v", studioMe.Limits)
+	}
 	_, err = s.CreateArtifact(ctx, client.ArtifactCreate{ID: "loom", Title: "Loom"})
 	ok("create artifact", err)
 	title := "Loom 2"

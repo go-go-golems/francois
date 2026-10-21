@@ -133,3 +133,59 @@ Completed the document and uploaded its PDF to reMarkable cloud. The guide conta
 ### Technical details
 - Cloud destination: /ai/2026/10/20/FRANCOIS-018.
 - Main deliverable: design-doc/01-slop-uploader-analysis-design-and-intern-implementation-guide.md.
+
+## Step 3: Implement the guided Studio uploader
+
+Created the integrated upload route and reused the existing Studio mutations. The form contains HTML selection, artifact details, capability controls, full manifest JSON, public-download policy, staged media, a Markdown write-up and attachments. A sequential submission module records completed steps and reconciles uncertain release mutations without replaying creation.
+
+### Prompt Context
+**User prompt (verbatim):** "Implement it, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill). Take screenshots for the diary / a report at the end.
+
+When done,  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      
+ Commit and push the bsidian vault when done (go-go-parc vault)."
+**Assistant interpretation:** Implement FRANCOIS-018, verify the integrated UI, capture evidence, and deliver a technical report to the vault.
+**Inferred user intent:** A usable uploader with understandable behavior and a durable explanation of its implementation.
+
+### What I did
+- Created `feat/slop-uploader` and rebased onto origin/main (e457daf), preserving the unrelated FRANCOIS-017 diary with autostash.
+- Extracted Markdown and media fields into `studio-fields.tsx`; ignored stale Markdown preview responses and associated its label with its textarea.
+- Extended StudioMe's Go, TypeScript and strict CLI contracts with HTML, gallery and attachment limits.
+- Added `uploader-model.ts`, `uploader-submit.ts`, and the `/studio/upload` form, plus navigation links and scoped responsive CSS.
+- Added six meaningful frontend tests covering manifest preservation, byte limits, publication order, partial failure, lost replies and media reuse.
+
+### Why
+- Existing handlers already enforce creator permissions, CSRF and release validation. A new backend workflow service would duplicate these contracts.
+- Local File references belong to the form; persisted records remain in RTK Query. Successful writes are durable, not a fictional transaction.
+
+### What worked
+- `pnpm check`, `pnpm test` (18 passing), and `pnpm build` passed.
+- Check mode performs no mutations. Publication saves page content before publishing the release. An attachment failure returns the actual draft and stops remaining writes.
+- Unknown capability namespaces and scoped options survive checkbox changes.
+
+### What didn't work
+- Initial TypeScript check reported TS7034/TS7005 for the inferred manifest variable. Added an explicit parsed-manifest-or-undefined type.
+- The shell uses Node 20.17.0 while package.json requires >=24. Commands passed with the engine warning; browser and Go integration remain to be verified.
+- Initially wrote the uploader CSS under ui/catalog; corrected it to the project's actual static CSS source before committing.
+
+### What I learned
+- The repository serves `pkg/catalog/web/static/catalog.css` directly; the JavaScript build does not copy a UI CSS source.
+- Upload replies are public release projections with checks, not full Studio release records. The response type now describes that shape.
+
+### What was tricky to build
+- A dropped HTTP reply can hide a successful database write. After creation is attempted, the form locks against replay and fetches the artifact. A lost final publish response is considered successful only when the reloaded release is published.
+- Cached media IDs prevent duplicate media on retries before release creation. File object identity is sufficient within one mounted form.
+
+### What warrants a second pair of eyes
+- Review the independent page/release publication boundary and the live-metadata notice for existing artifacts.
+- Browser checks should exercise artifact switching and mobile layout, not only submission helpers.
+
+### What should be done in the future
+- Complete database-backed tests, screenshot checks and the requested vault report in the next steps.
+
+### Code review instructions
+- Begin with uploader-submit.ts, then uploader-model.ts and uploader.tsx. Run pnpm check/test/build and the PostgreSQL catalog suite.
+
+### Technical details
+- No migration, new HTTP endpoint, service or dependency was introduced.
+- Gallery limit 24 and attachment limit 20 are returned by StudioMe alongside configured byte limits.
+- Metadata updates affect the live artifact; page PUT and release upload create separate drafts. Public download retains the existing freeSample wire field.
