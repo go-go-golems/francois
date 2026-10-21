@@ -50,9 +50,54 @@ func (s *Server) tokens(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, list)
 }
 
-// createToken issues a personal API token. The scopes must be ones the
-// caller's role may hold; tokens that reach the admin API must expire within
-// maxAdminTokenDays.
+// grantError is a token request the caller's role may not have.
+type grantError struct {
+	status        int
+	code, message string
+}
+
+func (e *grantError) Error() string { return e.code + ": " + e.message }
+
+func (e *grantError) write(w http.ResponseWriter) { httpx.Fail(w, e.status, e.code, e.message) }
+
+// tokenGrant validates the scopes and lifetime of a token for a user with
+// role: the scopes must be ones the role may hold, and tokens that reach the
+// admin API must expire within maxAdminTokenDays. It returns the scopes
+// without duplicates and the expiry (nil for none). The account page and
+// device approvals share it.
+func tokenGrant(role string, scopes []string, days int) ([]string, *time.Time, *grantError) {
+	if days < 0 || days > 366 {
+		return nil, nil, &grantError{400, "invalid_request", "A lifetime of 0–366 days (0 = no expiry) is required"}
+	}
+	allowed := store.ScopesForRole(role)
+	if len(allowed) == 0 {
+		return nil, nil, &grantError{403, "tokens_unavailable", "This account cannot create API tokens"}
+	}
+	var out []string
+	admin := false
+	for _, sc := range scopes {
+		if !slices.Contains(allowed, sc) {
+			return nil, nil, &grantError{400, "invalid_scopes", "Scopes must be chosen from: " + strings.Join(allowed, ", ")}
+		}
+		if !slices.Contains(out, sc) {
+			out = append(out, sc)
+		}
+		admin = admin || store.IsAdminScope(sc)
+	}
+	if len(out) == 0 {
+		return nil, nil, &grantError{400, "invalid_scopes", "Choose at least one scope from: " + strings.Join(allowed, ", ")}
+	}
+	if admin && (days < 1 || days > maxAdminTokenDays) {
+		return nil, nil, &grantError{400, "invalid_request", "Tokens with an admin scope must expire within 1–90 days"}
+	}
+	if days == 0 {
+		return out, nil, nil
+	}
+	t := time.Now().Add(time.Duration(days) * 24 * time.Hour)
+	return out, &t, nil
+}
+
+// createToken issues a personal API token within tokenGrant's rules.
 func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name   string   `json:"name"`
@@ -63,35 +108,10 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, 400, "invalid_request", "A name (≤80) and a lifetime of 0–366 days (0 = no expiry) are required")
 		return
 	}
-	allowed := store.ScopesForRole(me(r).Role)
-	if len(allowed) == 0 {
-		httpx.Fail(w, 403, "tokens_unavailable", "This account cannot create API tokens")
+	scopes, expires, gerr := tokenGrant(me(r).Role, in.Scopes, in.Days)
+	if gerr != nil {
+		gerr.write(w)
 		return
-	}
-	var scopes []string
-	admin := false
-	for _, sc := range in.Scopes {
-		if !slices.Contains(allowed, sc) {
-			httpx.Fail(w, 400, "invalid_scopes", "Scopes must be chosen from: "+strings.Join(allowed, ", "))
-			return
-		}
-		if !slices.Contains(scopes, sc) {
-			scopes = append(scopes, sc)
-		}
-		admin = admin || store.IsAdminScope(sc)
-	}
-	if len(scopes) == 0 {
-		httpx.Fail(w, 400, "invalid_scopes", "Choose at least one scope from: "+strings.Join(allowed, ", "))
-		return
-	}
-	if admin && (in.Days < 1 || in.Days > maxAdminTokenDays) {
-		httpx.Fail(w, 400, "invalid_request", "Tokens with an admin scope must expire within 1–90 days")
-		return
-	}
-	var expires *time.Time
-	if in.Days > 0 {
-		t := time.Now().Add(time.Duration(in.Days) * 24 * time.Hour)
-		expires = &t
 	}
 	secret, t, err := s.Store.CreateToken(r.Context(), actor(r), strings.TrimSpace(in.Name), scopes, expires)
 	if err != nil {

@@ -109,7 +109,9 @@ func (c *Client) newRequest(ctx context.Context, rq request, payload []byte) (*h
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.token != "" { // the device login endpoints take no token
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
 	req.Header.Set("Accept", "application/json")
 	if rq.contentType != "" {
 		req.Header.Set("Content-Type", rq.contentType)
