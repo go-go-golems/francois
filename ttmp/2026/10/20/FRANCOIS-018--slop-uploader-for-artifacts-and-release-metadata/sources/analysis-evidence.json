@@ -1,0 +1,42 @@
+{
+  "baseline": "fbb4f72ffd3917bf6e4f2229c5043a9b176b29ea",
+  "helperTest": {
+    "command": "node --test sources/prototype/slop-uploader/test/lib.test.mjs",
+    "exitCode": 0,
+    "reportedFileTests": 1,
+    "reportedFailures": 0,
+    "scope": "pure prototype helpers only"
+  },
+  "manifestExperiment": {
+    "input": {
+      "sample": {
+        "images": true,
+        "customOption": "keep"
+      },
+      "user": {
+        "scopes": [
+          "profile",
+          "email"
+        ]
+      },
+      "downloads": true
+    },
+    "afterCheckboxRoundTrip": {
+      "sample": {
+        "images": true
+      },
+      "user": {
+        "scopes": [
+          "profile"
+        ]
+      },
+      "downloads": true
+    }
+  },
+  "notPerformed": [
+    "prototype proxy tests",
+    "real uploads",
+    "browser runtime verification",
+    "production inspection"
+  ]
+}
