@@ -169,6 +169,7 @@ function UploadForm({
     dirty = useRef(false),
     generation = useRef(0);
   const mediaIDs = useRef(new Map<File, string>());
+  const mediaSequence = useRef(0);
   const formRef = useRef<HTMLFormElement>(null);
   const [check] = studio.useCheckReleaseMutation(),
     [create] = studio.useUploadReleaseMutation(),
@@ -197,10 +198,36 @@ function UploadForm({
         e.returnValue = "";
       }
     };
+    const navigate = (event: MouseEvent) => {
+      const link = (event.target as Element).closest?.("a[href]");
+      if (
+        !link ||
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.button !== 0
+      )
+        return;
+      if (
+        busyRef.current ||
+        (dirty.current &&
+          !window.confirm(
+            "Leave this upload and discard unsaved changes? Completed server writes will remain saved.",
+          ))
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      } else {
+        dirty.current = false;
+      }
+    };
+    document.addEventListener("click", navigate, true);
     window.addEventListener("beforeunload", prevent);
     return () => {
       generation.current++;
       window.removeEventListener("beforeunload", prevent);
+      document.removeEventListener("click", navigate, true);
     };
   }, []);
   async function chooseHTML(file?: File) {
@@ -220,7 +247,8 @@ function UploadForm({
     }));
   }
   async function send(mode: "check" | "draft" | "publish") {
-    if (busyRef.current || result?.recovery) return;
+    if (busyRef.current || result?.recovery || (mode !== "check" && !allowed))
+      return;
     const snapshot = {
       ...values,
       id: values.id.trim(),
@@ -328,7 +356,7 @@ function UploadForm({
     </label>
   );
   const fileChoice = (f: File): MediaChoice => ({
-    key: crypto.randomUUID(),
+    key: `local-${++mediaSequence.current}`,
     file: f,
     mediaType: f.type,
   });
@@ -350,8 +378,15 @@ function UploadForm({
       <fieldset disabled={locked} className="upload-fields">
         <section className="upload-panel">
           <h2>01 / Prototype</h2>
-          <label className="upload-drop">
-            {html ? html.name : "Choose your HTML file"}
+          <label
+            className="upload-drop"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (!locked) void chooseHTML(e.dataTransfer.files[0]);
+            }}
+          >
+            {html ? html.name : "Drop your HTML file here, or choose a file"}
             <input
               data-field="html"
               type="file"
@@ -523,10 +558,8 @@ function UploadForm({
             multiple
             onChange={(e) => {
               change();
-              setAttachments((a) => [
-                ...a,
-                ...Array.from(e.target.files ?? []),
-              ]);
+              const files = Array.from(e.target.files ?? []);
+              setAttachments((a) => [...a, ...files]);
               e.target.value = "";
             }}
           />
@@ -560,8 +593,8 @@ function UploadForm({
         </p>
         {!allowed && (
           <p role="alert">
-            Create your creator profile in Studio before uploading a new
-            artifact.
+            Ask an administrator to link your creator profile before uploading a
+            new artifact.
           </p>
         )}
         <div className="upload-actions">

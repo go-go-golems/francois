@@ -20,7 +20,7 @@ WhenToUse: ""
 
 ## Overview
 
-Design a single streamlined artifact uploader from the supplied JPEG and standalone prototype. The proposed implementation is a Studio screen that reuses existing authentication, creator permissions and upload APIs. The implementation guide is complete; application implementation remains open. Studio delivery is an explicit assumption pending any preference for the standalone local form.
+Design a single streamlined artifact uploader from the supplied JPEG and standalone prototype. The implemented Studio screen at `/studio/upload` reuses existing authentication, creator permissions and upload APIs. The guide, implementation, tests and screenshots are complete. See the diary for verification evidence and the browser fixture limitations.
 
 ## Documents
 

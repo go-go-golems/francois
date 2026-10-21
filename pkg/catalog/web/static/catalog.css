@@ -726,3 +726,5 @@ select.btn { appearance: none; cursor: pointer; }
 .slop-uploader .md-editor { grid-template-columns: 1fr; }
 @media(max-width: 850px) { .upload-layout { grid-template-columns: 1fr; } .upload-summary { position: static; } }
 @media(max-width: 480px) { .upload-panel { padding: 16px; } .upload-two, .upload-capabilities { grid-template-columns: 1fr; } .upload-selector { align-items: stretch; flex-direction: column; } }
+.slop-uploader .upload-actions .btn { background: var(--color-ink); color: white; }
+.slop-uploader .upload-result > button { display: block; margin-top: 16px; }

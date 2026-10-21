@@ -537,3 +537,13 @@ Line numbers refer to the inspected baseline; symbol names are the stable naviga
 | `scripts/build.mjs:29` | Catalog bundle generation |
 
 The preserved prototype files explain the requested UX; the Go handlers and store methods define what the real system currently guarantees. When they disagree, update the UX and guide consciously rather than assuming the prototype's comments are backend contracts.
+
+## Implementation completion — 20 October 2026
+
+The Studio variant described here is implemented on `feat/slop-uploader`. The form is `ui/catalog/uploader.tsx`; pure field/manifest helpers are in `uploader-model.ts`, and the sequential mutation/reconciliation code is in `uploader-submit.ts`. Shared Markdown/media fields moved to `studio-fields.tsx`. CSS remains in the project's existing `pkg/catalog/web/static/catalog.css`, and the built bundle is committed alongside it.
+
+The implementation uses local React state for files and RTK Query for persisted objects. It supports existing-artifact prefilling, numeric next-version suggestions, full-manifest editing, public download, staged cover/gallery, attachment uploads, Check, Save draft, Publish, and recovery links. The artifact selector explicitly resets staged files. HTML title/ID autofill respects touched fields. Version creation does not silently replace a release. Unknown manifest namespaces survive checkbox edits.
+
+A small implementation choice differs from the optional filename-matching suggestion: selecting an existing ID is explicit in the artifact selector. If a new artifact's ID already exists, validation asks the author to select it above. There is no automatic file transfer across artifact switches. Media selected from disk is staged; the shared library picker still offers its existing immediate-upload control, whose uploaded records remain in the library.
+
+Verification includes 18 frontend tests, TypeScript compilation, production bundling, the full PostgreSQL-backed Go suite, lint, generated-contract checks and a deterministic Chromium interaction script. The screenshots and receipt in `sources/implementation/` use the actual built UI with mocked APIs; real persistence and authorization are checked separately by Go tests. The implementation diary records failures and their fixes. This completion note does not assert production deployment.

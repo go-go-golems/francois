@@ -141,7 +141,7 @@ Created the integrated upload route and reused the existing Studio mutations. Th
 ### Prompt Context
 **User prompt (verbatim):** "Implement it, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill). Take screenshots for the diary / a report at the end.
 
-When done,  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      
+When done,  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).
  Commit and push the bsidian vault when done (go-go-parc vault)."
 **Assistant interpretation:** Implement FRANCOIS-018, verify the integrated UI, capture evidence, and deliver a technical report to the vault.
 **Inferred user intent:** A usable uploader with understandable behavior and a durable explanation of its implementation.
@@ -189,3 +189,64 @@ When done,  write a detailed project report for the obsidian vault as a deep div
 - No migration, new HTTP endpoint, service or dependency was introduced.
 - Gallery limit 24 and attachment limit 20 are returned by StudioMe alongside configured byte limits.
 - Metadata updates affect the live artifact; page PUT and release upload create separate drafts. Public download retains the existing freeSample wire field.
+
+## Step 4: Verify browser behavior and capture the completed interface
+
+Exercised the built React bundle in Chromium with deterministic API fixtures, then checked the actual Go handlers against PostgreSQL. The browser run exposed an attachment-selection lifetime bug that helper tests could not observe. Corrected it and verified publication, partial failure, artifact switching and draft saving.
+
+### Prompt Context
+**User prompt:** See Step 3.
+**Assistant interpretation:** Verify the shipped workflow and produce screenshots suitable for the diary and technical report.
+**Inferred user intent:** Evidence that the form works, with clear records of implementation problems and their resolutions.
+**Commit (code):** 0bd8a10 — "feat(studio): add guided artifact uploader with recoverable publication".
+
+### What I did
+- Added `scripts/01-check-uploader-browser.mjs` using the real built catalog bundle and explicit mocked API responses.
+- Captured filled desktop/mobile forms, successful publication, partial failure, and focused overview/storefront screenshots in `sources/implementation/`.
+- Fixed attachment selection by copying FileList synchronously before clearing the input. Added HTML drag-and-drop and navigation protection during uploads.
+- Replaced unnecessary cryptographic IDs for local thumbnail keys with a form-local counter.
+- Checked strict StudioMe decoding and all returned limit fields in TestClientContract.
+- Ran the frontend check/build, frontend tests, PostgreSQL-backed catalog/client tests, full Go suite, lint and logcopter checks.
+
+### Why
+- Pure orchestration tests cover ordering and failure boundaries; browser interactions catch DOM and React state-lifetime mistakes. Real backend tests independently verify permissions, persistence and wire contracts.
+- A thumbnail key only needs uniqueness within its mounted form. A counter avoids an unnecessary secure-context dependency.
+
+### What worked
+- All 18 frontend tests passed. TypeScript and production bundling passed.
+- `TEST_DATABASE_URL=… go test ./pkg/catalog ./pkg/catalog/client -count=1` passed, followed by `TEST_DATABASE_URL=… go test ./...` with all packages passing.
+- `make lint logcopter-check` passed; golangci-lint reported zero issues.
+- Browser receipt records zero page errors, no horizontal overflow at 1440/390 px, successful publish, durable draft recovery, disabled replay, selection reset, full manifest preservation and draft save.
+- Screenshot inspection confirmed readable responsive sections and a factual failure message identifying the saved draft.
+
+### What didn't work
+- Chromium initially failed inside the restricted sandbox: `FATAL:content/browser/sandbox_host_linux.cc:41 ... Operation not permitted (1)`. Running the browser check through approved escalation resolved this environment limitation.
+- The first failure-state check timed out waiting for `Upload stopped`; recorded HTTP calls showed no attachment mutation. The event handler cleared the input before the React updater read FileList. Snapshotting FileList before setState fixed it.
+- Staging cover media on the HTTP fixture origin exposed `crypto.randomUUID is not a function`. Local counter keys removed that dependency.
+
+### What I learned
+- A deferred state updater must receive durable values, not read mutable DOM input state after the event handler clears it.
+- Screenshot preparation itself exercises useful paths: staging a cover caught a requirement that the text-only run had not reached.
+
+### What was tricky to build
+- Screenshots of a sticky sidebar depend on the current scroll position. Resetting scroll before full-page captures keeps the summary aligned with the first form section.
+- The browser fixture now verifies the attachment filename before submitting, so a regression cannot silently bypass the intended error scenario.
+
+### What warrants a second pair of eyes
+- Browser screenshots use mocked APIs. They demonstrate actual rendered UI and client orchestration, not a production deployment or a single browser-to-PostgreSQL end-to-end run.
+- Publication remains two operations. If the page publishes and release publication fails, the completed page mutation remains public.
+
+### What should be done in the future
+- Complete and push the requested vault report. Production deployment is outside this implementation request.
+
+### Code review instructions
+- Inspect the attachment handler in uploader.tsx and recovery branches in uploader-submit.ts.
+- Reproduce screenshots with `node ttmp/2026/10/20/FRANCOIS-018--slop-uploader-for-artifacts-and-release-metadata/scripts/01-check-uploader-browser.mjs` from the repository root after `pnpm build`.
+- The browser script uses the installed Playwright path documented in its first lines.
+
+### Technical details
+- [Filled desktop](../sources/implementation/uploader-filled-1440.png)
+- [Filled mobile](../sources/implementation/uploader-filled-390.png)
+- [Published release](../sources/implementation/uploader-published-1440.png)
+- [Interrupted upload](../sources/implementation/uploader-recovery-1440.png)
+- [Machine-readable browser receipt](../sources/implementation/browser.json)
