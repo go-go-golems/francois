@@ -30,7 +30,7 @@ func (m *MCP) Run(ctx context.Context, v *values.Values) error {
 	}
 	me, err := c.Me(ctx)
 	if err != nil {
-		return errors.Wrap(err, "check the token")
+		return errors.Wrap(loginHint(err), "check the token")
 	}
 	if me.Token == nil {
 		return errors.New("the MCP server needs a personal API token")

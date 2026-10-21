@@ -95,7 +95,7 @@ func (c *CatalogPush) RunIntoGlazeProcessor(ctx context.Context, p *values.Value
 		report(apiErr.Checks)
 	}
 	if err != nil {
-		return err
+		return loginHint(err)
 	}
 	return out.AddRow(ctx, types.NewRow(types.MRP("release_id", res.Release.ID), types.MRP("artifact", s.ArtifactID), types.MRP("version", s.Version), types.MRP("state", res.Release.State),
 		types.MRP("attachments", len(res.Attachments))))

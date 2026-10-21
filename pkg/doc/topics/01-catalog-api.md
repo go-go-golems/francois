@@ -21,8 +21,9 @@ token made each change.
 
 ## Tokens and scopes
 
-Create a token on the site's account page (`/account` → API tokens). Choose
-only the scopes the task needs:
+Commands authenticate with a personal API token. Log in once per machine (see
+Connecting), or create a token on the site's account page (`/account` → API
+tokens). Choose only the scopes the task needs:
 
 | Scope | Reaches |
 | --- | --- |
@@ -36,11 +37,29 @@ can do.
 
 ## Connecting
 
+Store a token once per server; later commands find it without flags:
+
+```bash
+francois catalog auth login --with-token --server https://slop.boutique < token.txt
+francois catalog whoami
+francois catalog auth status       # stored logins and which one commands use
+francois catalog auth logout       # forget the token
+```
+
+Logins live in `credentials.json` under `$FRANCOIS_CONFIG_DIR`,
+`$XDG_CONFIG_HOME/francois` or `~/.config/francois` (mode 0600), one per
+server; the first login becomes the default server. Scripts and CI can keep
+using the environment, which takes precedence over stored logins:
+
 ```bash
 export FRANCOIS_SERVER=https://slop.boutique
 export FRANCOIS_TOKEN=frt_…        # or --token-file path
 francois catalog whoami
 ```
+
+`francois catalog auth token` prints the token in use, for example for
+`export FRANCOIS_TOKEN=$(francois catalog auth token)`; it refuses to print to
+a terminal unless given `--yes`.
 
 ## Command groups
 
