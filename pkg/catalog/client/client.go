@@ -62,7 +62,7 @@ func WithHandler(h http.Handler) Option {
 func WithStrictDecoding() Option { return func(c *Client) { c.strict = true } }
 
 // New returns a client for server (a portal origin such as
-// https://slop.boutique) authenticated with token (frt_…).
+// https://catalog.example.com) authenticated with token (frt_…).
 func New(server, token string, opts ...Option) *Client {
 	c := &Client{base: strings.TrimRight(server, "/"), token: token, http: &http.Client{Timeout: 2 * time.Minute}, retries: 3}
 	for _, o := range opts {

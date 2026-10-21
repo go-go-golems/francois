@@ -30,7 +30,7 @@ import (
 
 func connectionFlags() []*fields.Definition {
 	return []*fields.Definition{
-		fields.New("server", fields.TypeString, fields.WithHelp("Portal origin, e.g. https://slop.boutique (default: $FRANCOIS_SERVER, then the default stored login)")),
+		fields.New("server", fields.TypeString, fields.WithHelp("Portal origin, e.g. https://catalog.example.com (default: $FRANCOIS_SERVER, then the default stored login)")),
 		fields.New("token-file", fields.TypeString, fields.WithHelp("File containing the API token (default: $FRANCOIS_TOKEN holds the token itself, then the stored login for the server)")),
 		fields.New("host", fields.TypeString, fields.WithHelp("Host header override, for tunnels")),
 	}

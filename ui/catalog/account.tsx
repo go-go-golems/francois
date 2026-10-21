@@ -196,9 +196,14 @@ export function Account() {
             <a className="site-button callout-button" href="/pricing">
               Support the lab →
             </a>
-            <a className="u callout-contact" href="mailto:hej@slop.boutique">
-              Or get in touch
-            </a>
+            {session.contact && (
+              <a
+                className="u callout-contact"
+                href={`mailto:${session.contact}`}
+              >
+                Or get in touch
+              </a>
+            )}
           </div>
         </aside>
       )}

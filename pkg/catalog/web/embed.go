@@ -31,6 +31,18 @@ var RuntimeJS []byte
 //go:embed static/icon.svg
 var Icon []byte
 
+// Raster icons rendered from icon.svg (rsvg-convert, magick) for browsers
+// and home screens that do not use the SVG.
+//
+//go:embed static/favicon.ico
+var Favicon []byte
+
+//go:embed static/apple-touch-icon.png
+var AppleTouchIcon []byte
+
+//go:embed static/icon-512.png
+var Icon512 []byte
+
 // Templates are the server-rendered storefront pages (html/template): a
 // shared layout plus one file per page.
 //
@@ -44,10 +56,13 @@ var LegalTemplate string
 
 // Separate allowlists keep subscriber HTML out of the public asset routes.
 var portalAssets = map[string]*Asset{
-	"catalog.js":  newAsset("catalog.js", "text/javascript", CatalogJS),
-	"catalog.css": newAsset("catalog.css", "text/css", CatalogCSS),
-	"icon.svg":    newAsset("icon.svg", "image/svg+xml", Icon),
-	"public.js":   newAsset("public.js", "text/javascript", PublicJS),
+	"catalog.js":           newAsset("catalog.js", "text/javascript", CatalogJS),
+	"catalog.css":          newAsset("catalog.css", "text/css", CatalogCSS),
+	"icon.svg":             newAsset("icon.svg", "image/svg+xml", Icon),
+	"public.js":            newAsset("public.js", "text/javascript", PublicJS),
+	"favicon.ico":          newAsset("favicon.ico", "image/x-icon", Favicon),
+	"apple-touch-icon.png": newAsset("apple-touch-icon.png", "image/png", AppleTouchIcon),
+	"icon-512.png":         newAsset("icon-512.png", "image/png", Icon512),
 }
 
 var appAssets = map[string]*Asset{

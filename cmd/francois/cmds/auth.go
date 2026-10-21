@@ -40,7 +40,7 @@ func authCommands() (*cobra.Command, error) {
 				"With --with-token, reads an existing token from stdin (or a hidden prompt) instead. "+
 				"FRANCOIS_TOKEN and --token-file still take precedence over stored logins."),
 			glazed.WithFlags(
-				flag("server", "Portal origin, e.g. https://slop.boutique (default: $FRANCOIS_SERVER, then the default stored login)"),
+				flag("server", "Portal origin, e.g. https://catalog.example.com (default: $FRANCOIS_SERVER, then the default stored login)"),
 				flag("host", "Host header override, for tunnels; stored with the login"),
 				list("scopes", "Scopes to pre-select for approval (default: every scope your role allows)"),
 				flag("days", "Token lifetime to pre-select, 0 = no expiry (default 90; admin scopes need 1-90)"),

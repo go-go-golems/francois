@@ -46,7 +46,7 @@ func TestFontsServedAndCredited(t *testing.T) {
 	e.srv.fonts = f
 
 	_, css, _ = e.do(nil, "portal.test", "GET", "/fonts/fonts.css", nil, nil)
-	for _, want := range []string{`font-family:"ABC Areal";src:url(/fonts/ABCAreal-Medium.woff2) format("woff2");font-weight:500`, "ABCAreal-Regular.woff2"} {
+	for _, want := range []string{`font-family:"ABC Areal";src:url(/fonts/ABCAreal-Medium.woff2?v=` + f.hashes["ABCAreal-Medium.woff2"] + `) format("woff2");font-weight:500`, "ABCAreal-Regular.woff2"} {
 		if !strings.Contains(string(css), want) {
 			t.Fatalf("css lacks %q: %s", want, css)
 		}
@@ -55,12 +55,24 @@ func TestFontsServedAndCredited(t *testing.T) {
 	if code != 200 || h.Get("Content-Type") != "font/woff2" || !bytes.Equal(body, woff) {
 		t.Fatalf("font %d %v", code, h)
 	}
+	if h.Get("Cache-Control") != "public, max-age=604800" {
+		t.Fatalf("unversioned font cache: %q", h.Get("Cache-Control"))
+	}
+	// Versioned URLs, as the stylesheet and pages use them, are immutable.
+	for _, u := range []string{f.fileURL("ABCAreal-Regular.woff2"), f.cssURL()} {
+		if _, _, h = e.do(nil, "portal.test", "GET", u, nil, nil); h.Get("Cache-Control") != "public, max-age=31536000, immutable" {
+			t.Fatalf("%s cache: %q", u, h.Get("Cache-Control"))
+		}
+	}
+	if _, page, _ := e.do(nil, "portal.test", "GET", "/", nil, nil); !bytes.Contains(page, []byte(`<link rel="preload" href="`+f.fileURL("ABCAreal-Medium.woff2")+`" as="font" type="font/woff2" crossorigin>`)) {
+		t.Fatal("above-the-fold faces are not preloaded")
+	}
 	for _, p := range []string{"/fonts/secret.txt", "/fonts/ABCAreal-Bold.woff2", "/fonts/..%2Fsecret.txt"} {
 		if code, _, _ := e.do(nil, "portal.test", "GET", p, nil, nil); code != 404 {
 			t.Fatalf("%s: %d", p, code)
 		}
 	}
-	if _, page, _ := e.do(nil, "portal.test", "GET", "/", nil, nil); !bytes.Contains(page, []byte(`Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>`)) || !bytes.Contains(page, []byte(`href="/fonts/fonts.css"`)) {
+	if _, page, _ := e.do(nil, "portal.test", "GET", "/", nil, nil); !bytes.Contains(page, []byte(`Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>`)) || !bytes.Contains(page, []byte(`href="`+f.cssURL()+`"`)) {
 		t.Fatal("home page lacks the font stylesheet or the credit")
 	}
 }

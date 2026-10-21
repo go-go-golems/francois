@@ -6,14 +6,18 @@
 <title>{{if .Title}}{{.Title}} · {{end}}{{.Brand}}</title>
 {{if .Description}}<meta name="description" content="{{.Description}}">{{end}}
 <meta property="og:site_name" content="{{.Brand}}">
+<meta property="og:type" content="{{.OGType}}">
 <meta property="og:title" content="{{if .Title}}{{.Title}}{{else}}{{.Brand}}{{end}}">
 {{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
 <meta property="og:url" content="{{.Canonical}}">
-{{if .Image}}<meta property="og:image" content="{{.Image}}"><meta name="twitter:card" content="summary_large_image">{{end}}
+{{if .Image}}<meta property="og:image" content="{{.Image}}"><meta name="twitter:card" content="summary_large_image">{{else}}<meta name="twitter:card" content="summary">{{end}}
 <link rel="canonical" href="{{.Canonical}}">
-<link rel="icon" href="{{asset "icon.svg"}}">
+<link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{asset "apple-touch-icon.png"}}">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="alternate" type="application/rss+xml" title="{{.Brand}}" href="/feed.xml">
-<link rel="stylesheet" href="/fonts/fonts.css">
+{{range .FontPreloads}}<link rel="preload" href="{{.}}" as="font" type="font/woff2" crossorigin>
+{{end}}<link rel="stylesheet" href="{{.FontCSS}}">
 <link rel="stylesheet" href="{{asset "catalog.css"}}">
 {{if not .Sensitive}}<script src="{{asset "public.js"}}" defer></script>{{end}}
 </head>
@@ -30,7 +34,7 @@
 {{if .JournalPreview}}<p class="notice draft-banner">Journal preview — the blog is hidden from visitors.</p>{{else if .Draft}}<p class="notice draft-banner">Draft preview — visitors see the published page.</p>{{end}}
 {{template "content" .}}
 <footer class="site-footer">
-<div class="footer-brand"><a class="site-wordmark" href="/">{{.Brand}}</a><a href="mailto:hej@slop.boutique">hej@slop.boutique</a></div>
+<div class="footer-brand"><a class="site-wordmark" href="/">{{.Brand}}</a>{{with .Contact}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</div>
 <div><span>For humans</span><a href="/feed.xml">RSS</a>{{if .JournalEnabled}}<a href="/journal">Journal</a>{{end}}{{if not .Supporter}}<a href="/pricing">Support the lab</a>{{end}}{{if .User}}{{range .Nav}}{{if ne .Href "/"}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{end}}</div>
 <div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
 <div class="footer-type"><span>Type</span>{{if .TypeCredit}}<p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>{{end}}</div>
@@ -75,5 +79,5 @@
 {{define "thumb"}}{{if and (isVideo .MediaType) .Poster}}<img src="/media/{{.Poster}}" alt="{{.Alt}}" loading="lazy">{{else if isVideo .MediaType}}<video src="/media/{{.ID}}" muted playsinline preload="metadata" aria-label="{{.Alt}}"></video>{{else}}<img src="/media/{{.ID}}" alt="{{.Alt}}" loading="lazy">{{end}}{{end}}
 
 {{define "support-callout"}}{{if not .Supporter}}<aside class="support-callout" aria-labelledby="support-heading">
-<p class="callout-label">Support the lab</p><div><h2 id="support-heading">Keep the lab running.</h2><p>We prototype and explore, and share the work here. The lab is funded by people who want it to keep going. No ads, no clients, no investors.</p><a class="site-button callout-button" href="/pricing">Support the lab →</a><a class="u callout-contact" href="mailto:hej@slop.boutique">Or get in touch</a></div>
+<p class="callout-label">Support the lab</p><div><h2 id="support-heading">Keep the lab running.</h2><p>We prototype and explore, and share the work here. The lab is funded by people who want it to keep going. No ads, no clients, no investors.</p><a class="site-button callout-button" href="/pricing">Support the lab →</a>{{with .Contact}}<a class="u callout-contact" href="mailto:{{.}}">Or get in touch</a>{{end}}</div>
 </aside>{{end}}{{end}}

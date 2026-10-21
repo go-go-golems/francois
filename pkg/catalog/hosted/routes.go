@@ -51,6 +51,10 @@ func (rt *Runtime) Handler(inst store.Instance, portal, origin string) http.Hand
 	m.HandleFunc("POST /api/views/{view}/calls/{call}/tools/{tool}/result", func(w http.ResponseWriter, r *http.Request) { rt.toolResult(w, r, inst) })
 	m.HandleFunc("POST /api/assets", func(w http.ResponseWriter, r *http.Request) { rt.upload(w, r, inst) })
 	m.HandleFunc("GET /_blob/{id}", func(w http.ResponseWriter, r *http.Request) { rt.blob(w, r, inst) })
+	m.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+	})
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/launch", http.StatusFound)
@@ -62,6 +66,8 @@ func (rt *Runtime) Handler(inst store.Instance, portal, origin string) http.Hand
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		// Instances are private copies; only the portal's pages are indexed.
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 		if o := r.Header.Get("Origin"); o != "" && o != origin {
 			httpx.Fail(w, 403, "invalid_origin", "Cross-origin requests are not accepted")
 			return

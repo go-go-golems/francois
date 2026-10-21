@@ -97,6 +97,35 @@ automation only rewrites the `image:` of entries under `containers:`.
 Probes call `/readyz` and `/healthz` with `Host: francois.yolo.scapegoat.dev`;
 without it, host routing answers 421.
 
+Launch-readiness flags (FRANCOIS-020):
+
+- `--redirect-host=<host>` (repeatable) answers every request on that host
+  with 308 to the primary portal, keeping path and query. It must not be a
+  portal, `www.` + a portal, or an instance host.
+- `--hsts-max-age` (default `8760h`, `0` disables) sends
+  `Strict-Transport-Security; includeSubDomains` when the primary site is
+  HTTPS. With `--trust-proxy-headers`, a request carrying
+  `X-Forwarded-Proto: http` is redirected (308) to `https`.
+- `--contact-email` is shown in the footer, `/pricing` and the SPA; without it
+  no contact link is rendered.
+
+**Retiring `francois.yolo.scapegoat.dev`** (planned; the table above is still
+the live state). Target flags: `--public-url=https://slop.boutique
+--app-domain=slop.boutique --redirect-host=francois.yolo.scapegoat.dev`, and
+no `--site`. Order:
+
+1. Create the Stripe webhook `https://slop.boutique/webhooks/stripe` with the
+   same events (Stripe does not follow redirects). Put its secret first in
+   `--stripe-webhook-secret-files`, keep the old one second, deploy, confirm
+   delivery, then disable the old endpoint.
+2. ZITADEL already has the slop.boutique callback; remove the old host's
+   redirect URIs after the switch.
+3. Swap the flags, switch the probes to `Host: slop.boutique`, deploy. Roll
+   out with `--hsts-max-age=24h` first.
+4. CLI users run `francois catalog auth login --server https://slop.boutique`
+   once: Go drops `Authorization` on the cross-host redirect.
+5. Update the topology table above to the single site.
+
 ## 3. Inventory
 
 ### 3.1 Kubernetes package and sync waves

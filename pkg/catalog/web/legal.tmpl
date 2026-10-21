@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{.Title}} · {{.Site}}</title>
-<link rel="icon" href="/static/icon.svg">
-<link rel="stylesheet" href="/static/catalog.css">
+<meta name="description" content="{{.Description}}">
+<link rel="canonical" href="{{.Canonical}}">
+<link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
+<link rel="stylesheet" href="{{asset "catalog.css"}}">
 </head>
 <body>
 <div class="page">

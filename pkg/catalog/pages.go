@@ -121,7 +121,15 @@ type pageData struct {
 	Draft                                              bool
 	// TypeCredit shows the typeface credit when the licensed fonts are served.
 	TypeCredit bool
-	Body       any
+	// OGType is the Open Graph type: "article" for journal posts, else
+	// "website".
+	OGType string
+	// Contact is the configured public contact address, if any.
+	Contact string
+	// FontCSS and FontPreloads are versioned web-font URLs.
+	FontCSS      string
+	FontPreloads []string
+	Body         any
 }
 
 // card is an artifact as listed on the storefront.
@@ -159,7 +167,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
 	d.TypeCredit = s.fonts.present
-	d.Canonical = site.PortalOrigin() + r.URL.Path
+	d.Canonical = site.PortalOrigin() + canonicalPath(r.URL.Path)
+	d.Contact = s.Config.ContactEmail
+	d.FontCSS, d.FontPreloads = s.fonts.cssURL(), s.fonts.preloads()
+	if d.OGType == "" {
+		d.OGType = "website"
+	}
 	d.LoginAvailable = site.OIDC.Configured() || s.Config.EmailLogin != nil
 	d.LoginHref = signinURL(r.URL.RequestURI())
 	nav := []navItem{{Href: "/", Label: "Feed"}}
@@ -190,7 +203,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout", d); err != nil {
 		log.Error().Err(err).Str("page", page).Msg("render page")
-		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+		s.unavailable(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -214,9 +227,34 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusNotFound, "notfound", pageData{Title: "Not found"})
 }
 
+// canonicalPath folds the catalog's aliases of the homepage into "/".
+func canonicalPath(p string) string {
+	if p == "/apps" || p == "/apps/" {
+		return "/"
+	}
+	return p
+}
+
+// pageFailed renders the unavailable page without the settings document or
+// the session, either of which may be what failed.
 func (s *Server) pageFailed(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error().Err(err).Str("path", r.URL.Path).Msg("storefront page")
-	http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+	s.unavailable(w, r)
+}
+
+func (s *Server) unavailable(w http.ResponseWriter, r *http.Request) {
+	d := pageData{Title: "Unavailable", Brand: s.site(r).PublicURL.Hostname(), OGType: "website", Contact: s.Config.ContactEmail,
+		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path)}
+	var buf bytes.Buffer
+	if err := s.pages["unavailable"].ExecuteTemplate(&buf, "layout", d); err != nil {
+		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Retry-After", "30")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write(buf.Bytes())
 }
 
 // releaseCaps lists the capabilities the hosted runtime provides for a
@@ -635,7 +673,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	body["Author"] = author
-	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, Body: body}
+	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, OGType: "article", Body: body}
 	if post.Cover != "" {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
@@ -663,12 +701,20 @@ type rssItem struct {
 type rssDoc struct {
 	XMLName xml.Name `xml:"rss"`
 	Version string   `xml:"version,attr"`
+	AtomNS  string   `xml:"xmlns:atom,attr"`
 	Channel struct {
 		Title       string    `xml:"title"`
 		Link        string    `xml:"link"`
+		Self        atomLink  `xml:"atom:link"`
 		Description string    `xml:"description"`
 		Items       []rssItem `xml:"item"`
 	} `xml:"channel"`
+}
+
+type atomLink struct {
+	Href string `xml:"href,attr"`
+	Rel  string `xml:"rel,attr"`
+	Type string `xml:"type,attr"`
 }
 
 func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
@@ -701,7 +747,7 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 		}
 		doc.Channel.Items = append(doc.Channel.Items, item)
 	}
-	writeRSS(w, doc)
+	writeRSS(w, doc, origin+r.URL.Path)
 }
 
 // media serves uploaded storefront media. A media ID always names the same

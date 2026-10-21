@@ -65,13 +65,22 @@ export function SignOut() {
   );
 }
 
+// The page's own host stands in for the brand until the session loads.
+export const fallbackBrand = () => window.location.hostname;
+
 export function Header() {
   const { data: session } = api.useSessionQuery();
+  useEffect(() => {
+    // index.html carries a neutral title; pages with their own title keep it.
+    if (session?.brand && document.title === "Francois") {
+      document.title = session.brand;
+    }
+  }, [session?.brand]);
   const signedIn = session?.authenticated && session.user?.role !== "guest";
   return (
     <header className="site-header page">
       <Link className="site-wordmark" to="/">
-        {session?.brand ?? "slop.boutique"}
+        {session?.brand ?? fallbackBrand()}
       </Link>
       <p className="site-statement">
         A lab for computation and intelligence as material and medium. Run by
@@ -128,9 +137,11 @@ export function Footer() {
     <footer className="site-footer">
       <div className="footer-brand">
         <Link className="site-wordmark" to="/">
-          {session?.brand ?? "slop.boutique"}
+          {session?.brand ?? fallbackBrand()}
         </Link>
-        <a href="mailto:hej@slop.boutique">hej@slop.boutique</a>
+        {session?.contact && (
+          <a href={`mailto:${session.contact}`}>{session.contact}</a>
+        )}
       </div>
       <div>
         <span>For humans</span>
