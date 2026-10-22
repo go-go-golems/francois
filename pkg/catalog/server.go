@@ -164,7 +164,8 @@ func (c Config) Validate() error {
 			return errors.Errorf("redirect host %s is also a portal", raw)
 		}
 		for _, site := range c.Sites {
-			if _, _, ok := site.instanceName(h); ok {
+			// Any port: AppPort may still be empty here, defaulted in New.
+			if _, misdirected, ok := site.instanceName(h); ok || misdirected {
 				return errors.Errorf("redirect host %s is an instance host of %s", raw, site.PublicURL)
 			}
 		}

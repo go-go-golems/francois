@@ -65,6 +65,12 @@ func TestRedirectHost(t *testing.T) {
 			t.Errorf("%s: got %v, want %q", host, err, want)
 		}
 	}
+	// AppPort is defaulted from the portal port only in New, after Validate.
+	ported, _ := url.Parse("http://localhost:8090")
+	site = Site{PublicURL: ported, AppDomain: "apps.localhost", OIDC: identity.New(identity.Config{})}
+	if err := (Config{Sites: []Site{site}, RedirectHosts: []string{"i-x.apps.localhost:8090"}}).Validate(); err == nil || !strings.Contains(err.Error(), "instance host") {
+		t.Errorf("ported instance host: got %v", err)
+	}
 }
 
 // TestTransportSecurity sends HSTS on HTTPS deployments and upgrades
