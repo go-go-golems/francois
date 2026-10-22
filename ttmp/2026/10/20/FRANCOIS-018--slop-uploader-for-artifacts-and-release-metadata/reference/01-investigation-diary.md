@@ -477,3 +477,56 @@ Addressed PR #18's P2 review about Back/Forward bypassing the uploader's click a
 ### Technical details
 - Existing history state is preserved on replaceState; newly pushed SPA entries carry francoisRoutePosition.
 - No dependency or new router framework was introduced.
+
+## Step 10: Rebase onto merged main and deploy to production
+
+Rebased onto PR #18's merge commit, published its CI-built image through the normal GitOps workflow, and verified both production domains. The prior production image was sha-08332bb, so this rollout also applied four already-merged migrations for year funding, token ceilings, payment state and early access. Fresh database and artifact backups completed before rollout.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, merged, rebase deploy"
+**Assistant interpretation:** The prior deployment hold is released; deploy the merged implementation and verify it.
+**Inferred user intent:** Make the completed uploader and review correction available on the live site.
+**Source commit:** 21b8458cbe75cb34e2219d75bd6536a5f38df80d — merge of PR #18.
+
+### What I did
+- Ran git fetch and git rebase --autostash origin/main; preserved the unrelated FRANCOIS-017 diary edits.
+- Verified main's publish-image run 39539386083 completed successfully and published sha-21b8458.
+- Ran existing backup CronJobs as postgres-backup-francois-21b8458 and francois-backup-21b8458; both completed.
+- Reviewed infrastructure PR #374: exactly one image-line change. Its validate-gitops check passed before merge.
+- Merged the pinned head a76394cf18f17cb9cc648ef4080502d007e6394f. GitOps merge commit is 73f03d45212561022275e2b8257474c150a757a5.
+- Refreshed Argo, waited for the exact image in the Deployment, then waited for rollout readiness.
+- Added and ran scripts/02-verify-production.py. It performs read-only checks and writes sources/production-rollout.json.
+
+### Why
+- A previously healthy pod is not evidence that a new release has deployed. Checking the exact image before rollout status and comparing served assets against source proves the intended code reached both sites.
+- The pending migrations change the active settings representation; the pre-deployment backups preserve a recovery point.
+
+### What worked
+- Production runs ghcr.io/go-go-golems/francois:sha-21b8458 with one updated, ready replica.
+- Argo reports Synced/Healthy at infrastructure revision 73f03d4.
+- Startup logs confirm successful application of 016_year_funding.sql, 017_daily_tokens.sql, 017_year_payment_state.sql and 018_early_access.sql.
+- Health, readiness, home, pricing, sign-in, uploader shell and RSS checks passed on slop.boutique and francois.yolo.scapegoat.dev.
+- Served catalog.js and catalog.css match the merged source byte-for-byte. JavaScript includes the history-navigation guard.
+
+### What didn't work
+- No deployment or verification failure occurred. The image build and GitOps validation were awaited before changing production.
+
+### What I learned
+- Earlier application merges were not yet running in production. Comparing against the live image identified the additional migrations before deployment.
+
+### What was tricky to build
+- Argo's old deployment initially remained healthy while the new desired revision was being processed. Waiting for the desired image avoided falsely reporting completion during that interval.
+
+### What warrants a second pair of eyes
+- Production smoke checks are read-only and anonymous; they verify the uploader shell and exact deployed assets, not a new authenticated production upload.
+
+### What should be done in the future
+- No further action is required for this rollout. Older unmerged image-pin PRs were left unchanged and should not be deployed over the current image.
+
+### Code review instructions
+- Read sources/production-rollout.json and scripts/02-verify-production.py. CI run: https://github.com/go-go-golems/francois/actions/runs/39539386083. Deployment PR: https://github.com/wesen/2026-03-27--hetzner-k3s/pull/374.
+
+### Technical details
+- Live uploader: https://slop.boutique/studio/upload.
+- Verification time: 2026-10-21T03:40:53Z (20 October local time).
+- No credentials, production data or session cookies are stored in the receipt.

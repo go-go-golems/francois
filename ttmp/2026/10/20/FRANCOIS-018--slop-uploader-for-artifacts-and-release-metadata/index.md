@@ -40,3 +40,7 @@ The guide was uploaded to reMarkable cloud at `/ai/2026/10/20/FRANCOIS-018` as *
 ## Implementation report
 
 The 3,613-word technical report and six screenshots are committed and pushed to go-go-parc (`87fe8c0`): `Projects/2026/10/20/ARTICLE - Slop Uploader - A Small Publication Workflow with Explicit Recovery.md`. Application commits are `0bd8a10` and `16ad125` on `feat/slop-uploader`; production deployment has not been performed by this task.
+
+## Production
+
+Deployed PR #18's merge commit `21b8458` through [infrastructure PR #374](https://github.com/wesen/2026-03-27--hetzner-k3s/pull/374). The uploader is live at https://slop.boutique/studio/upload. Argo and both public domains were verified; see [rollout receipt](sources/production-rollout.json) and diary Step 10. This supersedes the earlier pre-deployment status above.
