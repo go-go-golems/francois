@@ -216,7 +216,8 @@ The client IDs are Terraform variable defaults; the secrets are only in Vault.
 | --- | --- |
 | Product | `prod_VQpH0Crg2Ztp5I` (Terraform) |
 | Price | `price_1UPxdFLeHmcfmvuCg0zsScj5`, lookup key prefix `francois-subscriber` (Terraform); listed in the `subscriber` plan |
-| Webhook endpoint | `we_1UQ9zfLeHmcfmvuC639e6BPZ` → `https://francois.yolo.scapegoat.dev/webhooks/stripe` |
+| Webhook endpoint | `we_1UT9dvLeHmcfmvuC8kc1FN7a` → `https://slop.boutique/webhooks/stripe` (all 14 events; secret in `stripe-webhook-secret`) |
+| Retiring endpoint | `we_1UQ9zfLeHmcfmvuC639e6BPZ` → `https://francois.yolo.scapegoat.dev/webhooks/stripe` (7 events; secret in `stripe-webhook-secret-previous`). Disable it after the host switch, then empty the `previous` key |
 | Webhook events | All events in [`pkg/catalog/payments/webhook-events.txt`](../pkg/catalog/payments/webhook-events.txt), including async checkout success/failure and `charge.refunded` |
 
 When creating or updating the Stripe endpoint, use the complete comma-separated
