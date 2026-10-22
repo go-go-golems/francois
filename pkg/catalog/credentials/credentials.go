@@ -182,14 +182,14 @@ func NormalizeOrigin(raw string) (string, error) {
 	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
-		return "", errors.Errorf("%q is not a portal origin such as https://slop.boutique", raw)
+		return "", errors.Errorf("%q is not a portal origin such as https://catalog.example.com", raw)
 	}
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "https" && scheme != "http" {
 		return "", errors.Errorf("%q: the portal origin must use https or http", raw)
 	}
 	if u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
-		return "", errors.Errorf("%q: give only the portal origin, such as https://slop.boutique", raw)
+		return "", errors.Errorf("%q: give only the portal origin, such as https://catalog.example.com", raw)
 	}
 	host := strings.ToLower(u.Hostname())
 	port := u.Port()
@@ -244,7 +244,7 @@ func ResolveServer(flag string) (Resolved, error) {
 		server, src = f.Default, FromFile
 	}
 	if server == "" {
-		return r, errors.New("set --server or FRANCOIS_SERVER to the portal origin, e.g. https://slop.boutique, or log in with francois catalog auth login --server URL")
+		return r, errors.New("set --server or FRANCOIS_SERVER to the portal origin, e.g. https://catalog.example.com, or log in with francois catalog auth login --server URL")
 	}
 	origin, err := NormalizeOrigin(server)
 	if err != nil {

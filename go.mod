@@ -2,7 +2,7 @@ module github.com/go-go-golems/francois
 
 go 1.26.3
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/go-go-golems/glazed v1.4.4-0.20260823170018-a7fdfda5e3c6
@@ -127,6 +127,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

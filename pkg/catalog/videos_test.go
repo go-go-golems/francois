@@ -84,7 +84,7 @@ func TestVideos(t *testing.T) {
 		}
 	}
 	_, list, _ := e.do(nil, "portal.test", "GET", "/apps", nil, nil)
-	if !bytes.Contains(list, []byte(`<img src="/media/`+imageID+`" alt="walkthrough"`)) {
+	if !bytes.Contains(list, []byte(`<img src="/media/`+imageID+`?w=160" alt="walkthrough"`)) {
 		t.Fatalf("catalogue card does not use the poster")
 	}
 

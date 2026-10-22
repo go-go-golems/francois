@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -43,6 +44,10 @@ var pageFuncs = template.FuncMap{
 		return t.UTC().Format("2 January 2006")
 	},
 	"isVideo": content.IsVideo,
+	// variant is the URL of a still image resized to width w; the server
+	// falls back to the original when it does not resize that file.
+	"variant": func(id string, w int) string { return content.MediaPrefix + id + "?w=" + strconv.Itoa(w) },
+	"srcset":  srcset,
 	// period ends a title with a full stop unless it already ends in
 	// punctuation ("Polis IDE." but "What is Polis?").
 	"period": func(s string) string {
@@ -121,7 +126,18 @@ type pageData struct {
 	Draft                                              bool
 	// TypeCredit shows the typeface credit when the licensed fonts are served.
 	TypeCredit bool
-	Body       any
+	// OGType is the Open Graph type: "article" for journal posts, else
+	// "website".
+	OGType string
+	// DefaultImage marks Image as the generated share card, whose size is
+	// known.
+	DefaultImage bool
+	// Contact is the configured public contact address, if any.
+	Contact string
+	// FontCSS and FontPreloads are versioned web-font URLs.
+	FontCSS      string
+	FontPreloads []string
+	Body         any
 }
 
 // card is an artifact as listed on the storefront.
@@ -159,7 +175,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
 	d.TypeCredit = s.fonts.present
-	d.Canonical = site.PortalOrigin() + r.URL.Path
+	d.Canonical = site.PortalOrigin() + canonicalPath(r.URL.Path)
+	d.Contact = s.Config.ContactEmail
+	d.FontCSS, d.FontPreloads = s.fonts.cssURL(), s.fonts.preloads()
+	if d.OGType == "" {
+		d.OGType = "website"
+	}
 	d.LoginAvailable = site.OIDC.Configured() || s.Config.EmailLogin != nil
 	d.LoginHref = signinURL(r.URL.RequestURI())
 	nav := []navItem{{Href: "/", Label: "Feed"}}
@@ -187,10 +208,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	if d.Description == "" {
 		d.Description = rev.Document.Storefront.Tagline
 	}
+	if d.Image == "" {
+		d.Image, d.DefaultImage = s.shareURL(r, rev.Document), true
+	}
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout", d); err != nil {
 		log.Error().Err(err).Str("page", page).Msg("render page")
-		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+		s.unavailable(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -214,9 +238,34 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusNotFound, "notfound", pageData{Title: "Not found"})
 }
 
+// canonicalPath folds the catalog's aliases of the homepage into "/".
+func canonicalPath(p string) string {
+	if p == "/apps" || p == "/apps/" {
+		return "/"
+	}
+	return p
+}
+
+// pageFailed renders the unavailable page without the settings document or
+// the session, either of which may be what failed.
 func (s *Server) pageFailed(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error().Err(err).Str("path", r.URL.Path).Msg("storefront page")
-	http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+	s.unavailable(w, r)
+}
+
+func (s *Server) unavailable(w http.ResponseWriter, r *http.Request) {
+	d := pageData{Title: "Unavailable", Brand: s.site(r).PublicURL.Hostname(), OGType: "website", Contact: s.Config.ContactEmail,
+		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path)}
+	var buf bytes.Buffer
+	if err := s.pages["unavailable"].ExecuteTemplate(&buf, "layout", d); err != nil {
+		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Retry-After", "30")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write(buf.Bytes())
 }
 
 // releaseCaps lists the capabilities the hosted runtime provides for a
@@ -525,9 +574,9 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now())}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
-		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID
+		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.ID + "?w=1200"
 	} else if c.Cover != nil && c.Cover.Poster != "" {
-		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.Poster
+		d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + c.Cover.Poster + "?w=1200"
 	}
 	s.render(w, r, http.StatusOK, "artifact", d)
 }
@@ -635,12 +684,12 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	body["Author"] = author
-	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, Body: body}
+	d := pageData{Title: post.Title, Crumb: "journal/" + post.Slug, Description: firstNonEmpty(post.Summary, content.Excerpt(post.Body, 200)), Draft: draft, JournalPreview: hidden, OGType: "article", Body: body}
 	if post.Cover != "" {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
 			if !content.IsVideo(m.MediaType) {
-				d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + m.ID
+				d.Image = s.site(r).PortalOrigin() + content.MediaPrefix + m.ID + "?w=1200"
 			}
 		}
 	}
@@ -663,12 +712,20 @@ type rssItem struct {
 type rssDoc struct {
 	XMLName xml.Name `xml:"rss"`
 	Version string   `xml:"version,attr"`
+	AtomNS  string   `xml:"xmlns:atom,attr"`
 	Channel struct {
 		Title       string    `xml:"title"`
 		Link        string    `xml:"link"`
+		Self        atomLink  `xml:"atom:link"`
 		Description string    `xml:"description"`
 		Items       []rssItem `xml:"item"`
 	} `xml:"channel"`
+}
+
+type atomLink struct {
+	Href string `xml:"href,attr"`
+	Rel  string `xml:"rel,attr"`
+	Type string `xml:"type,attr"`
 }
 
 func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
@@ -701,7 +758,7 @@ func (s *Server) journalFeed(w http.ResponseWriter, r *http.Request) {
 		}
 		doc.Channel.Items = append(doc.Channel.Items, item)
 	}
-	writeRSS(w, doc)
+	writeRSS(w, doc, origin+r.URL.Path)
 }
 
 // media serves uploaded storefront media. A media ID always names the same
@@ -739,12 +796,69 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	w.Header().Set("Content-Type", m.MediaType)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	if width, _ := strconv.Atoi(r.URL.Query().Get("w")); content.VariantWidth(width) && content.Resizable(m.MediaType, m.Width, m.Height) {
+		if data, err := s.variant(m, f, width); err == nil {
+			w.Header().Set("Content-Type", http.DetectContentType(data))
+			w.Header().Set("ETag", `"`+m.SHA256+"-w"+strconv.Itoa(width)+`"`)
+			http.ServeContent(w, r, "", m.CreatedAt, bytes.NewReader(data))
+			return
+		} else if !errors.Is(err, content.ErrNoVariant) {
+			log.Warn().Err(err).Str("media", m.ID).Int("width", width).Msg("media variant failed; serving original")
+		}
+		if _, err = f.Seek(0, io.SeekStart); err != nil {
+			http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", m.MediaType)
 	w.Header().Set("ETag", `"`+m.SHA256+`"`)
 	// ServeContent answers Range requests by seeking, so videos stream.
 	http.ServeContent(w, r, "", m.CreatedAt, f)
+}
+
+// srcset lists the resized widths of a still image smaller than the
+// original, then the original itself. It is empty when the image is not
+// resized, so the template keeps a plain src.
+func srcset(m store.Media) string {
+	if !content.Resizable(m.MediaType, m.Width, m.Height) {
+		return ""
+	}
+	var parts []string
+	for _, w := range content.VariantWidths {
+		if w < m.Width {
+			parts = append(parts, fmt.Sprintf("%s%s?w=%d %dw", content.MediaPrefix, m.ID, w, w))
+		}
+	}
+	return strings.Join(append(parts, fmt.Sprintf("%s%s %dw", content.MediaPrefix, m.ID, m.Width)), ", ")
+}
+
+// variant returns the cached resized copy of an image, creating it on first
+// request. Concurrent requests for the same variant share one resize, and
+// resizes run at most two at a time, so a burst of thumbnails cannot exhaust
+// memory.
+func (s *Server) variant(m store.Media, f io.ReadSeeker, width int) ([]byte, error) {
+	name := m.SHA256 + "-w" + strconv.Itoa(width)
+	if data, err := s.Publisher.Blobs.Variant(name); err == nil {
+		return data, nil
+	}
+	v, err, _ := s.resizes.Do(name, func() (any, error) {
+		s.resizeSlots <- struct{}{}
+		defer func() { <-s.resizeSlots }()
+		data, _, err := content.Resize(f, width)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.Publisher.Blobs.PutVariant(name, data); err != nil {
+			log.Warn().Err(err).Str("variant", name).Msg("media variant not cached")
+		}
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]byte), nil
 }
 
 // pricingPage presents contributions; render supplies confirmed supporter state.

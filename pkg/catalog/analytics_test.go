@@ -47,12 +47,13 @@ func TestRSSSerialization(t *testing.T) {
 	doc.Channel.Title = "A & B"
 	doc.Channel.Items = []rssItem{{Title: "<hello>", GUID: rssGUID{Value: "urn:francois:release:r1"}}}
 	w := httptest.NewRecorder()
-	writeRSS(w, doc)
+	writeRSS(w, doc, "https://example.test/feed.xml")
 	var parsed rssDoc
 	if err := xml.Unmarshal(w.Body.Bytes(), &parsed); err != nil {
 		t.Fatal(err)
 	}
-	if parsed.Channel.Title != "A & B" || parsed.Channel.Items[0].Title != "<hello>" || !strings.Contains(w.Body.String(), `isPermaLink="false"`) {
+	if parsed.Channel.Title != "A & B" || parsed.Channel.Items[0].Title != "<hello>" || !strings.Contains(w.Body.String(), `isPermaLink="false"`) ||
+		!strings.Contains(w.Body.String(), `xmlns:atom="http://www.w3.org/2005/Atom"`) || !strings.Contains(w.Body.String(), `<atom:link href="https://example.test/feed.xml" rel="self" type="application/rss+xml"></atom:link>`) {
 		t.Fatal(w.Body.String())
 	}
 }

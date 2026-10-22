@@ -23,6 +23,8 @@ func (s *Server) routes() http.Handler {
 	spa := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
+		// Account, studio and admin screens are never search results.
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 		_, _ = w.Write(web.PortalIndex)
 	}
 	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/", "GET /device"} {
@@ -63,6 +65,12 @@ func (s *Server) routes() http.Handler {
 		}
 		httpx.OK(w, map[string]any{"status": "ready", "models": len(s.Backend.Models()) > 0})
 	})
+	m.HandleFunc("GET /robots.txt", s.robots)
+	m.HandleFunc("GET /sitemap.xml", s.sitemap)
+	m.HandleFunc("GET /manifest.webmanifest", s.manifest)
+	m.HandleFunc("GET /share.png", s.shareImage)
+	m.HandleFunc("GET /favicon.ico", rootAsset("favicon.ico"))
+	m.HandleFunc("GET /apple-touch-icon.png", rootAsset("apple-touch-icon.png"))
 	m.HandleFunc("GET /fonts/fonts.css", s.fontCSS)
 	m.HandleFunc("GET /fonts/{name}", s.fontFile)
 	m.HandleFunc("GET /signin", s.guard(public, noToken, s.signinPage))
@@ -105,6 +113,16 @@ func (s *Server) routes() http.Handler {
 		}
 	}
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { httpx.Fail(w, 404, "not_found", "Unknown API route") })
+	// Any other page is the storefront's 404. "/" rather than "GET /", which
+	// would conflict with the "/api/" pattern above.
+	page404 := s.guard(public, noToken, s.notFound)
+	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
+		page404(w, r)
+	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
@@ -126,7 +144,9 @@ func (s *Server) legalPage(page, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
-		data := map[string]string{"Page": page, "Title": title, "Site": s.site(r).PublicURL.Hostname(), "Contact": s.Config.LegalContact, "Updated": legalUpdated}
+		site := s.site(r)
+		data := map[string]string{"Page": page, "Title": title, "Site": site.PublicURL.Hostname(), "Contact": s.Config.LegalContact, "Updated": legalUpdated,
+			"Canonical": site.PortalOrigin() + "/" + page, "Description": title + " for " + site.PublicURL.Hostname() + "."}
 		if err := s.legal.Execute(w, data); err != nil {
 			log.Error().Err(err).Str("page", page).Msg("render legal page")
 		}
@@ -144,7 +164,7 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	p := principal(r.Context())
 	site := s.site(r)
 	out := map[string]any{"authenticated": p != nil, "supporter": false, "loginAvailable": site.OIDC.Configured() || s.Config.EmailLogin != nil, "signupAvailable": site.OIDC.Configured() && s.Config.SignupAllowed, "billingEnabled": s.Payments != nil, "appDomain": site.AppDomain,
-		"typeCredit": s.fonts.present, "journalEnabled": false}
+		"typeCredit": s.fonts.present, "journalEnabled": false, "contact": s.Config.ContactEmail}
 	// The SPA shows the same brand in its crumb as the server-rendered pages.
 	if rev, err := s.Store.ActiveSettings(r.Context()); err == nil {
 		out["brand"] = s.brand(r, rev.Document)

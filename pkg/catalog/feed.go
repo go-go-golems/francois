@@ -37,9 +37,13 @@ func (s *Server) releaseFeed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	writeRSS(w, doc)
+	writeRSS(w, doc, origin+r.URL.Path)
 }
-func writeRSS(w http.ResponseWriter, doc rssDoc) {
+
+// writeRSS writes a feed whose atom:link self is the feed's own URL.
+func writeRSS(w http.ResponseWriter, doc rssDoc, self string) {
+	doc.AtomNS = "http://www.w3.org/2005/Atom"
+	doc.Channel.Self = atomLink{Href: self, Rel: "self", Type: "application/rss+xml"}
 	out, err := xml.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
@@ -61,7 +65,7 @@ func (s *Server) combinedFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-cache")
 	rows, err := s.Store.Pool.Query(r.Context(), `SELECT id,title,path,description,published FROM (
- SELECT 'release:'||r.id AS id,a.title||' '||r.version AS title,'/apps/'||a.id AS path,r.changelog AS description,r.published_at AS published FROM releases r JOIN catalog_artifacts a ON a.id=r.artifact_id WHERE r.state='published' AND a.visibility='listed'
+ SELECT 'release:'||r.id AS id,a.title||' '||r.version AS title,'/apps/'||a.id AS path,coalesce(nullif(a.description,''),r.changelog) AS description,r.published_at AS published FROM releases r JOIN catalog_artifacts a ON a.id=r.artifact_id WHERE r.state='published' AND a.visibility='listed'
  UNION ALL SELECT 'post:'||id,title,'/journal/'||slug,summary,published_at FROM posts WHERE state='published' AND $1
  ) items ORDER BY published DESC,id LIMIT 50`, rev.Document.Storefront.JournalEnabled)
 	if err != nil {
@@ -77,6 +81,9 @@ func (s *Server) combinedFeed(w http.ResponseWriter, r *http.Request) {
 	if rev.Document.Storefront.JournalEnabled {
 		doc.Channel.Description = "Applications and writing."
 	}
+	if rev.Document.Storefront.Tagline != "" {
+		doc.Channel.Description = rev.Document.Storefront.Tagline
+	}
 	for rows.Next() {
 		var id, title, path, description string
 		var published time.Time
@@ -90,5 +97,5 @@ func (s *Server) combinedFeed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Feed unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	writeRSS(w, doc)
+	writeRSS(w, doc, origin+r.URL.Path)
 }

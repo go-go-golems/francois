@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
 
 // Site is one portal origin and the application domain whose instance
@@ -102,6 +104,15 @@ type Config struct {
 	// MCP serves the MCP tools at /mcp on every portal for remote agents
 	// holding a personal API token.
 	MCP bool
+	// RedirectHosts are retired portal hosts: every request to one is
+	// redirected (308, method and body kept) to the primary portal origin.
+	RedirectHosts []string
+	// HSTSMaxAge is sent as Strict-Transport-Security on every response
+	// when the primary site is HTTPS; zero sends none.
+	HSTSMaxAge time.Duration
+	// ContactEmail is the public contact address shown on storefront pages
+	// and in the SPA; empty shows none.
+	ContactEmail string
 }
 
 // Validate rejects site lists the host dispatcher cannot route
@@ -144,6 +155,21 @@ func (c Config) Validate() error {
 		}
 		portals[host], domains[d] = true, true
 	}
+	for _, raw := range c.RedirectHosts {
+		h := strings.ToLower(raw)
+		if h == "" || strings.ContainsAny(h, "/*? \t") {
+			return errors.Errorf("redirect host %q must be a host name such as old.example", raw)
+		}
+		if portals[h] || portals[strings.TrimPrefix(h, "www.")] {
+			return errors.Errorf("redirect host %s is also a portal", raw)
+		}
+		for _, site := range c.Sites {
+			// Any port: AppPort may still be empty here, defaulted in New.
+			if _, misdirected, ok := site.instanceName(h); ok || misdirected {
+				return errors.Errorf("redirect host %s is an instance host of %s", raw, site.PublicURL)
+			}
+		}
+	}
 	return nil
 }
 
@@ -164,6 +190,9 @@ type Server struct {
 	demoLimiter   *limiter
 	deviceLimiter *limiter
 	fonts         *fonts
+	resizes       singleflight.Group
+	resizeSlots   chan struct{}
+	share         shareCache
 }
 
 func (c Config) Secure() bool { return c.primary().PublicURL.Scheme == "https" }
@@ -180,8 +209,8 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 			site.AppPort = site.PublicURL.Port()
 		}
 	}
-	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Parse(web.LegalTemplate)),
-		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter()}
+	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Funcs(pageFuncs).Parse(web.LegalTemplate)),
+		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter(), resizeSlots: make(chan struct{}, 2)}
 	var err error
 	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {
 		// Validate already checked the directory; serve no fonts rather than fail.
@@ -216,13 +245,45 @@ func (s *Server) site(r *http.Request) *Site {
 	return s.Config.primary()
 }
 
-// Handler dispatches by exact Host: a site's portal origin, www.<portal> as a
-// redirect to it, or a registered instance hostname under a site's
-// application domain. An instance opened through a site is framed by that
-// site's portal only.
+// servesHost reports whether host is one this server answers for: a portal,
+// its www. alias, a redirect host or a host under an application domain.
+func (s *Server) servesHost(host string) bool {
+	for _, h := range s.Config.RedirectHosts {
+		if host == strings.ToLower(h) {
+			return true
+		}
+	}
+	for _, site := range s.Config.Sites {
+		portal := strings.ToLower(site.PublicURL.Host)
+		if _, misdirected, ok := site.instanceName(host); host == portal || host == "www."+portal || ok || misdirected {
+			return true
+		}
+	}
+	return false
+}
+
+// Handler dispatches by exact Host: a retired redirect host, a site's portal
+// origin, www.<portal> as a redirect to it, or a registered instance hostname
+// under a site's application domain. An instance opened through a site is
+// framed by that site's portal only. On HTTPS deployments every response
+// carries HSTS, and a plain-HTTP request reported by a trusted ingress is
+// upgraded first.
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := strings.ToLower(r.Host)
+		if s.Config.Secure() && s.Config.HSTSMaxAge > 0 {
+			w.Header().Set("Strict-Transport-Security", "max-age="+strconv.Itoa(int(s.Config.HSTSMaxAge.Seconds()))+"; includeSubDomains")
+		}
+		if s.Config.Secure() && s.Config.TrustProxyHeaders && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "http") && s.servesHost(host) {
+			http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusPermanentRedirect) // #nosec G710 -- host is one this server is configured to serve
+			return
+		}
+		for _, h := range s.Config.RedirectHosts {
+			if host == strings.ToLower(h) {
+				http.Redirect(w, r, s.Config.primary().PortalOrigin()+r.URL.RequestURI(), http.StatusPermanentRedirect) // #nosec G710 -- the destination is always the primary portal origin
+				return
+			}
+		}
 		for i := range s.Config.Sites {
 			site := &s.Config.Sites[i]
 			portal := strings.ToLower(site.PublicURL.Host)

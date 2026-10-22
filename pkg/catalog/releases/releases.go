@@ -114,6 +114,43 @@ func (b *Blobs) PutReader(r io.Reader, limit int64) (string, string, int64, erro
 	return key, sum, size, os.Rename(tmp.Name(), final)
 }
 
+var variantPattern = regexp.MustCompile(`^[0-9a-f]{64}-w[0-9]{1,5}$`)
+
+// Variant returns a derived file (such as a resized image) stored under
+// variants/, or os.ErrNotExist. Variants are a cache: deleting the
+// directory only costs recomputation.
+func (b *Blobs) Variant(name string) ([]byte, error) {
+	if !variantPattern.MatchString(name) {
+		return nil, errors.New("invalid variant name")
+	}
+	return os.ReadFile(filepath.Join(b.Root, "variants", name[:2], name)) // #nosec G304 -- name is validated against variantPattern
+}
+
+// PutVariant stores a derived file atomically under variants/.
+func (b *Blobs) PutVariant(name string, data []byte) error {
+	if !variantPattern.MatchString(name) {
+		return errors.New("invalid variant name")
+	}
+	dir := filepath.Join(b.Root, "variants", name[:2])
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".variant-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if _, err = tmp.Write(data); err == nil {
+		err = tmp.Close()
+	} else {
+		_ = tmp.Close()
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(dir, name))
+}
+
 // ErrTooLarge reports an upload over its size limit.
 var ErrTooLarge = errors.New("file exceeds the size limit")
 

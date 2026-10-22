@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"os"
@@ -40,19 +41,46 @@ var knownFonts = map[string]fontFace{
 	"ABCArealMono-RegularItalic.woff2": {"ABC Areal Mono", 400, true},
 }
 
-// fonts are the web fonts loaded at startup.
+// fonts are the web fonts loaded at startup. Each file and the stylesheet
+// carry a content hash; a request naming the current hash (?v=) is cached
+// for a year, an unversioned one keeps short revalidating caching.
 type fonts struct {
 	files   map[string][]byte
+	hashes  map[string]string
 	css     []byte
+	cssHash string
 	loaded  time.Time
 	present bool
+}
+
+// preloadFonts are the faces used above the fold on every storefront page.
+var preloadFonts = []string{"ABCAreal-Regular.woff2", "ABCAreal-Medium.woff2"}
+
+func contentHash(b []byte) string { return fmt.Sprintf("%x", sha256.Sum256(b))[:16] }
+
+// cssURL is the versioned stylesheet URL for server-rendered pages.
+func (f *fonts) cssURL() string { return "/fonts/fonts.css?v=" + f.cssHash }
+
+// fileURL is the versioned URL of a loaded font file.
+func (f *fonts) fileURL(name string) string { return "/fonts/" + name + "?v=" + f.hashes[name] }
+
+// preloads are the versioned URLs of the loaded above-the-fold faces.
+func (f *fonts) preloads() []string {
+	out := []string{}
+	for _, name := range preloadFonts {
+		if _, ok := f.files[name]; ok {
+			out = append(out, f.fileURL(name))
+		}
+	}
+	return out
 }
 
 // loadFonts reads the known WOFF2 files from dir. An empty dir disables
 // web fonts; a configured dir without any known file is an error, so a
 // broken mount is noticed at startup.
 func loadFonts(dir string) (*fonts, error) {
-	f := &fonts{files: map[string][]byte{}, css: []byte("/* no web fonts configured */\n"), loaded: time.Now()}
+	f := &fonts{files: map[string][]byte{}, hashes: map[string]string{}, css: []byte("/* no web fonts configured */\n"), loaded: time.Now()}
+	f.cssHash = contentHash(f.css)
 	if dir == "" {
 		return f, nil
 	}
@@ -73,13 +101,14 @@ func loadFonts(dir string) (*fonts, error) {
 		if face.Italic {
 			style = "italic"
 		}
-		f.files[name] = data
-		fmt.Fprintf(&css, "@font-face{font-family:%q;src:url(/fonts/%s) format(\"woff2\");font-weight:%d;font-style:%s;font-display:swap}\n", face.Family, name, face.Weight, style)
+		f.files[name], f.hashes[name] = data, contentHash(data)
+		fmt.Fprintf(&css, "@font-face{font-family:%q;src:url(%s) format(\"woff2\");font-weight:%d;font-style:%s;font-display:swap}\n", face.Family, f.fileURL(name), face.Weight, style)
 	}
 	if len(f.files) == 0 {
 		return nil, errors.Errorf("no known WOFF2 fonts in %s", dir)
 	}
 	f.css, f.present = css.Bytes(), true
+	f.cssHash = contentHash(f.css)
 	return f, nil
 }
 
@@ -95,6 +124,9 @@ func sortedFontNames() []string {
 func (s *Server) fontCSS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if r.URL.Query().Get("v") == s.fonts.cssHash {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
 	http.ServeContent(w, r, "", s.fonts.loaded, bytes.NewReader(s.fonts.css))
 }
 
@@ -107,5 +139,8 @@ func (s *Server) fontFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "font/woff2")
 	w.Header().Set("Cache-Control", "public, max-age=604800")
+	if r.URL.Query().Get("v") == s.fonts.hashes[name] {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
 	http.ServeContent(w, r, "", s.fonts.loaded, bytes.NewReader(data))
 }

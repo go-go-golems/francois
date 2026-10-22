@@ -135,14 +135,14 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 		p.LineItems = []*stripe.CheckoutSessionCreateLineItemParams{{Quantity: stripe.Int64(1), PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
 			Currency: stripe.String("usd"), UnitAmount: stripe.Int64(r.SupportAmountCents),
 			Recurring:   &stripe.CheckoutSessionCreateLineItemPriceDataRecurringParams{Interval: stripe.String("month")},
-			ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Support slop.boutique")},
+			ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Monthly support")},
 		}}}
 		p.SubscriptionData.Metadata["francois_monthly_support"] = "true"
 	}
 	if r.YearFunding {
 		p.Mode = stripe.String(stripe.CheckoutSessionModePayment)
 		p.SubscriptionData = nil
-		p.LineItems = []*stripe.CheckoutSessionCreateLineItemParams{{Quantity: stripe.Int64(1), PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{Currency: stripe.String("usd"), UnitAmount: stripe.Int64(billing.YearFundingCents), ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Fund a year of slop.boutique")}}}}
+		p.LineItems = []*stripe.CheckoutSessionCreateLineItemParams{{Quantity: stripe.Int64(1), PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{Currency: stripe.String("usd"), UnitAmount: stripe.Int64(billing.YearFundingCents), ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Year of funding")}}}}
 		p.Metadata["francois_year_funding"] = "true"
 		p.InvoiceCreation = &stripe.CheckoutSessionCreateInvoiceCreationParams{Enabled: stripe.Bool(true)}
 	}

@@ -73,6 +73,9 @@ type CatalogServeSettings struct {
 	TrustProxyHeaders     bool     `glazed:"trust-proxy-headers"`
 	FontDir               string   `glazed:"font-dir"`
 	MCP                   bool     `glazed:"mcp"`
+	RedirectHosts         []string `glazed:"redirect-host"`
+	HSTSMaxAge            string   `glazed:"hsts-max-age"`
+	ContactEmail          string   `glazed:"contact-email"`
 	ReleaseDir            string   `glazed:"release-dir"`
 	Migrate               bool     `glazed:"migrate"`
 	OIDCIssuer            string   `glazed:"oidc-issuer"`
@@ -165,7 +168,12 @@ func (c *CatalogServe) Run(ctx context.Context, parsed *values.Values) error {
 		}
 		sites = append(sites, site(u, appDomain))
 	}
-	cfg := catalog.Config{Sites: sites, GoogleIDP: s.ZitadelGoogleIDP, GitHubIDP: s.ZitadelGitHubIDP, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP}
+	cfg := catalog.Config{Sites: sites, GoogleIDP: s.ZitadelGoogleIDP, GitHubIDP: s.ZitadelGitHubIDP, TrialAllowed: s.TrialAllowed, SignupAllowed: s.SignupAllowed, LegalContact: s.LegalContact, TrustProxyHeaders: s.TrustProxyHeaders, FontDir: s.FontDir, MCP: s.MCP, RedirectHosts: s.RedirectHosts, ContactEmail: s.ContactEmail}
+	hsts, err := time.ParseDuration(s.HSTSMaxAge)
+	if err != nil || hsts < 0 {
+		return errors.New("hsts-max-age must be a non-negative duration such as 8760h (0 disables)")
+	}
+	cfg.HSTSMaxAge = hsts
 	if s.EmailSigninEnabled {
 		token, err := secret("", s.ZitadelLoginTokenFile)
 		if err != nil {
@@ -493,9 +501,12 @@ func registerCatalog(root *cobra.Command) error {
 			fields.New("app-domain", fields.TypeString, fields.WithDefault("apps.localhost"), fields.WithHelp("Domain for per-instance application origins")),
 			fields.New("legal-contact", fields.TypeString, fields.WithHelp("Contact address shown on /privacy and /terms")),
 			fields.New("trust-proxy-headers", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Take visitor addresses from X-Real-Ip/X-Forwarded-For (only behind a trusted ingress); used for demo rate limits")),
+			fields.New("redirect-host", fields.TypeStringList, fields.WithHelp("Retired portal host whose requests all redirect (308) to the primary portal; repeatable")),
+			fields.New("hsts-max-age", fields.TypeString, fields.WithDefault("8760h"), fields.WithHelp("Strict-Transport-Security max-age sent when the primary site is HTTPS; 0 disables")),
+			fields.New("contact-email", fields.TypeString, fields.WithHelp("Public contact address shown on storefront pages; empty shows none")),
 			fields.New("mcp", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Serve MCP tools at /mcp for remote agents with a personal API token")),
 			fields.New("font-dir", fields.TypeString, fields.WithHelp("Private directory of licensed WOFF2 web fonts (ABC Areal); never commit these files")),
-			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://slop.boutique=slop.boutique; the app domain may equal the portal hostname")),
+			fields.New("site", fields.TypeStringList, fields.WithHelp("Additional site as <portal origin>=<app domain>, e.g. https://catalog.example.com=apps.example.com; the app domain may equal the portal hostname")),
 			fields.New("release-dir", fields.TypeString, fields.WithDefault("./var/catalog/releases"), fields.WithHelp("Private immutable release file directory")),
 			fields.New("migrate", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Apply pending migrations before serving")),
 			fields.New("email-signin-enabled", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Enable ZITADEL email-link sign-in and optional public signup")),

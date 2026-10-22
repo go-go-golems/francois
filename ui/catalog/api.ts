@@ -89,6 +89,7 @@ export type Session = {
   billingEnabled: boolean;
   appDomain: string;
   brand?: string;
+  contact?: string;
   typeCredit?: boolean;
   user?: SessionUser;
   csrfToken?: string;
