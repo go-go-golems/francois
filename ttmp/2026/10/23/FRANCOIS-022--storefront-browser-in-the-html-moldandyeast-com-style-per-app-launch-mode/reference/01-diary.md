@@ -316,3 +316,47 @@ Ran the six imported apps, with their real HTML and manifests, through the new v
 - Viewer sizes: Phone `max-width: 390px`, Tablet `834px`, Desktop `100%`.
 - Frame attributes after the fix: `sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"`, `allow="clipboard-write; fullscreen"`.
 - Screenshots (not committed): `$S/screens/real/<id>-{Desktop,Tablet,Phone}.png`, `sheet.png`, `<id>-newtab.png`, where `$S` is the session scratchpad.
+
+## Step 6: Preview sign-in links and the early-access baseline
+
+Two small things came out of the user trying the preview. Setting the session cookie from the console did nothing for them, because a guest session from an earlier demo had left an HttpOnly cookie with the same name, which scripts cannot overwrite. I added `/preview-login?as=…` links to the throwaway preview. They also pointed out that the early-access sentence sat higher than the Subscribe button label; that is fixed.
+
+### Prompt Context
+**User prompt (verbatim):** "How do I set the cookie? I'm not sure it work?", "no somehow, the api/me still shows guest afer setting the subscriber", "oh i had to manually remove the cookie?", "How can I align the baseline here" (with a screenshot of the early-access line and Subscribe button)
+**Assistant interpretation:** Make signing in to the preview reliable; align the early-access sentence with the button.
+**Inferred user intent:** Try the preview as each kind of visitor without fiddling, and polish the early-access invitation before deploy.
+**Commit (code):** 4fbed45 — "fix(catalog): align the early-access line with the Subscribe button"
+
+### What I did
+- Preview only (uncommitted `zz_preview_test.go`; copy refreshed in `scripts/01-local-preview-seed.go.txt`): wrapped the server handler in a mux with `GET /preview-login?as=paying|free|admin|guest`, which sets `francois_session_dev` server-side (HttpOnly, 1 day; `guest` or unknown clears it) and redirects to `/`.
+- `catalog.css`: `.runner-start` `align-items:center` → `baseline`; `.runner-early` `margin:0 0 14px` → `margin:0`.
+
+### Why
+- `setCookie` in `auth.go` always sets `HttpOnly: true`, so a guest session from a demo blocks `document.cookie` writes with the same name; the browser ignores them silently. Only a server response (or deleting the cookie in devtools) can replace it.
+- Baseline alignment keeps the 17 px sentence and the 15 px button label on one line, whatever the button padding.
+
+### What worked
+- `curl` with a stale `francois_session_dev=stale-guest` cookie, then each login link, then `/api/me`: `pat@example.com`, `fred@example.com`, `ada@example.com`.
+- Screenshot of `.runner-start` on `/apps/hypercore-studio` as the free user shows the sentence and the button label on one baseline.
+
+### What didn't work
+- First curl loop: zsh `no matches found: http://localhost:18555/preview-login?as=paying` (the unquoted `?` is a glob); quoted the URL.
+- A numeric baseline probe (zero-size inline-block appended to each element) reported text 462.6 px vs button 457.6 px; inside the `inline-flex` button the probe becomes a flex item, so the number is not the label's baseline. Judged by the screenshot instead.
+
+### What I learned
+- Any page that tells people to set the session cookie from the console will fail after a demo; the server-side link is the reliable way, also for future previews.
+
+### What was tricky to build
+- N/A.
+
+### What warrants a second pair of eyes
+- On narrow screens `.runner-start .site-button` is `width:100%` and wraps below the sentence; baseline alignment does not affect that layout.
+
+### What should be done in the future
+- Phase 5 as before (deploy, launch modes per app, production viewer check).
+
+### Code review instructions
+- `pkg/catalog/web/static/catalog.css` lines for `.runner-start` and `.runner-early`.
+
+### Technical details
+- Preview links: `http://localhost:18555/preview-login?as=paying|free|admin|guest`.

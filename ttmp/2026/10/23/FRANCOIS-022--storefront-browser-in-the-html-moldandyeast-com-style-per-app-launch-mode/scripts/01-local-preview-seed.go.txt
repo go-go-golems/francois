@@ -89,9 +89,22 @@ func TestZZPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() { _ = http.Serve(ln, e.srv.Handler()) }()
 	paying := e.user("pat", "subscriber", true)
 	free := e.user("fred", "", false)
+	// /preview-login?as=paying|free|admin|guest sets the session cookie on
+	// the server, which replaces an HttpOnly guest cookie a script cannot.
+	logins := map[string]string{"paying": paying.token, "free": free.token, "admin": admin.token}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /preview-login", func(w http.ResponseWriter, r *http.Request) {
+		tok, maxAge := logins[r.URL.Query().Get("as")], 86400
+		if tok == "" {
+			maxAge = -1
+		}
+		http.SetCookie(w, &http.Cookie{Name: "francois_session_dev", Value: tok, Path: "/", MaxAge: maxAge, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	})
+	mux.Handle("/", e.srv.Handler())
+	go func() { _ = http.Serve(ln, mux) }()
 	_ = os.WriteFile("/tmp/claude-1000/-home-manuel-code-wesen-go-go-golems-francois/8fa07163-a132-41ac-89e0-100f59698739/scratchpad/preview-tokens.txt", []byte("paying="+paying.token+"\nfree="+free.token+"\nadmin="+admin.token+"\n"), 0o600)
 	t.Log("serving http://localhost:18555/")
 	for {
