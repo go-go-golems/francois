@@ -1,0 +1,13 @@
+{
+  "testOnly": true,
+  "account": "acct_1TxEMNLpxiqBMHHi",
+  "product": "prod_VUrdIdgaEDJm8G",
+  "price": "price_1UTrtzLpxiqBMHHiHvtBwWyX",
+  "amount": 100,
+  "currency": "usd",
+  "interval": "month",
+  "webhook": "we_1UTrunLpxiqBMHHiGNMfI40a",
+  "portal": "https://sandbox.slop.boutique",
+  "database": "francois_sandbox",
+  "sharedProductionData": false
+}

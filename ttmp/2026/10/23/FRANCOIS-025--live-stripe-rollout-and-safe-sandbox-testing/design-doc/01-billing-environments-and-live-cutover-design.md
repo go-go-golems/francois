@@ -121,3 +121,19 @@ Completion evidence must include: inventory, approved price parity, mode isolati
 - Treatment of existing test subscriptions/benefits and billing history.
 - Exact live account identity and tax configuration.
 - Approval and amount for the eventual real-money test.
+
+## Authorized sandbox implementation checkpoint
+
+Portal hostname: sandbox.slop.boutique (existing wildcard DNS verified). Instance domain: sandbox.yolo.scapegoat.dev, yielding i-<id>.sandbox.yolo.scapegoat.dev. Existing wildcard DNS there resolves to the same cluster; the DigitalOcean DNS-01 issuer can obtain its wildcard certificate. Use a separate HTTP-01 certificate for the portal. This avoids incorrectly treating *.slop.boutique as covering deeper names or requiring Ramon to add a new ACME delegation.
+
+Use namespace francois-sandbox, independent database/user and PVC, separate Vault runtime path apps/francois/sandbox/runtime and a dedicated public PKCE client/project. Reuse the existing identity organization for operator SSO only; do not clone users or application data. Disable email-link registration and paid model access (fake backend), and require operator ingress authentication except the signed Stripe webhook route. The shared issuer's own account recovery remains outside the application email-disable boundary.
+
+Stripe dashboard currently requires operator login. Do not silently reuse the existing production deployment's test key. Prepare the isolated runtime with billing disabled until a dedicated test credential and endpoint can be provisioned. This is a partial runtime milestone, not completion of billing-sandbox qualification or the visible mode-indicator requirement. Production remains unchanged.
+
+Repository coordination: original ticket commit 8db2edb was absent from the updated main branch. It was recovered into isolated worktree francois-sandbox as commit 4f9b8a9; unrelated current edits were preserved.
+
+## Deployed sandbox checkpoint
+
+Sandbox infrastructure is now deployed and the operator confirms login. Stripe dashboard access was resolved; a dedicated restricted test key, test price/webhook and default portal configuration are provisioned. Billing is enabled in **test mode**, superseding the temporary disabled-billing preparation plan above. Existing storefront title/header overrides supply a visible SANDBOX indicator without a separate image. A backend mode-control feature was not implemented.
+
+The operator gate password is retained per explicit instruction. Do not include it in documentation; retrieve it from Vault. The full sandbox payment regression task remains open. This checkpoint does not authorize switching production to live or charging real money.

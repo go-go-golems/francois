@@ -1,0 +1,73 @@
+{
+  "allowance": {
+    "globalConcurrency": 6,
+    "maxOutputTokens": 8192,
+    "maxToolRounds": 5,
+    "perUserConcurrency": 1
+  },
+  "demo": {
+    "dailyBudget": 200000,
+    "enabled": false,
+    "maxActive": 20,
+    "perAddressPerHour": 3,
+    "perUserPerHour": 3,
+    "tokens": 5000,
+    "ttlMinutes": 20
+  },
+  "limits": {
+    "assetBytesPerInstance": 268435456,
+    "documentsPerInstance": 500,
+    "maxAttachmentBytes": 104857600,
+    "maxHtmlBytes": 16777216,
+    "maxMediaBytes": 26214400,
+    "storageBytesPerInstance": 16777216,
+    "viewsPerUser": 3
+  },
+  "models": {
+    "allowed": [],
+    "tiers": {}
+  },
+  "operations": {
+    "acceptNewVisits": true,
+    "notice": "",
+    "samplingEnabled": false,
+    "storageMode": "read-write"
+  },
+  "plans": [
+    {
+      "dailyTokens": 10000,
+      "instances": 1,
+      "key": "free",
+      "membersPerInstance": 1,
+      "name": "Free",
+      "prices": []
+    },
+    {
+      "dailyTokens": 100000,
+      "instances": 10,
+      "key": "subscriber",
+      "membersPerInstance": 10,
+      "name": "Paying",
+      "prices": [
+        {
+          "interval": "month",
+          "priceId": "price_1UTrtzLpxiqBMHHiHvtBwWyX",
+          "label": "$1 / month (test only)"
+        }
+      ]
+    }
+  ],
+  "publishing": {
+    "allowPinnedAfterWithdraw": true,
+    "earlyAccessDays": 0
+  },
+  "storefront": {
+    "intro": "Private test environment. No production content or real payments.",
+    "journalEnabled": false,
+    "tagline": "Sandbox \u2014 test payments only.",
+    "title": "slop.boutique SANDBOX",
+    "copy": {
+      "header.statement": "SANDBOX \u2014 Stripe test mode. No real payments. Isolated test data."
+    }
+  }
+}

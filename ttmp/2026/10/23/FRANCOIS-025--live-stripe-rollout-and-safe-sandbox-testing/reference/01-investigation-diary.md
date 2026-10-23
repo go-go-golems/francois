@@ -59,3 +59,55 @@ Read design-doc/01 and its source relations. Verify CLI and service mode guards 
 
 ### Technical details
 Repository has unrelated modified application files; stage only this ticket. Deployment hostname and account capability inspection are future work. No secret values were accessed.
+
+## Step 2: Provision and qualify the isolated sandbox runtime
+
+Provisioned sandbox.slop.boutique with independent application state, a separate PKCE client, operator ingress gate and dedicated Stripe test credentials. Runtime and TLS are healthy; the operator confirmed normal account sign-in works. Production billing was not switched to live, and the broader payment regression/cutover tasks remain open.
+
+### Prompt Context
+**User prompts (verbatim):** "ok, update the docmgr ticket design doc if needed, then go"; "i logged in to stripe"; "try again"; "continue"; "do you need me to do anything?"; "what should I log in with?"; "ok, worked. no need to rotate."
+**Assistant interpretation:** Provision the isolated sandbox, use the authenticated Stripe test dashboard, and accept operator-confirmed login without rotating the operator gate password.
+**Inferred user intent:** Obtain a usable test environment without altering production billing.
+**Commits:** Terraform 04fd555 (sandbox OIDC); platform 2621d11 (sandbox), aa1bd44 (route priority), 45506f1 (VSO projection), merged via PRs #386–388. Initial ticket recovered as 4f9b8a9 in an isolated worktree.
+
+### What I did
+- Updated design: portal sandbox.slop.boutique and instance origins i-<id>.sandbox.yolo.scapegoat.dev. Both resolve via existing DNS. Separate portal HTTP-01 and wildcard DigitalOcean DNS-01 certificates; no Ramon DNS change needed.
+- Created Terraform-owned project/client in the existing operator identity organization, with sandbox-only redirect/logout URLs and public PKCE. Plan exactly two additions; apply succeeded. No production client/policy changed.
+- Created a named restricted test API key in the Slop Boutique account and moved it directly into Vault without outputting its value. Provisioned test product, $1 USD/month price matching the existing production test price, 14-event webhook and default test customer portal. Verified key authentication and livemode=false responses. No live Stripe requests or charges.
+- Created standalone francois-sandbox package: separate DB/user/PVC, scoped VSO policies/roles, explicit test-mode flag, fake model backend, disabled email-link/signup flags and no production model credentials. Fonts and identity issuer/organization are intentionally shared; application data is not.
+- Deployed observed production image sha-dff295d as the initial sandbox baseline. Production subsequently evolves independently; no automatic sandbox image promotion is claimed.
+- Seeded validated sandbox settings through the running CLI: visible SANDBOX brand/header, no sampling, matching price/limits. No production users, subscriptions or content were copied.
+- Gated portal and instance routes with Basic Auth; only exact /webhooks/stripe bypasses that gate and still requires Stripe signatures. Added noindex headers.
+- Verified VSO healthy, database bootstrap complete, certificates Ready, deployment available, Argo Healthy/Synced. Unauthenticated portal returns 401, authorized portal 200 with SANDBOX/noindex, unsigned webhook 400. Browser screenshot visually reviewed. OIDC request reached hosted login; operator later confirms completed sign-in.
+
+### Why
+Separate persistence and credential custody protect real billing from test operations. Retaining a single-mode server avoids rewriting customer mappings and event processing. Existing storefront copy settings provide the visible test banner without a special application build.
+
+### What worked
+55-package GitOps validation and PR CI passed. Both certificates Ready. Dedicated test product prod_VUrdIdgaEDJm8G, price price_1UTrtzLpxiqBMHHiHvtBwWyX, webhook we_1UTrunLpxiqBMHHiGNMfI40a; portal configuration bpc_1UTs62LpxiqBMHHiO97ul0ZF is active, default and test-only. $1/month parity checked via the old test Price before creating the new equivalent. Operator confirmed sandbox login. Final production and sandbox Argo apps both Healthy/Synced.
+
+### What didn't work
+- Original ticket path disappeared after the other worktree switched/rebased to main; appending failed with FileNotFoundError. Recovered original doc-only commit into a separate worktree using cherry-pick; did not reset unrelated work. An overly broad discovery find timed out and was abandoned for git worktree/commit inspection.
+- Browser initially lacked Stripe authentication; operator signed in and access succeeded on retry. Dialog snapshot selector matched two dialogs; scoped find identified the active workflow. Permission selection could not find the Webhook Endpoints cell by exact label because it included a docs link; used the observed Write control. No unrestricted/live key was used.
+- Browser VM dynamic import of node:child_process failed with ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING. Used a single-request loopback-only bridge to store the credential through Vault, with no body logging or credential files. The bridge closed after custody succeeded.
+- First webhook provisioning treated the comma-separated event file as one event; Stripe HTTP 400: Invalid enabled_events[0]. Corrected comma parsing and reused stable idempotency keys; provisioning succeeded without duplicate products/prices.
+- Initial portal probe returned 404 instead of 401. Added explicit route priority in PR #387, but the same probe still returned 404. Traefik then showed the actual cause: `failed to load basic auth credentials: found 2 elements for secret 'francois-sandbox/sandbox-ingress-auth', must be single element exactly`. VSO had included _raw alongside users despite excludes. PR #388 set excludeRaw=true; confirmed only users remains, then 401/200 behavior passed. The earlier priority hypothesis alone was insufficient. No further speculative fixes were attempted.
+- Running the settings CLI with --output=json failed: unknown flag --output. Installed help specified --format=json; this worked. The initial database had no settings row, so seeded defaults plus sandbox-only overrides through the validated CLI rather than SQL-copying production settings.
+
+### What I learned
+The exact runtime CLI contract differs from older Glazed output conventions. VSO excludes does not suppress its raw payload unless excludeRaw is enabled. Explicit app routing and secret-shape validation matter even when Argo reports healthy. A shared identity organization does not imply shared application data.
+
+### What was tricky to build
+Secure browser-to-Vault credential custody; separate DNS/TLS boundaries without changing Cloudflare; preventing sandbox model/email side effects; and safely distinguishing restricted portal traffic from signed webhook access.
+
+### What warrants a second pair of eyes
+Full sandbox Checkout/entitlement/portal cancellation/refund regression remains unverified. The operator gate password was pasted into chat; the operator explicitly declined rotation, so no rotation was performed and the value is not repeated in these documents. Credential permissions include test provisioning operations; narrow those separately if a stricter runtime-only policy is desired. Do not claim a shared Stripe test account provides object-level isolation: it is a separate test-mode boundary with a dedicated key and tagged objects, not a Stripe account-per-deployment guarantee.
+
+### What should be done in the future
+Exercise actual sandbox Checkout and webhook-driven entitlement changes, portal/cancellation/refund cases and permission coverage; publish an explicit image promotion process. Before live cutover, review all remaining ticket gates and obtain real-money test approval. Shared pg_dumpall covers the database; sandbox blob data is disposable without a dedicated object backup.
+
+### Code review instructions
+Review platform PRs #386–388, Terraform sandbox client, scripts 01–04, sources/runtime-provisioning.json, sandbox-settings.json and sandbox-home.png. Confirm no font binary, password or Stripe key is committed. The historical provisioning scripts are operator tools, not a daemon; review partial state before replaying.
+
+### Technical details
+Namespace/database: francois-sandbox / francois_sandbox. Vault runtime apps/francois/sandbox/runtime; key custody apps/francois/sandbox/stripe; gate apps/francois/sandbox/ingress. Stripe account acct_1TxEMNLpxiqBMHHi in test mode; API version 2026-06-24.dahlia. Readiness and TLS checked after deploy. Application-level payment completion is not yet claimed.
