@@ -14,10 +14,10 @@
 <nav class="tags" aria-label="Filter by tag"><a class="tag" href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}><span class="tag-label">All</span> <span class="tag-count">{{.Body.Total}}</span></a>{{range .Body.Tags}}<a class="tag" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}><span class="tag-label">{{.Name}}</span> <span class="tag-count">{{.Count}}</span></a>{{end}}</nav>
 </form>
 <section class="browser-list" aria-label="Artifacts list" data-browser-list>
-{{range .Body.Groups}}<div class="browser-group" data-browser-group>
-<p class="group-label"><span>{{.Label}}</span><span>{{len .Rows}} {{if eq (len .Rows) 1}}artifact{{else}}artifacts{{end}}</span></p>
+{{range .Body.Groups}}<div class="browser-group" data-browser-group{{if not .Shown}} hidden{{end}}>
+<p class="group-label"><span>{{.Label}}</span><span data-browser-group-count>{{.Shown}} {{if eq .Shown 1}}artifact{{else}}artifacts{{end}}</span></p>
 <div class="group-rows">{{range .Rows}}
-<article class="ri" data-browser-row data-search="{{.Title}} {{.Description}} {{join .Tags " "}}">
+<article class="ri" data-browser-row data-search="{{.Title}} {{.Description}} {{join .Tags " "}}"{{if .Hidden}} hidden{{end}}>
 <a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1" aria-hidden="true">{{if .Cover}}{{template "thumb" .Cover}}{{else}}<div class="mono-thumb"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
 <div class="ri-text">
 <div class="ri-head"><h2 class="ri-title"><a href="/apps/{{.ID}}">{{.Title}}</a></h2>{{if .Description}}<p class="ri-desc">{{.Description}}</p>{{end}}</div>
@@ -28,7 +28,7 @@
 </div>
 </article>{{end}}</div>
 </div>{{end}}
-<div class="browser-empty" data-browser-empty{{if .Body.Groups}} hidden{{end}}><p>No artifacts match your search.</p><a class="u" href="/">Clear filters</a></div>
+<div class="browser-empty" data-browser-empty{{if .Body.Count}} hidden{{end}}><p>No artifacts match your search.</p><a class="u" href="/">Clear filters</a></div>
 </section>
 <dialog class="viewer browser-viewer" data-viewer aria-label="Artifact"></dialog>
 {{template "support-callout" .}}

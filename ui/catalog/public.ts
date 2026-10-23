@@ -374,11 +374,7 @@ class Viewer {
       const box = el("div", { class: "v-blocked" });
       box.append(
         el("p", {}, (e as Error).message),
-        el(
-          "a",
-          { class: "u", href: "/apps/" + id },
-          "Go to the artifact page",
-        ),
+        el("a", { class: "u", href: "/apps/" + id }, "Go to the artifact page"),
       );
       surface.replaceChildren(box);
       state.textContent = "Unavailable";
@@ -432,7 +428,15 @@ function bindBrowser() {
       list
         .querySelectorAll<HTMLElement>("[data-browser-group]")
         .forEach((g) => {
-          g.hidden = !g.querySelector("[data-browser-row]:not([hidden])");
+          const n = g.querySelectorAll(
+            "[data-browser-row]:not([hidden])",
+          ).length;
+          g.hidden = n === 0;
+          const label = g.querySelector<HTMLElement>(
+            "[data-browser-group-count]",
+          );
+          if (label)
+            label.textContent = `${n} ${n === 1 ? "artifact" : "artifacts"}`;
         });
       if (count)
         count.textContent = `${shown} ${shown === 1 ? "artifact" : "artifacts"}`;

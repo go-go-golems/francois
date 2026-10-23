@@ -62,8 +62,8 @@ func TestBrowser(t *testing.T) {
 		`<h1>These artifacts are the results of our research.`,
 		`<span class="tag-label">graphics</span> <span class="tag-count">2</span>`,
 		`<span class="tag-label">All</span> <span class="tag-count">3</span>`,
-		`<span>October 2026</span><span>2 artifacts</span>`,
-		`<span>September 2026</span><span>1 artifact</span>`,
+		`<span>October 2026</span><span data-browser-group-count>2 artifacts</span>`,
+		`<span>September 2026</span><span data-browser-group-count>1 artifact</span>`,
 		`portal.test/apps/zeta · `,
 		`data-launch="inline"`,
 		`<span class="result-count" data-browser-count aria-live="polite">3 artifacts</span>`,
@@ -88,7 +88,7 @@ func TestBrowser(t *testing.T) {
 		_, p, _ := e.do(nil, "portal.test", "GET", "/?sort="+sortBy, nil, nil)
 		order(string(p), ids...)
 	}
-	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=az", nil, nil); !bytes.Contains(p, []byte(`<span>A</span><span>1 artifact</span>`)) {
+	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=az", nil, nil); !bytes.Contains(p, []byte(`<span>A</span><span data-browser-group-count>1 artifact</span>`)) {
 		t.Error("A–Z groups by initial")
 	}
 	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=bogus", nil, nil); !bytes.Contains(p, []byte(`<option value="newest" selected>`)) {

@@ -481,7 +481,7 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	tags := []category{}
 	index := map[string]int{}
-	matches := []card{}
+	matches, hidden := []card{}, map[string]bool{}
 	for _, c := range cards {
 		for _, t := range c.Tags {
 			if i, ok := index[t]; ok {
@@ -492,17 +492,21 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 			tags = append(tags, category{t, link(t), 1, t == tag})
 		}
 		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
-		if (tag == "" || contains(c.Tags, tag)) && (q == "" || strings.Contains(haystack, strings.ToLower(q))) {
+		if tag == "" || contains(c.Tags, tag) {
 			matches = append(matches, c)
+			hidden[c.ID] = q != "" && !strings.Contains(haystack, strings.ToLower(q))
 		}
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
-	rows := make([]archiveRow, len(matches))
+	rows, shown := make([]archiveRow, len(matches)), 0
 	for i, c := range matches {
 		rows[i] = archiveRowOf(c, rev.Document, who)
+		if rows[i].Hidden = hidden[c.ID]; !rows[i].Hidden {
+			shown++
+		}
 	}
 	groups := groupArchive(rows, order)
-	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": len(rows), "Total": len(cards), "Tags": tags, "Tag": tag,
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": len(cards), "Tags": tags, "Tag": tag,
 		"Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link(""), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
 }
 
@@ -524,6 +528,9 @@ type archiveRow struct {
 	Download, DownloadName string
 	// EarlyNote invites visitors who do not pay to subscribe.
 	EarlyNote bool
+	// Hidden rows do not match the search; they are rendered hidden so the
+	// live search can show them again when the query broadens.
+	Hidden bool
 }
 
 // visitor is what the landing page needs to know about the viewer: member
@@ -556,6 +563,17 @@ func archiveRowOf(c card, doc settings.Document, who visitor) archiveRow {
 type archiveGroup struct {
 	Label string
 	Rows  []archiveRow
+}
+
+// Shown counts the group's rows that match the search.
+func (g archiveGroup) Shown() int {
+	n := 0
+	for _, r := range g.Rows {
+		if !r.Hidden {
+			n++
+		}
+	}
+	return n
 }
 
 func groupArchive(rows []archiveRow, order string) []archiveGroup {
