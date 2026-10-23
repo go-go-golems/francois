@@ -189,3 +189,42 @@ While Step 2 was being written up, the user corrected two things. The operators 
 
 ### Technical details
 - N/A.
+
+## Step 4: Enterprise checkout made identical to individual support
+
+The user asked what differs between the two checkouts. I listed the enterprise-only Stripe settings (product name, tax ID, required billing address, customer update), and the user decided: "no they should just be the same, just the price changes." Removed those settings from `CreateCheckout` and kept only the invisible tier tag.
+
+### Prompt Context
+**User prompt (verbatim):** "is there a difference between the enterprise checkout and the normal checkout, besides the amount?" then "no they should just be the same, just the price changes."
+**Assistant interpretation:** The Stripe Checkout for enterprise must be the individual one with another amount.
+**Inferred user intent:** No extra friction or different invoices for companies; enterprise is a price level.
+**Commit (code):** 01e0617 — "fix(payments): enterprise checkout is the individual checkout at another price"
+
+### What I did
+- `payments/gateway.go`: the enterprise branch now only adds `subscription_data.metadata.francois_support_tier=enterprise`.
+- `payments/enterprise_test.go`: the enterprise payload must have the product name "Monthly support" and the tier tag, and must not send `tax_id_collection`, `billing_address_collection` or `customer_update`.
+- Design doc: added an update note under section 6. Branch `fix/enterprise-checkout-same` (it also carries the unpushed FRANCOIS-022 Step 12 diary commit).
+
+### What worked
+- `go test ./pkg/catalog/payments ./pkg/catalog -run 'Enterprise|Support|Stripe'` ok; golangci-lint on payments: 0 issues.
+
+### What didn't work
+- My first Python edit of the test asserted on the pre-gofmt text and stopped with `AssertionError` (gofmt had aligned the map keys). The gateway edit had already been written, so the payments test failed until I rewrote the test lines by line number.
+
+### What I learned
+- N/A.
+
+### What was tricky to build
+- N/A.
+
+### What warrants a second pair of eyes
+- The account page and the recurring-support note still say "Enterprise support"; that is outside the checkout. Say if those should read like individual support too.
+
+### What should be done in the future
+- Deploy this change. The "Stripe test-mode checkout" task now only needs to confirm the enterprise amount.
+
+### Code review instructions
+- `payments/gateway.go` `CreateCheckout`; `payments/enterprise_test.go`.
+
+### Technical details
+- N/A.
