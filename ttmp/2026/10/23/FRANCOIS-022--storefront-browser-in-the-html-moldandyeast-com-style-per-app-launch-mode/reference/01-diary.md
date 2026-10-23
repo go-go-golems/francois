@@ -503,3 +503,37 @@ The user asked to push, open a PR and wait for the Codex review ("unlisted: not 
 
 ### What warrants a second pair of eyes
 - All 23 commit hashes on the branch changed. The hashes quoted in earlier diary steps and changelog entries refer to the pre-rewrite commits (still on the local backup branch); commit subjects are unchanged and identify them.
+
+## Step 11: Codex review, live search could not broaden
+
+PR #23 was pushed and the user asked to wait for the Codex review. Codex reported one P2 finding on `ui/catalog/public.ts:429`: "Restore excluded results when broadening a live search". It was correct. `feedPage` dropped rows that did not match `?q=`, so after loading `/?q=loom` the live filter could only narrow what was on the page; clearing the field left an incomplete list. Fixed by rendering all rows (after the tag filter) and marking non-matching ones `hidden`.
+
+### Prompt Context
+**User prompt (verbatim):** "unlisted: not yet. Push, PR, wiat for codex review to come back"
+**Assistant interpretation:** Push, open the PR, wait for Codex, then act on its findings.
+**Inferred user intent:** Get an independent review before merging.
+**Commit (code):** 1a2a3ed — "fix(catalog): let the live search broaden a server-side query"
+
+### What I did
+- Watched the PR. The first Codex comment was only its status summary (`"status":"running"`); I waited for `"status":"completed"` in the `codex-review-state` marker, then read the review and its inline comment.
+- `pages.go`: `archiveRow.Hidden`, `archiveGroup.Shown()`; `feedPage` keeps tag-matching cards, marks query misses hidden and counts only shown rows.
+- `home.tmpl`: `hidden` on non-matching rows and on groups with no shown rows; the group count is `{{.Shown}}` in `[data-browser-group-count]`; the empty state depends on `.Body.Count`.
+- `public.ts` `bindBrowser`: updates each group's count as you type.
+- Tests: `final_archive_test` checks that `/?q=alpha` renders both rows with Beta hidden, the "1 artifact" count and a hidden empty state. `browser_test` group-count strings updated.
+
+### What worked
+- `go test ./pkg/catalog` ok; `pnpm check` ok.
+- Playwright:
+  - `/?q=comic` shows 2; cleared → 7 and URL `/`; "kiln" → 1, with the group label "1 artifact";
+  - `/?q=zzzz` → empty state; typing "mimeo" → 1 row and no empty state.
+
+### What didn't work
+- My first background watcher stopped at the Codex status comment ("reviews=0 comments=1"), which is not the review; replaced it with a watcher on the review state.
+- `TestBrowser` failed (`browser_test.go:72: landing page lacks "<span>October 2026</span><span>2 artifacts</span>"`) because of the new `data-browser-group-count` attribute. `TestFinalArchiveQueriesAndPublicationIdentity` failed at line 80 because Beta is now present (hidden). Updated both assertions.
+
+### What warrants a second pair of eyes
+- Hidden rows still load their thumbnails lazily only when shown (`loading="lazy"` on `display:none` images does not fetch), so the page weight with a query stays about the same.
+- I did not reply on the PR thread or ask Codex to re-review; both would post as the user.
+
+### Code review instructions
+- `pages.go` `feedPage` (query loop), `home.tmpl` group/row lines, `public.ts` `bindBrowser`.
