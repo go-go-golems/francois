@@ -139,3 +139,7 @@ One deviation from section 3.1: the help text is one sentence that also mentions
 ### Update: operator direction and help text
 
 The user decided the buttons the other way round from sections 1 and 3: **`<<1` divides by two** (left button, 256 → 128 → … → 8) and **`>>1` multiplies by two** (right button, 256 → 512 → … → 4096). The help line is "Halve or double, from 8 to 4096 USD a month.", without the invoice sentence. Checkout still collects the company's address and tax ID.
+
+### Update: same checkout as individual support
+
+After deploy the user decided: "no they should just be the same, just the price changes." The enterprise Checkout no longer sets the "Enterprise support" product name, tax ID collection, a required billing address or the customer name/address update (section 3.3). It is the individual "Monthly support" Checkout with the enterprise amount. The subscription still carries `francois_support_tier=enterprise` (not shown to the customer), so the account page says "Enterprise support, N USD a month."

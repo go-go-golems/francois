@@ -140,12 +140,9 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 		}}}
 		p.SubscriptionData.Metadata["francois_monthly_support"] = "true"
 		if r.SupportTier == billing.TierEnterprise {
-			// Companies need an invoice with their name, address and tax ID.
-			p.LineItems[0].PriceData.ProductData.Name = stripe.String("Enterprise support")
+			// The checkout is the same as individual support; only the tag
+			// lets the account page name the tier.
 			p.SubscriptionData.Metadata["francois_support_tier"] = billing.TierEnterprise
-			p.TaxIDCollection = &stripe.CheckoutSessionCreateTaxIDCollectionParams{Enabled: stripe.Bool(true)}
-			p.BillingAddressCollection = stripe.String(string(stripe.CheckoutSessionBillingAddressCollectionRequired))
-			p.CustomerUpdate = &stripe.CheckoutSessionCreateCustomerUpdateParams{Name: stripe.String("auto"), Address: stripe.String("auto")}
 		}
 	}
 	if r.YearFunding {

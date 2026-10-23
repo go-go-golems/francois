@@ -9,5 +9,5 @@
 - [x] Phase 2: launchMode field (migration 020, store, studio API, client, CLI, MCP, Studio UI)
 - [x] Phase 3: landing page browser (groups, sorts, tag counts, download and early-access rules, accent token, CSS)
 - [x] Phase 4: client (live filter, Open viewer, tab launch, inline auto-start, subscribe invitation)
-- [ ] Phase 5: deploy, set launch modes per app, smoke test
+- [ ] Phase 5: deploy (done 2026-10-23, sha-dff295d), set launch modes per app, smoke test
 - [x] Gallery lightbox on app pages <!-- t:irm0 -->

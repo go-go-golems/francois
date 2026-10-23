@@ -537,3 +537,20 @@ PR #23 was pushed and the user asked to wait for the Codex review. Codex reporte
 
 ### Code review instructions
 - `pages.go` `feedPage` (query loop), `home.tmpl` group/row lines, `public.ts` `bindBrowser`.
+
+## Step 12: Merged, deployed (milestone)
+
+The user merged PR #23 and asked: "merged, rebase, deploy", then "close the older bumps".
+- Local `main` was fast-forwarded to the merge commit `dff295d`.
+- The `publish-image` run 40029831736 (tests, image `ghcr.io/go-go-golems/francois:sha-dff295d`) passed and opened GitOps PR wesen/2026-03-27--hetzner-k3s#384, a one-line image bump from `sha-ec51568`.
+- My `gh pr merge 384` was denied by the permission classifier ("Production Deploy"); the user merged it themselves (`! gh pr merge 384 … --squash --delete-branch`, 21:56:52Z).
+- The older bump PRs #377 (sha-4cfe4c0), #365 and #359 were closed with a comment and their branches deleted.
+- Rollout: `deployment "francois" successfully rolled out`. Pod logs show `Applied migration migration=020_launch_mode.sql` and `021_support_tier.sql`.
+- Production checks:
+  - `/`, `/apps/kiln-workbench`, `/pricing`, `/privacy` and `/terms` answer 200, and an unknown path 404;
+  - the landing page shows "23 artifacts", and live search "comic" shows 2;
+  - `/pricing` has the enterprise form with `<<1`; `/privacy` uses the site layout;
+  - Hypercore has 10 zoomable screenshots; no console errors;
+  - a landing thumbnail `?w=640&v=2` returns 200 image/jpeg (0.74 s on the first, uncached request).
+- This deploy also shipped PR #22 (thumbnail quality), which had not been deployed before.
+- Not done yet: setting launch modes per artifact (all are `tab`), the production viewer check, and the Stripe test-mode enterprise checkout.
