@@ -629,6 +629,7 @@ func (s *Server) canEditArtifact(ctx context.Context, u store.User, artifact str
 type download struct {
 	Href, Label, Name string
 	Size              int64
+	Signin            bool // Href is the sign-in page, not the file
 }
 
 type releaseLine struct {
@@ -708,12 +709,17 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			gallery = append(gallery, m)
 		}
 	}
-	mayDownload, paying := false, false
+	mayDownload, paying, member := false, false, false
 	if p != nil {
 		if e, doc, err := s.entitlement(ctx, p.User); err == nil {
 			mayDownload, paying = e.CanRun(a, doc), e.Paid()
+			member = e.Source != SourceGuest && e.Source != SourceDisabled
 		}
 	}
+	// The HTML download follows the landing page rule (archiveRowOf): none
+	// while in early access for visitors who do not pay, a sign-in link for
+	// visitors without an account, the file otherwise.
+	hideDownload := a.EarlyAccess(time.Now()) && !paying
 	lines := []releaseLine{}
 	for _, rel := range rels {
 		l := releaseLine{Release: rel, Locked: !rel.FreeSample && !mayDownload}
@@ -724,12 +730,13 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			}
 			l.Attached = append(l.Attached, al)
 		}
-		if !l.Locked {
-			for _, f := range rel.Files {
-				if f.Role != "html" {
-					continue
-				}
-				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Get the file ↓", Name: f.Name, Size: f.Size})
+		for _, f := range rel.Files {
+			switch {
+			case f.Role != "html" || hideDownload:
+			case !l.Locked:
+				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Download ↓", Name: f.Name, Size: f.Size})
+			case !member:
+				l.Downloads = append(l.Downloads, download{Href: signinURL("/apps/" + a.ID), Label: "Download ↓", Name: f.Name, Size: f.Size, Signin: true})
 			}
 		}
 		lines = append(lines, l)
@@ -1040,7 +1047,7 @@ func (s *Server) variant(m store.Media, f io.ReadSeeker, width int) ([]byte, err
 
 // pricingPage presents contributions; render supplies confirmed supporter state.
 func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support independent experiments in computation and intelligence."})
+	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support an independent lab for computation and intelligence."})
 }
 
 // publicPlans is GET /api/plans: the public plans, without price IDs.

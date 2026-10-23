@@ -99,7 +99,7 @@ export function Account() {
                   </span>
                   <div>
                     <p>
-                      experiments made possible since you started supporting us
+                      artifacts made possible since you started supporting us
                       on{" "}
                       {new Date(a.support.startedAt).toLocaleDateString(
                         "en-GB",

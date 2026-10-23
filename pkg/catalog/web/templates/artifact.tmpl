@@ -1,6 +1,6 @@
 {{define "content"}}{{with .Body}}<main class="experiment">
-<header class="experiment-header"><p class="experiment-meta">{{if .Card.Number}}{{ordinal .Card.Number}} · {{end}}{{longDate .Card.FirstPublished}}{{if .Card.Tags}} · {{join .Card.Tags ", "}}{{end}}</p>
-<div class="experiment-title-row"><h1>{{.Card.Title}}</h1><div class="experiment-download">{{range .Releases}}{{range .Downloads}}<a class="site-button" href="{{.Href}}" download="{{.Name}}">{{.Label}}</a><span class="file-meta">{{.Name}}, {{size .Size}}</span>{{end}}{{end}}</div></div>
+<header class="experiment-header"><p class="experiment-meta">{{if .Card.Number}}{{ordinal .Card.Number}} · {{end}}{{longDate .Card.FirstPublished}}{{if .Card.Tags}} · {{join .Card.Tags " · "}}{{end}}</p>
+<div class="experiment-title-row"><h1>{{.Card.Title}}</h1><div class="experiment-download">{{range .Releases}}{{range .Downloads}}<a class="site-button" href="{{.Href}}"{{if not .Signin}} download="{{.Name}}"{{end}}>{{.Label}}</a><span class="file-meta">{{.Name}}, {{size .Size}}{{if .Signin}} · sign in to download{{end}}</span>{{end}}{{end}}</div></div>
 {{if .Card.Description}}<p class="experiment-description">{{.Card.Description}}</p>{{end}}
 {{if .Card.Creators}}<p class="byline">by {{range $i, $c := .Card.Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
 </header>
@@ -9,7 +9,7 @@
 <div class="runner-surface" data-runner-surface>{{if .Card.Cover}}{{template "hero" .Card.Cover}}{{else}}<div class="runner-placeholder">{{.Card.Title}}</div>{{end}}</div>
 <div class="runner-start" data-actions data-artifact="{{.Card.ID}}" data-release="{{.Card.ReleaseID}}" data-title="{{.Card.Title}}" data-launch="{{.Card.LaunchMode}}"{{if .Demo}} data-demo="true"{{end}}{{if .EarlyAccessUntil}} data-early-access-until="{{.EarlyAccessUntil.Format "2006-01-02T15:04:05Z07:00"}}"{{end}}
  data-label-start="{{$.Copy.Text "runner.start"}}" data-label-demo="{{$.Copy.Text "runner.demo"}}" data-label-signin="{{$.Copy.Text "runner.signin"}}" data-label-early="{{$.Copy.Date "earlyaccess.runner" .EarlyAccessUntil}}" data-label-subscribe="{{$.Copy.Text "earlyaccess.button"}}">
-{{if .EarlyBlocked}}<p class="runner-early">{{$.Copy.Date "earlyaccess.runner" .EarlyAccessUntil}}</p><a class="site-button is-primary" href="/pricing">{{$.Copy.Text "earlyaccess.button"}}</a>{{else}}<a class="site-button" href="/signin?return=/apps/{{.Card.ID}}">{{$.Copy.Text "runner.signin"}}</a>{{end}}<noscript><p>Enable JavaScript to run this experiment in your browser.</p></noscript></div>
+{{if .EarlyBlocked}}<p class="runner-early">{{$.Copy.Date "earlyaccess.runner" .EarlyAccessUntil}}</p><a class="site-button is-primary" href="/pricing">{{$.Copy.Text "earlyaccess.button"}}</a>{{else}}<a class="site-button" href="/signin?return=/apps/{{.Card.ID}}">{{$.Copy.Text "runner.signin"}}</a>{{end}}<noscript><p>Enable JavaScript to run this artifact in your browser.</p></noscript></div>
 <a class="u runner-link" data-runner-link data-runner-control hidden>Open full screen ↗</a>
 </section>
 <div class="experiment-editorial">{{range .Sections}}<section class="editorial-row">{{if .Label}}<h2 class="editorial-label">{{.Label}}</h2>{{else}}<div class="editorial-label" aria-hidden="true"></div>{{end}}<div class="md editorial-body">{{.HTML}}</div></section>{{end}}</div>

@@ -72,8 +72,12 @@ func TestEarlyAccessAcrossRunDownloadAndDemo(t *testing.T) {
 				t.Fatalf("free sample download %s: %d", path, code)
 			}
 		}
-		if code, page, _ := e.do(actor, "portal.test", "GET", "/apps/early", nil, nil); code != 200 || !strings.Contains(string(page), `href="`+filePath+`"`) || !strings.Contains(string(page), `href="`+attachmentPath+`"`) {
-			t.Fatalf("sample page missing downloads: %d %s", code, page)
+		// The API serves a free sample to anyone, but the page offers the
+		// HTML only to paying visitors while early access lasts, like the
+		// landing page; attachments stay listed.
+		_, page, _ := e.do(actor, "portal.test", "GET", "/apps/early", nil, nil)
+		if offered := strings.Contains(string(page), `href="`+filePath+`"`); offered != (actor == &paid) || !strings.Contains(string(page), `href="`+attachmentPath+`"`) {
+			t.Fatalf("sample page downloads for %v: offered=%v", actor, offered)
 		}
 	}
 	if code, out := e.portal(&free, "POST", "/api/instances", map[string]string{"releaseId": release}); code != 403 {

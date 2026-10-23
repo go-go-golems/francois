@@ -79,7 +79,7 @@ func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 		t.Fatalf("filters/identity: %s", filtered)
 	}
 	_, empty, _ := e.do(nil, "portal.test", "GET", "/?q=%22%3E%3Cscript%3E", nil, nil)
-	if !bytes.Contains(empty, []byte("No experiments match")) || bytes.Contains(empty, []byte(`<script>`)) {
+	if !bytes.Contains(empty, []byte("No artifacts match")) || bytes.Contains(empty, []byte(`<script>`)) {
 		t.Fatalf("empty/search escaping: %s", empty)
 	}
 	_, journal, _ := e.do(nil, "portal.test", "GET", "/journal", nil, nil)

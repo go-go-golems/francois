@@ -62,11 +62,11 @@ func TestBrowser(t *testing.T) {
 		`<h1>These artifacts are the results of our research.`,
 		`<span class="tag-label">graphics</span> <span class="tag-count">2</span>`,
 		`<span class="tag-label">All</span> <span class="tag-count">3</span>`,
-		`<span>October 2026</span><span>2 experiments</span>`,
-		`<span>September 2026</span><span>1 experiment</span>`,
+		`<span>October 2026</span><span>2 artifacts</span>`,
+		`<span>September 2026</span><span>1 artifact</span>`,
 		`portal.test/apps/zeta · `,
 		`data-launch="inline"`,
-		`<span class="result-count" data-browser-count aria-live="polite">3 experiments</span>`,
+		`<span class="result-count" data-browser-count aria-live="polite">3 artifacts</span>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("landing page lacks %q", want)
@@ -88,7 +88,7 @@ func TestBrowser(t *testing.T) {
 		_, p, _ := e.do(nil, "portal.test", "GET", "/?sort="+sortBy, nil, nil)
 		order(string(p), ids...)
 	}
-	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=az", nil, nil); !bytes.Contains(p, []byte(`<span>A</span><span>1 experiment</span>`)) {
+	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=az", nil, nil); !bytes.Contains(p, []byte(`<span>A</span><span>1 artifact</span>`)) {
 		t.Error("A–Z groups by initial")
 	}
 	if _, p, _ := e.do(nil, "portal.test", "GET", "/?sort=bogus", nil, nil); !bytes.Contains(p, []byte(`<option value="newest" selected>`)) {
@@ -143,7 +143,7 @@ func TestBrowser(t *testing.T) {
 	// The app page carries the launch mode and copy labels for public.ts,
 	// and renders the subscribe invitation itself for visitors who do not pay.
 	_, app, _ := e.do(nil, "portal.test", "GET", "/apps/alpha", nil, nil)
-	for _, want := range []string{`data-launch="inline"`, `data-label-start="Start experiment →"`, `data-label-demo="Try it →"`, `>Sign in to run</a>`} {
+	for _, want := range []string{`data-launch="inline"`, `data-label-start="Run artifact →"`, `data-label-demo="Try it →"`, `>Sign in to run</a>`} {
 		if !bytes.Contains(app, []byte(want)) {
 			t.Errorf("app page lacks %q", want)
 		}

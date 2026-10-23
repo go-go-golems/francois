@@ -113,7 +113,7 @@ async function openInstance(
   const out = await response.json();
   if (!response.ok)
     throw new RequestError(
-      out.error?.message || "Could not open the experiment",
+      out.error?.message || "Could not open the artifact",
       out.error?.code || "",
     );
   if (out.launchBlocked) throw new Error(out.launchBlocked);
@@ -129,7 +129,7 @@ function mountFrame(
   onState: (message: string) => void,
 ) {
   const frame = el("iframe", {
-    title: title || "Experiment",
+    title: title || "Artifact",
     sandbox:
       "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
     allow: "clipboard-write; fullscreen",
@@ -196,7 +196,7 @@ async function renderActions(box: HTMLElement) {
   }
   const text = decision.demo
     ? label(box, "labelDemo", "Try it →")
-    : label(box, "labelStart", "Start experiment →");
+    : label(box, "labelStart", "Run artifact →");
   const start = el(
     "button",
     { class: "site-button is-primary", type: "button" },
@@ -250,7 +250,7 @@ async function renderActions(box: HTMLElement) {
           try {
             await surface.requestFullscreen();
           } catch {
-            fail(runner, "Use Open full screen to open the experiment.");
+            fail(runner, "Use Open full screen to open the artifact.");
           }
         } else location.assign("/instances/" + current.id);
       };
@@ -351,7 +351,7 @@ class Viewer {
     const bottom = el("div", { class: "v-bottom" });
     bottom.append(sizes, tools);
     this.dialog.replaceChildren(top, table, bottom);
-    this.dialog.setAttribute("aria-label", data.title || "Experiment");
+    this.dialog.setAttribute("aria-label", data.title || "Artifact");
     document.body.classList.add("has-window");
     this.dialog.showModal();
     close.focus();
@@ -377,7 +377,7 @@ class Viewer {
         el(
           "a",
           { class: "u", href: "/apps/" + id },
-          "Go to the experiment page",
+          "Go to the artifact page",
         ),
       );
       surface.replaceChildren(box);
@@ -435,7 +435,7 @@ function bindBrowser() {
           g.hidden = !g.querySelector("[data-browser-row]:not([hidden])");
         });
       if (count)
-        count.textContent = `${shown} ${shown === 1 ? "experiment" : "experiments"}`;
+        count.textContent = `${shown} ${shown === 1 ? "artifact" : "artifacts"}`;
       if (empty) empty.hidden = shown > 0;
       const url = new URL(location.href);
       if (q) url.searchParams.set("q", query.value.trim());

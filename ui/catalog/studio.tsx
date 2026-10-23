@@ -330,7 +330,7 @@ function Details({
               setF({ ...f, visibility: e.target.value as "listed" | "hidden" })
             }
           >
-            <option value="listed">Listed in the catalog</option>
+            <option value="listed">Listed on the landing page</option>
             <option value="hidden">Hidden</option>
           </select>
         </div>

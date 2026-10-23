@@ -1,21 +1,21 @@
-{{define "content"}}<main class="{{if .Body.Journal}}archive{{else}}browser{{end}}" aria-label="{{if .Body.Journal}}Journal{{else}}Experiments{{end}}">
+{{define "content"}}<main class="{{if .Body.Journal}}archive{{else}}browser{{end}}" aria-label="{{if .Body.Journal}}Journal{{else}}Artifacts{{end}}">
 {{if .Body.Journal}}<section class="final-section"><div class="final-label">Writing</div><div class="final-content"><h1>Journal.</h1>{{template "posts" .Body.Posts}}</div></section>
 {{else}}
 {{if .Body.LoginError}}<p class="notice bad login-error"><span>Sign-in did not complete. Please try again.</span>{{if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}</p>{{end}}
 <section class="browser-hero"><h1>{{.Copy.Text "home.hero"}}</h1></section>
 <form class="browser-controls" method="get" action="/" role="search" data-browser-form>
 <div class="browser-views">
-<label class="visually-hidden" for="browser-query">Search experiments</label><input class="browser-search" id="browser-query" name="q" value="{{.Body.Query}}" placeholder="{{.Copy.Text "home.search"}}" type="search" autocomplete="off" data-browser-query>
+<label class="visually-hidden" for="browser-query">Search artifacts</label><input class="browser-search" id="browser-query" name="q" value="{{.Body.Query}}" placeholder="{{.Copy.Text "home.search"}}" type="search" autocomplete="off" data-browser-query>
 <label class="visually-hidden" for="browser-sort">Sort</label><select class="browser-sort" id="browser-sort" name="sort" data-archive-sort>{{range .Body.Orders}}<option value="{{.Value}}"{{if eq .Value $.Body.Sort}} selected{{end}}>{{.Label}}</option>{{end}}</select>
-<span class="result-count" data-browser-count aria-live="polite">{{.Body.Count}} {{if eq .Body.Count 1}}experiment{{else}}experiments{{end}}</span>
+<span class="result-count" data-browser-count aria-live="polite">{{.Body.Count}} {{if eq .Body.Count 1}}artifact{{else}}artifacts{{end}}</span>
 <noscript><button class="tlink" type="submit">Search</button></noscript>
 </div>
 {{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}
 <nav class="tags" aria-label="Filter by tag"><a class="tag" href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}><span class="tag-label">All</span> <span class="tag-count">{{.Body.Total}}</span></a>{{range .Body.Tags}}<a class="tag" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}><span class="tag-label">{{.Name}}</span> <span class="tag-count">{{.Count}}</span></a>{{end}}</nav>
 </form>
-<section class="browser-list" aria-label="Experiments list" data-browser-list>
+<section class="browser-list" aria-label="Artifacts list" data-browser-list>
 {{range .Body.Groups}}<div class="browser-group" data-browser-group>
-<p class="group-label"><span>{{.Label}}</span><span>{{len .Rows}} {{if eq (len .Rows) 1}}experiment{{else}}experiments{{end}}</span></p>
+<p class="group-label"><span>{{.Label}}</span><span>{{len .Rows}} {{if eq (len .Rows) 1}}artifact{{else}}artifacts{{end}}</span></p>
 <div class="group-rows">{{range .Rows}}
 <article class="ri" data-browser-row data-search="{{.Title}} {{.Description}} {{join .Tags " "}}">
 <a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1" aria-hidden="true">{{if .Cover}}{{template "thumb" .Cover}}{{else}}<div class="mono-thumb"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
@@ -28,8 +28,8 @@
 </div>
 </article>{{end}}</div>
 </div>{{end}}
-<div class="browser-empty" data-browser-empty{{if .Body.Groups}} hidden{{end}}><p>No experiments match your search.</p><a class="u" href="/">Clear filters</a></div>
+<div class="browser-empty" data-browser-empty{{if .Body.Groups}} hidden{{end}}><p>No artifacts match your search.</p><a class="u" href="/">Clear filters</a></div>
 </section>
-<dialog class="viewer browser-viewer" data-viewer aria-label="Experiment"></dialog>
+<dialog class="viewer browser-viewer" data-viewer aria-label="Artifact"></dialog>
 {{template "support-callout" .}}
 {{end}}</main>{{end}}

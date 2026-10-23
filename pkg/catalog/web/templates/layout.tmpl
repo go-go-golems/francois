@@ -37,7 +37,7 @@
 <div class="footer-brand"><a class="site-wordmark" href="/">{{.Brand}}</a>{{with .Contact}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</div>
 <div><span>For humans</span><a href="/feed.xml">RSS</a>{{if .JournalEnabled}}<a href="/journal">Journal</a>{{end}}{{if not .Supporter}}<a href="/pricing">Support the lab</a>{{end}}{{if .User}}{{range .Nav}}{{if ne .Href "/"}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}<button class="tlink quiet" type="button" data-signout>Sign out</button>{{end}}</div>
 <div><span>Information</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
-<div class="footer-type"><span>Type</span>{{if .TypeCredit}}<p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p>{{end}}</div>
+{{if .TypeCredit}}<div class="footer-type"><span>Type</span><p>Set in <a href="https://abcdinamo.com/free/areal">ABC Areal</a>, by <a href="https://abcdinamo.com">ABC Dinamo</a></p></div>{{end}}
 </footer>
 </div>
 </body>

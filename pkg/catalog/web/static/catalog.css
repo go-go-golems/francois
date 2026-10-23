@@ -530,6 +530,8 @@ select.btn { appearance: none; cursor: pointer; }
 .final-label { font-size:15px; line-height:22px; color:var(--color-muted); }
 .final-label p { margin:4px 0 0; overflow-wrap:anywhere; }
 .final-content { min-width:0; max-width:888px; }
+.final-lost { padding-bottom:120px; }
+.final-lost .final-content > p { margin:0 0 24px; }
 .final-content > h1 { font-size:48px; line-height:52px; letter-spacing:-.025em; font-weight:400; margin:0 0 20px; }
 .final-lead { max-width:760px; font-size:20px; line-height:30px; margin:0; }
 .support-principles { list-style:none; counter-reset:principle; padding:0; margin:72px 0; max-width:760px; border-top:1px solid var(--color-line); }
@@ -675,7 +677,7 @@ html:has(.lightbox[open]) { overflow:hidden; }
 .signin-other { margin-top: 32px; font-size: 15px; line-height: 22px; }
 
 /* Final support contribution control, exported from Ramon’s desktop/mobile artboards. */
-.support-tiers { display:flex; flex-direction:column; gap:32px; }
+.support-tiers { display:flex; flex-direction:column; gap:32px; max-width:760px; }
 .support-tabs { display:flex; gap:24px; border-bottom:1px solid var(--color-line); }
 .support-tabs[hidden] { display:none; }
 .support-tabs [role=tab] { margin-bottom:-1px; padding:0 0 10px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--color-muted); font:inherit; font-size:17px; line-height:24px; cursor:pointer; }
