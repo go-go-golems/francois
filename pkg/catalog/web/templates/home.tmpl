@@ -1,19 +1,35 @@
-{{define "content"}}<main class="archive" aria-label="{{if .Body.Journal}}Journal{{else}}Experiments{{end}}">
+{{define "content"}}<main class="{{if .Body.Journal}}archive{{else}}browser{{end}}" aria-label="{{if .Body.Journal}}Journal{{else}}Artifacts{{end}}">
 {{if .Body.Journal}}<section class="final-section"><div class="final-label">Writing</div><div class="final-content"><h1>Journal.</h1>{{template "posts" .Body.Posts}}</div></section>
 {{else}}
 {{if .Body.LoginError}}<p class="notice bad login-error"><span>Sign-in did not complete. Please try again.</span>{{if .LoginAvailable}}<a class="tlink" href="{{.LoginHref}}">Sign in</a>{{end}}</p>{{end}}
-<div class="archive-intro"><h1>A lab for computation and intelligence as material and medium.</h1><p>Run by Manuel and Ramon. {{.Body.Total}} experiments so far.</p></div>
-<form class="archive-controls" method="get" action="/" role="search">
-<div class="archive-search"><label class="visually-hidden" for="archive-query">Search experiments</label><input id="archive-query" name="q" value="{{.Body.Query}}" placeholder="Search {{.Body.Total}} experiments" type="search"><button type="submit" aria-label="Search and sort experiments"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor"/><path d="M9.5 9.5L13 13" stroke="currentColor"/></svg></button></div>
-{{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}
-<nav class="archive-categories" aria-label="Categories"><a href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}>All</a>{{range .Body.Tags}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}</nav>
-<div class="archive-sort"><label for="archive-sort">Sort</label><select id="archive-sort" name="sort" data-archive-sort><option value="newest"{{if eq .Body.Sort "newest"}} selected{{end}}>Newest first</option><option value="oldest"{{if eq .Body.Sort "oldest"}} selected{{end}}>Oldest first</option></select></div>
-</form>
-<div class="archive-list">
-{{range .Body.Rows}}<a class="archive-row" href="/apps/{{.ID}}" data-archive-row>
-<span class="archive-number">{{ordinal .Number}}</span><div class="archive-main"><h2>{{.Title}}</h2><p>{{join .Tags ", "}}{{if .Tags}} · {{end}}{{shortDate .FirstPublished}}</p></div><span class="archive-tags">{{join .Tags ", "}}</span><time class="archive-date">{{shortDate .FirstPublished}}</time><span class="archive-thumb"><span class="archive-monogram">{{monogram .Title}}</span>{{if .Cover}}{{template "mini" .Cover}}{{end}}</span>
-</a>{{else}}<div class="archive-empty"><p>No experiments match your search.</p><a class="u" href="/">Clear filters</a></div>{{end}}
-<div class="archive-preview" data-archive-preview hidden aria-hidden="true"></div>
+<section class="browser-hero"><h1>{{.Copy.Text "home.hero"}}</h1></section>
+<form class="browser-controls" method="get" action="/" role="search" data-browser-form>
+<div class="browser-views">
+<label class="visually-hidden" for="browser-query">Search artifacts</label><input class="browser-search" id="browser-query" name="q" value="{{.Body.Query}}" placeholder="{{.Copy.Text "home.search"}}" type="search" autocomplete="off" data-browser-query>
+<label class="visually-hidden" for="browser-sort">Sort</label><select class="browser-sort" id="browser-sort" name="sort" data-archive-sort>{{range .Body.Orders}}<option value="{{.Value}}"{{if eq .Value $.Body.Sort}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+<span class="result-count" data-browser-count aria-live="polite">{{.Body.Count}} {{if eq .Body.Count 1}}artifact{{else}}artifacts{{end}}</span>
+<noscript><button class="tlink" type="submit">Search</button></noscript>
 </div>
+{{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}
+<nav class="tags" aria-label="Filter by tag"><a class="tag" href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}><span class="tag-label">All</span> <span class="tag-count">{{.Body.Total}}</span></a>{{range .Body.Tags}}<a class="tag" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}><span class="tag-label">{{.Name}}</span> <span class="tag-count">{{.Count}}</span></a>{{end}}</nav>
+</form>
+<section class="browser-list" aria-label="Artifacts list" data-browser-list>
+{{range .Body.Groups}}<div class="browser-group" data-browser-group{{if not .Shown}} hidden{{end}}>
+<p class="group-label"><span>{{.Label}}</span><span data-browser-group-count>{{.Shown}} {{if eq .Shown 1}}artifact{{else}}artifacts{{end}}</span></p>
+<div class="group-rows">{{range .Rows}}
+<article class="ri" data-browser-row data-search="{{.Title}} {{.Description}} {{join .Tags " "}}"{{if .Hidden}} hidden{{end}}>
+<a class="ri-thumb" href="/apps/{{.ID}}" tabindex="-1" aria-hidden="true">{{if .Cover}}{{template "thumb" .Cover}}{{else}}<div class="mono-thumb"><span class="mono-letters">{{monogram .Title}}</span><span class="mono-caps">{{join .Capabilities " · "}}</span></div>{{end}}</a>
+<div class="ri-text">
+<div class="ri-head"><h2 class="ri-title"><a href="/apps/{{.ID}}">{{.Title}}</a></h2>{{if .Description}}<p class="ri-desc">{{.Description}}</p>{{end}}</div>
+<div class="ri-foot">{{if .Tags}}<p class="ri-tags">{{join .Tags " · "}}</p>{{end}}
+{{if .EarlyNote}}<p class="ri-early">{{$.Copy.Date "earlyaccess.row" .EarlyAccessUntil}} <a class="u" href="/pricing">{{$.Copy.Text "earlyaccess.button"}}</a></p>{{end}}
+<p class="ri-actions"><a class="u" href="/apps/{{.ID}}" data-open data-artifact="{{.ID}}" data-release="{{.ReleaseID}}" data-title="{{.Title}}" data-description="{{.Description}}" data-launch="{{.LaunchMode}}"{{if .Demo}} data-demo="true"{{end}}{{if .EarlyAccessUntil}} data-early-access-until="{{.EarlyAccessUntil.Format "2006-01-02T15:04:05Z07:00"}}"{{end}}>Open</a>{{if .Download}}<a class="u" href="{{.Download}}"{{if .DownloadName}} download="{{.DownloadName}}"{{end}}>Download</a>{{end}}<span class="ri-path mono">{{$.Body.Host}}/apps/{{.ID}}{{if .Size}} · {{size .Size}}{{end}}</span></p>
+</div>
+</div>
+</article>{{end}}</div>
+</div>{{end}}
+<div class="browser-empty" data-browser-empty{{if .Body.Count}} hidden{{end}}><p>No artifacts match your search.</p><a class="u" href="/">Clear filters</a></div>
+</section>
+<dialog class="viewer browser-viewer" data-viewer aria-label="Artifact"></dialog>
 {{template "support-callout" .}}
 {{end}}</main>{{end}}

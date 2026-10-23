@@ -3,6 +3,7 @@ package catalog
 import (
 	"bytes"
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -75,11 +76,26 @@ func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 		t.Fatalf("archive order/visibility: %s", all)
 	}
 	_, filtered, _ := e.do(nil, "portal.test", "GET", "/?q=alpha&tag=graphics&sort=oldest", nil, nil)
-	if !bytes.Contains(filtered, []byte(`class="archive-number">001`)) || bytes.Contains(filtered, []byte(`href="/apps/beta"`)) || !bytes.Contains(filtered, []byte(`q=alpha&amp;sort=oldest`)) {
+	if !bytes.Contains(filtered, []byte(`<h2 class="ri-title"><a href="/apps/alpha">Alpha tool</a></h2>`)) || regexp.MustCompile(`data-search="Beta[^"]*">`).Match(filtered) || !bytes.Contains(filtered, []byte(`q=alpha&amp;sort=oldest`)) {
 		t.Fatalf("filters/identity: %s", filtered)
 	}
+	// A search renders every row and hides the ones that do not match, so the
+	// live search can broaden the query again without a reload.
+	_, searched, _ := e.do(nil, "portal.test", "GET", "/?q=alpha", nil, nil)
+	rows := regexp.MustCompile(`<article class="ri" data-browser-row data-search="([A-Za-z]+)[^"]*"( hidden)?>`).FindAllSubmatch(searched, -1)
+	if len(rows) != 2 {
+		t.Fatalf("searched rows %q", rows)
+	}
+	for _, m := range rows {
+		if want := string(m[1]) != "Alpha"; (len(m[2]) > 0) != want {
+			t.Fatalf("%s hidden=%q", m[1], m[2])
+		}
+	}
+	if !bytes.Contains(searched, []byte(`data-browser-count aria-live="polite">1 artifact</span>`)) || !bytes.Contains(searched, []byte(`data-browser-empty hidden>`)) {
+		t.Fatalf("search count: %s", searched)
+	}
 	_, empty, _ := e.do(nil, "portal.test", "GET", "/?q=%22%3E%3Cscript%3E", nil, nil)
-	if !bytes.Contains(empty, []byte("No experiments match")) || bytes.Contains(empty, []byte(`<script>`)) {
+	if !bytes.Contains(empty, []byte("No artifacts match")) || bytes.Contains(empty, []byte(`<script>`)) {
 		t.Fatalf("empty/search escaping: %s", empty)
 	}
 	_, journal, _ := e.do(nil, "portal.test", "GET", "/journal", nil, nil)

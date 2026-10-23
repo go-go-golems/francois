@@ -21,7 +21,6 @@ import (
 	"github.com/go-go-golems/francois/pkg/catalog/payments"
 	"github.com/go-go-golems/francois/pkg/catalog/releases"
 	"github.com/go-go-golems/francois/pkg/catalog/store"
-	"github.com/go-go-golems/francois/pkg/catalog/web"
 	"github.com/go-go-golems/francois/pkg/piworker"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -183,7 +182,6 @@ type Server struct {
 	Backend       piworker.Backend
 	Runtime       *hosted.Runtime
 	portal        http.Handler
-	legal         *template.Template
 	pages         map[string]*template.Template
 	md            *content.Markdown
 	emailLimiter  *limiter
@@ -209,7 +207,7 @@ func New(ctx context.Context, cfg Config, s *store.Store, p *releases.Publisher,
 			site.AppPort = site.PublicURL.Port()
 		}
 	}
-	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b, legal: template.Must(template.New("legal").Funcs(pageFuncs).Parse(web.LegalTemplate)),
+	srv := &Server{Config: cfg, Store: s, Publisher: p, Payments: pay, Backend: b,
 		pages: parsePages(), md: content.NewMarkdown(), demoLimiter: newLimiter(), emailLimiter: newLimiter(), deviceLimiter: newLimiter(), resizeSlots: make(chan struct{}, 2)}
 	var err error
 	if srv.fonts, err = loadFonts(cfg.FontDir); err != nil {

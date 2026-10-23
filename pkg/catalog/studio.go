@@ -137,7 +137,7 @@ func artifactSummary(a store.Artifact, credits []store.Creator, rels []store.Rel
 	}
 	return map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "visibility": a.Visibility,
 		"featured": a.Featured, "sortOrder": a.SortOrder, "earlyAccessUntil": a.EarlyAccessUntil, "demoEnabled": a.DemoEnabled,
-		"cover": a.Page.Cover, "hasDraft": a.PageDraft != nil, "creators": ids, "releases": len(rels), "draftReleases": drafts,
+		"launchMode": a.LaunchMode, "cover": a.Page.Cover, "hasDraft": a.PageDraft != nil, "creators": ids, "releases": len(rels), "draftReleases": drafts,
 		"latestVersion": latest, "updatedAt": a.UpdatedAt}
 }
 
@@ -259,6 +259,7 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 		SortOrder        *int      `json:"sortOrder"`
 		EarlyAccessUntil *string   `json:"earlyAccessUntil"`
 		DemoEnabled      *bool     `json:"demoEnabled"`
+		LaunchMode       *string   `json:"launchMode"`
 		Creators         *[]string `json:"creators"`
 	}
 	if err := httpx.Read(w, r, &in, 16<<10); err != nil {
@@ -297,6 +298,13 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 	if in.DemoEnabled != nil {
 		a.DemoEnabled = *in.DemoEnabled
 	}
+	if in.LaunchMode != nil {
+		if *in.LaunchMode != store.LaunchInline && *in.LaunchMode != store.LaunchTab {
+			httpx.Fail(w, 400, "invalid_request", "launchMode must be inline or tab")
+			return
+		}
+		a.LaunchMode = *in.LaunchMode
+	}
 	if a.Title == "" || len(a.Title) > 120 || len(a.Description) > 2000 || (a.Visibility != "listed" && a.Visibility != "hidden") ||
 		a.SortOrder < -10000 || a.SortOrder > 10000 {
 		httpx.Fail(w, 400, "invalid_request", "Invalid title, description, visibility, plan or sort order")
@@ -320,7 +328,7 @@ func (s *Server) studioPatchArtifact(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_ = s.Store.Audit(ctx, actor(r), "artifact.update", a.ID, map[string]any{"visibility": a.Visibility, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled})
+	_ = s.Store.Audit(ctx, actor(r), "artifact.update", a.ID, map[string]any{"visibility": a.Visibility, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled, "launchMode": a.LaunchMode})
 	a, _ = s.Store.Artifact(ctx, a.ID)
 	httpx.OK(w, a)
 }

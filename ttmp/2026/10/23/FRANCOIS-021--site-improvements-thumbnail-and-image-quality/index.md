@@ -1,7 +1,7 @@
 ---
 Title: 'Site improvements: thumbnail and image quality'
 Ticket: FRANCOIS-021
-Status: active
+Status: complete
 Topics:
     - frontend
     - performance
@@ -10,8 +10,8 @@ Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: "Storefront thumbnail/variant quality: hover preview upscaling, JPEG quality and versioned variant URLs."
-LastUpdated: 2026-10-23T14:46:36.093348924-04:00
+Summary: 'Storefront thumbnail/variant quality: hover preview upscaling, JPEG quality and versioned variant URLs.'
+LastUpdated: 2026-10-23T15:20:02.448110451-04:00
 WhatFor: ""
 WhenToUse: ""
 ---

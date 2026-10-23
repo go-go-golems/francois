@@ -49,11 +49,6 @@ var Icon512 []byte
 //go:embed templates/*.tmpl
 var Templates embed.FS
 
-// LegalTemplate renders /privacy and /terms (html/template).
-//
-//go:embed legal.tmpl
-var LegalTemplate string
-
 // Separate allowlists keep subscriber HTML out of the public asset routes.
 var portalAssets = map[string]*Asset{
 	"catalog.js":           newAsset("catalog.js", "text/javascript", CatalogJS),

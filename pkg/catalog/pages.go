@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-go-golems/francois/pkg/catalog/content"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
@@ -144,7 +146,37 @@ type pageData struct {
 	// FontCSS and FontPreloads are versioned web-font URLs.
 	FontCSS      string
 	FontPreloads []string
-	Body         any
+	// Copy is the editable site text (settings storefront.copy).
+	Copy siteCopy
+	Body any
+}
+
+// siteCopy resolves editable site text for templates: {{.Copy.Text "key"}}
+// for one-line text and {{.Copy.HTML "key"}} for Markdown.
+type siteCopy struct {
+	doc settings.Document
+	md  *content.Markdown
+}
+
+func (c siteCopy) Text(key string) string { return c.doc.CopyText(key) }
+
+func (c siteCopy) HTML(key string) template.HTML { return c.md.Render(c.doc.CopyText(key), nil) }
+
+// Legal renders a legal page's Markdown with {site} and {contact} filled in.
+func (c siteCopy) Legal(key, site, contact string) template.HTML {
+	to := "the support address shown on the sign-in consent screen"
+	if contact != "" {
+		to = "[" + contact + "](mailto:" + contact + ")"
+	}
+	return c.md.Render(strings.NewReplacer("{site}", site, "{contact}", to).Replace(c.doc.CopyText(key)), nil)
+}
+
+// Date fills the {date} placeholder of a copy key.
+func (c siteCopy) Date(key string, t *time.Time) string {
+	if t == nil {
+		return c.Text(key)
+	}
+	return strings.ReplaceAll(c.Text(key), "{date}", t.UTC().Format("2 January 2006"))
 }
 
 // card is an artifact as listed on the storefront.
@@ -160,6 +192,16 @@ type card struct {
 	Featured               bool
 	EarlyAccessUntil       *time.Time
 	DemoEnabled            bool
+	LaunchMode             string
+	// HTMLFile is the latest release's application file; FreeSample lets
+	// anyone download it.
+	HTMLFile   *store.ReleaseFile
+	FreeSample bool
+}
+
+// EarlyAccess reports whether the card is still for paying customers only.
+func (c card) EarlyAccess() bool {
+	return c.EarlyAccessUntil != nil && c.EarlyAccessUntil.After(time.Now())
 }
 
 // brand is the storefront name shown in the header and titles: the
@@ -181,6 +223,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	}
 	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
+	d.Copy = siteCopy{doc: rev.Document, md: s.md}
 	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + canonicalPath(r.URL.Path)
 	d.Contact = s.Config.ContactEmail
@@ -213,7 +256,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	}
 	d.Nav = nav
 	if d.Description == "" {
-		d.Description = rev.Document.Storefront.Tagline
+		d.Description = firstNonEmpty(rev.Document.Storefront.Tagline, rev.Document.CopyText("header.statement"))
 	}
 	if d.Image == "" {
 		d.Image, d.DefaultImage = s.shareURL(r, rev.Document), true
@@ -262,7 +305,8 @@ func (s *Server) pageFailed(w http.ResponseWriter, r *http.Request, err error) {
 
 func (s *Server) unavailable(w http.ResponseWriter, r *http.Request) {
 	d := pageData{Title: "Unavailable", Brand: s.site(r).PublicURL.Hostname(), OGType: "website", Contact: s.Config.ContactEmail,
-		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path)}
+		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path),
+		Copy: siteCopy{doc: settings.Defaults(), md: s.md}}
 	var buf bytes.Buffer
 	if err := s.pages["unavailable"].ExecuteTemplate(&buf, "layout", d); err != nil {
 		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
@@ -353,8 +397,16 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 }
 
 func cardOf(a store.Artifact, rel store.Release, creators []store.Creator) card {
-	return card{ID: a.ID, Title: a.Title, Description: a.Description, Tags: a.Tags, Capabilities: releaseCaps(rel), Creators: creators,
-		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, EarlyAccessUntil: a.EarlyAccessUntil, DemoEnabled: a.DemoEnabled}
+	c := card{ID: a.ID, Title: a.Title, Description: a.Description, Tags: a.Tags, Capabilities: releaseCaps(rel), Creators: creators,
+		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, EarlyAccessUntil: a.EarlyAccessUntil, DemoEnabled: a.DemoEnabled,
+		LaunchMode: a.LaunchMode, FreeSample: rel.FreeSample}
+	for i := range rel.Files {
+		if rel.Files[i].Role == "html" {
+			c.HTMLFile = &rel.Files[i]
+			break
+		}
+	}
+	return c
 }
 
 func find(arts []store.Artifact, id string) *store.Artifact {
@@ -394,10 +446,21 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	var who visitor
+	if p := principal(ctx); p != nil {
+		if e, _, err := s.entitlement(ctx, p.User); err == nil {
+			who = visitor{member: e.Source != SourceGuest && e.Source != SourceDisabled, paying: e.Paid()}
+		}
+	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tag := r.URL.Query().Get("tag")
 	order := r.URL.Query().Get("sort")
-	if order != "oldest" {
+	if !archiveOrders[order] {
 		order = "newest"
 	}
 	link := func(t string) string {
@@ -413,30 +476,148 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	type category struct {
 		Name, Href string
+		Count      int
 		Current    bool
 	}
 	tags := []category{}
-	seen := map[string]bool{}
-	matches := []card{}
+	index := map[string]int{}
+	matches, hidden := []card{}, map[string]bool{}
 	for _, c := range cards {
 		for _, t := range c.Tags {
-			if !seen[t] {
-				tags = append(tags, category{t, link(t), t == tag})
-				seen[t] = true
+			if i, ok := index[t]; ok {
+				tags[i].Count++
+				continue
 			}
+			index[t] = len(tags)
+			tags = append(tags, category{t, link(t), 1, t == tag})
 		}
 		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
-		if (tag == "" || contains(c.Tags, tag)) && (q == "" || strings.Contains(haystack, strings.ToLower(q))) {
+		if tag == "" || contains(c.Tags, tag) {
 			matches = append(matches, c)
+			hidden[c.ID] = q != "" && !strings.Contains(haystack, strings.ToLower(q))
 		}
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
-	if order == "newest" {
-		for i, j := 0, len(matches)-1; i < j; i, j = i+1, j-1 {
-			matches[i], matches[j] = matches[j], matches[i]
+	rows, shown := make([]archiveRow, len(matches)), 0
+	for i, c := range matches {
+		rows[i] = archiveRowOf(c, rev.Document, who)
+		if rows[i].Hidden = hidden[c.ID]; !rows[i].Hidden {
+			shown++
 		}
 	}
-	s.render(w, r, http.StatusOK, "home", pageData{Description: "A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.", Body: map[string]any{"Rows": matches, "Total": len(cards), "Tags": tags, "Tag": tag, "Query": q, "Sort": order, "AllHref": link(""), "LoginError": r.URL.Query().Get("login_error")}})
+	groups := groupArchive(rows, order)
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": len(cards), "Tags": tags, "Tag": tag,
+		"Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link(""), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
+}
+
+// archiveOrderList is the landing page sort menu.
+var archiveOrderList = []struct{ Value, Label string }{
+	{"newest", "Newest first"}, {"oldest", "Oldest first"}, {"az", "A–Z"}, {"small", "Smallest first"}, {"large", "Largest first"},
+}
+
+var archiveOrders = map[string]bool{"newest": true, "oldest": true, "az": true, "small": true, "large": true}
+
+// archiveRow is one experiment in the landing page list.
+type archiveRow struct {
+	card
+	Size int64
+	// Demo means a visitor without a plan may start a demo.
+	Demo bool
+	// Download is the file link, or a sign-in link for visitors who must
+	// sign in first; empty during early access for visitors who do not pay.
+	Download, DownloadName string
+	// EarlyNote invites visitors who do not pay to subscribe.
+	EarlyNote bool
+	// Hidden rows do not match the search; they are rendered hidden so the
+	// live search can show them again when the query broadens.
+	Hidden bool
+}
+
+// visitor is what the landing page needs to know about the viewer: member
+// means a signed-in account that may run artifacts (not a demo guest).
+type visitor struct{ member, paying bool }
+
+// archiveRowOf applies the download rule of mayDownload to a row: the link
+// is hidden only while an artifact is in early access and the visitor does
+// not pay. Visitors who must sign in first get a sign-in link instead of a
+// download that would answer 401.
+func archiveRowOf(c card, doc settings.Document, who visitor) archiveRow {
+	row := archiveRow{card: c, Demo: doc.Demo.Enabled && c.DemoEnabled}
+	if c.HTMLFile == nil {
+		return row
+	}
+	row.Size, row.DownloadName = c.HTMLFile.Size, c.HTMLFile.Name
+	switch {
+	case c.EarlyAccess() && !who.paying:
+		row.EarlyNote = true
+	case c.FreeSample || who.member:
+		row.Download = "/api/releases/" + c.ReleaseID + "/files/" + c.HTMLFile.ID + "/download"
+	default:
+		row.Download, row.DownloadName = signinURL("/apps/"+c.ID), ""
+	}
+	return row
+}
+
+// archiveGroup is a labelled run of rows: a month for date orders, an
+// initial for A–Z, one group for size orders.
+type archiveGroup struct {
+	Label string
+	Rows  []archiveRow
+}
+
+// Shown counts the group's rows that match the search.
+func (g archiveGroup) Shown() int {
+	n := 0
+	for _, r := range g.Rows {
+		if !r.Hidden {
+			n++
+		}
+	}
+	return n
+}
+
+func groupArchive(rows []archiveRow, order string) []archiveGroup {
+	by := func(less func(a, b archiveRow) bool) {
+		sort.SliceStable(rows, func(i, j int) bool { return less(rows[i], rows[j]) })
+	}
+	published := func(a, b archiveRow) bool {
+		if a.FirstPublished.Equal(*b.FirstPublished) {
+			return a.ID < b.ID
+		}
+		return a.FirstPublished.Before(*b.FirstPublished)
+	}
+	label := func(r archiveRow) string { return r.FirstPublished.UTC().Format("January 2006") }
+	switch order {
+	case "oldest":
+		by(published)
+	case "newest":
+		by(func(a, b archiveRow) bool { return published(b, a) })
+	case "az":
+		by(func(a, b archiveRow) bool { return strings.ToLower(a.Title) < strings.ToLower(b.Title) })
+		label = func(r archiveRow) string {
+			first, _ := utf8.DecodeRuneInString(strings.ToUpper(r.Title))
+			if !unicode.IsLetter(first) {
+				return "#"
+			}
+			return string(first)
+		}
+	case "small", "large":
+		by(func(a, b archiveRow) bool {
+			if a.Size == b.Size {
+				return a.Title < b.Title
+			}
+			return (a.Size < b.Size) == (order == "small")
+		})
+		label = func(archiveRow) string { return "By size" }
+	}
+	groups := []archiveGroup{}
+	for _, r := range rows {
+		if l := label(r); len(groups) == 0 || groups[len(groups)-1].Label != l {
+			groups = append(groups, archiveGroup{Label: l})
+		}
+		groups[len(groups)-1].Rows = append(groups[len(groups)-1].Rows, r)
+	}
+	return groups
 }
 
 func contains(list []string, v string) bool {
@@ -466,6 +647,7 @@ func (s *Server) canEditArtifact(ctx context.Context, u store.User, artifact str
 type download struct {
 	Href, Label, Name string
 	Size              int64
+	Signin            bool // Href is the sign-in page, not the file
 }
 
 type releaseLine struct {
@@ -545,12 +727,17 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			gallery = append(gallery, m)
 		}
 	}
-	mayDownload := false
+	mayDownload, paying, member := false, false, false
 	if p != nil {
-		if e, doc, err := s.entitlement(ctx, p.User); err == nil && e.CanRun(a, doc) {
-			mayDownload = true
+		if e, doc, err := s.entitlement(ctx, p.User); err == nil {
+			mayDownload, paying = e.CanRun(a, doc), e.Paid()
+			member = e.Source != SourceGuest && e.Source != SourceDisabled
 		}
 	}
+	// The HTML download follows the landing page rule (archiveRowOf): none
+	// while in early access for visitors who do not pay, a sign-in link for
+	// visitors without an account, the file otherwise.
+	hideDownload := a.EarlyAccess(time.Now()) && !paying
 	lines := []releaseLine{}
 	for _, rel := range rels {
 		l := releaseLine{Release: rel, Locked: !rel.FreeSample && !mayDownload}
@@ -561,12 +748,13 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			}
 			l.Attached = append(l.Attached, al)
 		}
-		if !l.Locked {
-			for _, f := range rel.Files {
-				if f.Role != "html" {
-					continue
-				}
-				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Get the file ↓", Name: f.Name, Size: f.Size})
+		for _, f := range rel.Files {
+			switch {
+			case f.Role != "html" || hideDownload:
+			case !l.Locked:
+				l.Downloads = append(l.Downloads, download{Href: "/api/releases/" + rel.ID + "/files/" + f.ID + "/download", Label: "Download ↓", Name: f.Name, Size: f.Size})
+			case !member:
+				l.Downloads = append(l.Downloads, download{Href: signinURL("/apps/" + a.ID), Label: "Download ↓", Name: f.Name, Size: f.Size, Signin: true})
 			}
 		}
 		lines = append(lines, l)
@@ -579,7 +767,8 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	doc := rev.Document
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
 		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
-			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now())}}
+			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now()),
+			"EarlyBlocked": a.EarlyAccess(time.Now()) && !paying}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.VariantURL(c.Cover.ID, 1200)
 	} else if c.Cover != nil && c.Cover.Poster != "" {
@@ -876,7 +1065,7 @@ func (s *Server) variant(m store.Media, f io.ReadSeeker, width int) ([]byte, err
 
 // pricingPage presents contributions; render supplies confirmed supporter state.
 func (s *Server) pricingPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support independent experiments in computation and intelligence."})
+	s.render(w, r, http.StatusOK, "pricing", pageData{Title: "Support the lab", Crumb: "pricing", Description: "Support an independent lab for computation and intelligence."})
 }
 
 // publicPlans is GET /api/plans: the public plans, without price IDs.

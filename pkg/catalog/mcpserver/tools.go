@@ -65,6 +65,7 @@ type artifactPatchIn struct {
 	SortOrder        *int      `json:"sortOrder,omitempty"`
 	EarlyAccessUntil *string   `json:"earlyAccessUntil,omitempty" jsonschema:"RFC3339 date; empty clears early access"`
 	DemoEnabled      *bool     `json:"demoEnabled,omitempty"`
+	LaunchMode       *string   `json:"launchMode,omitempty" jsonschema:"inline (starts in the page) or tab (cover, then full screen in a new tab)"`
 	Creators         *[]string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
 }
 
@@ -208,14 +209,14 @@ func studioTools() []spec {
 				a, err := s.CreateArtifact(ctx, in)
 				return a, "Created " + a.ID + ".", err
 			}),
-		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, early-access end date, demo flag or creators. Only the fields given change.",
+		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, early-access end date, demo flag, launch mode or creators. Only the fields given change.",
 			func(ctx context.Context, e *env, in artifactPatchIn) (client.Artifact, string, error) {
 				s, err := st(ctx, e)
 				if err != nil {
 					return client.Artifact{}, "", err
 				}
 				a, err := s.PatchArtifact(ctx, in.ID, client.ArtifactPatch{Title: in.Title, Description: in.Description, Tags: in.Tags, Visibility: in.Visibility,
-					Featured: in.Featured, SortOrder: in.SortOrder, EarlyAccessUntil: in.EarlyAccessUntil, DemoEnabled: in.DemoEnabled, Creators: in.Creators})
+					Featured: in.Featured, SortOrder: in.SortOrder, EarlyAccessUntil: in.EarlyAccessUntil, DemoEnabled: in.DemoEnabled, LaunchMode: in.LaunchMode, Creators: in.Creators})
 				return a, "Updated " + in.ID + ".", err
 			}),
 		tool("save_page_draft", ToolsetStudio, scopeStudio, rw, additive, "Save a draft of an artifact's public page (Markdown body, cover, gallery). The public page changes only after publish_page_draft.",
@@ -557,6 +558,9 @@ type storefrontIn struct {
 	Title   *string `json:"title,omitempty"`
 	Tagline *string `json:"tagline,omitempty"`
 	Intro   *string `json:"intro,omitempty" jsonschema:"Markdown"`
+	// Copy changes editable site text by key; an empty string restores the
+	// default. Keys are listed in the settings' copyKeys.
+	Copy map[string]string `json:"copy,omitempty" jsonschema:"Site text by key (header.statement, home.hero, callout.*, runner.*, earlyaccess.*); empty restores the default"`
 }
 
 type stateIn struct {
@@ -790,7 +794,7 @@ func customerTools() []spec {
 				})
 				return rev, fmt.Sprintf("Settings revision %d is active.", rev.Revision), err
 			}),
-		tool("set_storefront_text", ToolsetCustomers, scopeWrite, rw, additive, "Change the storefront's title, tagline or introduction (Markdown).",
+		tool("set_storefront_text", ToolsetCustomers, scopeWrite, rw, additive, "Change the storefront's title, tagline, introduction (Markdown) or site text (copy keys).",
 			func(ctx context.Context, e *env, in storefrontIn) (client.SettingsRevision, string, error) {
 				a, err := ad(ctx, e)
 				if err != nil {
@@ -800,6 +804,11 @@ func customerTools() []spec {
 					set(&d.Storefront.Title, in.Title)
 					set(&d.Storefront.Tagline, in.Tagline)
 					set(&d.Storefront.Intro, in.Intro)
+					for k, v := range in.Copy {
+						if err := d.SetCopy(k, v); err != nil {
+							return err
+						}
+					}
 					return nil
 				})
 				return rev, fmt.Sprintf("Settings revision %d is active.", rev.Revision), err

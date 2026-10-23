@@ -14,6 +14,7 @@ import (
 
 type supportView struct {
 	Kind            string     `json:"kind"`
+	Tier            string     `json:"tier,omitempty"` // "enterprise" for company support
 	Active          bool       `json:"active"`
 	AmountCents     int64      `json:"amountCents"`
 	StartedAt       *time.Time `json:"startedAt,omitempty"`
@@ -35,6 +36,9 @@ func supportStatus(subs []billing.Subscription, doc settings.Document, now time.
 			out.StartedAt = sub.StartedAt
 		}
 		out.AmountCents += sub.SupportAmountCents
+		if sub.SupportTier == billing.TierEnterprise {
+			out.Tier = billing.TierEnterprise
+		}
 		if out.Until == nil || sub.AccessUntil.Before(*out.Until) {
 			out.Until = sub.AccessUntil
 			out.CancelScheduled = sub.CancelAtPeriodEnd
@@ -70,6 +74,20 @@ func (s *Server) supportSummary(ctx context.Context, user store.User, subs []bil
 	return out, nil
 }
 
+// validSupport checks a support request: year funding has a fixed amount,
+// enterprise a power of two (billing.EnterpriseAmount), monthly 1–9999 USD.
+func validSupport(kind string, cents int64) bool {
+	switch kind {
+	case "year":
+		return true
+	case billing.TierEnterprise:
+		return billing.EnterpriseAmount(cents)
+	case "", "month":
+		return cents >= 100 && cents <= 999900 && cents%100 == 0
+	}
+	return false
+}
+
 func (s *Server) supportCheckout(w http.ResponseWriter, r *http.Request) {
 	if s.Payments == nil {
 		httpx.Fail(w, 503, "billing_unavailable", "Billing is not configured")
@@ -79,8 +97,12 @@ func (s *Server) supportCheckout(w http.ResponseWriter, r *http.Request) {
 		Kind        string `json:"kind"`
 		AmountCents int64  `json:"amountCents"`
 	}
-	if err := httpx.Read(w, r, &in, 1024); err != nil || (in.Kind != "year" && (in.Kind != "" && in.Kind != "month" || in.AmountCents < 100 || in.AmountCents > 999900 || in.AmountCents%100 != 0)) {
-		httpx.Fail(w, 400, "invalid_amount", "Choose 1–9999 whole US dollars per month")
+	if err := httpx.Read(w, r, &in, 1024); err != nil || !validSupport(in.Kind, in.AmountCents) {
+		msg := "Choose 1–9999 whole US dollars per month"
+		if in.Kind == billing.TierEnterprise {
+			msg = "Choose 8, 16, 32 … 4096 US dollars per month"
+		}
+		httpx.Fail(w, 400, "invalid_amount", msg)
 		return
 	}
 	p := principal(r.Context())
@@ -94,9 +116,12 @@ func (s *Server) supportCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var target string
-	if in.Kind == "year" {
+	switch in.Kind {
+	case "year":
 		target, err = s.Payments.FundYear(r.Context(), p.User, s.site(r).PortalOrigin())
-	} else {
+	case billing.TierEnterprise:
+		target, err = s.Payments.SupportEnterprise(r.Context(), p.User, in.AmountCents, rev.Document.Prices(), s.site(r).PortalOrigin())
+	default:
 		target, err = s.Payments.Support(r.Context(), p.User, in.AmountCents, rev.Document.Prices(), s.site(r).PortalOrigin())
 	}
 	if err != nil {

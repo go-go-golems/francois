@@ -96,6 +96,8 @@ type Storefront struct {
 	Title          string `json:"title"`
 	Tagline        string `json:"tagline"`
 	Intro          string `json:"intro"` // Markdown
+	// Copy overrides registered site text (CopyKeys) by key.
+	Copy map[string]string `json:"copy,omitempty"`
 }
 
 type Document struct {
@@ -277,6 +279,9 @@ func (d *Document) validateDemo() error {
 	f := d.Storefront
 	if len(f.Title) > 80 || len(f.Tagline) > 240 || len(f.Intro) > 20<<10 {
 		return errors.New("storefront: title ≤80, tagline ≤240 and intro ≤20 KB")
+	}
+	if err := validateCopy(f.Copy); err != nil {
+		return err
 	}
 	return nil
 }

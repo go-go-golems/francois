@@ -1,0 +1,6 @@
+{{define "content"}}{{with .Body}}<main class="final-legal">
+<section class="final-section"><div class="final-label">Information</div><div class="final-content">
+<h1>{{.Heading}}</h1>
+<div class="md legal-body">{{$.Copy.Legal .Key .Site .Contact}}</div>
+</div></section>
+</main>{{end}}{{end}}

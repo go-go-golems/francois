@@ -13,3 +13,7 @@ Archive hover preview loaded the 160px variant at 432px; mini thumbnails get a s
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/content/resize.go — quality and VariantURL
 - /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/web/templates/layout.tmpl — mini thumbnail srcset
 - /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/public.ts — hover preview sizes
+
+## 2026-10-23
+
+Closed after PR #22 merged (4cfe4c0). Not done here: production deploy/re-measure and lossless WebP re-uploads.

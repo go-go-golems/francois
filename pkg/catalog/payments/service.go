@@ -72,7 +72,7 @@ func (s *Service) ensureCustomer(ctx context.Context, u store.User) (string, err
 // attempt/Session; a request for another price retires the earlier attempt
 // first, so its Session can no longer be paid.
 func (s *Service) Checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string) (string, error) {
-	return s.checkout(ctx, u, price, accepted, portal, 0, false)
+	return s.checkout(ctx, u, price, accepted, portal, 0, "", false)
 }
 
 // Support creates monthly USD support in the single Subscriber tier.
@@ -80,15 +80,24 @@ func (s *Service) Support(ctx context.Context, u store.User, cents int64, accept
 	if cents < 100 || cents > 999900 || cents%100 != 0 {
 		return "", errors.New("monthly support must be 1–9999 whole US dollars")
 	}
-	return s.checkout(ctx, u, "support:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents, false)
+	return s.checkout(ctx, u, "support:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents, "", false)
+}
+
+// SupportEnterprise creates monthly enterprise support: a power of two
+// between 8 and 4096 USD, invoiced to a company.
+func (s *Service) SupportEnterprise(ctx context.Context, u store.User, cents int64, accepted map[string]bool, portal string) (string, error) {
+	if !billing.EnterpriseAmount(cents) {
+		return "", errors.New("enterprise support must be 8, 16, 32 … 4096 US dollars")
+	}
+	return s.checkout(ctx, u, "support:enterprise:usd:"+strconv.FormatInt(cents, 10), accepted, portal, cents, billing.TierEnterprise, false)
 }
 
 // FundYear opens a one-time USD payment at Stripe's maximum charge amount.
 func (s *Service) FundYear(ctx context.Context, u store.User, portal string) (string, error) {
-	return s.checkout(ctx, u, billing.YearFundingKey, nil, portal, 0, true)
+	return s.checkout(ctx, u, billing.YearFundingKey, nil, portal, 0, "", true)
 }
 
-func (s *Service) checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string, supportAmount int64, yearFunding bool) (string, error) {
+func (s *Service) checkout(ctx context.Context, u store.User, price string, accepted map[string]bool, portal string, supportAmount int64, tier string, yearFunding bool) (string, error) {
 	if customer, err := s.Store.CustomerFor(ctx, u.ID); err == nil && !yearFunding {
 		subs, err := s.Gateway.CustomerSubscriptions(ctx, customer)
 		if err != nil {
@@ -139,7 +148,7 @@ func (s *Service) checkout(ctx context.Context, u store.User, price string, acce
 		successPath = "/thank-you"
 	}
 	cs, err := s.Gateway.CreateCheckout(ctx, CheckoutRequest{
-		CustomerID: customer, PriceID: price, SupportAmountCents: supportAmount, YearFunding: yearFunding, UserID: u.ID, AttemptID: attempt.ID,
+		CustomerID: customer, PriceID: price, SupportAmountCents: supportAmount, SupportTier: tier, YearFunding: yearFunding, UserID: u.ID, AttemptID: attempt.ID,
 		SuccessURL:     portal + successPath + "?checkout={CHECKOUT_SESSION_ID}",
 		CancelURL:      portal + "/account",
 		IdempotencyKey: s.Config.Deployment + "-checkout-" + attempt.ID,

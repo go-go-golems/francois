@@ -43,7 +43,7 @@ export function bindInstanceLaunch(
       const message =
         error?.data?.error?.message ??
         error?.message ??
-        "This experiment cannot be opened right now.";
+        "This artifact cannot be opened right now.";
       target.postMessage(
         {
           type: "francois-launch-denied",

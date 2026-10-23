@@ -3,6 +3,7 @@ package cmds
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/go-go-golems/francois/pkg/catalog/client"
 	"github.com/go-go-golems/francois/pkg/catalog/settings"
@@ -47,10 +48,11 @@ func artifactCommands() (*cobra.Command, error) {
 		def{name: "update", short: "Change an artifact's metadata (only the flags given)",
 			flags: append(argID("artifact ID"), flag("title", "Title"), flag("description", "Description"), list("tags", "Tags (replaces all)"),
 				boolean("clear-tags", "Remove all tags"), flag("visibility", "listed or hidden"), flag("featured", "true or false"), flag("sort-order", "Position on the storefront"),
-				flag("early-access-until", "RFC3339 date; empty clears early access"), flag("demo-enabled", "true or false"), list("creators", "Creator profile IDs (replaces all)")),
+				flag("early-access-until", "RFC3339 date; empty clears early access"), flag("demo-enabled", "true or false"), flag("launch-mode", "inline (start in the page) or tab (cover, then full screen in a new tab)"),
+				list("creators", "Creator profile IDs (replaces all)")),
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
 				p := client.ArtifactPatch{Title: a.optS("title"), Description: a.optS("description"), Tags: a.optL("tags", "clear-tags"), Visibility: a.optS("visibility"),
-					EarlyAccessUntil: a.optS("early-access-until"), Creators: a.optL("creators", "")}
+					EarlyAccessUntil: a.optS("early-access-until"), LaunchMode: a.optS("launch-mode"), Creators: a.optL("creators", "")}
 				var err error
 				if p.Featured, err = a.optB("featured"); err != nil {
 					return nil, err
@@ -480,7 +482,80 @@ func settingsCommands() (*cobra.Command, error) {
 				}
 				return c.Admin.SaveSettings(ctx, doc, base)
 			}},
+		def{name: "copy", short: "List the editable site text with the active values", run: func(ctx context.Context, c *client.Client, _ in) (any, error) {
+			s, err := c.Admin.Settings(ctx)
+			if err != nil {
+				return nil, err
+			}
+			rows := []map[string]any{}
+			for _, k := range settings.CopyKeys {
+				override := s.Active.Document.Storefront.Copy[k.Key]
+				rows = append(rows, map[string]any{"key": k.Key, "label": k.Label, "kind": k.Kind, "max": k.Max,
+					"value": s.Active.Document.CopyText(k.Key), "overridden": override != ""})
+			}
+			return rows, nil
+		}},
+		def{name: "set-copy", short: "Set or reset one piece of site text", destructive: true,
+			flags: []*fieldsDef{arg("key", "Copy key, see 'settings copy'"), flag("text", "New text"), flag("file", "Read the text from a file (Markdown keys)"), boolean("reset", "Return to the default text")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				text := a.S("text")
+				if f := a.S("file"); f != "" {
+					raw, err := os.ReadFile(f) // #nosec G304 -- the operator names the file
+					if err != nil {
+						return nil, err
+					}
+					text = strings.TrimSpace(string(raw))
+				}
+				if !a.B("reset") && strings.TrimSpace(text) == "" {
+					return nil, errors.New("give --text, --file or --reset")
+				}
+				if a.B("reset") {
+					text = ""
+				}
+				return c.Admin.EditSettings(ctx, func(d *settings.Document) error { return d.SetCopy(a.S("key"), text) })
+			}},
+		def{name: "legal", short: "Show the privacy policy or terms of service (Markdown)", flags: []*fieldsDef{arg("page", "privacy or terms")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				key, err := legalKey(a.S("page"))
+				if err != nil {
+					return nil, err
+				}
+				s, err := c.Admin.Settings(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"page": a.S("page"), "overridden": s.Active.Document.Storefront.Copy[key] != "", "markdown": s.Active.Document.CopyText(key)}, nil
+			}},
+		def{name: "set-legal", short: "Replace the privacy policy or terms of service from a Markdown file", destructive: true,
+			flags: []*fieldsDef{arg("page", "privacy or terms"), flag("file", "Markdown file; {site} and {contact} are filled in"), boolean("reset", "Return to the default text")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				key, err := legalKey(a.S("page"))
+				if err != nil {
+					return nil, err
+				}
+				text := ""
+				if f := a.S("file"); f != "" && !a.B("reset") {
+					raw, err := os.ReadFile(f) // #nosec G304 -- the operator names the file
+					if err != nil {
+						return nil, err
+					}
+					if text = strings.TrimSpace(string(raw)); text == "" {
+						return nil, errors.New("the file is empty")
+					}
+				} else if !a.B("reset") {
+					return nil, errors.New("give --file or --reset")
+				}
+				return c.Admin.EditSettings(ctx, func(d *settings.Document) error { return d.SetCopy(key, text) })
+			}},
 	)
+}
+
+// legalKey maps a legal page name to its site copy key.
+func legalKey(page string) (string, error) {
+	if page != "privacy" && page != "terms" {
+		return "", errors.Errorf("page must be privacy or terms, not %q", page)
+	}
+	return "legal." + page, nil
 }
 
 func billingCommands() (*cobra.Command, error) {

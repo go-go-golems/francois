@@ -27,17 +27,17 @@ func TestContentStore(t *testing.T) {
 		t.Fatalf("upload %d %v", code, out)
 	}
 	a, err := st.Artifact(ctx, "board")
-	if err != nil || a.Title != "Board" || a.Visibility != "listed" || a.Page.Gallery == nil {
+	if err != nil || a.Title != "Board" || a.Visibility != "listed" || a.Page.Gallery == nil || a.LaunchMode != store.LaunchTab {
 		t.Fatalf("artifact %+v %v", a, err)
 	}
-	a.Title, a.Featured, a.DemoEnabled = "Board, renamed", true, true
+	a.Title, a.Featured, a.DemoEnabled, a.LaunchMode = "Board, renamed", true, true, store.LaunchInline
 	if _, err = st.UpdateArtifact(ctx, a); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err = e.srv.Publisher.CreateDraft(ctx, admin.user.ID, uploadOf("board", "", "1.1.0")); err != nil {
 		t.Fatalf("second release: %v", err)
 	}
-	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || !a.DemoEnabled {
+	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || !a.DemoEnabled || a.LaunchMode != store.LaunchInline {
 		t.Fatalf("metadata changed by upload: %+v", a)
 	}
 	if _, err = st.CreateArtifact(ctx, store.Artifact{ID: "board", Title: "dup"}); !errors.Is(err, store.ErrConflict) {
@@ -177,13 +177,14 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 	for _, who := range []*tactor{&admin, &sub} {
 		code, body, _ := e.do(who, "portal.test", "GET", "/apps/board", nil, nil)
 		s := string(body)
-		if code != 200 || strings.Count(s, ">Get the file ↓</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
+		if code != 200 || strings.Count(s, ">Download ↓</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
 			strings.Contains(s, "/api/releases/"+oldID+"/") || strings.Contains(s, ">Manifest</a>") {
 			t.Fatalf("expected one current HTML download: %d %s", code, body)
 		}
 	}
-	// A historical free sample must not surface as the current paid download.
-	if code, body, _ := e.do(nil, "portal.test", "GET", "/apps/board", nil, nil); code != 200 || bytes.Contains(body, []byte("Get the file")) {
+	// A historical free sample must not surface as the current paid download;
+	// anonymous visitors get a sign-in link instead.
+	if code, body, _ := e.do(nil, "portal.test", "GET", "/apps/board", nil, nil); code != 200 || bytes.Contains(body, []byte("/files/")) || !bytes.Contains(body, []byte(`href="/signin?return=%2Fapps%2Fboard">Download ↓</a>`)) {
 		t.Fatalf("anonymous download: %d %s", code, body)
 	}
 	// History remains downloadable through its authorized API, including manifests.
@@ -252,11 +253,11 @@ func TestStorefrontPages(t *testing.T) {
 	if !strings.Contains(h.Get("Content-Security-Policy"), "media-src 'self'") {
 		t.Fatalf("CSP %q", h.Get("Content-Security-Policy"))
 	}
-	// Downloads are offered to entitled users only.
-	if strings.Contains(b, "Get the file") {
+	// The file is offered to entitled users only; others are asked to sign in.
+	if strings.Contains(b, "/files/") || !strings.Contains(b, "sign in to download") {
 		t.Fatal("download offered anonymously")
 	}
-	if _, b, _ = get(&sub, "/apps/board"); !strings.Contains(b, "Get the file") || !strings.Contains(b, "data-signout") {
+	if _, b, _ = get(&sub, "/apps/board"); !strings.Contains(b, `download="`) || !strings.Contains(b, "data-signout") {
 		t.Fatal("subscriber page misses download or sign-out")
 	}
 

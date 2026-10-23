@@ -83,6 +83,7 @@ type Artifact struct {
 	SortOrder        int        `json:"sortOrder"`
 	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
 	DemoEnabled      bool       `json:"demoEnabled"`
+	LaunchMode       string     `json:"launchMode"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 }
@@ -98,6 +99,7 @@ type ArtifactRow struct {
 	SortOrder        int        `json:"sortOrder"`
 	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
 	DemoEnabled      bool       `json:"demoEnabled"`
+	LaunchMode       string     `json:"launchMode"`
 	Cover            string     `json:"cover"`
 	HasDraft         bool       `json:"hasDraft"`
 	Creators         []string   `json:"creators"`
@@ -132,6 +134,7 @@ type ArtifactPatch struct {
 	SortOrder        *int      `json:"sortOrder,omitempty"`
 	EarlyAccessUntil *string   `json:"earlyAccessUntil,omitempty"`
 	DemoEnabled      *bool     `json:"demoEnabled,omitempty"`
+	LaunchMode       *string   `json:"launchMode,omitempty"`
 	Creators         *[]string `json:"creators,omitempty"`
 }
 
@@ -408,6 +411,7 @@ type Settings struct {
 	ProviderModels json.RawMessage    `json:"providerModels"`
 	Secrets        map[string]bool    `json:"secrets"`
 	Defaults       settings.Document  `json:"defaults"`
+	CopyKeys       []settings.CopyKey `json:"copyKeys"`
 }
 
 // UserQuery filters GET /api/admin/users.

@@ -70,22 +70,24 @@ func TestVideos(t *testing.T) {
 	expect("release", code, out, 201, "")
 	code, out = e.portal(&admin, "POST", "/api/studio/releases/"+out["id"].(string)+"/publish", nil)
 	expect("publish", code, out, 200, "")
-	code, out = e.portal(&admin, "PUT", "/api/studio/artifacts/film/draft", map[string]any{"body": "Watch:\n\n![walk](/media/" + videoID + ")", "cover": videoID})
+	code, out = e.portal(&admin, "PUT", "/api/studio/artifacts/film/draft", map[string]any{"body": "Watch:\n\n![walk](/media/" + videoID + ")", "cover": videoID, "gallery": []string{imageID, videoID}})
 	expect("draft", code, out, 200, "")
 	code, out = e.portal(&admin, "POST", "/api/studio/artifacts/film/draft/publish", nil)
 	expect("publish page", code, out, 200, "")
 	_, page, _ := e.do(nil, "portal.test", "GET", "/apps/film", nil, nil)
 	for _, want := range []string{
-		`<video src="/media/` + videoID + `" autoplay muted loop playsinline controls`,                                // cover
-		`<video src="/media/` + videoID + `" controls preload="metadata" playsinline poster="/media/` + imageID + `"`, // body
+		`<video src="/media/` + videoID + `" autoplay muted loop playsinline controls`,                                                                 // cover
+		`<video src="/media/` + videoID + `" controls preload="metadata" playsinline poster="/media/` + imageID + `"`,                                  // body
+		`<figure><a class="gallery-zoom" href="/media/` + imageID + `" data-zoom aria-label="View full size: still"><img src="/media/` + imageID + `"`, // gallery image opens full size
+		`<figure><video src="/media/` + videoID + `" controls`,                                                                                         // gallery video plays in place
 	} {
 		if !bytes.Contains(page, []byte(want)) {
 			t.Fatalf("artifact page lacks %q", want)
 		}
 	}
 	_, list, _ := e.do(nil, "portal.test", "GET", "/apps", nil, nil)
-	poster := `<img src="/media/` + imageID + `?w=160&amp;v=2" srcset="/media/` + imageID + `?w=160&amp;v=2 160w, `
-	if !bytes.Contains(list, []byte(poster)) || !bytes.Contains(list, []byte(`?w=1200&amp;v=2 1200w" sizes="76px" alt="walkthrough"`)) {
+	poster := `<img src="/media/` + imageID + `?w=640&amp;v=2" srcset="/media/` + imageID + `?w=160&amp;v=2 160w, `
+	if !bytes.Contains(list, []byte(poster)) || !bytes.Contains(list, []byte(`?w=1200&amp;v=2 1200w" sizes="(max-width: 900px) 100vw, 402px" alt="walkthrough"`)) {
 		t.Fatalf("catalogue card does not use the poster")
 	}
 

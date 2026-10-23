@@ -7,6 +7,7 @@ import "time"
 // Subscription is the projection of one Stripe subscription.
 type Subscription struct {
 	SupportAmountCents int64      `json:"supportAmountCents"`
+	SupportTier        string     `json:"supportTier,omitempty"` // "" or TierEnterprise
 	StartedAt          *time.Time `json:"startedAt,omitempty"`
 	ID                 string     `json:"id"`
 	CustomerID         string     `json:"customerId"`
@@ -149,4 +150,19 @@ type YearSupport struct {
 	AttemptID     string
 	PaidAt        *time.Time
 	Until         *time.Time
+}
+
+// Enterprise monthly support is a power of two between 8 and 4096 USD; the
+// pricing page halves ("<<1") or doubles (">>1") it from 256 USD.
+const (
+	TierEnterprise         = "enterprise"
+	EnterpriseMinCents     = 800
+	EnterpriseMaxCents     = 409600
+	EnterpriseDefaultCents = 25600
+)
+
+// EnterpriseAmount reports whether cents is a valid enterprise amount.
+func EnterpriseAmount(cents int64) bool {
+	dollars := cents / 100
+	return cents >= EnterpriseMinCents && cents <= EnterpriseMaxCents && cents%100 == 0 && dollars&(dollars-1) == 0
 }

@@ -58,3 +58,40 @@ func TestSupportStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestEnterpriseSupport(t *testing.T) {
+	e := setup(t)
+	_, page, _ := e.do(nil, "portal.test", "GET", "/pricing", nil, nil)
+	for _, want := range []string{`data-support-tiers`, `>Individual</button>`, `>Enterprise</button>`, `data-support-enterprise`, `name="amount" aria-live="polite">256</output>`, `data-shift="half" title="Halve" aria-label="Halve the monthly amount">&lt;&lt;1</button>`, `data-shift="double" title="Double" aria-label="Double the monthly amount">&gt;&gt;1</button>`, `Support as a company →`} {
+		if !strings.Contains(string(page), want) {
+			t.Fatalf("pricing page lacks %q", want)
+		}
+	}
+	u := e.user("acme", "subscriber", false)
+	until := time.Now().Add(24 * time.Hour)
+	_, err := e.store.Pool.Exec(context.Background(), `INSERT INTO billing_subscriptions(stripe_subscription_id,user_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,support_amount_cents,support_tier) VALUES('sub_ent',$1,'cus_ent','price_dynamic','active',1,1,$2,102400,'enterprise')`, u.user.ID, until)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, a := e.portal(&u, "GET", "/api/account", nil)
+	sup := a["support"].(map[string]any)
+	if sup["active"] != true || sup["tier"] != "enterprise" || sup["amountCents"] != float64(102400) {
+		t.Fatalf("support summary %v", sup)
+	}
+	if a["entitlement"].(map[string]any)["source"] != SourceSubscription {
+		t.Fatal("enterprise support did not enter the Subscriber tier")
+	}
+	for _, c := range []struct {
+		kind  string
+		cents int64
+		want  bool
+	}{
+		{"enterprise", 25600, true}, {"enterprise", 800, true}, {"enterprise", 409600, true},
+		{"enterprise", 30000, false}, {"enterprise", 819200, false}, {"enterprise", 400, false},
+		{"", 4200, true}, {"month", 999900, true}, {"month", 4250, false}, {"year", 0, true}, {"decade", 4200, false},
+	} {
+		if got := validSupport(c.kind, c.cents); got != c.want {
+			t.Errorf("validSupport(%q, %d) = %v", c.kind, c.cents, got)
+		}
+	}
+}

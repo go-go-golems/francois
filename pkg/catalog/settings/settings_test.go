@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -62,5 +63,39 @@ func TestParseRejectsOldShape(t *testing.T) {
 	old := `{"models":{"allowed":[],"tiers":{}},"allowance":{"dailyTokens":5,"perUserConcurrency":2,"globalConcurrency":8,"maxToolRounds":5},"limits":{"instancesPerUser":10,"membersPerInstance":10,"documentsPerInstance":5000,"assetBytesPerInstance":1,"maxHtmlBytes":2048},"publishing":{}}`
 	if _, err := Parse([]byte(old)); err == nil {
 		t.Fatal("a pre-plans document must be migrated (store migration 005), not silently accepted")
+	}
+}
+
+// TestCopy falls back to registered defaults and rejects unknown keys,
+// overlong values and line breaks in one-line text.
+func TestCopy(t *testing.T) {
+	d := Defaults()
+	if got := d.CopyText("home.hero"); !strings.HasPrefix(got, "These artifacts are the results of our research.") {
+		t.Fatalf("default hero %q", got)
+	}
+	d.Storefront.Copy = map[string]string{"home.hero": "  ", "callout.heading": "Fund us."}
+	if err := d.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if d.CopyText("callout.heading") != "Fund us." || d.CopyText("home.hero") == "  " || d.CopyText("nope") != "" {
+		t.Fatal("override or blank fallback wrong")
+	}
+	for _, bad := range []map[string]string{
+		{"home.heroo": "x"},
+		{"home.hero": strings.Repeat("x", 241)},
+		{"home.hero": "two\nlines"},
+	} {
+		d.Storefront.Copy = bad
+		if err := d.Validate(); err == nil {
+			t.Fatalf("accepted %v", bad)
+		}
+	}
+	d.Storefront.Copy = map[string]string{"callout.body": "Two\n\nparagraphs."}
+	if err := d.Validate(); err != nil {
+		t.Fatal("markdown copy may span lines:", err)
+	}
+	raw, _ := json.Marshal(Defaults())
+	if strings.Contains(string(raw), `"copy"`) {
+		t.Fatal("empty copy should be omitted from stored documents")
 	}
 }

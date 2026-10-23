@@ -3,6 +3,7 @@ import { api, Check, Instance, Release } from "./api";
 // Studio endpoints (/api/studio): content management for creators and
 // administrators. Injected into the shared API so they reuse its CSRF header.
 
+export type LaunchMode = "inline" | "tab";
 export type Page = { body: string; cover?: string; gallery: string[] };
 export type StudioArtifact = {
   id: string;
@@ -16,6 +17,8 @@ export type StudioArtifact = {
   sortOrder: number;
   earlyAccessUntil?: string;
   demoEnabled: boolean;
+  // inline: starts in the page; tab: cover, then full screen in a new tab.
+  launchMode: LaunchMode;
   createdAt: string;
   updatedAt: string;
 };
@@ -29,6 +32,7 @@ export type ArtifactRow = {
   sortOrder: number;
   earlyAccessUntil?: string;
   demoEnabled: boolean;
+  launchMode: LaunchMode;
   cover: string;
   hasDraft: boolean;
   creators: string[];
@@ -108,6 +112,7 @@ export type ArtifactPatch = Partial<
     | "sortOrder"
     | "earlyAccessUntil"
     | "demoEnabled"
+    | "launchMode"
   >
 > & {
   creators?: string[];
