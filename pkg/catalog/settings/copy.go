@@ -39,6 +39,12 @@ var CopyKeys = []CopyKey{
 	{Key: "earlyaccess.runner", Label: "Early access, app page", Help: "Shown next to the cover; {date} is the end of early access.", Kind: "text", Max: 200,
 		Default: "In early access for subscribers until {date}. Subscribe to run it now."},
 	{Key: "earlyaccess.button", Label: "Subscribe button", Kind: "text", Max: 60, Default: "Subscribe →"},
+	{Key: "support.tab.individual", Label: "Support tab, individual", Help: "Pricing page tab for personal monthly support.", Kind: "text", Max: 40, Default: "Individual"},
+	{Key: "support.tab.enterprise", Label: "Support tab, enterprise", Help: "Pricing page tab for company support (8 to 4096 USD, powers of two).", Kind: "text", Max: 40, Default: "Enterprise"},
+	{Key: "support.enterprise.label", Label: "Enterprise label", Kind: "text", Max: 80, Default: "Every month, for your company"},
+	{Key: "support.enterprise.help", Label: "Enterprise help", Help: "Under the enterprise amount.", Kind: "text", Max: 240,
+		Default: "Halve or double, from 8 to 4096 USD a month. Invoiced to your company, with its address and tax ID."},
+	{Key: "support.enterprise.button", Label: "Enterprise button", Kind: "text", Max: 60, Default: "Support as a company →"},
 }
 
 // CopyKeyByName returns the registered key, if any.

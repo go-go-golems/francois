@@ -205,6 +205,7 @@ export type Instance = {
 };
 export type Subscription = {
   supportAmountCents: number;
+  supportTier?: "enterprise";
   id: string;
   priceId: string;
   status: string;
@@ -235,6 +236,7 @@ export type AccessGrant = {
 export type Account = {
   support: {
     kind: "month" | "year";
+    tier?: "enterprise";
     active: boolean;
     amountCents: number;
     startedAt?: string;

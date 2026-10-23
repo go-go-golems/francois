@@ -61,6 +61,12 @@ func TestSupportStatus(t *testing.T) {
 
 func TestEnterpriseSupport(t *testing.T) {
 	e := setup(t)
+	_, page, _ := e.do(nil, "portal.test", "GET", "/pricing", nil, nil)
+	for _, want := range []string{`data-support-tiers`, `>Individual</button>`, `>Enterprise</button>`, `data-support-enterprise`, `name="amount" aria-live="polite">256</output>`, `data-shift="right"`, `&gt;&gt;1`, `&lt;&lt;1`, `Support as a company →`} {
+		if !strings.Contains(string(page), want) {
+			t.Fatalf("pricing page lacks %q", want)
+		}
+	}
 	u := e.user("acme", "subscriber", false)
 	until := time.Now().Add(24 * time.Hour)
 	_, err := e.store.Pool.Exec(context.Background(), `INSERT INTO billing_subscriptions(stripe_subscription_id,user_id,stripe_customer_id,price_id,status,quantity,item_count,access_until,support_amount_cents,support_tier) VALUES('sub_ent',$1,'cus_ent','price_dynamic','active',1,1,$2,102400,'enterprise')`, u.user.ID, until)

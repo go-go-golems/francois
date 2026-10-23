@@ -20,7 +20,7 @@ export function RecurringSupport({
       {active.map((s) => (
         <p key={s.id}>
           {s.supportAmountCents > 0
-            ? `${s.supportAmountCents / 100} USD a month. `
+            ? `${s.supportTier === "enterprise" ? "Enterprise support, " : ""}${s.supportAmountCents / 100} USD a month. `
             : "Your existing recurring subscription: "}
           {s.cancelAtPeriodEnd
             ? "Scheduled to stop on "

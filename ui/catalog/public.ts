@@ -7,6 +7,11 @@ import {
   type LaunchData,
   type Plan,
 } from "./launch-decision";
+import {
+  ENTERPRISE_DEFAULT,
+  isEnterpriseAmount,
+  shift,
+} from "./enterprise-amount";
 import { serviceNotice } from "./service-notice";
 // public.ts adds the session-dependent actions to server-rendered storefront
 // pages: sign out, run an artifact (in the page, in the landing page viewer
@@ -491,6 +496,43 @@ function bindBrowser() {
   });
 }
 
+// startSupport opens Stripe Checkout for monthly support. Visitors without
+// a verified account sign in first and come back to the same choice; an
+// open subscription is managed in the Stripe portal instead.
+async function startSupport(
+  form: HTMLFormElement,
+  submit: HTMLButtonElement,
+  body: { kind?: string; amountCents: number },
+  returnTo: string,
+) {
+  if (submit.disabled || !form.reportValidity()) return;
+  submit.disabled = true;
+  try {
+    const session = await getSession();
+    if (!session.authenticated || session.user?.role === "guest") {
+      location.assign("/signin?return=" + encodeURIComponent(returnTo));
+      return;
+    }
+    const result = await post<{ url: string }>("/api/billing/support", body);
+    location.assign(result.url);
+  } catch (err) {
+    if (err instanceof RequestError && err.code === "subscription_open") {
+      try {
+        const result = await post<{ url: string }>("/api/billing/portal", {});
+        location.assign(result.url);
+        return;
+      } catch (portalError) {
+        err = portalError;
+      }
+    }
+    fail(form, (err as Error).message);
+    submit.disabled = false;
+  }
+}
+
+const enterpriseLink = () =>
+  new URLSearchParams(location.search).get("tier") === "enterprise";
+
 function bindSupport(form: HTMLFormElement) {
   const input = form.querySelector<HTMLInputElement>("[name=amount]")!;
   const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
@@ -498,7 +540,12 @@ function bindSupport(form: HTMLFormElement) {
     input.style.width = Math.max(2, input.value.length) + "ch";
   };
   const initial = Number(new URLSearchParams(location.search).get("amount"));
-  if (Number.isInteger(initial) && initial >= 1 && initial <= 9999)
+  if (
+    !enterpriseLink() &&
+    Number.isInteger(initial) &&
+    initial >= 1 &&
+    initial <= 9999
+  )
     input.value = String(initial);
   resize();
   input.addEventListener("input", resize);
@@ -520,37 +567,85 @@ function bindSupport(form: HTMLFormElement) {
         resize();
       });
     });
-  form.addEventListener("submit", async (event) => {
+  form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (submit.disabled || !form.reportValidity()) return;
-    submit.disabled = true;
-    try {
-      const session = await getSession();
-      if (!session.authenticated || session.user?.role === "guest") {
-        location.assign(
-          "/signin?return=" +
-            encodeURIComponent("/pricing?amount=" + input.value),
-        );
-        return;
-      }
-      const result = await post<{ url: string }>("/api/billing/support", {
-        amountCents: Number(input.value) * 100,
-      });
-      location.assign(result.url);
-    } catch (err) {
-      if (err instanceof RequestError && err.code === "subscription_open") {
-        try {
-          const result = await post<{ url: string }>("/api/billing/portal", {});
-          location.assign(result.url);
-          return;
-        } catch (portalError) {
-          err = portalError;
-        }
-      }
-      fail(form, (err as Error).message);
-      submit.disabled = false;
-    }
+    void startSupport(
+      form,
+      submit,
+      { amountCents: Number(input.value) * 100 },
+      "/pricing?amount=" + input.value,
+    );
   });
+}
+
+// bindEnterprise drives the enterprise amount: >>1 halves and <<1 doubles,
+// between 8 and 4096 USD; the buttons are disabled at either end.
+function bindEnterprise(form: HTMLFormElement) {
+  const output = form.querySelector<HTMLOutputElement>("output[name=amount]")!;
+  const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+  const buttons = [...form.querySelectorAll<HTMLButtonElement>("[data-shift]")];
+  const initial = Number(new URLSearchParams(location.search).get("amount"));
+  let amount =
+    enterpriseLink() && isEnterpriseAmount(initial)
+      ? initial
+      : ENTERPRISE_DEFAULT;
+  const render = () => {
+    output.value = String(amount);
+    for (const b of buttons)
+      b.disabled =
+        shift(amount, b.dataset.shift as "left" | "right") === amount;
+  };
+  for (const b of buttons)
+    b.addEventListener("click", () => {
+      amount = shift(amount, b.dataset.shift as "left" | "right");
+      render();
+    });
+  render();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void startSupport(
+      form,
+      submit,
+      { kind: "enterprise", amountCents: amount * 100 },
+      `/pricing?tier=enterprise&amount=${amount}`,
+    );
+  });
+}
+
+// bindSupportTiers turns the two support panels into tabs. Without
+// JavaScript both panels show, one under the other.
+function bindSupportTiers(box: HTMLElement) {
+  const list = box.querySelector<HTMLElement>("[role=tablist]")!;
+  const tabs = [...list.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+  const select = (tab: HTMLButtonElement, focus: boolean) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")!)!.hidden = !on;
+    }
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => {
+      select(tab, false);
+      const url = new URL(location.href);
+      url.searchParams.delete("amount");
+      if (tab.dataset.tier) url.searchParams.set("tier", tab.dataset.tier);
+      else url.searchParams.delete("tier");
+      history.replaceState(history.state, "", url);
+    });
+    tab.addEventListener("keydown", (event) => {
+      const step =
+        event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      tabs[(i + step + tabs.length) % tabs.length].click();
+      tabs[(i + step + tabs.length) % tabs.length].focus();
+    });
+  });
+  list.hidden = false;
+  select(tabs[enterpriseLink() ? 1 : 0], false);
 }
 
 function bindYearSupport(form: HTMLFormElement) {
@@ -673,6 +768,12 @@ function main() {
   document
     .querySelectorAll<HTMLFormElement>("[data-support-monthly]")
     .forEach(bindSupport);
+  document
+    .querySelectorAll<HTMLFormElement>("[data-support-enterprise]")
+    .forEach(bindEnterprise);
+  document
+    .querySelectorAll<HTMLElement>("[data-support-tiers]")
+    .forEach(bindSupportTiers);
   document
     .querySelectorAll<HTMLFormElement>("[data-support-year]")
     .forEach(bindYearSupport);

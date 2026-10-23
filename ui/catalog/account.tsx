@@ -127,7 +127,7 @@ export function Account() {
               {a.support.active && a.support.amountCents > 0
                 ? a.support.kind === "year"
                   ? `${(a.support.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} USD. A year funded.`
-                  : `${a.support.amountCents / 100} USD a month.`
+                  : `${a.support.tier === "enterprise" ? "Enterprise support, " : ""}${a.support.amountCents / 100} USD a month.`
                 : a.entitlement.plan.name}
             </p>
           </div>
