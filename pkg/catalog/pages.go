@@ -699,10 +699,10 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			gallery = append(gallery, m)
 		}
 	}
-	mayDownload := false
+	mayDownload, paying := false, false
 	if p != nil {
-		if e, doc, err := s.entitlement(ctx, p.User); err == nil && e.CanRun(a, doc) {
-			mayDownload = true
+		if e, doc, err := s.entitlement(ctx, p.User); err == nil {
+			mayDownload, paying = e.CanRun(a, doc), e.Paid()
 		}
 	}
 	lines := []releaseLine{}
@@ -733,7 +733,8 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 	doc := rev.Document
 	d := pageData{Title: a.Title, Description: firstNonEmpty(a.Description, content.Excerpt(page.Body, 200)), Crumb: "apps/" + a.ID, Draft: draft,
 		Body: map[string]any{"Card": c, "Sections": s.md.Sections(page.Body, s.markdownEmbeds(ctx, page.Body)), "Gallery": gallery, "Releases": lines,
-			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now())}}
+			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now()),
+			"EarlyBlocked": a.EarlyAccess(time.Now()) && !paying}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
 		d.Image = s.site(r).PortalOrigin() + content.VariantURL(c.Cover.ID, 1200)
 	} else if c.Cover != nil && c.Cover.Poster != "" {

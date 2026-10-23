@@ -157,7 +157,7 @@ export function Launcher({ id }: { id: string }) {
     <div className="viewer">
       <Link
         className="viewer-close u"
-        to={inst.kind === "preview" ? "/studio" : "/"}
+        to={inst.kind === "preview" ? "/studio" : "/apps/" + inst.artifactId}
         aria-label="Close application"
       >
         Close

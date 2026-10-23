@@ -1,16 +1,19 @@
 import { bindInstanceLaunch } from "./instance-launch";
+import {
+  autoStart,
+  decide,
+  inNewTab,
+  type Decision,
+  type LaunchData,
+  type Plan,
+} from "./launch-decision";
 import { serviceNotice } from "./service-notice";
 // public.ts adds the session-dependent actions to server-rendered storefront
-// pages: sign out, run an artifact, try a demo. Pages are complete without
-// it; it only replaces placeholders. No framework, to stay small.
+// pages: sign out, run an artifact (in the page, in the landing page viewer
+// or full screen in a new tab), try a demo, and the landing page's live
+// search. Pages are complete without it; it only replaces placeholders and
+// intercepts links. No framework, to stay small.
 
-type Plan = {
-  key: string;
-  name: string;
-  source: string;
-  paid: boolean;
-  instances: number;
-};
 type Session = {
   authenticated: boolean;
   loginAvailable: boolean;
@@ -78,105 +81,149 @@ function fail(box: HTMLElement, message: string) {
   box.append(notice);
 }
 
+// Labels come from the page (site copy) so editors can change them.
+const label = (box: HTMLElement, key: string, fallback: string) =>
+  box.dataset[key] || fallback;
+
+type Opened = { id: string; origin: string; launchBlocked?: string };
+
+// openInstance creates (or resumes) the visitor's instance, or a demo for a
+// visitor without a plan, and returns where to frame it.
+async function openInstance(
+  data: DOMStringMap,
+  decision: Decision,
+): Promise<Opened> {
+  const created =
+    decision.kind === "start" && decision.demo
+      ? await post<{ id: string }>("/api/demos", { artifactId: data.artifact })
+      : await post<{ id: string }>("/api/instances/open", {
+          releaseId: data.release,
+          title: data.title,
+        });
+  // A new guest visit sets a cookie. Discard the pre-guest CSRF snapshot.
+  session = undefined;
+  await getSession();
+  const response = await fetch("/api/instances/" + created.id);
+  const out = await response.json();
+  if (!response.ok)
+    throw new RequestError(
+      out.error?.message || "Could not open the experiment",
+      out.error?.code || "",
+    );
+  if (out.launchBlocked) throw new Error(out.launchBlocked);
+  return out as Opened;
+}
+
+// mountFrame frames an opened instance in surface and runs the launch
+// handshake; onState receives "" when the app started, else the reason.
+function mountFrame(
+  surface: HTMLElement,
+  instance: Opened,
+  title: string,
+  onState: (message: string) => void,
+) {
+  const frame = el("iframe", {
+    title: title || "Experiment",
+    sandbox:
+      "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
+    allow: "clipboard-write; fullscreen",
+    allowfullscreen: "",
+  });
+  const unbind = bindInstanceLaunch(
+    frame,
+    instance.origin,
+    (challenge) =>
+      post("/api/instances/" + instance.id + "/launch", { challenge }),
+    onState,
+  );
+  frame.src = instance.origin + "/launch";
+  surface.replaceChildren(frame);
+  return {
+    unbind,
+    reload: () => {
+      frame.src = instance.origin + "/launch";
+    },
+  };
+}
+
+// openInNewTab opens the window synchronously (inside the click, so popup
+// blockers allow it) and points it at the full-screen page once the
+// instance exists.
+async function openInNewTab(data: DOMStringMap, decision: Decision) {
+  const tab = window.open("about:blank", "_blank");
+  try {
+    const instance = await openInstance(data, decision);
+    if (tab) tab.location.href = "/instances/" + instance.id;
+    else location.assign("/instances/" + instance.id);
+  } catch (e) {
+    tab?.close();
+    throw e;
+  }
+}
+
 async function renderActions(box: HTMLElement) {
   const s = await getSession();
-  const { release, title, demo } = box.dataset;
-  const earlyAccess =
-    !!box.dataset.earlyAccessUntil &&
-    Date.parse(box.dataset.earlyAccessUntil) > Date.now();
-  const plan = s.plan;
-  const canRun =
-    !!plan &&
-    (plan.source === "staff" ||
-      (plan.source !== "guest" &&
-        plan.source !== "disabled" &&
-        (!earlyAccess || plan.paid) &&
-        plan.instances > 0));
+  const data = box.dataset as LaunchData & DOMStringMap;
+  const decision = decide(s.plan, data);
   const runner = box.closest<HTMLElement>("[data-runner]");
   box.replaceChildren();
-  if (!release) return;
-  if (earlyAccess && !plan?.paid) {
+  if (!data.release) return;
+  if (decision.kind === "subscribe") {
     box.append(
-      el("a", { class: "site-button", href: "/pricing" }, "Get early access →"),
+      el("p", { class: "runner-early" }, label(box, "labelEarly", "")),
+      el(
+        "a",
+        { class: "site-button is-primary", href: "/pricing" },
+        label(box, "labelSubscribe", "Subscribe →"),
+      ),
     );
     return;
   }
-
-  if (!canRun && demo !== "true") {
+  if (decision.kind === "signin") {
     box.append(
-      el("a", { class: "site-button", href: loginHref() }, "Sign in to run"),
+      el(
+        "a",
+        { class: "site-button", href: loginHref() },
+        label(box, "labelSignin", "Sign in to run"),
+      ),
     );
     return;
   }
+  const text = decision.demo
+    ? label(box, "labelDemo", "Try it →")
+    : label(box, "labelStart", "Start experiment →");
   const start = el(
     "button",
-    { class: "site-button", type: "button" },
-    "Start experiment →",
+    { class: "site-button is-primary", type: "button" },
+    text,
   );
   box.append(start);
-  let instance:
-    | { id: string; origin: string; launchBlocked?: string }
-    | undefined;
-  let unbind: (() => void) | undefined;
-  start.addEventListener("click", async () => {
+  let instance: Opened | undefined;
+  let mounted: ReturnType<typeof mountFrame> | undefined;
+  const run = async () => {
     start.disabled = true;
     start.textContent = "Starting…";
     box.querySelector(".action-error")?.remove();
     try {
-      if (!instance) {
-        const created = canRun
-          ? await post<{ id: string }>("/api/instances/open", {
-              releaseId: release,
-              title,
-            })
-          : await post<{ id: string }>("/api/demos", {
-              artifactId: box.dataset.artifact,
-            });
-        // A new guest visit sets a cookie. Discard the pre-guest CSRF snapshot.
-        session = undefined;
-        await getSession();
-        const response = await fetch("/api/instances/" + created.id);
-        const out = await response.json();
-        if (!response.ok)
-          throw new RequestError(
-            out.error?.message || "Could not open the experiment",
-            out.error?.code || "",
-          );
-        instance = out;
-      }
-      if (!instance) throw new Error("Could not open the experiment");
-      if (instance.launchBlocked) throw new Error(instance.launchBlocked);
-      if (!runner) {
-        location.assign("/instances/" + instance.id);
+      if (inNewTab(data) || !runner) {
+        await openInNewTab(data, decision);
+        start.disabled = false;
+        start.textContent = text;
         return;
       }
+      instance ??= await openInstance(data, decision);
+      const current = instance;
       const surface = runner.querySelector<HTMLElement>(
         "[data-runner-surface]",
       )!;
       const state = runner.querySelector<HTMLElement>("[data-runner-state]")!;
-      const frame = el("iframe", {
-        title: title || "Experiment",
-        sandbox:
-          "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
-        allow: "clipboard-write; fullscreen",
-        allowfullscreen: "",
+      mounted?.unbind();
+      mounted = mountFrame(surface, current, data.title || "", (message) => {
+        state.textContent = message ? "Unavailable" : "Live";
+        runner.classList.toggle("is-live", !message);
+        if (message) fail(runner, message);
+        else runner.querySelector(".action-error")?.remove();
       });
-      const current = instance;
-      unbind?.();
-      unbind = bindInstanceLaunch(
-        frame,
-        current.origin,
-        (challenge) =>
-          post("/api/instances/" + current.id + "/launch", { challenge }),
-        (message) => {
-          state.textContent = message ? "Unavailable" : "Live";
-          runner.classList.toggle("is-live", !message);
-          if (message) fail(runner, message);
-          else runner.querySelector(".action-error")?.remove();
-        },
-      );
-      frame.src = current.origin + "/launch";
-      surface.replaceChildren(frame);
       state.textContent = "Starting…";
       runner.querySelector<HTMLAnchorElement>("[data-runner-link]")!.href =
         "/instances/" + current.id;
@@ -189,7 +236,7 @@ async function renderActions(box: HTMLElement) {
           runner.querySelector(".action-error")?.remove();
           state.textContent = "Starting…";
           runner.classList.remove("is-live");
-          frame.src = current.origin + "/launch";
+          mounted?.reload();
         };
       runner.querySelector<HTMLButtonElement>(
         "[data-runner-fullscreen]",
@@ -207,74 +254,242 @@ async function renderActions(box: HTMLElement) {
       start.textContent = "Try again →";
       fail(box, (e as Error).message);
     }
-  });
+  };
+  start.addEventListener("click", run);
   addEventListener("pagehide", (event) => {
-    if (!event.persisted) unbind?.();
+    if (!event.persisted) mounted?.unbind();
   });
+  if (runner && autoStart(data, decision)) void run();
 }
 
-function bindArchive() {
-  document
-    .querySelectorAll<HTMLImageElement>(".archive-thumb img")
-    .forEach((image) => {
-      const fallback = () => {
-        image.hidden = true;
-      };
-      image.addEventListener("error", fallback);
-      if (image.complete && image.naturalWidth === 0) fallback();
+// Viewer is the landing page's full-viewport window for inline artifacts,
+// after html.moldandyeast.com: title, Details, Close · Esc, device sizes.
+class Viewer {
+  private unbind?: () => void;
+  private reload?: () => void;
+  private opened?: string;
+
+  constructor(private dialog: HTMLDialogElement) {
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      this.close(true);
     });
+    addEventListener("popstate", () => {
+      if (this.opened && !new URLSearchParams(location.search).get("open"))
+        this.close(false);
+    });
+  }
+
+  async open(data: DOMStringMap, decision: Decision, push = true) {
+    this.close(false);
+    const id = data.artifact!;
+    this.opened = id;
+    if (push) {
+      const url = new URL(location.href);
+      url.searchParams.set("open", id);
+      history.pushState({ open: id }, "", url);
+    }
+    const surface = el("div", { class: "v-device" });
+    const state = el("span", { class: "v-state" }, "Starting…");
+    const close = el(
+      "button",
+      { class: "tlink", type: "button" },
+      "Close · Esc",
+    );
+    close.onclick = () => this.close(true);
+    const sizes = el("div", {
+      class: "v-sizes",
+      role: "group",
+      "aria-label": "Screen size",
+    });
+    for (const [name, width] of [
+      ["Phone", "390px"],
+      ["Tablet", "834px"],
+      ["Desktop", "100%"],
+    ]) {
+      const b = el(
+        "button",
+        { type: "button", "aria-pressed": String(name === "Desktop") },
+        name,
+      );
+      b.onclick = () => {
+        surface.style.maxWidth = width;
+        sizes
+          .querySelectorAll("button")
+          .forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      };
+      sizes.append(b);
+    }
+    const reload = el("button", { class: "tlink", type: "button" }, "Reload");
+    reload.onclick = () => this.reload?.();
+    const full = el(
+      "a",
+      { class: "u", target: "_blank", rel: "noopener" },
+      "Open in new tab ↗",
+    );
+    const title = el("div", { class: "v-title" });
+    title.append(
+      el("strong", {}, data.title || ""),
+      el("span", { class: "v-desc" }, data.description || ""),
+    );
+    const actions = el("div", { class: "v-actions" });
+    actions.append(
+      el("a", { class: "u", href: "/apps/" + id }, "Details"),
+      close,
+    );
+    const top = el("div", { class: "v-top" });
+    top.append(title, actions);
+    const table = el("div", { class: "v-table" });
+    table.append(surface);
+    const tools = el("div", { class: "v-actions" });
+    tools.append(state, reload, full);
+    const bottom = el("div", { class: "v-bottom" });
+    bottom.append(sizes, tools);
+    this.dialog.replaceChildren(top, table, bottom);
+    this.dialog.setAttribute("aria-label", data.title || "Experiment");
+    document.body.classList.add("has-window");
+    this.dialog.showModal();
+    close.focus();
+    try {
+      const instance = await openInstance(data, decision);
+      if (this.opened !== id) return;
+      full.href = "/instances/" + instance.id;
+      const mounted = mountFrame(
+        surface,
+        instance,
+        data.title || "",
+        (message) => {
+          state.textContent = message || "Live";
+        },
+      );
+      this.unbind = mounted.unbind;
+      this.reload = mounted.reload;
+    } catch (e) {
+      if (this.opened !== id) return;
+      const box = el("div", { class: "v-blocked" });
+      box.append(
+        el("p", {}, (e as Error).message),
+        el(
+          "a",
+          { class: "u", href: "/apps/" + id },
+          "Go to the experiment page",
+        ),
+      );
+      surface.replaceChildren(box);
+      state.textContent = "Unavailable";
+    }
+  }
+
+  close(back: boolean) {
+    if (!this.opened) return;
+    this.opened = undefined;
+    this.unbind?.();
+    this.unbind = this.reload = undefined;
+    this.dialog.close();
+    this.dialog.replaceChildren();
+    document.body.classList.remove("has-window");
+    if (back && new URLSearchParams(location.search).get("open")) {
+      const url = new URL(location.href);
+      url.searchParams.delete("open");
+      history.pushState({}, "", url);
+    }
+  }
+}
+
+function bindBrowser() {
   document
     .querySelector<HTMLSelectElement>("[data-archive-sort]")
     ?.addEventListener("change", (event) => {
       (event.target as HTMLSelectElement).form?.requestSubmit();
     });
-  const preview = document.querySelector<HTMLElement>("[data-archive-preview]");
-  if (!preview) return;
-  document
-    .querySelectorAll<HTMLElement>("[data-archive-row]")
-    .forEach((row) => {
-      const show = () => {
-        if (!matchMedia("(min-width: 901px) and (hover: hover)").matches)
-          return;
-        const media = row.querySelector(
-          "img:not([hidden]),video:not([hidden])",
-        );
-        if (!media) return;
-        preview.hidden = false;
-        const clone = media.cloneNode(true) as HTMLElement;
-        clone.setAttribute("aria-hidden", "true");
-        // The row thumbnail is sized for 76px; let the browser pick the
-        // variant for the preview's width instead of upscaling it.
-        if (clone instanceof HTMLImageElement && clone.srcset)
-          clone.sizes = preview.offsetWidth + "px";
-        preview.replaceChildren(clone);
-        const rect = row.getBoundingClientRect();
-        preview.style.left =
-          Math.min(
-            innerWidth - preview.offsetWidth - 20,
-            rect.left + rect.width * 0.46,
-          ) + "px";
-        preview.style.top =
-          Math.max(
-            12,
-            Math.min(innerHeight - preview.offsetHeight - 12, rect.top + 24),
-          ) + "px";
-      };
-      const hide = () => {
-        preview.hidden = true;
-      };
-      row.addEventListener("mouseenter", show);
-      row.addEventListener("focus", show);
-      row.addEventListener("mouseleave", hide);
-      row.addEventListener("blur", hide);
-    });
-  addEventListener(
-    "scroll",
-    () => {
-      preview.hidden = true;
-    },
-    { passive: true },
+  const list = document.querySelector<HTMLElement>("[data-browser-list]");
+  if (!list) return;
+
+  // Live filter: hide rows and groups that do not match while typing; Enter
+  // submits the form and the server applies the same rule.
+  const query = document.querySelector<HTMLInputElement>(
+    "[data-browser-query]",
   );
+  const count = document.querySelector<HTMLElement>("[data-browser-count]");
+  const empty = list.querySelector<HTMLElement>("[data-browser-empty]");
+  const rows = [...list.querySelectorAll<HTMLElement>("[data-browser-row]")];
+  const haystacks = rows.map((r) => (r.dataset.search || "").toLowerCase());
+  let timer: number | undefined;
+  query?.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const q = query.value.trim().toLowerCase();
+      let shown = 0;
+      rows.forEach((r, i) => {
+        r.hidden = !!q && !haystacks[i].includes(q);
+        if (!r.hidden) shown++;
+      });
+      list
+        .querySelectorAll<HTMLElement>("[data-browser-group]")
+        .forEach((g) => {
+          g.hidden = !g.querySelector("[data-browser-row]:not([hidden])");
+        });
+      if (count)
+        count.textContent = `${shown} ${shown === 1 ? "experiment" : "experiments"}`;
+      if (empty) empty.hidden = shown > 0;
+      const url = new URL(location.href);
+      if (q) url.searchParams.set("q", query.value.trim());
+      else url.searchParams.delete("q");
+      history.replaceState(history.state, "", url);
+    }, 80);
+  });
+
+  // Open: inline artifacts start in the viewer, tab artifacts open full
+  // screen in a new tab. Everyone else follows the link to the app page,
+  // which explains how to get access. The session is fetched up front so
+  // the decision is made synchronously inside the click (popup blockers).
+  const dialog = document.querySelector<HTMLDialogElement>("[data-viewer]");
+  const viewer = dialog ? new Viewer(dialog) : undefined;
+  let plan: Plan | undefined;
+  let ready = false;
+  getSession()
+    .then((s) => {
+      plan = s.plan;
+      ready = true;
+      const open = new URLSearchParams(location.search).get("open");
+      const link =
+        open &&
+        list.querySelector<HTMLAnchorElement>(
+          `[data-open][data-artifact="${CSS.escape(open)}"]`,
+        );
+      // On page load, only inline artifacts for visitors who may run them.
+      if (link && viewer) {
+        const d = decide(plan, link.dataset);
+        if (autoStart(link.dataset, d))
+          void viewer.open(link.dataset, d, false);
+      }
+    })
+    .catch(() => {});
+  list.addEventListener("click", (event) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>(
+      "[data-open]",
+    );
+    if (
+      !link ||
+      !ready ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.button !== 0
+    )
+      return;
+    const d = decide(plan, link.dataset);
+    if (d.kind !== "start") return;
+    event.preventDefault();
+    if (inNewTab(link.dataset))
+      openInNewTab(link.dataset, d).catch((e) =>
+        fail(
+          link.closest<HTMLElement>(".ri-foot") || list,
+          (e as Error).message,
+        ),
+      );
+    else if (viewer) void viewer.open(link.dataset, d);
+  });
 }
 
 function bindSupport(form: HTMLFormElement) {
@@ -376,7 +591,7 @@ function bindSignOut(btn: HTMLElement) {
 }
 
 function main() {
-  bindArchive();
+  bindBrowser();
   // Looping cover videos stay still for visitors who prefer reduced motion.
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
     document

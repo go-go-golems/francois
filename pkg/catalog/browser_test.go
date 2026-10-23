@@ -139,4 +139,20 @@ func TestBrowser(t *testing.T) {
 	if _, p, _ := e.do(nil, "portal.test", "GET", "/", nil, nil); !strings.Contains(row(p, "early"), `Early access for subscribers until `) || !strings.Contains(row(p, "early"), `<a class="u" href="/pricing">Subscribe →</a>`) {
 		t.Error("early access row does not invite to subscribe")
 	}
+
+	// The app page carries the launch mode and copy labels for public.ts,
+	// and renders the subscribe invitation itself for visitors who do not pay.
+	_, app, _ := e.do(nil, "portal.test", "GET", "/apps/alpha", nil, nil)
+	for _, want := range []string{`data-launch="inline"`, `data-label-start="Start experiment →"`, `data-label-demo="Try it →"`, `>Sign in to run</a>`} {
+		if !bytes.Contains(app, []byte(want)) {
+			t.Errorf("app page lacks %q", want)
+		}
+	}
+	_, early, _ := e.do(&free, "portal.test", "GET", "/apps/early", nil, nil)
+	if !bytes.Contains(early, []byte(`<p class="runner-early">In early access for subscribers until `)) || !bytes.Contains(early, []byte(`<a class="site-button is-primary" href="/pricing">Subscribe →</a>`)) || !bytes.Contains(early, []byte(`data-launch="tab"`)) {
+		t.Error("early access app page does not invite a free account to subscribe")
+	}
+	if _, early, _ = e.do(&paying, "portal.test", "GET", "/apps/early", nil, nil); bytes.Contains(early, []byte(`class="runner-early"`)) {
+		t.Error("paying visitors are invited to subscribe")
+	}
 }
