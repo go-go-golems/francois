@@ -75,7 +75,7 @@ func TestFinalArchiveQueriesAndPublicationIdentity(t *testing.T) {
 		t.Fatalf("archive order/visibility: %s", all)
 	}
 	_, filtered, _ := e.do(nil, "portal.test", "GET", "/?q=alpha&tag=graphics&sort=oldest", nil, nil)
-	if !bytes.Contains(filtered, []byte(`class="archive-number">001`)) || bytes.Contains(filtered, []byte(`href="/apps/beta"`)) || !bytes.Contains(filtered, []byte(`q=alpha&amp;sort=oldest`)) {
+	if !bytes.Contains(filtered, []byte(`<h2 class="ri-title"><a href="/apps/alpha">Alpha tool</a></h2>`)) || bytes.Contains(filtered, []byte(`href="/apps/beta"`)) || !bytes.Contains(filtered, []byte(`q=alpha&amp;sort=oldest`)) {
 		t.Fatalf("filters/identity: %s", filtered)
 	}
 	_, empty, _ := e.do(nil, "portal.test", "GET", "/?q=%22%3E%3Cscript%3E", nil, nil)

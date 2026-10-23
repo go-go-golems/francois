@@ -288,8 +288,8 @@ func TestMediaVariants(t *testing.T) {
 		t.Fatalf("GIF srcset %q", got)
 	}
 
-	// The archive row thumbnail is 76px wide, but the hover preview reuses
-	// it at 432px, so it must offer the larger variants too.
+	// The landing page row thumbnail offers every variant for its 402px
+	// column.
 	expect := func(what string, code int, out map[string]any, want int) {
 		t.Helper()
 		if code != want {
@@ -305,8 +305,8 @@ func TestMediaVariants(t *testing.T) {
 	code, out = e.portal(&admin, "POST", "/api/studio/artifacts/thumbs/draft/publish", nil)
 	expect("publish page", code, out, 200)
 	_, home, _ := e.do(nil, "portal.test", "GET", "/", nil, nil)
-	if !bytes.Contains(home, []byte(`<img src="/media/`+id+`?w=160&amp;v=2" srcset="/media/`+id+`?w=160&amp;v=2 160w, `)) || !bytes.Contains(home, []byte(`/media/`+id+` 800w" sizes="76px"`)) {
-		t.Fatal("archive thumbnail lacks a srcset for the hover preview")
+	if !bytes.Contains(home, []byte(`<img src="/media/`+id+`?w=640&amp;v=2" srcset="/media/`+id+`?w=160&amp;v=2 160w, `)) || !bytes.Contains(home, []byte(`/media/`+id+` 800w" sizes="(max-width: 900px) 100vw, 402px"`)) {
+		t.Fatal("landing page thumbnail lacks its srcset")
 	}
 }
 

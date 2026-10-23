@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-go-golems/francois/pkg/catalog/content"
 	"github.com/go-go-golems/francois/pkg/catalog/httpx"
@@ -181,6 +183,16 @@ type card struct {
 	Featured               bool
 	EarlyAccessUntil       *time.Time
 	DemoEnabled            bool
+	LaunchMode             string
+	// HTMLFile is the latest release's application file; FreeSample lets
+	// anyone download it.
+	HTMLFile   *store.ReleaseFile
+	FreeSample bool
+}
+
+// EarlyAccess reports whether the card is still for paying customers only.
+func (c card) EarlyAccess() bool {
+	return c.EarlyAccessUntil != nil && c.EarlyAccessUntil.After(time.Now())
 }
 
 // brand is the storefront name shown in the header and titles: the
@@ -376,8 +388,16 @@ func (s *Server) cards(ctx context.Context, include func(store.Artifact) bool) (
 }
 
 func cardOf(a store.Artifact, rel store.Release, creators []store.Creator) card {
-	return card{ID: a.ID, Title: a.Title, Description: a.Description, Tags: a.Tags, Capabilities: releaseCaps(rel), Creators: creators,
-		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, EarlyAccessUntil: a.EarlyAccessUntil, DemoEnabled: a.DemoEnabled}
+	c := card{ID: a.ID, Title: a.Title, Description: a.Description, Tags: a.Tags, Capabilities: releaseCaps(rel), Creators: creators,
+		Version: rel.Version, ReleaseID: rel.ID, Published: rel.PublishedAt, Featured: a.Featured, EarlyAccessUntil: a.EarlyAccessUntil, DemoEnabled: a.DemoEnabled,
+		LaunchMode: a.LaunchMode, FreeSample: rel.FreeSample}
+	for i := range rel.Files {
+		if rel.Files[i].Role == "html" {
+			c.HTMLFile = &rel.Files[i]
+			break
+		}
+	}
+	return c
 }
 
 func find(arts []store.Artifact, id string) *store.Artifact {
@@ -417,10 +437,21 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		s.pageFailed(w, r, err)
 		return
 	}
+	rev, err := s.Store.ActiveSettings(ctx)
+	if err != nil {
+		s.pageFailed(w, r, err)
+		return
+	}
+	var who visitor
+	if p := principal(ctx); p != nil {
+		if e, _, err := s.entitlement(ctx, p.User); err == nil {
+			who = visitor{member: e.Source != SourceGuest && e.Source != SourceDisabled, paying: e.Paid()}
+		}
+	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tag := r.URL.Query().Get("tag")
 	order := r.URL.Query().Get("sort")
-	if order != "oldest" {
+	if !archiveOrders[order] {
 		order = "newest"
 	}
 	link := func(t string) string {
@@ -436,17 +467,20 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	type category struct {
 		Name, Href string
+		Count      int
 		Current    bool
 	}
 	tags := []category{}
-	seen := map[string]bool{}
+	index := map[string]int{}
 	matches := []card{}
 	for _, c := range cards {
 		for _, t := range c.Tags {
-			if !seen[t] {
-				tags = append(tags, category{t, link(t), t == tag})
-				seen[t] = true
+			if i, ok := index[t]; ok {
+				tags[i].Count++
+				continue
 			}
+			index[t] = len(tags)
+			tags = append(tags, category{t, link(t), 1, t == tag})
 		}
 		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
 		if (tag == "" || contains(c.Tags, tag)) && (q == "" || strings.Contains(haystack, strings.ToLower(q))) {
@@ -454,12 +488,109 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
-	if order == "newest" {
-		for i, j := 0, len(matches)-1; i < j; i, j = i+1, j-1 {
-			matches[i], matches[j] = matches[j], matches[i]
-		}
+	rows := make([]archiveRow, len(matches))
+	for i, c := range matches {
+		rows[i] = archiveRowOf(c, rev.Document, who)
 	}
-	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Rows": matches, "Total": len(cards), "Tags": tags, "Tag": tag, "Query": q, "Sort": order, "AllHref": link(""), "LoginError": r.URL.Query().Get("login_error")}})
+	groups := groupArchive(rows, order)
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": len(rows), "Total": len(cards), "Tags": tags, "Tag": tag,
+		"Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link(""), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
+}
+
+// archiveOrderList is the landing page sort menu.
+var archiveOrderList = []struct{ Value, Label string }{
+	{"newest", "Newest first"}, {"oldest", "Oldest first"}, {"az", "A–Z"}, {"small", "Smallest first"}, {"large", "Largest first"},
+}
+
+var archiveOrders = map[string]bool{"newest": true, "oldest": true, "az": true, "small": true, "large": true}
+
+// archiveRow is one experiment in the landing page list.
+type archiveRow struct {
+	card
+	Size int64
+	// Demo means a visitor without a plan may start a demo.
+	Demo bool
+	// Download is the file link, or a sign-in link for visitors who must
+	// sign in first; empty during early access for visitors who do not pay.
+	Download, DownloadName string
+	// EarlyNote invites visitors who do not pay to subscribe.
+	EarlyNote bool
+}
+
+// visitor is what the landing page needs to know about the viewer: member
+// means a signed-in account that may run artifacts (not a demo guest).
+type visitor struct{ member, paying bool }
+
+// archiveRowOf applies the download rule of mayDownload to a row: the link
+// is hidden only while an artifact is in early access and the visitor does
+// not pay. Visitors who must sign in first get a sign-in link instead of a
+// download that would answer 401.
+func archiveRowOf(c card, doc settings.Document, who visitor) archiveRow {
+	row := archiveRow{card: c, Demo: doc.Demo.Enabled && c.DemoEnabled}
+	if c.HTMLFile == nil {
+		return row
+	}
+	row.Size, row.DownloadName = c.HTMLFile.Size, c.HTMLFile.Name
+	switch {
+	case c.EarlyAccess() && !who.paying:
+		row.EarlyNote = true
+	case c.FreeSample || who.member:
+		row.Download = "/api/releases/" + c.ReleaseID + "/files/" + c.HTMLFile.ID + "/download"
+	default:
+		row.Download, row.DownloadName = signinURL("/apps/"+c.ID), ""
+	}
+	return row
+}
+
+// archiveGroup is a labelled run of rows: a month for date orders, an
+// initial for A–Z, one group for size orders.
+type archiveGroup struct {
+	Label string
+	Rows  []archiveRow
+}
+
+func groupArchive(rows []archiveRow, order string) []archiveGroup {
+	by := func(less func(a, b archiveRow) bool) {
+		sort.SliceStable(rows, func(i, j int) bool { return less(rows[i], rows[j]) })
+	}
+	published := func(a, b archiveRow) bool {
+		if a.FirstPublished.Equal(*b.FirstPublished) {
+			return a.ID < b.ID
+		}
+		return a.FirstPublished.Before(*b.FirstPublished)
+	}
+	label := func(r archiveRow) string { return r.FirstPublished.UTC().Format("January 2006") }
+	switch order {
+	case "oldest":
+		by(published)
+	case "newest":
+		by(func(a, b archiveRow) bool { return published(b, a) })
+	case "az":
+		by(func(a, b archiveRow) bool { return strings.ToLower(a.Title) < strings.ToLower(b.Title) })
+		label = func(r archiveRow) string {
+			first, _ := utf8.DecodeRuneInString(strings.ToUpper(r.Title))
+			if !unicode.IsLetter(first) {
+				return "#"
+			}
+			return string(first)
+		}
+	case "small", "large":
+		by(func(a, b archiveRow) bool {
+			if a.Size == b.Size {
+				return a.Title < b.Title
+			}
+			return (a.Size < b.Size) == (order == "small")
+		})
+		label = func(archiveRow) string { return "By size" }
+	}
+	groups := []archiveGroup{}
+	for _, r := range rows {
+		if l := label(r); len(groups) == 0 || groups[len(groups)-1].Label != l {
+			groups = append(groups, archiveGroup{Label: l})
+		}
+		groups[len(groups)-1].Rows = append(groups[len(groups)-1].Rows, r)
+	}
+	return groups
 }
 
 func contains(list []string, v string) bool {
