@@ -133,23 +133,13 @@ func (s *Server) routes() http.Handler {
 	})
 }
 
-// legalUpdated is the date shown on /privacy and /terms; change it with
-// their text in web/legal.tmpl.
-const legalUpdated = "16 October 2026"
-
-// legalPage serves the privacy policy or terms as plain HTML, named after
-// the site the request arrived on, so identity-provider consent screens and
-// crawlers can read them without JavaScript.
+// legalPage renders /privacy or /terms from the site copy (legal.<page>),
+// so staff can edit them in the admin panel or with the CLI.
 func (s *Server) legalPage(page, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		site := s.site(r)
-		data := map[string]string{"Page": page, "Title": title, "Site": site.PublicURL.Hostname(), "Contact": s.Config.LegalContact, "Updated": legalUpdated,
-			"Canonical": site.PortalOrigin() + "/" + page, "Description": title + " for " + site.PublicURL.Hostname() + "."}
-		if err := s.legal.Execute(w, data); err != nil {
-			log.Error().Err(err).Str("page", page).Msg("render legal page")
-		}
+		site := s.site(r).PublicURL.Hostname()
+		s.render(w, r, http.StatusOK, "legal", pageData{Title: title, Crumb: page, Description: title + " for " + site + ".",
+			Body: map[string]any{"Key": "legal." + page, "Heading": title, "Site": site, "Contact": s.Config.LegalContact}})
 	}
 }
 

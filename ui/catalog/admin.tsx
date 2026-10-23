@@ -910,7 +910,7 @@ function SiteCopy({
               {k.label} <span className="muted mono">{k.key}</span>
             </span>
             {k.kind === "markdown" ? (
-              <textarea rows={4} {...props} />
+              <textarea rows={k.max > 4000 ? 16 : 4} {...props} />
             ) : (
               <input {...props} />
             )}

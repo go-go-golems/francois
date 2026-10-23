@@ -39,6 +39,8 @@ var CopyKeys = []CopyKey{
 	{Key: "earlyaccess.runner", Label: "Early access, app page", Help: "Shown next to the cover; {date} is the end of early access.", Kind: "text", Max: 200,
 		Default: "In early access for subscribers until {date}. Subscribe to run it now."},
 	{Key: "earlyaccess.button", Label: "Subscribe button", Kind: "text", Max: 60, Default: "Subscribe →"},
+	{Key: "legal.privacy", Label: "Privacy policy", Help: "The /privacy page. {site} is the site's host name, {contact} the legal contact address. Change the date on the first line when the text changes.", Kind: "markdown", Max: 20000, Default: defaultPrivacy},
+	{Key: "legal.terms", Label: "Terms of service", Help: "The /terms page. {site} is the site's host name, {contact} the legal contact address. Change the date on the first line when the text changes.", Kind: "markdown", Max: 20000, Default: defaultTerms},
 	{Key: "support.tab.individual", Label: "Support tab, individual", Help: "Pricing page tab for personal monthly support.", Kind: "text", Max: 40, Default: "Individual"},
 	{Key: "support.tab.enterprise", Label: "Support tab, enterprise", Help: "Pricing page tab for company support (8 to 4096 USD, powers of two).", Kind: "text", Max: 40, Default: "Enterprise"},
 	{Key: "support.enterprise.label", Label: "Enterprise label", Kind: "text", Max: 80, Default: "Every month, for your company"},

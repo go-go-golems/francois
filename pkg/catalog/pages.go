@@ -162,6 +162,15 @@ func (c siteCopy) Text(key string) string { return c.doc.CopyText(key) }
 
 func (c siteCopy) HTML(key string) template.HTML { return c.md.Render(c.doc.CopyText(key), nil) }
 
+// Legal renders a legal page's Markdown with {site} and {contact} filled in.
+func (c siteCopy) Legal(key, site, contact string) template.HTML {
+	to := "the support address shown on the sign-in consent screen"
+	if contact != "" {
+		to = "[" + contact + "](mailto:" + contact + ")"
+	}
+	return c.md.Render(strings.NewReplacer("{site}", site, "{contact}", to).Replace(c.doc.CopyText(key)), nil)
+}
+
 // Date fills the {date} placeholder of a copy key.
 func (c siteCopy) Date(key string, t *time.Time) string {
 	if t == nil {

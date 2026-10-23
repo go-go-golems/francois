@@ -514,7 +514,48 @@ func settingsCommands() (*cobra.Command, error) {
 				}
 				return c.Admin.EditSettings(ctx, func(d *settings.Document) error { return d.SetCopy(a.S("key"), text) })
 			}},
+		def{name: "legal", short: "Show the privacy policy or terms of service (Markdown)", flags: []*fieldsDef{arg("page", "privacy or terms")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				key, err := legalKey(a.S("page"))
+				if err != nil {
+					return nil, err
+				}
+				s, err := c.Admin.Settings(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"page": a.S("page"), "overridden": s.Active.Document.Storefront.Copy[key] != "", "markdown": s.Active.Document.CopyText(key)}, nil
+			}},
+		def{name: "set-legal", short: "Replace the privacy policy or terms of service from a Markdown file", destructive: true,
+			flags: []*fieldsDef{arg("page", "privacy or terms"), flag("file", "Markdown file; {site} and {contact} are filled in"), boolean("reset", "Return to the default text")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				key, err := legalKey(a.S("page"))
+				if err != nil {
+					return nil, err
+				}
+				text := ""
+				if f := a.S("file"); f != "" && !a.B("reset") {
+					raw, err := os.ReadFile(f) // #nosec G304 -- the operator names the file
+					if err != nil {
+						return nil, err
+					}
+					if text = strings.TrimSpace(string(raw)); text == "" {
+						return nil, errors.New("the file is empty")
+					}
+				} else if !a.B("reset") {
+					return nil, errors.New("give --file or --reset")
+				}
+				return c.Admin.EditSettings(ctx, func(d *settings.Document) error { return d.SetCopy(key, text) })
+			}},
 	)
+}
+
+// legalKey maps a legal page name to its site copy key.
+func legalKey(page string) (string, error) {
+	if page != "privacy" && page != "terms" {
+		return "", errors.Errorf("page must be privacy or terms, not %q", page)
+	}
+	return "legal." + page, nil
 }
 
 func billingCommands() (*cobra.Command, error) {
