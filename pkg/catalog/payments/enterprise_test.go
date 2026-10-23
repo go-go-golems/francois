@@ -28,12 +28,17 @@ func TestEnterpriseSupportStripePayload(t *testing.T) {
 		}
 		for key, want := range map[string]string{
 			"mode": "subscription", "line_items[0][price_data][unit_amount]": "102400", "line_items[0][price_data][recurring][interval]": "month",
-			"line_items[0][price_data][product_data][name]":         "Enterprise support",
+			"line_items[0][price_data][product_data][name]":         "Monthly support",
 			"subscription_data[metadata][francois_monthly_support]": "true", "subscription_data[metadata][francois_support_tier]": "enterprise",
-			"tax_id_collection[enabled]": "true", "billing_address_collection": "required", "customer_update[name]": "auto", "customer_update[address]": "auto",
 		} {
 			if got := r.Form.Get(key); got != want {
 				t.Errorf("%s=%q, want %q", key, got, want)
+			}
+		}
+		// Only the amount differs from individual support.
+		for _, key := range []string{"tax_id_collection[enabled]", "billing_address_collection", "customer_update[name]", "customer_update[address]"} {
+			if r.Form.Get(key) != "" {
+				t.Errorf("enterprise checkout sends %s", key)
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
