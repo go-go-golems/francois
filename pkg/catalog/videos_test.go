@@ -70,14 +70,16 @@ func TestVideos(t *testing.T) {
 	expect("release", code, out, 201, "")
 	code, out = e.portal(&admin, "POST", "/api/studio/releases/"+out["id"].(string)+"/publish", nil)
 	expect("publish", code, out, 200, "")
-	code, out = e.portal(&admin, "PUT", "/api/studio/artifacts/film/draft", map[string]any{"body": "Watch:\n\n![walk](/media/" + videoID + ")", "cover": videoID})
+	code, out = e.portal(&admin, "PUT", "/api/studio/artifacts/film/draft", map[string]any{"body": "Watch:\n\n![walk](/media/" + videoID + ")", "cover": videoID, "gallery": []string{imageID, videoID}})
 	expect("draft", code, out, 200, "")
 	code, out = e.portal(&admin, "POST", "/api/studio/artifacts/film/draft/publish", nil)
 	expect("publish page", code, out, 200, "")
 	_, page, _ := e.do(nil, "portal.test", "GET", "/apps/film", nil, nil)
 	for _, want := range []string{
-		`<video src="/media/` + videoID + `" autoplay muted loop playsinline controls`,                                // cover
-		`<video src="/media/` + videoID + `" controls preload="metadata" playsinline poster="/media/` + imageID + `"`, // body
+		`<video src="/media/` + videoID + `" autoplay muted loop playsinline controls`,                                                                 // cover
+		`<video src="/media/` + videoID + `" controls preload="metadata" playsinline poster="/media/` + imageID + `"`,                                  // body
+		`<figure><a class="gallery-zoom" href="/media/` + imageID + `" data-zoom aria-label="View full size: still"><img src="/media/` + imageID + `"`, // gallery image opens full size
+		`<figure><video src="/media/` + videoID + `" controls`,                                                                                         // gallery video plays in place
 	} {
 		if !bytes.Contains(page, []byte(want)) {
 			t.Fatalf("artifact page lacks %q", want)

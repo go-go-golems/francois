@@ -13,7 +13,7 @@
 <a class="u runner-link" data-runner-link data-runner-control hidden>Open full screen ↗</a>
 </section>
 <div class="experiment-editorial">{{range .Sections}}<section class="editorial-row">{{if .Label}}<h2 class="editorial-label">{{.Label}}</h2>{{else}}<div class="editorial-label" aria-hidden="true"></div>{{end}}<div class="md editorial-body">{{.HTML}}</div></section>{{end}}</div>
-{{if .Gallery}}<section class="gallery experiment-gallery" aria-label="Gallery">{{range .Gallery}}<figure>{{template "media" .}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>{{end}}</section>{{end}}
+{{if .Gallery}}<section class="gallery experiment-gallery" aria-label="Gallery">{{range .Gallery}}<figure>{{if isVideo .MediaType}}{{template "media" .}}{{else}}<a class="gallery-zoom" href="/media/{{.ID}}" data-zoom aria-label="View full size{{with .Alt}}: {{.}}{{end}}">{{template "media" .}}</a>{{end}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>{{end}}</section>{{end}}
 {{range .Releases}}{{if .Attached}}<section class="editorial-row experiment-attachments"><h2 class="editorial-label">Attachments</h2><div><ul class="attachments" aria-label="Attachments">{{range .Attached}}<li>{{if .Href}}<a class="u" href="{{.Href}}" download="{{.Name}}">{{.Title}}</a>{{else}}<span>{{.Title}}</span>{{end}} <span class="muted">{{.Name}} · {{size .Size}}</span></li>{{end}}</ul>{{if .Locked}}<p class="muted small">{{if $.Body.EarlyAccess}}Paying access is required until {{$.Body.EarlyAccessUntil.Format "2 January 2006"}}.{{else}}Sign in to download attachments.{{end}}</p>{{end}}</div></section>{{end}}{{end}}
 {{template "support-callout" $}}
 </main>{{end}}{{end}}

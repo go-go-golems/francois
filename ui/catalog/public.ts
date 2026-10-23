@@ -578,6 +578,74 @@ function bindYearSupport(form: HTMLFormElement) {
   });
 }
 
+// bindLightbox opens a gallery's screenshots full size in a modal: arrows
+// or the buttons step through them, Esc, Close or a click outside the image
+// closes it. Without JavaScript the link opens the image itself.
+function bindLightbox(gallery: HTMLElement) {
+  const links = [
+    ...gallery.querySelectorAll<HTMLAnchorElement>("a[data-zoom]"),
+  ];
+  if (!links.length) return;
+  const dialog = el("dialog", {
+    class: "lightbox",
+    "aria-label": "Screenshot",
+  });
+  const img = el("img", { alt: "" });
+  const caption = el("p", { class: "lightbox-caption" });
+  const count = el("span", { class: "lightbox-count" });
+  const prev = el(
+    "button",
+    { type: "button", class: "tlink", "aria-label": "Previous screenshot" },
+    "← Previous",
+  );
+  const next = el(
+    "button",
+    { type: "button", class: "tlink", "aria-label": "Next screenshot" },
+    "Next →",
+  );
+  const close = el("button", { type: "button", class: "tlink" }, "Close · Esc");
+  const bar = el("div", { class: "lightbox-bar" });
+  const nav = el("div", { class: "lightbox-nav" });
+  if (links.length > 1) nav.append(prev, count, next);
+  bar.append(caption, nav, close);
+  dialog.append(img, bar);
+  document.body.append(dialog);
+  let at = 0;
+  const show = (i: number) => {
+    at = (i + links.length) % links.length;
+    const thumb = links[at].querySelector("img");
+    img.src = links[at].href;
+    img.alt = thumb?.alt || "";
+    caption.textContent = thumb?.alt || "";
+    count.textContent = `${at + 1} / ${links.length}`;
+  };
+  links.forEach((link, i) =>
+    link.addEventListener("click", (event) => {
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.button !== 0
+      )
+        return;
+      event.preventDefault();
+      show(i);
+      dialog.showModal();
+    }),
+  );
+  prev.onclick = () => show(at - 1);
+  next.onclick = () => show(at + 1);
+  close.onclick = () => dialog.close();
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowLeft") show(at - 1);
+    else if (event.key === "ArrowRight") show(at + 1);
+  });
+  dialog.addEventListener("close", () => links[at].focus());
+}
+
 function bindSignOut(btn: HTMLElement) {
   btn.addEventListener("click", async () => {
     try {
@@ -601,6 +669,7 @@ function main() {
       });
   }
   document.querySelectorAll<HTMLElement>("[data-signout]").forEach(bindSignOut);
+  document.querySelectorAll<HTMLElement>(".gallery").forEach(bindLightbox);
   document
     .querySelectorAll<HTMLFormElement>("[data-support-monthly]")
     .forEach(bindSupport);
