@@ -258,8 +258,8 @@ func TestMediaVariants(t *testing.T) {
 		}
 		return cfg, format, h, b
 	}
-	cfg, format, h, first := get(id, "?w=320")
-	if format != "jpeg" || cfg.Width != 320 || cfg.Height != 200 || h.Get("Content-Type") != "image/jpeg" || !strings.HasSuffix(h.Get("ETag"), `-w320"`) {
+	cfg, format, h, first := get(id, "?w=320&v=2")
+	if format != "jpeg" || cfg.Width != 320 || cfg.Height != 200 || h.Get("Content-Type") != "image/jpeg" || !strings.HasSuffix(h.Get("ETag"), `-w320-v2"`) {
 		t.Fatalf("variant: %s %dx%d %q %q", format, cfg.Width, cfg.Height, h.Get("Content-Type"), h.Get("ETag"))
 	}
 	if _, _, _, again := get(id, "?w=320"); !bytes.Equal(first, again) {
@@ -280,12 +280,33 @@ func TestMediaVariants(t *testing.T) {
 		t.Fatalf("GIF resized to %s", format)
 	}
 
-	want := "/media/m?w=160 160w, /media/m?w=320 320w, /media/m?w=640 640w, /media/m 800w"
+	want := "/media/m?w=160&v=2 160w, /media/m?w=320&v=2 320w, /media/m?w=640&v=2 640w, /media/m 800w"
 	if got := srcset(store.Media{ID: "m", MediaType: "image/png", Width: 800, Height: 500}); got != want {
 		t.Fatalf("srcset %q", got)
 	}
 	if got := srcset(store.Media{ID: "m", MediaType: "image/gif", Width: 800, Height: 500}); got != "" {
 		t.Fatalf("GIF srcset %q", got)
+	}
+
+	// The archive row thumbnail is 76px wide, but the hover preview reuses
+	// it at 432px, so it must offer the larger variants too.
+	expect := func(what string, code int, out map[string]any, want int) {
+		t.Helper()
+		if code != want {
+			t.Fatalf("%s: %d %v", what, code, out)
+		}
+	}
+	code, out := e.multipartTo(admin, "/api/studio/releases", map[string]string{"artifactId": "thumbs", "title": "Thumbs", "version": "1.0.0", "manifestJson": `{}`}, "html", "a.html", []byte(testHTML))
+	expect("release", code, out, 201)
+	code, out = e.portal(&admin, "POST", "/api/studio/releases/"+out["id"].(string)+"/publish", nil)
+	expect("publish", code, out, 200)
+	code, out = e.portal(&admin, "PUT", "/api/studio/artifacts/thumbs/draft", map[string]any{"body": "Text.", "cover": id})
+	expect("draft", code, out, 200)
+	code, out = e.portal(&admin, "POST", "/api/studio/artifacts/thumbs/draft/publish", nil)
+	expect("publish page", code, out, 200)
+	_, home, _ := e.do(nil, "portal.test", "GET", "/", nil, nil)
+	if !bytes.Contains(home, []byte(`<img src="/media/`+id+`?w=160&amp;v=2" srcset="/media/`+id+`?w=160&amp;v=2 160w, `)) || !bytes.Contains(home, []byte(`/media/`+id+` 800w" sizes="76px"`)) {
+		t.Fatal("archive thumbnail lacks a srcset for the hover preview")
 	}
 }
 
