@@ -532,7 +532,7 @@ PR #23 was pushed and the user asked to wait for the Codex review. Codex reporte
 - `TestBrowser` failed (`browser_test.go:72: landing page lacks "<span>October 2026</span><span>2 artifacts</span>"`) because of the new `data-browser-group-count` attribute. `TestFinalArchiveQueriesAndPublicationIdentity` failed at line 80 because Beta is now present (hidden). Updated both assertions.
 
 ### What warrants a second pair of eyes
-- Hidden rows still load their thumbnails lazily only when shown (`loading="lazy"` on `display:none` images does not fetch), so the page weight with a query stays about the same.
+- Hidden rows carry `loading="lazy"` thumbnails, which browsers normally do not fetch while `display:none`; I did not measure page weight with a query.
 - I did not reply on the PR thread or ask Codex to re-review; both would post as the user.
 
 ### Code review instructions
