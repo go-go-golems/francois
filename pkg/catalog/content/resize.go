@@ -6,6 +6,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"golang.org/x/image/draw"
@@ -16,6 +17,21 @@ import (
 // fixed set keeps the derived files bounded: a client cannot ask for every
 // width in turn.
 var VariantWidths = []int{160, 320, 640, 1200}
+
+// VariantVersion names the current encoding of variants. Variant URLs carry
+// it, because they are cached as immutable: raising it gives browsers and
+// the variant cache fresh files after the encoder changes.
+const VariantVersion = 2
+
+// variantQuality is the JPEG quality of opaque variants. Screenshots of
+// interfaces are mostly text and thin lines, which ring visibly below ~90.
+const variantQuality = 90
+
+// VariantURL is the URL of media id resized to width w; the server falls
+// back to the original when it does not resize that file.
+func VariantURL(id string, w int) string {
+	return MediaPrefix + id + "?w=" + strconv.Itoa(w) + "&v=" + strconv.Itoa(VariantVersion)
+}
 
 // maxResizePixels bounds the decoded size (4 bytes per pixel) of an image
 // the server resizes; larger images are served as uploaded.
@@ -69,7 +85,7 @@ func Resize(r io.ReadSeeker, w int) ([]byte, string, error) {
 	draw.CatmullRom.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
 	var out bytes.Buffer
 	if dst.Opaque() {
-		err = jpeg.Encode(&out, dst, &jpeg.Options{Quality: 82})
+		err = jpeg.Encode(&out, dst, &jpeg.Options{Quality: variantQuality})
 		return out.Bytes(), "image/jpeg", err
 	}
 	err = (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&out, dst)

@@ -114,7 +114,7 @@ func (b *Blobs) PutReader(r io.Reader, limit int64) (string, string, int64, erro
 	return key, sum, size, os.Rename(tmp.Name(), final)
 }
 
-var variantPattern = regexp.MustCompile(`^[0-9a-f]{64}-w[0-9]{1,5}$`)
+var variantPattern = regexp.MustCompile(`^[0-9a-f]{64}-w[0-9]{1,5}(-v[0-9]{1,3})?$`)
 
 // Variant returns a derived file (such as a resized image) stored under
 // variants/, or os.ErrNotExist. Variants are a cache: deleting the

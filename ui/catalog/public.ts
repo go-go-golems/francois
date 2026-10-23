@@ -240,10 +240,14 @@ function bindArchive() {
           "img:not([hidden]),video:not([hidden])",
         );
         if (!media) return;
+        preview.hidden = false;
         const clone = media.cloneNode(true) as HTMLElement;
         clone.setAttribute("aria-hidden", "true");
+        // The row thumbnail is sized for 76px; let the browser pick the
+        // variant for the preview's width instead of upscaling it.
+        if (clone instanceof HTMLImageElement && clone.srcset)
+          clone.sizes = preview.offsetWidth + "px";
         preview.replaceChildren(clone);
-        preview.hidden = false;
         const rect = row.getBoundingClientRect();
         preview.style.left =
           Math.min(
