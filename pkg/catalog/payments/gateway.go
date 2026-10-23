@@ -18,6 +18,7 @@ import (
 type CheckoutRequest struct {
 	YearFunding                            bool
 	SupportAmountCents                     int64
+	SupportTier                            string // "" or billing.TierEnterprise
 	CustomerID, PriceID, UserID, AttemptID string
 	SuccessURL, CancelURL, IdempotencyKey  string
 }
@@ -138,6 +139,14 @@ func (g *stripeGateway) CreateCheckout(ctx context.Context, r CheckoutRequest) (
 			ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{Name: stripe.String("Monthly support")},
 		}}}
 		p.SubscriptionData.Metadata["francois_monthly_support"] = "true"
+		if r.SupportTier == billing.TierEnterprise {
+			// Companies need an invoice with their name, address and tax ID.
+			p.LineItems[0].PriceData.ProductData.Name = stripe.String("Enterprise support")
+			p.SubscriptionData.Metadata["francois_support_tier"] = billing.TierEnterprise
+			p.TaxIDCollection = &stripe.CheckoutSessionCreateTaxIDCollectionParams{Enabled: stripe.Bool(true)}
+			p.BillingAddressCollection = stripe.String(string(stripe.CheckoutSessionBillingAddressCollectionRequired))
+			p.CustomerUpdate = &stripe.CheckoutSessionCreateCustomerUpdateParams{Name: stripe.String("auto"), Address: stripe.String("auto")}
+		}
 	}
 	if r.YearFunding {
 		p.Mode = stripe.String(stripe.CheckoutSessionModePayment)
@@ -217,6 +226,9 @@ func Project(s *stripe.Subscription) billing.Subscription {
 				out.PriceID = item.Price.ID
 				if s.Metadata["francois_monthly_support"] == "true" && item.Price.Currency == stripe.CurrencyUSD && item.Price.Recurring != nil && item.Price.Recurring.Interval == stripe.PriceRecurringIntervalMonth && item.Price.Recurring.IntervalCount == 1 && item.Quantity == 1 {
 					out.SupportAmountCents = item.Price.UnitAmount
+					if s.Metadata["francois_support_tier"] == billing.TierEnterprise {
+						out.SupportTier = billing.TierEnterprise
+					}
 				}
 			}
 			out.Quantity = int(item.Quantity)
