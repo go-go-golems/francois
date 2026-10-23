@@ -33,3 +33,11 @@ Gallery screenshots open full size in a modal lightbox (54ddbd2); early-access b
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/public.ts — bindLightbox
+
+## 2026-10-23
+
+Consistency pass: legal pages in layout + CMS + CLI (517459e); artifacts wording, guest download on app page, dot tags, 404/footer/tab fixes (f3cda46)
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/pkg/catalog/settings/legal.go — Default legal texts

@@ -408,3 +408,80 @@ Gallery screenshots on an app page now open full size in a modal. Before, clicki
 
 ### Technical details
 - Full-size URL: `/media/{id}` without `?w=`, i.e. the original upload.
+
+## Step 8: Consistency review and fixes
+
+Reviewed every public page as guest, free user and subscriber at 1440 and 390 px. Then fixed what the user picked from the findings:
+- the privacy and terms pages now use the site layout, with their text editable as site copy and through two CLI verbs;
+- the visible wording says "artifacts" everywhere;
+- the app page offers Download (a sign-in link for guests);
+- tags on the app page are separated by dots;
+- the 404 and error pages use the labelled section layout;
+- the footer's empty Type heading is gone;
+- the pricing tabs are as wide as the rest of their column.
+
+### Prompt Context
+**User prompt (verbatim):** "Ok, cool. Let's review the site for consistency. also is there a way to hide a release from the main page?" then "update privacy and term page and put their content in CMS, with CLI verb too. \n\ncall them artifacts\n\n- there should be a download link on the main page as well. I don't even see one on the apps/kiln-workbench (as a guest)\n- tags: use dots\n\n5, 6, 7 fix as well."
+**Assistant interpretation:** Implement findings 1, 2 (as "artifacts"), 4, 5, 6, 7 plus a Download link for guests on the app page; the row-layout finding (3) and gallery captions (8) were not picked.
+**Inferred user intent:** One coherent site before deploy, and staff-editable legal texts.
+**Commit (code):** 517459e — "feat(catalog): privacy and terms in the site layout, editable as site copy"; f3cda46 — "feat(catalog): call them artifacts, download for guests, consistent pages"
+
+### What I did
+- Review: full-page Playwright screenshots of `/`, `/apps/kiln-workbench`, `/apps/hypercore-studio`, `/pricing`, `/signin`, `/privacy`, a 404, `/account`, at 1440 and 390 px.
+- Hiding: answered from the code. `visibility=hidden` removes an artifact everywhere: the list, RSS, sitemap and catalog API; demos stop; `/apps/{id}` returns 404 to everyone but its editors. Withdrawing a release suspends its instances. There is no "unlisted" mode.
+- Legal:
+  - `settings/legal.go` holds the Markdown defaults (the old wording, `{site}`/`{contact}` placeholders). It feeds two new copy keys, `legal.privacy` and `legal.terms` (markdown, 20000 characters).
+  - `siteCopy.Legal` fills the placeholders and renders the text.
+  - `templates/legal.tmpl` uses the section layout, labelled "Information". `routes.go` `legalPage` uses `s.render`.
+  - Removed `web/legal.tmpl`, `web.LegalTemplate`, `Server.legal` and `legalUpdated`.
+  - CLI: `francois catalog settings legal <page>` and `settings set-legal <page> --file|--reset`.
+  - Admin: the copy editor gives keys longer than 4000 characters a 16-row textarea.
+- Wording: "experiment(s)" → "artifact(s)" in `home.tmpl`, `artifact.tmpl`, `pricing.tmpl`, `copy.go` (`home.search` "Search artifacts", `runner.start` "Run artifact →"), `public.ts`, `instance-launch.ts`, `account.tsx`. "Back to the catalog" → "Back to all artifacts". Studio "Listed in the catalog" → "Listed on the landing page".
+- Download on the app page: `artifactPage` applies the landing page rule. The file goes to members and to free samples; visitors without an account get a sign-in link ("· sign in to download"); nobody who doesn't pay gets one during early access. The label is "Download ↓" (was "Get the file ↓").
+- Tags: `join .Card.Tags " · "`.
+- `notfound.tmpl` and `unavailable.tmpl` use the section layout with a label; the footer's Type column renders only with the font credit; `.support-tiers { max-width:760px }`.
+- Tests: new `legal_test.go` `TestLegalPagesFromCopy` (layout, placeholders, mailto, override). `TestLegalPages`, `storefront_test`, `browser_test`, `final_archive_test` and `layout_test` were updated for the new markup and wording. In `early_access_test` the expectation for early-access free samples changed (below).
+
+### Why
+- Legal texts as copy keys reuse the copy editor, validation, the CLI and MCP (`set_storefront_text` takes `copy`) instead of a new settings section. The "Last updated" date is part of the editable text.
+- One download rule for both pages: the same visitor sees the same offer in the list and on the page.
+
+### What worked
+- `go test ./... -count=1` ok, `pnpm check` ok, `pnpm test` 22 pass.
+- Playwright:
+  - guest on Kiln: "Download ↓ · sign in to download" linking to `/signin?return=%2Fapps%2Fkiln-workbench`;
+  - guest on Hypercore (early access): no download;
+  - paying user on Kiln: the file, and "Run artifact →";
+  - landing page: "7 artifacts", "Search artifacts", "6 artifacts" group;
+  - `/privacy` in the site layout;
+  - 404 with its "Not found" label;
+  - pricing tabs, principles and year section all 760 px wide;
+  - footer without "Type".
+
+### What didn't work
+- My new test was first named `TestLegalPages`, which collides with the existing `catalog_test.go:654` (`TestLegalPages redeclared in this block`); renamed it to `TestLegalPagesFromCopy`.
+- The old `TestLegalPages` failed (`catalog_test.go:663: portal.test/privacy: 200`): the Markdown renderer emits `<h2 id="contact">`, and the title now uses the brand. Updated it to check the host substitution and `<h2 id="contact">Contact</h2>`.
+- `early_access_test.go:76: sample page missing downloads`: that test expected the page to offer an early-access free sample's HTML to everyone. That contradicts the user's rule ("download is hidden only when under the early acces period and non subscriber"), which the landing page already applied. The test now expects the HTML only for the paying visitor; attachments and the API are unchanged.
+- `server.go`: `"…/catalog/web" imported and not used` after removing the legal template; dropped the import.
+
+### What I learned
+- Legal text, markdown and the brand: the page `<title>` now uses the configured brand ("Privacy policy · Brand") instead of the request host; the body still names the host through `{site}`.
+
+### What was tricky to build
+- Keeping the download rule identical: the app page needs `member` (not `CanRun`, which also checks plan allowances) to match `archiveRowOf`, while attachments keep their own `Locked` rule.
+
+### What warrants a second pair of eyes
+- Early-access free samples: page and API now differ (the API still serves the file to anyone). If free samples should always be downloadable, both pages need the opposite rule.
+- Copy overrides already saved in production (e.g. `runner.start` or `home.search`) keep their old wording; only the defaults changed.
+- The legal texts still say "catalog of browser applications" and "applications"; I left the legal wording alone.
+
+### What should be done in the future
+- Optional "unlisted" visibility (page reachable, not on the landing page or RSS), if wanted.
+- Row footer layout on the landing page (finding 3) and gallery captions (finding 8) were not picked.
+
+### Code review instructions
+- `pkg/catalog/settings/legal.go`, `copy.go`; `pages.go` `siteCopy.Legal`, `artifactPage` download block; `routes.go` `legalPage`; `templates/legal.tmpl`, `notfound.tmpl`, `unavailable.tmpl`, `layout.tmpl` footer; `cmd/francois/cmds/api_commands.go` `legal`/`set-legal`.
+- Validate: `go test ./pkg/catalog -run 'Legal|Storefront|EarlyAccess|Browser'`.
+
+### Technical details
+- CLI: `francois catalog settings legal privacy`; `francois catalog settings set-legal terms --file terms.md --yes`; `--reset` returns to the default.
