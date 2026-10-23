@@ -545,7 +545,8 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	// Secret configuration is reported as configured/not configured only.
 	secrets := map[string]bool{"oidc": s.site(r).OIDC.Configured(), "stripe": s.Payments != nil, "modelProvider": len(s.Backend.Models()) > 0}
 	w.Header().Set("ETag", strconv.Quote(strconv.FormatInt(rev.Revision, 10)))
-	httpx.OK(w, map[string]any{"active": rev, "history": history, "providerModels": models, "secrets": secrets, "defaults": settings.Defaults()})
+	httpx.OK(w, map[string]any{"active": rev, "history": history, "providerModels": models, "secrets": secrets, "defaults": settings.Defaults(),
+		"copyKeys": settings.CopyKeys})
 }
 
 // adminSaveSettings replaces the settings document. If-Match must name the

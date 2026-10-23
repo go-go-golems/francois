@@ -557,6 +557,9 @@ type storefrontIn struct {
 	Title   *string `json:"title,omitempty"`
 	Tagline *string `json:"tagline,omitempty"`
 	Intro   *string `json:"intro,omitempty" jsonschema:"Markdown"`
+	// Copy changes editable site text by key; an empty string restores the
+	// default. Keys are listed in the settings' copyKeys.
+	Copy map[string]string `json:"copy,omitempty" jsonschema:"Site text by key (header.statement, home.hero, callout.*, runner.*, earlyaccess.*); empty restores the default"`
 }
 
 type stateIn struct {
@@ -790,7 +793,7 @@ func customerTools() []spec {
 				})
 				return rev, fmt.Sprintf("Settings revision %d is active.", rev.Revision), err
 			}),
-		tool("set_storefront_text", ToolsetCustomers, scopeWrite, rw, additive, "Change the storefront's title, tagline or introduction (Markdown).",
+		tool("set_storefront_text", ToolsetCustomers, scopeWrite, rw, additive, "Change the storefront's title, tagline, introduction (Markdown) or site text (copy keys).",
 			func(ctx context.Context, e *env, in storefrontIn) (client.SettingsRevision, string, error) {
 				a, err := ad(ctx, e)
 				if err != nil {
@@ -800,6 +803,11 @@ func customerTools() []spec {
 					set(&d.Storefront.Title, in.Title)
 					set(&d.Storefront.Tagline, in.Tagline)
 					set(&d.Storefront.Intro, in.Intro)
+					for k, v := range in.Copy {
+						if err := d.SetCopy(k, v); err != nil {
+							return err
+						}
+					}
 					return nil
 				})
 				return rev, fmt.Sprintf("Settings revision %d is active.", rev.Revision), err

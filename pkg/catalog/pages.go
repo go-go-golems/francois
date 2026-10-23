@@ -144,7 +144,28 @@ type pageData struct {
 	// FontCSS and FontPreloads are versioned web-font URLs.
 	FontCSS      string
 	FontPreloads []string
-	Body         any
+	// Copy is the editable site text (settings storefront.copy).
+	Copy siteCopy
+	Body any
+}
+
+// siteCopy resolves editable site text for templates: {{.Copy.Text "key"}}
+// for one-line text and {{.Copy.HTML "key"}} for Markdown.
+type siteCopy struct {
+	doc settings.Document
+	md  *content.Markdown
+}
+
+func (c siteCopy) Text(key string) string { return c.doc.CopyText(key) }
+
+func (c siteCopy) HTML(key string) template.HTML { return c.md.Render(c.doc.CopyText(key), nil) }
+
+// Date fills the {date} placeholder of a copy key.
+func (c siteCopy) Date(key string, t *time.Time) string {
+	if t == nil {
+		return c.Text(key)
+	}
+	return strings.ReplaceAll(c.Text(key), "{date}", t.UTC().Format("2 January 2006"))
 }
 
 // card is an artifact as listed on the storefront.
@@ -181,6 +202,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	}
 	d.JournalEnabled = rev.Document.Storefront.JournalEnabled
 	d.Brand = s.brand(r, rev.Document)
+	d.Copy = siteCopy{doc: rev.Document, md: s.md}
 	d.TypeCredit = s.fonts.present
 	d.Canonical = site.PortalOrigin() + canonicalPath(r.URL.Path)
 	d.Contact = s.Config.ContactEmail
@@ -213,7 +235,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	}
 	d.Nav = nav
 	if d.Description == "" {
-		d.Description = rev.Document.Storefront.Tagline
+		d.Description = firstNonEmpty(rev.Document.Storefront.Tagline, rev.Document.CopyText("header.statement"))
 	}
 	if d.Image == "" {
 		d.Image, d.DefaultImage = s.shareURL(r, rev.Document), true
@@ -262,7 +284,8 @@ func (s *Server) pageFailed(w http.ResponseWriter, r *http.Request, err error) {
 
 func (s *Server) unavailable(w http.ResponseWriter, r *http.Request) {
 	d := pageData{Title: "Unavailable", Brand: s.site(r).PublicURL.Hostname(), OGType: "website", Contact: s.Config.ContactEmail,
-		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path)}
+		FontCSS: s.fonts.cssURL(), FontPreloads: s.fonts.preloads(), Canonical: s.site(r).PortalOrigin() + canonicalPath(r.URL.Path),
+		Copy: siteCopy{doc: settings.Defaults(), md: s.md}}
 	var buf bytes.Buffer
 	if err := s.pages["unavailable"].ExecuteTemplate(&buf, "layout", d); err != nil {
 		http.Error(w, "Page unavailable", http.StatusServiceUnavailable)
@@ -436,7 +459,7 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 			matches[i], matches[j] = matches[j], matches[i]
 		}
 	}
-	s.render(w, r, http.StatusOK, "home", pageData{Description: "A lab for computation and intelligence as material and medium. Run by Manuel and Ramon.", Body: map[string]any{"Rows": matches, "Total": len(cards), "Tags": tags, "Tag": tag, "Query": q, "Sort": order, "AllHref": link(""), "LoginError": r.URL.Query().Get("login_error")}})
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Rows": matches, "Total": len(cards), "Tags": tags, "Tag": tag, "Query": q, "Sort": order, "AllHref": link(""), "LoginError": r.URL.Query().Get("login_error")}})
 }
 
 func contains(list []string, v string) bool {

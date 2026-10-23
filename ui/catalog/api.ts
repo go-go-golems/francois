@@ -347,7 +347,18 @@ export type SettingsDoc = {
     tagline: string;
     intro: string;
     journalEnabled: boolean;
+    // Overrides of registered site text; see CopyKey.
+    copy?: Record<string, string>;
   };
+};
+// CopyKey is one piece of editable site text (settings/copy.go).
+export type CopyKey = {
+  key: string;
+  label: string;
+  help?: string;
+  kind: "text" | "markdown";
+  max: number;
+  default: string;
 };
 export type SettingsRevision = {
   revision: number;
@@ -593,6 +604,7 @@ export const api = createApi({
           images: boolean;
         }[];
         secrets: Record<string, boolean>;
+        copyKeys: CopyKey[];
       },
       void
     >({

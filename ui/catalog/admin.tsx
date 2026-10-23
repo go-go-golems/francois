@@ -1,7 +1,15 @@
 import { AnalyticsPage } from "./analytics";
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { api, Check, errorMessage, Plan, Release, SettingsDoc } from "./api";
+import {
+  api,
+  Check,
+  CopyKey,
+  errorMessage,
+  Plan,
+  Release,
+  SettingsDoc,
+} from "./api";
 import { navigate, show } from "./store";
 import {
   bytes,
@@ -873,6 +881,50 @@ const thinkingLevels = [
   "max",
 ];
 
+// SiteCopy edits storefront.copy: one field per registered key, the default
+// as placeholder; clearing a field returns to the default.
+function SiteCopy({
+  keys,
+  copy,
+  set,
+}: {
+  keys: CopyKey[];
+  copy: Record<string, string>;
+  set: (key: string, value: string) => void;
+}) {
+  return (
+    <div className="site-copy">
+      {keys.map((k) => {
+        const value = copy[k.key] ?? "";
+        const props = {
+          value,
+          placeholder: k.default,
+          maxLength: k.max,
+          onChange: (
+            e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+          ) => set(k.key, e.target.value),
+        };
+        return (
+          <label className="field" key={k.key}>
+            <span>
+              {k.label} <span className="muted mono">{k.key}</span>
+            </span>
+            {k.kind === "markdown" ? (
+              <textarea rows={4} {...props} />
+            ) : (
+              <input {...props} />
+            )}
+            <span className="muted small">
+              {k.help ? k.help + " " : ""}
+              {value ? `${[...value].length}/${k.max}` : "Default text."}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 function Settings() {
   const { data } = api.useSettingsQuery();
   const [save, { isLoading }] = api.useSaveSettingsMutation();
@@ -1252,6 +1304,20 @@ function Settings() {
                 }
               />
             </label>
+          </Row>
+          <Row label="Site copy" sub="public text, blank uses the default">
+            <SiteCopy
+              keys={data.copyKeys}
+              copy={doc.storefront.copy ?? {}}
+              set={(key, value) =>
+                upd((d) => {
+                  const copy = { ...(d.storefront.copy ?? {}) };
+                  if (value.trim() === "") delete copy[key];
+                  else copy[key] = value;
+                  d.storefront.copy = copy;
+                })
+              }
+            />
           </Row>
           <Row label="Runtime" sub="concurrency, all users">
             <div className="grid-fields">

@@ -3,6 +3,7 @@ package cmds
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/go-go-golems/francois/pkg/catalog/client"
 	"github.com/go-go-golems/francois/pkg/catalog/settings"
@@ -479,6 +480,38 @@ func settingsCommands() (*cobra.Command, error) {
 					base = cur.Active.Revision
 				}
 				return c.Admin.SaveSettings(ctx, doc, base)
+			}},
+		def{name: "copy", short: "List the editable site text with the active values", run: func(ctx context.Context, c *client.Client, _ in) (any, error) {
+			s, err := c.Admin.Settings(ctx)
+			if err != nil {
+				return nil, err
+			}
+			rows := []map[string]any{}
+			for _, k := range settings.CopyKeys {
+				override := s.Active.Document.Storefront.Copy[k.Key]
+				rows = append(rows, map[string]any{"key": k.Key, "label": k.Label, "kind": k.Kind, "max": k.Max,
+					"value": s.Active.Document.CopyText(k.Key), "overridden": override != ""})
+			}
+			return rows, nil
+		}},
+		def{name: "set-copy", short: "Set or reset one piece of site text", destructive: true,
+			flags: []*fieldsDef{arg("key", "Copy key, see 'settings copy'"), flag("text", "New text"), flag("file", "Read the text from a file (Markdown keys)"), boolean("reset", "Return to the default text")},
+			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
+				text := a.S("text")
+				if f := a.S("file"); f != "" {
+					raw, err := os.ReadFile(f) // #nosec G304 -- the operator names the file
+					if err != nil {
+						return nil, err
+					}
+					text = strings.TrimSpace(string(raw))
+				}
+				if !a.B("reset") && strings.TrimSpace(text) == "" {
+					return nil, errors.New("give --text, --file or --reset")
+				}
+				if a.B("reset") {
+					text = ""
+				}
+				return c.Admin.EditSettings(ctx, func(d *settings.Document) error { return d.SetCopy(a.S("key"), text) })
 			}},
 	)
 }
