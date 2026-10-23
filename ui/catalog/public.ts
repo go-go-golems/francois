@@ -127,7 +127,6 @@ function mountFrame(
     sandbox:
       "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
     allow: "clipboard-write; fullscreen",
-    allowfullscreen: "",
   });
   const unbind = bindInstanceLaunch(
     frame,
