@@ -23,10 +23,22 @@ func TestValidateExamplesAndBlockers(t *testing.T) {
 		"bootstrap":   `<script type="application/json" id="francois-view">{}</script>`,
 		"credential":  `const key = "sk_live_abcdefghijklmnop"`,
 		"private key": "-----BEGIN RSA PRIVATE KEY-----",
+		"aws key":     `const id = "AKIAIOSFODNN7EXAMPLE";`,
+		"aws key eol": "aws_access_key_id = AKIAIOSFODNN7EXAMPLE",
 	} {
 		_, checks := Validate(Upload{ArtifactID: "x", Title: "X", Version: "1", HTML: []byte(base + body + "</body></html>")})
 		if !Blocking(checks) {
 			t.Fatalf("%s not blocked", name)
+		}
+	}
+	// Embedded base64 (fonts, images) contains AKIA-like runs by chance.
+	for name, body := range map[string]string{
+		"lower case in base64": `src="data:font/woff2;base64,d09GMgABAAAAakiaQ0dFR2pRb3Jt1a2B/xyz="`,
+		"upper case in base64": `src="data:image/png;base64,iVBORw0KGgoAKIAQ0DFR2PRB3JT1A2BXYZ+abc/def="`,
+	} {
+		_, checks := Validate(Upload{ArtifactID: "x", Title: "X", Version: "1", HTML: []byte(base + body + "</body></html>")})
+		if Blocking(checks) {
+			t.Fatalf("%s blocked: %+v", name, checks)
 		}
 	}
 	if _, checks := Validate(Upload{ArtifactID: "x", Title: "X", Version: "1", HTML: []byte(base + "</html>"), Manifest: []byte(`{"shell":{}}`)}); !Blocking(checks) {

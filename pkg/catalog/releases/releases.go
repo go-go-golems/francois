@@ -230,7 +230,11 @@ type Check struct {
 
 var (
 	bootstrapMarker  = regexp.MustCompile(`id=["']francois-view["']|/static/runtime\.js`)
-	credentialMarker = regexp.MustCompile(`(?i)(sk_(live|test)_[A-Za-z0-9]{8,}|rk_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"refresh_token"\s*:|AKIA[0-9A-Z]{16}|sk-ant-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{32,})`)
+	credentialMarker = regexp.MustCompile(`(?i)(sk_(live|test)_[A-Za-z0-9]{8,}|rk_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"refresh_token"\s*:|sk-ant-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{32,})`)
+	// AWS access key IDs are upper case and stand alone. Matching them case-
+	// insensitively, or inside a longer run of base64, flags embedded fonts and
+	// images (any few hundred KB of base64 contains "akia…" by chance).
+	awsKeyMarker = regexp.MustCompile(`(^|[^A-Za-z0-9+/])AKIA[0-9A-Z]{16}([^A-Za-z0-9+/=]|$)`)
 	sqliteMarker     = []byte("SQLite format 3\x00")
 	externalScript   = regexp.MustCompile(`(?i)<script[^>]+src=["'](https?:)?//([^/"']+)`)
 )
@@ -268,7 +272,7 @@ func Validate(u Upload) (map[string]json.RawMessage, []Check) {
 	if bootstrapMarker.Match(u.HTML) {
 		add("error", "runtime_bootstrap", "The HTML contains an injected Francois view bootstrap; upload authored source, not a served page")
 	}
-	if credentialMarker.Match(u.HTML) {
+	if credentialMarker.Match(u.HTML) || awsKeyMarker.Match(u.HTML) {
 		add("error", "credential_like", "The HTML contains credential-like text; remove secrets before publishing")
 	}
 	hosts := map[string]bool{}
