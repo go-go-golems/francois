@@ -144,3 +144,48 @@ Built enterprise monthly support end to end, as designed in Step 1, using the de
 
 ### Technical details
 - Stripe form keys sent for enterprise: `line_items[0][price_data][product_data][name]=Enterprise support`, `subscription_data[metadata][francois_support_tier]=enterprise`, `tax_id_collection[enabled]=true`, `billing_address_collection=required`, `customer_update[name]=auto`, `customer_update[address]=auto`.
+
+## Step 3: Operator direction and help text
+
+While Step 2 was being written up, the user corrected two things. The operators go the other way: `<<1` divides by two and `>>1` multiplies by two. And the help line should not mention invoicing. Both are changed; the left button is now `<<1` (halve) and the right one `>>1` (double).
+
+### Prompt Context
+**User prompt (verbatim):** "<< = divide by 2 (shift left)\n>> = multilpe by 2 (shift right).\n\nupdate" and "don't add the \"invoiced to your company\""
+**Assistant interpretation:** Swap the meaning of the two labels and drop the invoice sentence from the help text.
+**Inferred user intent:** The control should read as the user thinks of it, and the page should stay short.
+**Commit (code):** 22a4c1d — "fix(catalog): <<1 halves and >>1 doubles the enterprise amount"
+
+### What I did
+- `pricing.tmpl`: the left button is `data-shift="half"` with the label `&lt;&lt;1` and the right one `data-shift="double"` with `&gt;&gt;1`; the tooltips are still "Halve" / "Double".
+- `enterprise-amount.ts`: `Shift = "half" | "double"`; `shift` multiplies or divides by 2 instead of using `<<`/`>>`, so the code no longer encodes a direction.
+- `public.ts`, `tests/enterprise-amount.test.ts`, `support_test.go`, comment in `billing/policy.go` updated.
+- `settings/copy.go` `support.enterprise.help` default: "Halve or double, from 8 to 4096 USD a month."
+- Design doc: added an "Update" note under section 6.
+
+### Why
+- Naming the steps "half"/"double" keeps the button labels free to change (they are plain text in the template) without touching the logic.
+
+### What worked
+- `pnpm test` 22 pass; `go test ./pkg/catalog ./pkg/catalog/payments ./pkg/catalog/settings -run 'Enterprise|Support|Copy'` ok.
+- Playwright: the left label is `<<1` and goes 256 → 128; the right label is `>>1` and goes 128 → 256 → 512; the help text is the new sentence.
+
+### What didn't work
+- N/A.
+
+### What I learned
+- N/A.
+
+### What was tricky to build
+- N/A.
+
+### What warrants a second pair of eyes
+- Checkout still collects the billing address and tax ID for enterprise; only the sentence on the page was removed.
+
+### What should be done in the future
+- Stripe test-mode checkout before deploy (task open).
+
+### Code review instructions
+- `pricing.tmpl` enterprise controls; `enterprise-amount.ts`.
+
+### Technical details
+- N/A.

@@ -135,3 +135,7 @@ The user asked to "build enterprise support" without answering section 5, so the
 4. An individual supporter is sent to the Stripe portal, as for a second individual subscription.
 
 One deviation from section 3.1: the help text is one sentence that also mentions the invoice ("Halve or double, from 8 to 4096 USD a month. Invoiced to your company, with its address and tax ID.").
+
+### Update: operator direction and help text
+
+The user decided the buttons the other way round from sections 1 and 3: **`<<1` divides by two** (left button, 256 → 128 → … → 8) and **`>>1` multiplies by two** (right button, 256 → 512 → … → 4096). The help line is "Halve or double, from 8 to 4096 USD a month.", without the invoice sentence. Checkout still collects the company's address and tax ID.
