@@ -485,3 +485,7 @@ Reviewed every public page as guest, free user and subscriber at 1440 and 390 px
 
 ### Technical details
 - CLI: `francois catalog settings legal privacy`; `francois catalog settings set-legal terms --file terms.md --yes`; `--reset` returns to the default.
+
+## Step 9: Row address line (milestone)
+
+The user picked review finding 3 ("yeah"): the address · size line under each landing row now always has its own line. `.ri-path { flex-basis:100% }`, `.ri-actions` gap `8px 24px`. Checked with Playwright at 1440 px: in all seven rows the line sits 30 px below Open, at the same left edge. Commit: 9c99046.
