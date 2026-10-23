@@ -62,7 +62,7 @@ func TestSupportStatus(t *testing.T) {
 func TestEnterpriseSupport(t *testing.T) {
 	e := setup(t)
 	_, page, _ := e.do(nil, "portal.test", "GET", "/pricing", nil, nil)
-	for _, want := range []string{`data-support-tiers`, `>Individual</button>`, `>Enterprise</button>`, `data-support-enterprise`, `name="amount" aria-live="polite">256</output>`, `data-shift="right"`, `&gt;&gt;1`, `&lt;&lt;1`, `Support as a company →`} {
+	for _, want := range []string{`data-support-tiers`, `>Individual</button>`, `>Enterprise</button>`, `data-support-enterprise`, `name="amount" aria-live="polite">256</output>`, `data-shift="half" title="Halve" aria-label="Halve the monthly amount">&lt;&lt;1</button>`, `data-shift="double" title="Double" aria-label="Double the monthly amount">&gt;&gt;1</button>`, `Support as a company →`} {
 		if !strings.Contains(string(page), want) {
 			t.Fatalf("pricing page lacks %q", want)
 		}

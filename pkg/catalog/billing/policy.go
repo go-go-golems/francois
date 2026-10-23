@@ -153,7 +153,7 @@ type YearSupport struct {
 }
 
 // Enterprise monthly support is a power of two between 8 and 4096 USD; the
-// pricing page halves (>>1) or doubles (<<1) it from 256 USD.
+// pricing page halves ("<<1") or doubles (">>1") it from 256 USD.
 const (
 	TierEnterprise         = "enterprise"
 	EnterpriseMinCents     = 800

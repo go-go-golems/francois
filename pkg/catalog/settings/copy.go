@@ -43,7 +43,7 @@ var CopyKeys = []CopyKey{
 	{Key: "support.tab.enterprise", Label: "Support tab, enterprise", Help: "Pricing page tab for company support (8 to 4096 USD, powers of two).", Kind: "text", Max: 40, Default: "Enterprise"},
 	{Key: "support.enterprise.label", Label: "Enterprise label", Kind: "text", Max: 80, Default: "Every month, for your company"},
 	{Key: "support.enterprise.help", Label: "Enterprise help", Help: "Under the enterprise amount.", Kind: "text", Max: 240,
-		Default: "Halve or double, from 8 to 4096 USD a month. Invoiced to your company, with its address and tax ID."},
+		Default: "Halve or double, from 8 to 4096 USD a month."},
 	{Key: "support.enterprise.button", Label: "Enterprise button", Kind: "text", Max: 60, Default: "Support as a company →"},
 }
 

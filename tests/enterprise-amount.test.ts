@@ -13,13 +13,13 @@ test("enterprise amounts are powers of two from 8 to 4096", () => {
     assert.equal(isEnterpriseAmount(usd), false, String(usd));
 });
 
-test(">>1 halves down to 8 and <<1 doubles up to 4096", () => {
+test("<<1 halves down to 8 and >>1 doubles up to 4096", () => {
   const down = [ENTERPRISE_DEFAULT];
-  while (shift(down.at(-1)!, "right") !== down.at(-1))
-    down.push(shift(down.at(-1)!, "right"));
+  while (shift(down.at(-1)!, "half") !== down.at(-1))
+    down.push(shift(down.at(-1)!, "half"));
   assert.deepEqual(down, [256, 128, 64, 32, 16, 8]);
   const up = [ENTERPRISE_DEFAULT];
-  while (shift(up.at(-1)!, "left") !== up.at(-1))
-    up.push(shift(up.at(-1)!, "left"));
+  while (shift(up.at(-1)!, "double") !== up.at(-1))
+    up.push(shift(up.at(-1)!, "double"));
   assert.deepEqual(up, [256, 512, 1024, 2048, 4096]);
 });

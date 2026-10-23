@@ -16,7 +16,7 @@
 <div class="support-panel" role="tabpanel" id="support-panel-enterprise" aria-labelledby="support-tab-enterprise">
 <form class="support-monthly" data-support-enterprise>
 <label class="final-label" for="support-enterprise-amount">{{$.Copy.Text "support.enterprise.label"}}</label>
-<div class="support-amount-controls"><button type="button" class="support-shift" data-shift="right" title="Halve" aria-label="Halve the monthly amount">&gt;&gt;1</button><div class="support-amount-value"><output id="support-enterprise-amount" name="amount" aria-live="polite">256</output><span>USD</span></div><button type="button" class="support-shift" data-shift="left" title="Double" aria-label="Double the monthly amount">&lt;&lt;1</button></div>
+<div class="support-amount-controls"><button type="button" class="support-shift" data-shift="half" title="Halve" aria-label="Halve the monthly amount">&lt;&lt;1</button><div class="support-amount-value"><output id="support-enterprise-amount" name="amount" aria-live="polite">256</output><span>USD</span></div><button type="button" class="support-shift" data-shift="double" title="Double" aria-label="Double the monthly amount">&gt;&gt;1</button></div>
 <p class="support-amount-help">{{$.Copy.Text "support.enterprise.help"}}</p>
 <button class="site-button site-support" type="submit">{{$.Copy.Text "support.enterprise.button"}}</button>
 </form></div>

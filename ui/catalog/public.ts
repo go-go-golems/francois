@@ -11,6 +11,7 @@ import {
   ENTERPRISE_DEFAULT,
   isEnterpriseAmount,
   shift,
+  type Shift,
 } from "./enterprise-amount";
 import { serviceNotice } from "./service-notice";
 // public.ts adds the session-dependent actions to server-rendered storefront
@@ -578,7 +579,7 @@ function bindSupport(form: HTMLFormElement) {
   });
 }
 
-// bindEnterprise drives the enterprise amount: >>1 halves and <<1 doubles,
+// bindEnterprise drives the enterprise amount: <<1 halves and >>1 doubles,
 // between 8 and 4096 USD; the buttons are disabled at either end.
 function bindEnterprise(form: HTMLFormElement) {
   const output = form.querySelector<HTMLOutputElement>("output[name=amount]")!;
@@ -592,12 +593,11 @@ function bindEnterprise(form: HTMLFormElement) {
   const render = () => {
     output.value = String(amount);
     for (const b of buttons)
-      b.disabled =
-        shift(amount, b.dataset.shift as "left" | "right") === amount;
+      b.disabled = shift(amount, b.dataset.shift as Shift) === amount;
   };
   for (const b of buttons)
     b.addEventListener("click", () => {
-      amount = shift(amount, b.dataset.shift as "left" | "right");
+      amount = shift(amount, b.dataset.shift as Shift);
       render();
     });
   render();
