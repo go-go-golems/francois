@@ -22,7 +22,7 @@ WhenToUse: ""
 **Request.** Use the html.moldandyeast.com layout for the slop.boutique landing page and browser while keeping our header, support banner and footer; add a per-app setting to start the HTML directly or to show the cover and open full screen in a new tab.
 
 **Study.**
-- Looked at html.moldandyeast.com with Playwright at 1440 px: header with address-style search, display headline, sort and tag counts, month groups, `.ri` rows with Open · Download · path · size, and a full-viewport viewer dialog (`/?open=slug`) with device sizes. It is client-rendered with absolute positioning. Saved `index.html`, `styles.css`, `js/app.js` in `sources/`.
+- Looked at html.moldandyeast.com with Playwright at 1440 px: header with address-style search, display headline, sort and tag counts, month groups, `.ri` rows with Open · Download · path · size, and a full-viewport viewer dialog (`/?open=slug`) with device sizes. It is client-rendered with absolute positioning. Saved `index.html`, `styles.css`, `js/app.js` in `sources/` for study; before pushing (Step 10) they were dropped from the branch history, because the repository is public.
 - Mapped our side with an exploration pass: `feedPage`/`cards` in `pages.go`, `home.tmpl`, `artifact.tmpl`, `layout.tmpl`, `catalog.css` sections, `public.ts` `renderActions`, launch handshake (`instance-launch.ts`, `launch.ts`, `hosted/routes.go`), `/instances/{id}` Launcher, entitlements, demos, settings revisions, artifact model and migrations (next is 020).
 - Key constraint found: `launch.ts` refuses to run unframed, so "new tab" must open the portal page `/instances/{id}`.
 
@@ -489,3 +489,17 @@ Reviewed every public page as guest, free user and subscriber at 1440 and 390 px
 ## Step 9: Row address line (milestone)
 
 The user picked review finding 3 ("yeah"): the address · size line under each landing row now always has its own line. `.ri-path { flex-basis:100% }`, `.ri-actions` gap `8px 24px`. Checked with Playwright at 1440 px: in all seven rows the line sits 30 px below Open, at the same left edge. Commit: 9c99046.
+
+## Step 10: Third-party sources out of history, push and PR
+
+The user asked to push, open a PR and wait for the Codex review ("unlisted: not yet. Push, PR, wiat for codex review to come back"). The repository `go-go-golems/francois` is public, and commit 547848a contained html.moldandyeast.com's `index.html`, `styles.css` and `app.js`. Asked; the user chose "Drop from history".
+
+### What I did
+- `git branch backup/storefront-browser-before-filter HEAD` (local only), then `git filter-branch --index-filter "git rm --cached --ignore-unmatch …/sources/moldandyeast-*" main..HEAD`. Only 547848a touched those paths. Removed `.git/refs/original`.
+- Added `sources/README.md` with the URL and why the files are not kept, and updated the design guide (section on the reference site) and the Step 1 diary line.
+
+### What didn't work
+- My first `grep … --include=*.md` failed in zsh with `no matches found: --include=*.md` (the unquoted glob); grepped explicit paths instead.
+
+### What warrants a second pair of eyes
+- All 23 commit hashes on the branch changed. The hashes quoted in earlier diary steps and changelog entries refer to the pre-rewrite commits (still on the local backup branch); commit subjects are unchanged and identify them.

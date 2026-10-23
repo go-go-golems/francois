@@ -195,7 +195,7 @@ type Storefront struct {          // settings.go
 
 ## 2. The reference: html.moldandyeast.com
 
-Copies of its `index.html`, `styles.css` and `js/app.js` are in this ticket's `sources/` for study (not for shipping). Anatomy at 1440 px:
+Its `index.html`, `styles.css` and `js/app.js` were studied on 2026-10-23; they are not copied into this public repository (see `sources/README.md`). Anatomy at 1440 px:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
