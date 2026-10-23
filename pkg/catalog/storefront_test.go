@@ -27,17 +27,17 @@ func TestContentStore(t *testing.T) {
 		t.Fatalf("upload %d %v", code, out)
 	}
 	a, err := st.Artifact(ctx, "board")
-	if err != nil || a.Title != "Board" || a.Visibility != "listed" || a.Page.Gallery == nil {
+	if err != nil || a.Title != "Board" || a.Visibility != "listed" || a.Page.Gallery == nil || a.LaunchMode != store.LaunchTab {
 		t.Fatalf("artifact %+v %v", a, err)
 	}
-	a.Title, a.Featured, a.DemoEnabled = "Board, renamed", true, true
+	a.Title, a.Featured, a.DemoEnabled, a.LaunchMode = "Board, renamed", true, true, store.LaunchInline
 	if _, err = st.UpdateArtifact(ctx, a); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err = e.srv.Publisher.CreateDraft(ctx, admin.user.ID, uploadOf("board", "", "1.1.0")); err != nil {
 		t.Fatalf("second release: %v", err)
 	}
-	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || !a.DemoEnabled {
+	if a, _ = st.Artifact(ctx, "board"); a.Title != "Board, renamed" || !a.Featured || !a.DemoEnabled || a.LaunchMode != store.LaunchInline {
 		t.Fatalf("metadata changed by upload: %+v", a)
 	}
 	if _, err = st.CreateArtifact(ctx, store.Artifact{ID: "board", Title: "dup"}); !errors.Is(err, store.ErrConflict) {

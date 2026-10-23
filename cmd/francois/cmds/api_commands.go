@@ -48,10 +48,11 @@ func artifactCommands() (*cobra.Command, error) {
 		def{name: "update", short: "Change an artifact's metadata (only the flags given)",
 			flags: append(argID("artifact ID"), flag("title", "Title"), flag("description", "Description"), list("tags", "Tags (replaces all)"),
 				boolean("clear-tags", "Remove all tags"), flag("visibility", "listed or hidden"), flag("featured", "true or false"), flag("sort-order", "Position on the storefront"),
-				flag("early-access-until", "RFC3339 date; empty clears early access"), flag("demo-enabled", "true or false"), list("creators", "Creator profile IDs (replaces all)")),
+				flag("early-access-until", "RFC3339 date; empty clears early access"), flag("demo-enabled", "true or false"), flag("launch-mode", "inline (start in the page) or tab (cover, then full screen in a new tab)"),
+				list("creators", "Creator profile IDs (replaces all)")),
 			run: func(ctx context.Context, c *client.Client, a in) (any, error) {
 				p := client.ArtifactPatch{Title: a.optS("title"), Description: a.optS("description"), Tags: a.optL("tags", "clear-tags"), Visibility: a.optS("visibility"),
-					EarlyAccessUntil: a.optS("early-access-until"), Creators: a.optL("creators", "")}
+					EarlyAccessUntil: a.optS("early-access-until"), LaunchMode: a.optS("launch-mode"), Creators: a.optL("creators", "")}
 				var err error
 				if p.Featured, err = a.optB("featured"); err != nil {
 					return nil, err

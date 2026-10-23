@@ -237,7 +237,7 @@ func (s *Server) catalog(w http.ResponseWriter, r *http.Request) {
 			creators = append(creators, map[string]string{"slug": c.Slug, "name": c.Name})
 		}
 		out = append(out, map[string]any{"id": a.ID, "title": a.Title, "description": a.Description, "tags": a.Tags, "updatedAt": a.UpdatedAt, "releases": counts[a.ID], "latest": publicRelease(rel),
-			"cover": a.Page.Cover, "creators": creators, "featured": a.Featured, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled, "url": "/apps/" + a.ID})
+			"cover": a.Page.Cover, "creators": creators, "featured": a.Featured, "earlyAccessUntil": a.EarlyAccessUntil, "demo": a.DemoEnabled, "launchMode": a.LaunchMode, "url": "/apps/" + a.ID})
 	}
 	httpx.OK(w, out)
 }

@@ -30,8 +30,11 @@ type Artifact struct {
 	SortOrder        int        `json:"sortOrder"`
 	EarlyAccessUntil *time.Time `json:"earlyAccessUntil,omitempty"`
 	DemoEnabled      bool       `json:"demoEnabled"`
-	CreatedAt        time.Time  `json:"createdAt"`
-	UpdatedAt        time.Time  `json:"updatedAt"`
+	// LaunchMode is "inline" (start in the page) or "tab" (cover, then full
+	// screen in a new tab).
+	LaunchMode string    `json:"launchMode"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 type ReleaseFile struct {
@@ -72,6 +75,12 @@ func isUnique(err error) bool {
 // CreateArtifact inserts a new artifact credited to creators in one
 // transaction, so whoever creates an artifact is credited before anyone else
 // can see it; an existing ID fails with ErrConflict.
+// Launch modes of an artifact on the storefront.
+const (
+	LaunchInline = "inline"
+	LaunchTab    = "tab"
+)
+
 func (s *Store) CreateArtifact(ctx context.Context, a Artifact, creators ...string) (Artifact, error) {
 	if a.Tags == nil {
 		a.Tags = []string{}
@@ -82,15 +91,18 @@ func (s *Store) CreateArtifact(ctx context.Context, a Artifact, creators ...stri
 	if a.Page.Gallery == nil {
 		a.Page.Gallery = []string{}
 	}
+	if a.LaunchMode == "" {
+		a.LaunchMode = LaunchTab
+	}
 	page, _ := json.Marshal(a.Page)
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return a, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	err = tx.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,early_access_until,demo_enabled)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at,updated_at`,
-		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled).Scan(&a.CreatedAt, &a.UpdatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO catalog_artifacts(id,title,description,tags,visibility,page,featured,sort_order,early_access_until,demo_enabled,launch_mode)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING created_at,updated_at`,
+		a.ID, a.Title, a.Description, a.Tags, a.Visibility, page, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled, a.LaunchMode).Scan(&a.CreatedAt, &a.UpdatedAt)
 	if isUnique(err) {
 		return a, errors.Wrapf(ErrConflict, "artifact %s already exists", a.ID)
 	}
@@ -129,8 +141,8 @@ func (s *Store) UpdateArtifact(ctx context.Context, a Artifact) (Artifact, error
 	if a.Tags == nil {
 		a.Tags = []string{}
 	}
-	err := s.Pool.QueryRow(ctx, `UPDATE catalog_artifacts SET title=$2,description=$3,tags=$4,visibility=$5,featured=$6,sort_order=$7,early_access_until=$8,demo_enabled=$9,updated_at=now()
-WHERE id=$1 RETURNING updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled).Scan(&a.UpdatedAt)
+	err := s.Pool.QueryRow(ctx, `UPDATE catalog_artifacts SET title=$2,description=$3,tags=$4,visibility=$5,featured=$6,sort_order=$7,early_access_until=$8,demo_enabled=$9,launch_mode=$10,updated_at=now()
+WHERE id=$1 RETURNING updated_at`, a.ID, a.Title, a.Description, a.Tags, a.Visibility, a.Featured, a.SortOrder, a.EarlyAccessUntil, a.DemoEnabled, a.LaunchMode).Scan(&a.UpdatedAt)
 	return a, notFound(err)
 }
 
@@ -162,12 +174,12 @@ func (s *Store) DiscardPageDraft(ctx context.Context, id string) error {
 	return err
 }
 
-const artifactColumns = `id,title,description,tags,visibility,page,page_draft,featured,sort_order,early_access_until,demo_enabled,created_at,updated_at`
+const artifactColumns = `id,title,description,tags,visibility,page,page_draft,featured,sort_order,early_access_until,demo_enabled,launch_mode,created_at,updated_at`
 
 func scanArtifact(r pgx.Row) (Artifact, error) {
 	var a Artifact
 	var page, draft []byte
-	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &page, &draft, &a.Featured, &a.SortOrder, &a.EarlyAccessUntil, &a.DemoEnabled, &a.CreatedAt, &a.UpdatedAt)
+	err := r.Scan(&a.ID, &a.Title, &a.Description, &a.Tags, &a.Visibility, &page, &draft, &a.Featured, &a.SortOrder, &a.EarlyAccessUntil, &a.DemoEnabled, &a.LaunchMode, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return a, notFound(err)
 	}

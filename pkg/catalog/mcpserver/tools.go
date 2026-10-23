@@ -65,6 +65,7 @@ type artifactPatchIn struct {
 	SortOrder        *int      `json:"sortOrder,omitempty"`
 	EarlyAccessUntil *string   `json:"earlyAccessUntil,omitempty" jsonschema:"RFC3339 date; empty clears early access"`
 	DemoEnabled      *bool     `json:"demoEnabled,omitempty"`
+	LaunchMode       *string   `json:"launchMode,omitempty" jsonschema:"inline (starts in the page) or tab (cover, then full screen in a new tab)"`
 	Creators         *[]string `json:"creators,omitempty" jsonschema:"creator profile IDs; replaces all"`
 }
 
@@ -208,14 +209,14 @@ func studioTools() []spec {
 				a, err := s.CreateArtifact(ctx, in)
 				return a, "Created " + a.ID + ".", err
 			}),
-		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, early-access end date, demo flag or creators. Only the fields given change.",
+		tool("update_artifact", ToolsetStudio, scopeStudio, rw, additive, "Change an artifact's title, description, tags, visibility, featured flag, order, early-access end date, demo flag, launch mode or creators. Only the fields given change.",
 			func(ctx context.Context, e *env, in artifactPatchIn) (client.Artifact, string, error) {
 				s, err := st(ctx, e)
 				if err != nil {
 					return client.Artifact{}, "", err
 				}
 				a, err := s.PatchArtifact(ctx, in.ID, client.ArtifactPatch{Title: in.Title, Description: in.Description, Tags: in.Tags, Visibility: in.Visibility,
-					Featured: in.Featured, SortOrder: in.SortOrder, EarlyAccessUntil: in.EarlyAccessUntil, DemoEnabled: in.DemoEnabled, Creators: in.Creators})
+					Featured: in.Featured, SortOrder: in.SortOrder, EarlyAccessUntil: in.EarlyAccessUntil, DemoEnabled: in.DemoEnabled, LaunchMode: in.LaunchMode, Creators: in.Creators})
 				return a, "Updated " + in.ID + ".", err
 			}),
 		tool("save_page_draft", ToolsetStudio, scopeStudio, rw, additive, "Save a draft of an artifact's public page (Markdown body, cover, gallery). The public page changes only after publish_page_draft.",

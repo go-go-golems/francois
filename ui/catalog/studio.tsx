@@ -2,7 +2,15 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { api, Check, errorMessage, Release } from "./api";
 import { navigate, show } from "./store";
-import { ArtifactRow, Creator, Media, Page, Post, studio } from "./studio-api";
+import {
+  ArtifactRow,
+  Creator,
+  LaunchMode,
+  Media,
+  Page,
+  Post,
+  studio,
+} from "./studio-api";
 import { bytes, date, Empty, Link, Row, useAct, useRoute } from "./ui";
 
 // The studio is where creators and administrators manage storefront
@@ -269,6 +277,7 @@ function Details({
     description: a.description,
     tags: a.tags.join(", "),
     visibility: a.visibility,
+    launchMode: a.launchMode,
     featured: a.featured,
     sortOrder: a.sortOrder,
     earlyAccessUntil: a.earlyAccessUntil
@@ -325,6 +334,25 @@ function Details({
             <option value="hidden">Hidden</option>
           </select>
         </div>
+      </div>
+      <div className="field">
+        <label htmlFor="d-launch">Launch</label>
+        <select
+          id="d-launch"
+          value={f.launchMode}
+          onChange={(e) =>
+            setF({ ...f, launchMode: e.target.value as LaunchMode })
+          }
+        >
+          <option value="tab">
+            New tab: show the cover, start full screen
+          </option>
+          <option value="inline">Inline: start right away in the page</option>
+        </select>
+        <span className="muted small">
+          Inline suits small pieces that read well in a window; large tools are
+          better full screen in their own tab.
+        </span>
       </div>
       <label className="field">
         <span>Early access ends (UTC)</span>
