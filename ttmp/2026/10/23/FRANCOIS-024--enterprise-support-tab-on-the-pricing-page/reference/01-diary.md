@@ -78,3 +78,69 @@ Wrote a short design for a second tab on `/pricing`: enterprise monthly support,
 
 ### Technical details
 - Valid enterprise amounts: 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 USD; `amountCents = amount * 100`, within today's 100–999900 limit.
+
+## Step 2: Build enterprise support
+
+Built enterprise monthly support end to end, as designed in Step 1, using the design's proposed answers to its open questions. On the server, `kind: "enterprise"` is validated as a power of two between 8 and 4096 USD. The Stripe Checkout is named "Enterprise support", carries a tier tag and collects the company's name, address and tax ID; the tier is projected and stored (migration 021) and reported on the account. The pricing page has Individual / Enterprise tabs, and the enterprise amount moves with `>>1` and `<<1`. Both are tested, and the page was checked in a browser.
+
+### Prompt Context
+**User prompt (verbatim):** "build enterprise support"
+**Assistant interpretation:** Implement the FRANCOIS-024 design; the open questions were not answered, so take the proposed defaults.
+**Inferred user intent:** Ship the enterprise option on the pricing page.
+**Commit (code):** a2f17f0 — "feat(billing): enterprise monthly support tier"; e3156f2 — "feat(catalog): Individual / Enterprise tabs on the pricing page"
+
+### What I did
+- `billing/policy.go`: `TierEnterprise`, `EnterpriseMinCents`/`MaxCents`/`DefaultCents`, `EnterpriseAmount(cents)`; `Subscription.SupportTier`.
+- `payments/gateway.go`: `CheckoutRequest.SupportTier`. For enterprise, `CreateCheckout` sets the product name "Enterprise support", `subscription_data.metadata.francois_support_tier=enterprise`, `tax_id_collection.enabled`, `billing_address_collection=required` and `customer_update{name,address}=auto`. `Project` sets `SupportTier` only on a valid support subscription.
+- `payments/service.go`: `SupportEnterprise` (attempt key `support:enterprise:usd:<cents>`); `checkout` takes the tier.
+- `store/billing.go` + `migrations/021_support_tier.sql`: `support_tier text NOT NULL DEFAULT '' CHECK IN ('','enterprise')` is read and written.
+- `support.go`: `validSupport(kind, cents)`; `supportCheckout` routes `enterprise` to `SupportEnterprise` with its own 400 message; `supportView.Tier`.
+- `settings/copy.go`: keys `support.tab.individual`, `support.tab.enterprise`, `support.enterprise.label`, `support.enterprise.help`, `support.enterprise.button`.
+- `pricing.tmpl`: `div[data-support-tiers]` with a `hidden` tablist and two tab panels; the enterprise form has an `<output>` for the amount and `>>1` / `<<1` buttons.
+- `ui/catalog/enterprise-amount.ts` (`isEnterpriseAmount`, `shift`) + `tests/enterprise-amount.test.ts`. In `public.ts`: the shared `startSupport` (sign in / checkout / portal), `bindEnterprise` and `bindSupportTiers` (arrow keys, `?tier=` via `replaceState`). `bindSupport` ignores `?amount=` on enterprise links.
+- `account.tsx`, `recurring-support.tsx`, `api.ts`: "Enterprise support, N USD a month."
+- CSS: `.support-tiers`, `.support-tabs`, `.support-panel[hidden]`, `.support-shift` (monospace), disabled buttons.
+- Tests: `payments/enterprise_test.go` (amount table, Stripe form payload, individual payload has no tier/tax fields, projection, service request and attempt key), `support_test.go` `TestEnterpriseSupport` (pricing markup, account summary with tier, entitlement, `validSupport` table).
+
+### Why
+- Reusing `francois_monthly_support=true` keeps the entitlement path untouched: an enterprise subscription is projected as support, and the tier is extra information.
+- The tier is a column, not derived from the amount, because 8–4096 overlaps the individual range (an individual can give 256 too).
+- The amount is an `<output>`, not an input, so only valid amounts can be chosen; the server checks again.
+
+### What worked
+- `go test ./... -count=1` all ok; `pnpm check` ok; `pnpm test` 22 pass; prettier clean; golangci-lint only reports the uncommitted preview file.
+- Playwright on `/pricing`:
+  - The tabs appear and the Enterprise panel is hidden at first. Clicking Enterprise sets `?tier=enterprise` and hides Individual.
+  - `>>1` goes 256 → 128 → 64 → 32 → 16 → 8 and is then disabled. `<<1` goes 8 → … → 4096 and is then disabled.
+  - The left and right arrow keys switch tabs.
+  - A guest's submit at 1024 goes to `/signin?return=/pricing?tier=enterprise&amount=1024`.
+  - `?tier=enterprise&amount=1024` restores the tab and 1024; `amount=300` falls back to 256.
+  - The free user's submit reaches the server and shows "Billing is not configured" (no Stripe locally).
+  - At 390 px nothing overflows (`scrollWidth` 375).
+
+### What didn't work
+- My first endpoint test table expected 400 for invalid amounts, but got `503 billing_unavailable` for all of them. `supportCheckout` returns 503 before reading the body when `s.Payments` is nil, which is always the case in the catalog harness. I extracted `validSupport` and tested it directly; the Stripe side is tested in `payments`.
+- The first rewrite of the body check returned without a response on a JSON error (`httpx.Read` does not write one). I restored the 400 `invalid_amount` for unreadable bodies.
+
+### What I learned
+- The `payments` package already had a Stripe form-payload test pattern (`httptest` server + `ParseForm`). Reusing it checks the real `stripe-go` encoding of `tax_id_collection`, `billing_address_collection` and `customer_update`.
+
+### What was tricky to build
+- Query parameters for both forms: `?amount=` used to belong to the individual form. An enterprise link `?tier=enterprise&amount=1024` must not set the individual input to 1024, and switching tabs must drop a stale `amount`. Each form now reads `amount` only for its own tier, and a tab click deletes `amount` from the URL.
+
+### What warrants a second pair of eyes
+- `customer_update` with `name`/`address: auto` overwrites the Stripe customer's name and address with what the company enters. For a person who later supports individually, the invoice would carry the company details. That is acceptable for invoices, but worth knowing.
+- Stripe requires automatic tax or a valid business configuration for `tax_id_collection` in some countries; test mode should be tried before deploy.
+- The admin subscriptions list does not show the tier yet (the API row includes `supportTier`).
+
+### What should be done in the future
+- A Stripe test-mode checkout of an enterprise subscription before deploying (check the tax ID field, the invoice and the webhook projection).
+- Optionally show the tier in the admin subscriptions table.
+
+### Code review instructions
+- Server: `billing/policy.go` (end), `payments/gateway.go` `CreateCheckout`/`Project`, `payments/service.go` `SupportEnterprise`, `support.go` `validSupport`/`supportCheckout`, `migrations/021_support_tier.sql`.
+- Client: `ui/catalog/enterprise-amount.ts`, `public.ts` `startSupport`/`bindEnterprise`/`bindSupportTiers`, `pricing.tmpl`.
+- Validate: `go test ./pkg/catalog/payments ./pkg/catalog -run 'Enterprise|Support'`; `pnpm test`.
+
+### Technical details
+- Stripe form keys sent for enterprise: `line_items[0][price_data][product_data][name]=Enterprise support`, `subscription_data[metadata][francois_support_tier]=enterprise`, `tax_id_collection[enabled]=true`, `billing_address_collection=required`, `customer_update[name]=auto`, `customer_update[address]=auto`.

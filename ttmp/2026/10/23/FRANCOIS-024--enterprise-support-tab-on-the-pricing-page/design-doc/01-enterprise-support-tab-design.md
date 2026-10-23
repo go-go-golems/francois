@@ -11,10 +11,14 @@ Owners: []
 RelatedFiles:
     - Path: repo://pkg/catalog/payments/gateway.go
       Note: CreateCheckout price_data and Project metadata
+    - Path: repo://pkg/catalog/store/migrations/021_support_tier.sql
+      Note: Stored tier
     - Path: repo://pkg/catalog/support.go
       Note: supportCheckout validation and supportView
     - Path: repo://pkg/catalog/web/templates/pricing.tmpl
       Note: Monthly support form gets the tabs
+    - Path: repo://ui/catalog/enterprise-amount.ts
+      Note: Amount rule (client)
     - Path: repo://ui/catalog/public.ts
       Note: bindSupport, model for the enterprise form
 ExternalSources: []
@@ -121,3 +125,13 @@ Enterprise fits inside this path: it is monthly support with a different amount 
 2. **Invoices:** collect tax ID and billing address in Checkout for enterprise only (proposed), or for individuals too?
 3. **Labels:** "Individual / Enterprise" for the tabs, "Support as a company →" for the button? Should the `>>1`/`<<1` buttons have a plain-language tooltip ("Halve", "Double") for people who don't read bit shifts?
 4. **Switching:** should an individual supporter be able to move to enterprise from the pricing page (Stripe would replace the subscription), or is going through the portal, as proposed, enough?
+
+## 6. Decisions taken when building (2026-10-23)
+
+The user asked to "build enterprise support" without answering section 5, so the proposed answers were used:
+1. Same access as individual support.
+2. Tax ID and billing address are collected for enterprise only.
+3. Labels: "Individual" / "Enterprise", "Every month, for your company", "Support as a company →". The `>>1`/`<<1` buttons have "Halve" / "Double" tooltips. All of these are site copy and editable in the admin panel.
+4. An individual supporter is sent to the Stripe portal, as for a second individual subscription.
+
+One deviation from section 3.1: the help text is one sentence that also mentions the invoice ("Halve or double, from 8 to 4096 USD a month. Invoiced to your company, with its address and tax ID.").
