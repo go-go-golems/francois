@@ -1,0 +1,103 @@
+package catalog
+
+// Throwaway local preview for FRANCOIS-022 (not committed): seeds the six
+// imported apps with their real covers and serves the storefront on
+// 127.0.0.1:18555 until the stop file disappears.
+
+import (
+	"context"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/go-go-golems/francois/pkg/catalog/identity"
+)
+
+func TestZZPreview(t *testing.T) {
+	stop := os.Getenv("PREVIEW_STOP_FILE")
+	if stop == "" {
+		t.Skip("preview only")
+	}
+	local, _ := url.Parse("http://localhost:18555")
+	e := setup(t, func(c *Config) { c.Sites[1] = Site{PublicURL: local, AppDomain: "localhost", OIDC: identity.New(identity.Config{})} })
+	ctx := context.Background()
+	admin := e.user("ada", "admin", false)
+	g := "/tmp/claude-1000/-home-manuel-code-wesen-go-go-golems-francois/8fa07163-a132-41ac-89e0-100f59698739/scratchpad/gallery/"
+	apps := []struct{ id, title, desc, cover string; tags []string; size int; early bool; mode string; month int }{
+		{"polis", "Polis", "Shared-room agent workspace", "", []string{"agents", "rooms"}, 300 << 10, false, "tab", 9},
+		{"form-skate-workbench", "Form Skate Workbench", "An IDE and agent for building a skateboard game from the ground up: editable physics, motors, trick recognition and a drafting-sheet stage.", g + "form-skate-workbench/00-skate.webp", []string{"skate", "game", "physics", "workbench"}, 3600 << 10, false, "tab", 10},
+		{"living-comic-studio", "Living Comic Studio", "Write a comic as a program: 3D actors, cameras, balloons and inks, staged into living pages, plus a chat room where messages become panels.", g + "living-comic-studio/00-lcs-b.webp", []string{"comics", "3d", "creative-coding", "studio"}, 7900 << 10, false, "inline", 10},
+		{"hypercore-studio", "Hypercore Studio", "The Living Comic engine in deep space: grow monsters from code and stage sci-fi comic pages under a magenta nebula.", g + "hypercore-studio/00-hc-b.webp", []string{"comics", "3d", "creative-coding", "studio", "sci-fi"}, 8100 << 10, true, "inline", 10},
+		{"mimeo", "Mimeo", "A zine workbench: write pages as a script, with exact-odds tables, picture recipes, clay creatures and print-ready spreads.", g + "mimeo/00-mimeo.webp", []string{"zines", "print", "creative-coding", "rpg"}, 973 << 10, false, "tab", 10},
+		{"kiln-workbench", "Kiln Workbench", "A compiler workbench: write passes and IRs in JavaScript, watch every rewrite, generate CUDA and WGSL, and measure kernels on simulated GPUs.", g + "kiln-workbench/00-kiln.webp", []string{"compilers", "gpu", "workbench", "education"}, 726 << 10, false, "tab", 10},
+		{"octavo-lab", "Octavo Lab", "An operating-system playground: worlds in QuickJS sandboxes on a virtual dual-screen handheld, with faults, timelines and a coding agent.", g + "octavo-lab/00-octavo.webp", []string{"operating-systems", "simulation", "workbench", "education"}, 1039 << 10, false, "tab", 10},
+	}
+	for i, a := range apps {
+		up := uploadOf(a.id, a.title, "1.0.0")
+		pad := make([]byte, a.size)
+		for j := range pad {
+			pad[j] = ' '
+		}
+		up.HTML = append([]byte(testHTML), pad...)
+		if html, err := os.ReadFile(g + "../build/" + a.id + ".html"); err == nil {
+			up.HTML = html
+			if m, err := os.ReadFile(g + "../build/" + a.id + ".json"); err == nil {
+				up.Manifest = m
+			}
+		}
+		up.MaxHTML = 16 << 20
+		up.FreeSample = i%2 == 0
+		rel, _, err := e.srv.Publisher.CreateDraft(ctx, admin.user.ID, up)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = e.store.PublishRelease(ctx, rel.ID, admin.user.ID, 0); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = e.store.Pool.Exec(ctx, `UPDATE releases SET published_at=$2 WHERE id=$1`, rel.ID, time.Date(2026, time.Month(a.month), 1+i*3, 12, 0, 0, 0, time.UTC))
+		art, _ := e.store.Artifact(ctx, a.id)
+		art.Description, art.Tags, art.LaunchMode, art.DemoEnabled = a.desc, a.tags, a.mode, true
+		if a.early {
+			until := time.Now().Add(20 * 24 * time.Hour)
+			art.EarlyAccessUntil = &until
+		}
+		if _, err = e.store.UpdateArtifact(ctx, art); err != nil {
+			t.Fatal(err)
+		}
+		if a.cover != "" {
+			data, err := os.ReadFile(a.cover)
+			if err != nil {
+				t.Fatal(err)
+			}
+			code, out := e.multipartTo(admin, "/api/studio/media", map[string]string{"alt": a.title}, "file", "cover.webp", data)
+			if code != 201 {
+				t.Fatalf("upload %d %v", code, out)
+			}
+			e.portal(&admin, "PUT", "/api/studio/artifacts/"+a.id+"/draft", map[string]any{"body": "Text.", "cover": out["id"]})
+			e.portal(&admin, "POST", "/api/studio/artifacts/"+a.id+"/draft/publish", nil)
+		}
+	}
+	doc := testDoc(100)
+	doc.Demo.Enabled = true
+	if _, err := e.store.SaveSettings(ctx, "", doc); err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:18555")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _ = http.Serve(ln, e.srv.Handler()) }()
+	paying := e.user("pat", "subscriber", true)
+	free := e.user("fred", "", false)
+	_ = os.WriteFile("/tmp/claude-1000/-home-manuel-code-wesen-go-go-golems-francois/8fa07163-a132-41ac-89e0-100f59698739/scratchpad/preview-tokens.txt", []byte("paying="+paying.token+"\nfree="+free.token+"\nadmin="+admin.token+"\n"), 0o600)
+	t.Log("serving http://localhost:18555/")
+	for {
+		if _, err := os.Stat(stop); err != nil {
+			return
+		}
+		time.Sleep(time.Second)
+	}
+}

@@ -260,3 +260,59 @@ The whole flow was checked end to end with Playwright against the local preview 
 ### Technical details
 - Row data attributes: `data-open data-artifact data-release data-title data-description data-launch data-demo data-early-access-until`.
 - Runner label attributes: `data-label-start data-label-demo data-label-signin data-label-subscribe`, from copy keys `runner.*` and `earlyaccess.button`.
+
+## Step 5: Real apps in the viewer and in a new tab (pre-deploy check)
+
+Ran the six imported apps, with their real HTML and manifests, through the new viewer at Phone, Tablet and Desktop sizes, and two of them through the new-tab path. Until now the local preview had seeded every app with the test placeholder page (it just says "board"), so the user saw a blank instance and asked why it didn't load. With the real builds, every app reaches "Live" in about a second and renders at all three sizes. The only defect found in our code was a redundant `allowfullscreen` attribute that made Chrome warn on every viewer open; it is fixed.
+
+### Prompt Context
+**User prompt (verbatim):** "why does http://localhost:18555/instances/ins_30daff07ede8499e4208 not load ?" (with a pasted browser console), then "ok, so when we deploy it it would be good?", then "ok, do it. commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Before deploying, check that the real apps (several MB, 3D) work in the inline viewer at each size and in the new-tab path, fix anything found, and record it.
+**Inferred user intent:** Confidence that deploying FRANCOIS-022 won't break the six live apps.
+**Commit (code):** f0d389e — "fix(catalog): drop the redundant allowfullscreen on the viewer frame"
+
+### What I did
+- Diagnosed the "does not load" report: `GET /api/instances/ins_30daff07ede8499e4208` as the admin test user returned the instance (owner `ada`, Hypercore Studio). In a browser the full launch chain succeeded (`/launch` 200, `/api/instances/{id}/launch` 200, `/api/launch/exchange` 200, `/page` 200, `runtime.js` 200, `/api/views` 200), and the frame showed the placeholder text "board". The pasted CSP errors come from `content.js` / `index.js` (a browser extension) and "tooltipContainer does not exist" from the same source; none are from our bundles.
+- Changed the throwaway preview seed (`pkg/catalog/zz_preview_test.go`, uncommitted; a copy is saved as `scripts/01-local-preview-seed.go.txt`) to load `scratchpad/build/<id>.html` and `<id>.json` (the manifests published to production) when present.
+- Flipped all six apps to `inline` directly in the throwaway test DB (`UPDATE catalog_artifacts SET launch_mode='inline' WHERE id <> 'polis'`), then, as the paying user, opened `/?open=<id>` for each app, waited for "Live", and took screenshots at Desktop, Tablet (834 px) and Phone (390 px) in a 1440×900 window.
+- Put four apps back to `tab` and clicked Open on Kiln Workbench and Form Skate Workbench from the landing page: each opened a new tab at `/instances/ins_…` with the app frame at `i-….localhost:18555/launch`; the full-screen page's Close points to `/apps/{id}`.
+- Removed `allowfullscreen: ""` from `mountFrame` in `ui/catalog/public.ts`, ran `pnpm check` and `make web-build`, restarted the preview and confirmed the frame has only `title, sandbox, allow, src` and the console has no warnings.
+
+### Why
+- The placeholder made the preview useless for judging the viewer with real content; the risk in the deploy is size, 3D and layout of real apps inside a resizable dialog, not the launch protocol (unchanged).
+- Changing the test DB directly instead of the Studio API: the API needs the CSRF token from the session, which `/api/me` does not expose to a script (two attempts returned `403 csrf_failed`); the DB is a throwaway created by the test.
+
+### What worked
+- All six apps reached "Live" in the viewer in 1.08–1.21 s (Living Comic 1078 ms, Hypercore 1185, Form Skate 1146, Mimeo 1164, Kiln 1209, Octavo 1139).
+- All rendered at Desktop and Tablet; Phone renders but see below.
+- No console errors from our code or the apps; the only warning was the `allowfullscreen` one, now gone.
+- New-tab path works for real apps (Kiln, Form Skate).
+
+### What didn't work
+- My first browser check of the user's instance returned `401 login_required` and "Instance not found": I had hardcoded the admin token from before the preview restart (each restart creates a new DB and new tokens). With the current token it loaded. No bug.
+- `PATCH /api/studio/artifacts/{id}` from the page with `x-csrf-token` taken from `/api/me` → `403 {"error":{"code":"csrf_failed","message":"Missing or invalid CSRF token"}}` (both `me.csrf` and `me.token` are wrong sources). Used the test DB instead.
+- A first `psql` attempt stored `docker exec … psql` in a shell variable and failed with `command not found` (zsh does not word-split); used a function.
+- Frame lookup in the screenshot script (`f.url().includes('/page')`) found no frame (the frame keeps its `/launch` URL), so per-size measurements of the app's inner width are missing; screenshots were checked by eye instead.
+
+### What I learned
+- The app frame's URL stays `/launch` in Playwright's frame list even after it shows `/page`; match on the instance origin instead.
+- Living Comic Studio (and Hypercore, same engine) lays out its comic page wider than 390 px, so at Phone size the panels and chat input are cut off on the right inside the frame. That is the app's own layout, not the viewer; a real phone would show the same.
+
+### What was tricky to build
+- Nothing new in the code; the challenge was making the preview faithful (real HTML + manifest, real covers, the right mix of launch modes, a fresh token per restart).
+
+### What warrants a second pair of eyes
+- Phone size for the comic apps (Living Comic, Hypercore): decide whether to keep Phone in the viewer for them or accept the app's own overflow.
+- Production differs from the preview in one way that matters: the storefront and app domain are different hosts there (here both are `localhost`). The CSP `frame-src` and the app domain's `frame-ancestors` are built from config and were only exercised locally.
+
+### What should be done in the future
+- Phase 5: deploy, then set launch modes per app and repeat the viewer check on production.
+
+### Code review instructions
+- `ui/catalog/public.ts` `mountFrame`.
+- Reproduce: copy `scripts/01-local-preview-seed.go.txt` to `pkg/catalog/zz_preview_test.go`, `touch $S/preview.run`, run `TEST_DATABASE_URL=… PREVIEW_STOP_FILE=$S/preview.run go test ./pkg/catalog -run TestZZPreview -v -timeout 8h`, open `http://localhost:18555/`, set the cookie `francois_session_dev` to a token from `$S/preview-tokens.txt`.
+
+### Technical details
+- Viewer sizes: Phone `max-width: 390px`, Tablet `834px`, Desktop `100%`.
+- Frame attributes after the fix: `sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"`, `allow="clipboard-write; fullscreen"`.
+- Screenshots (not committed): `$S/screens/real/<id>-{Desktop,Tablet,Phone}.png`, `sheet.png`, `<id>-newtab.png`, where `$S` is the session scratchpad.
