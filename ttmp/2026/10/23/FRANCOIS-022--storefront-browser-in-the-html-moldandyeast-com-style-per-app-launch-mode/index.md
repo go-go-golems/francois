@@ -8,7 +8,13 @@ Topics:
 DocType: index
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://pkg/catalog/settings/copy.go
+      Note: Editable site copy registry
+    - Path: repo://pkg/catalog/web/templates/home.tmpl
+      Note: Landing page browser
+    - Path: repo://ui/catalog/launch-decision.ts
+      Note: Launch rules (who may start, subscribe, inline/tab)
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-10-23T15:20:02.611202977-04:00
