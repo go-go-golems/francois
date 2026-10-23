@@ -25,3 +25,11 @@ Pre-deploy check: all six real apps run in the inline viewer (Live in ~1.1 s, De
 ### Related Files
 
 - /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/public.ts — mountFrame iframe attributes
+
+## 2026-10-23
+
+Gallery screenshots open full size in a modal lightbox (54ddbd2); early-access baseline fix (4fbed45)
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/francois/ui/catalog/public.ts — bindLightbox

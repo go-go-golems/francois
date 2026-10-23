@@ -360,3 +360,51 @@ Two small things came out of the user trying the preview. Setting the session co
 
 ### Technical details
 - Preview links: `http://localhost:18555/preview-login?as=paying|free|admin|guest`.
+
+## Step 7: Gallery screenshots open full size in a modal
+
+Gallery screenshots on an app page now open full size in a modal. Before, clicking one did nothing, on production too (slop.boutique's gallery is plain `<figure><img>`). Each image is now wrapped in a link to the full-size file, so it still works without JavaScript. With JavaScript, the link opens a full-viewport lightbox with caption, position, previous/next and keyboard support.
+
+### Prompt Context
+**User prompt (verbatim):** "also when clicking on screenshots they should show up full size as modal (like https://slop.boutique/apps/hypercore-studio)"
+**Assistant interpretation:** On app pages, clicking a gallery screenshot should open it full size in a modal (the URL names the page with the screenshots; it has no modal today).
+**Inferred user intent:** Let visitors look at the screenshots properly without leaving the page.
+**Commit (code):** 54ddbd2 — "feat(catalog): open gallery screenshots full size in a modal"
+
+### What I did
+- `artifact.tmpl` gallery: images are wrapped in `<a class="gallery-zoom" href="/media/{id}" data-zoom aria-label="View full size: {alt}">`; videos are not wrapped (they keep their controls).
+- `ui/catalog/public.ts` `bindLightbox(gallery)`: one `dialog.lightbox` per gallery with the image, caption (alt), `n / N`, ← Previous / Next → (only with more than one image), Close · Esc. Arrow keys step, wrapping around. A click on the dialog padding closes it. Focus returns to the thumbnail link on close. Modified clicks (Cmd/Ctrl/Shift, middle button) keep the browser's default and open the file.
+- `catalog.css`: `.gallery-zoom` (zoom-in cursor), `.lightbox*`. The image uses `object-fit: contain` in the remaining height. `html:has(.lightbox[open]) { overflow:hidden }` stops the page scrolling behind the modal. The bar wraps on narrow screens: caption on its own line, nav and Close on the next.
+- `videos_test.go` `TestVideos`: the page gallery holds an image and a video. The test asserts the image is wrapped in the zoom link and the video is not.
+- Preview seed: uploads up to six screenshots from each app's `gallery/` folder as the page gallery.
+
+### Why
+- A link to `/media/{id}` (the original, up to 2400 px wide) gives full size without JavaScript and in a new tab, and the modal is progressive enhancement, like the rest of `public.ts`.
+- Videos already have controls; zooming them would conflict with play/pause clicks.
+
+### What worked
+- Playwright on `/apps/hypercore-studio` (1440×900): click the 2nd screenshot → dialog open, "2 / 6", `src` is the original (natural 2080×1704); ArrowRight → "3 / 6"; ArrowLeft twice → "1 / 6"; Esc closes and focus is back on the link; a click outside the image closes; Close · Esc closes; no console errors.
+- 390×844: image fits, bar wraps onto two lines, `html` overflow is `hidden` while open and `visible` after.
+- `go test ./pkg/catalog -run 'TestVideos|TestBrowser|TestMediaVariants'` ok; `pnpm check`, `pnpm test`, prettier clean.
+
+### What didn't work
+- First phone screenshot: the bar was squeezed into one row ("Hypercore / Studio, / grow-a-monster", "3 / 6" broken over two lines), and the page scrollbar showed at the right edge. Fixed with `flex-wrap`, `white-space:nowrap` on the nav, a full-width caption under 640 px, and the `:has()` scroll lock.
+- `golangci-lint` still reports one gofmt issue, in the uncommitted `zz_preview_test.go` only.
+
+### What I learned
+- There was no existing lightbox anywhere in the storefront, so nothing to reuse; the landing-page viewer dialog was the model for the full-viewport `<dialog>` reset.
+
+### What was tricky to build
+- Closing on a click outside the image: the image box fills the remaining height with `object-fit: contain`, so a click on the letterbox area beside the picture hits the `img`, not the dialog, and does not close. Only the dialog's padding and bar gaps close. I accepted this; Esc and Close are always there.
+
+### What warrants a second pair of eyes
+- `:has()` is needed for the scroll lock. Browsers without it (old Firefox before 121) just let the page scroll behind the modal.
+
+### What should be done in the future
+- Possibly preload the next image, and support swipe on touch screens.
+
+### Code review instructions
+- `ui/catalog/public.ts` `bindLightbox`; `artifact.tmpl` gallery line; `catalog.css` `.lightbox*`; `videos_test.go`.
+
+### Technical details
+- Full-size URL: `/media/{id}` without `?w=`, i.e. the original upload.

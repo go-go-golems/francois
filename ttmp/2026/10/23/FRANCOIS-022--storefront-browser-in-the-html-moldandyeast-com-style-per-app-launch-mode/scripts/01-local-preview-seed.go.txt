@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,7 +78,19 @@ func TestZZPreview(t *testing.T) {
 			if code != 201 {
 				t.Fatalf("upload %d %v", code, out)
 			}
-			e.portal(&admin, "PUT", "/api/studio/artifacts/"+a.id+"/draft", map[string]any{"body": "Text.", "cover": out["id"]})
+			gallery := []any{}
+			shots, _ := filepath.Glob(filepath.Join(filepath.Dir(a.cover), "*.webp"))
+			for _, shot := range shots {
+				if shot == a.cover || len(gallery) == 6 {
+					continue
+				}
+				data, _ := os.ReadFile(shot)
+				name := strings.TrimSuffix(filepath.Base(shot), ".webp")
+				if code, m := e.multipartTo(admin, "/api/studio/media", map[string]string{"alt": a.title + ", " + name[3:]}, "file", "shot.webp", data); code == 201 {
+					gallery = append(gallery, m["id"])
+				}
+			}
+			e.portal(&admin, "PUT", "/api/studio/artifacts/"+a.id+"/draft", map[string]any{"body": "Text.", "cover": out["id"], "gallery": gallery})
 			e.portal(&admin, "POST", "/api/studio/artifacts/"+a.id+"/draft/publish", nil)
 		}
 	}
