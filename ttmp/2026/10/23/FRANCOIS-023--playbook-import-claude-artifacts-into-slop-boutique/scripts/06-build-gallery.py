@@ -12,6 +12,11 @@ for slug, items in plan.items():
     d = out / slug; d.mkdir(parents=True, exist_ok=True); rows = []
     for i, (src, alt) in enumerate(items):
         dst = d / f"{i:02d}-{pathlib.Path(src).stem}.webp"
+        if dst.exists() and dst.stat().st_mtime >= pathlib.Path(src).stat().st_mtime:
+            # Already converted and the source is unchanged: re-encoding lossless WebP is slow.
+            with Image.open(dst) as im:
+                rows.append({"file": str(dst), "alt": alt, "size": im.size, "bytes": dst.stat().st_size})
+            continue
         im = Image.open(src).convert('RGB')
         if im.width > 2400: im = im.resize((2400, round(im.height*2400/im.width)), Image.LANCZOS)
         im.save(dst, 'WEBP', quality=86, method=6) if lossy else im.save(dst, 'WEBP', lossless=True, method=6)

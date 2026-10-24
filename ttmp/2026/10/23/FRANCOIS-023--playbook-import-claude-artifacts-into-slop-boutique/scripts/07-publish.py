@@ -1,5 +1,7 @@
 """Upload gallery media, set catalog page and metadata, publish the page and
-draft releases. Idempotent: a receipt records uploaded media by file.
+draft releases. Idempotent: a receipt records uploaded media by file and size,
+so a redone image with the same name is uploaded again. Transient network
+errors (seen as "tls: bad record MAC" on large uploads) are retried.
 
 usage: python3 -I 07-publish.py <plan.json> <gallery-manifest.json> <pages-dir> <receipt.json> [slug...]
 
@@ -7,7 +9,7 @@ plan.json: {"<slug>": {"description": "...", "tags": ["a","b"], "release": "rel_
 gallery-manifest.json: output of 06-build-gallery.py (first image = cover)
 pages-dir: <slug>.md page bodies (Markdown, no title heading: the page shows it)
 """
-import json, pathlib, subprocess, sys
+import json, pathlib, subprocess, sys, time
 
 plan = json.loads(pathlib.Path(sys.argv[1]).read_text())
 man = json.loads(pathlib.Path(sys.argv[2]).read_text())
@@ -17,7 +19,11 @@ only = sys.argv[5:]
 receipt = json.loads(receipt_f.read_text()) if receipt_f.exists() else {}
 
 def cli(*a):
-    r = subprocess.run(['francois', 'catalog', *a, '--format', 'json'], capture_output=True, text=True)
+    for attempt in range(5):
+        r = subprocess.run(['francois', 'catalog', *a, '--format', 'json'], capture_output=True, text=True)
+        if not r.returncode or not any(k in r.stderr for k in ('tls:', 'connection reset', 'EOF', 'timeout', 'Timeout', 'deadline exceeded')):
+            break
+        time.sleep(2 + 3 * attempt)
     if r.returncode:
         raise SystemExit(' '.join(a[:3]) + ': ' + r.stderr[-800:])
     out = json.loads(r.stdout or '[]')
@@ -35,12 +41,13 @@ for slug, rows in man.items():
     assert not cur['artifact'].get('pageDraft'), slug + ' has an unpublished page draft; do not overwrite it'
     ids = []
     for r in rows:
-        if r['file'] not in st['media']:
+        key = f"{r['file']}:{r['bytes']}"
+        if key not in st['media']:
             m = cli('media', 'upload', r['file'], '--alt', r['alt'])
-            st['media'][r['file']] = m['id']
+            st['media'][key] = m['id']
             save()
             print('uploaded', slug, pathlib.Path(r['file']).name, m['id'], flush=True)
-        ids.append(st['media'][r['file']])
+        ids.append(st['media'][key])
     cli('artifacts', 'update', slug, '--description', meta['description'], '--tags', ','.join(meta['tags']))
     cli('artifacts', 'page-set', slug, '--body-file', str(pages / (slug + '.md')), '--cover', ids[0], '--gallery', ','.join(ids[1:]))
     cli('artifacts', 'page-publish', slug)

@@ -1,0 +1,215 @@
+<title>Import Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a filter bar over a dense checklist, with a sticky tray at the bottom that builds the paste-back text. */
+:root {
+  --bg: #f3f4f1;
+  --panel: #ffffff;
+  --fg: #1d211f;
+  --muted: #646b66;
+  --line: #d9ddd7;
+  --accent: #2f5bd3;
+  --accent-soft: #e4eafb;
+  --onsite: #2e7d4f;
+  --onsite-soft: #e2f1e7;
+  --warn: #9a6400;
+  --warn-soft: #f7ecd6;
+  --font-ui: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141715; --panel: #1c201e; --fg: #e6e9e6; --muted: #9aa29c; --line: #2e3430;
+    --accent: #7c9cf5; --accent-soft: #24304f; --onsite: #6fcf97; --onsite-soft: #1d3326;
+    --warn: #e2b25a; --warn-soft: #3a2f1a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141715; --panel: #1c201e; --fg: #e6e9e6; --muted: #9aa29c; --line: #2e3430;
+  --accent: #7c9cf5; --accent-soft: #24304f; --onsite: #6fcf97; --onsite-soft: #1d3326;
+  --warn: #e2b25a; --warn-soft: #3a2f1a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 160px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header h1 { font-size: 24px; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.filters input[type=search] { flex: 1 1 220px; min-width: 0; font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12px var(--font-ui); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.toggle { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; }
+.count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+th { text-align: left; font: 500 11px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--bg); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+tr.sel td { background: var(--accent-soft); }
+td.ck { width: 32px; }
+td.ck input { width: 16px; height: 16px; accent-color: var(--accent); margin: 2px 0 0; cursor: pointer; }
+.t a { color: var(--fg); font-weight: 700; text-decoration: none; }
+.t a:hover, .t a:focus-visible { color: var(--accent); text-decoration: underline; }
+.desc { color: var(--muted); margin-top: 2px; }
+.meta { font: 12px var(--font-mono); color: var(--muted); margin-top: 4px; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.b { font: 500 11px var(--font-mono); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); white-space: nowrap; }
+.b.multi { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.b.single { border-color: var(--accent); color: var(--accent); }
+.b.site { border-color: var(--onsite); color: var(--onsite); background: var(--onsite-soft); }
+.b.kind { color: var(--muted); }
+td.when { font: 12px var(--font-mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+.tray {
+  position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line);
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.tray .in { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.tray textarea { flex: 1 1 320px; min-width: 0; font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); resize: vertical; min-height: 36px; height: 36px; }
+.btn { font: 700 14px var(--font-ui); padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--panel); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, .chip:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.status { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#out { width: 100%; font: 12px var(--font-mono); height: 140px; margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); padding: 8px; }
+@media (max-width: 640px) {
+  th.h-when, td.when { display: none; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Claude artifacts to import</h1>
+    <p>Your recent claude.ai artifacts, and those shared with you. Docs documents hold text in the Docs store and come over as Markdown, not as an app. Tick the ones to bring to slop.boutique, then copy the list and paste it back into Claude Code. A green <span class="b site">on site</span> badge means an app with that title is already in the catalog.</p>
+  </header>
+
+  <div class="filters">
+    <input type="search" id="q" placeholder="Filter by title or description" aria-label="Filter">
+    <div class="chips" id="kinds" role="group" aria-label="Kind"></div>
+    <div class="chips" id="fmts" role="group" aria-label="Format"></div>
+    <label class="toggle"><input type="checkbox" id="hideSite"> Hide apps already on site</label>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>Artifact</th><th>Format</th><th class="h-when">Updated</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tray">
+  <div class="in">
+    <span class="status" id="selcount">0 selected</span>
+    <textarea id="notes" placeholder="Notes for Claude (optional), e.g. slugs, free sample, launch mode"></textarea>
+    <button class="btn ghost" id="clear" type="button">Clear</button>
+    <button class="btn" id="copy" type="button" disabled>Copy selection</button>
+  </div>
+  <div class="in"><textarea id="out" readonly hidden aria-label="Copied text"></textarea></div>
+</div>
+
+<script>
+const DATA = /*DATA*/[];
+const ONSITE = /*ONSITE*/{};
+const KEY = "import-picker-sel";
+let sel = new Set();
+try { sel = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify([...sel])); } catch (e) {} };
+
+const kinds = ["all", ...new Set(DATA.map(d => d.kind || "other"))];
+let kind = "all";
+const FMT = {all: "any format", "single-html": "single HTML", "multi-file": "multi-file", docs: "Docs", design: "Design", shared: "shared"};
+const fmts = ["all", ...new Set(DATA.map(d => d.format))];
+let fmt = "all";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+$("kinds").innerHTML = kinds.map(k => `<button class="chip" type="button" data-k="${esc(k)}" aria-pressed="${k === kind}">${esc(k)}</button>`).join("");
+$("kinds").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  kind = b.dataset.k;
+  for (const c of $("kinds").children) c.setAttribute("aria-pressed", c.dataset.k === kind);
+  render();
+});
+$("fmts").innerHTML = fmts.map(k => `<button class="chip" type="button" data-f="${esc(k)}" aria-pressed="${k === fmt}">${esc(FMT[k] || k)}</button>`).join("");
+$("fmts").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  fmt = b.dataset.f;
+  for (const c of $("fmts").children) c.setAttribute("aria-pressed", c.dataset.f === fmt);
+  render();
+});
+
+function fmtBadge(d) {
+  if (d.shared) return `<span class="b">shared with you · HTML</span>`;
+  if (d.format === "docs") return `<span class="b">Docs document</span>`;
+  if (d.format === "design") return `<span class="b">Design canvas · ${d.files} files</span>`;
+  if (d.format === "single-html") return `<span class="b single">single HTML</span>`;
+  if (d.format === "multi-file") return `<span class="b multi">multi-file · ${d.files} files</span>`;
+  return `<span class="b">unknown</span>`;
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const hide = $("hideSite").checked;
+  const shown = DATA.filter(d =>
+    (kind === "all" || (d.kind || "other") === kind) &&
+    (fmt === "all" || d.format === fmt) &&
+    (!hide || !ONSITE[d.url]) &&
+    (!q || (d.title + " " + d.desc).toLowerCase().includes(q)));
+  $("rows").innerHTML = shown.map(d => {
+    const id = "c-" + d.url.split("/").pop();
+    const meta = [d.size, d.contents, (d.capabilities || []).length ? "uses " + d.capabilities.join(", ") : ""].filter(Boolean).join(" · ");
+    return `<tr class="${sel.has(d.url) ? "sel" : ""}">
+      <td class="ck"><input type="checkbox" id="${id}" data-u="${esc(d.url)}" ${sel.has(d.url) ? "checked" : ""} aria-label="Select ${esc(d.title)}"></td>
+      <td class="t"><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.title)}</a>
+        <div class="desc">${esc(d.desc)}</div>
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+        ${d.note ? `<div class="meta">${esc(d.note)}</div>` : ""}</td>
+      <td><div class="badges">${fmtBadge(d)}<span class="b kind">${esc(d.kind)}</span>${ONSITE[d.url] ? `<span class="b site">on site: ${esc(ONSITE[d.url])}</span>` : ""}</div></td>
+      <td class="when">${esc(d.updated || "—")}</td></tr>`;
+  }).join("");
+  $("count").textContent = `${shown.length} of ${DATA.length} shown`;
+  updateTray();
+}
+
+$("rows").addEventListener("change", e => {
+  const u = e.target.dataset.u; if (!u) return;
+  e.target.checked ? sel.add(u) : sel.delete(u);
+  e.target.closest("tr").classList.toggle("sel", e.target.checked);
+  save(); updateTray();
+});
+$("q").addEventListener("input", render);
+$("hideSite").addEventListener("change", render);
+$("clear").addEventListener("click", () => { sel.clear(); save(); render(); $("out").hidden = true; });
+
+function buildText() {
+  const picked = DATA.filter(d => sel.has(d.url));
+  const lines = ["Import these claude.ai artifacts into slop.boutique (playbook FRANCOIS-023):", ""];
+  for (const d of picked) {
+    const f = d.shared ? "shared with me" : d.format === "multi-file" ? `multi-file, ${d.files} files` : d.format;
+    lines.push(`- ${d.title} — ${d.url} — ${f}${ONSITE[d.url] ? ` — already on site as ${ONSITE[d.url]}` : ""}`);
+  }
+  const n = $("notes").value.trim();
+  if (n) lines.push("", "Notes: " + n);
+  return lines.join("\n");
+}
+function updateTray() {
+  $("selcount").textContent = `${sel.size} selected`;
+  $("copy").disabled = sel.size === 0;
+}
+$("copy").addEventListener("click", () => {
+  const text = buildText();
+  const out = $("out");
+  out.value = text; out.hidden = false;
+  const done = ok => { $("copy").textContent = ok ? "Copied" : "Select and copy below"; setTimeout(() => $("copy").textContent = "Copy selection", 1800); };
+  navigator.clipboard.writeText(text).then(() => done(true), () => { out.focus(); out.select(); done(false); });
+});
+render();
+</script>
