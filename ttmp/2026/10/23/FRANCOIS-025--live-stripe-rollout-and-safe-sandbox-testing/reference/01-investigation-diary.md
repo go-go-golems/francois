@@ -167,3 +167,62 @@ Review scripts/05-issuer-cutover.py and its receipt, platform PRs #389/#391, dep
 
 ### Technical details
 Active consumers: francois, francois-sandbox, agentlogic and datadrop. Todo deployments remain retired at zero replicas and were not reactivated or migrated. Current production strategy remains Recreate with one replica. The new desired behavior is to keep the serving predecessor until its replacement is ready; implementation remains open.
+
+
+## Step 4: Exercise sandbox payments end to end, including refund and cleanup
+
+The operator confirmed the login flows work. Using the existing authenticated sandbox account and an origin-scoped Basic Auth browser context, exercised real hosted Stripe test Checkout and the customer portal. All tested business flows passed on deployed image sha-dff295d. No production credentials, real cards, live payments, production settings or application code were changed.
+
+Finished with both test subscriptions canceled, the year payment fully refunded, the abandoned Checkout expired, and the account displaying Free. Test payment history remains intentionally available for audit; the two monthly test charges were not refunded. This qualifies the listed paths, not every possible payment method, failure or renewal scenario.
+
+### Prompt Context
+**User prompt (verbatim):** "login flows work. Test the sandbox checkout stuff and all."
+**Assistant interpretation:** Accept operator login confirmation and test purchase, access, webhooks, portal and cancellation/refund behavior in the isolated sandbox.
+**Inferred user intent:** Establish concrete billing confidence before live cutover without charging real money.
+
+### What I did
+- Confirmed every hosted payment page displayed Sandbox/Test mode; API mutations required an rk_test_ key and fetched objects with livemode=false before modification.
+- Individual support: selected $1/month, submitted declined test card 4000000000000002, saw the decline and independently verified account remained Free. Retried with 4242424242424242; Checkout returned to the sandbox with $1/month support and the next-payment date.
+- Verified processed checkout.session.completed, customer.subscription.created and invoice.paid rows plus an active test-only subscription.
+- Customer portal opened correctly, showed the paid invoice and test payment method. Scheduled cancellation; account retained support until period end. Used Don't cancel subscription → Renew subscription; API and account confirmed cancellation removed.
+- Verified active-support pricing replaces the monthly purchase buttons with Manage subscription. This is UI duplicate prevention, not a direct adversarial API test.
+- Canceled the exact individual test subscription through Stripe's test API, processed deletion webhook, and verified Free access.
+- Enterprise support: bought the default $256/month test offering; collected a fictitious billing address. Database projected support_tier=enterprise and support_amount_cents=25600.
+- Year funding: paid the displayed $999,999.99 test-only one-time amount. Account showed one year through 24 October 2027, no automatic renewal, and correctly warned that enterprise monthly support remained active.
+- Refunded that exact year payment in the Stripe test dashboard. charge.refunded processed, checkout payment_state became refunded, year access disappeared, and enterprise access remained.
+- Canceled the exact enterprise test subscription and verified final Free access.
+- Started another $1 test Checkout, returned without paying, verified Free, and started again: the same open Checkout was reused. Expired that session using Stripe's test API; checkout.session.expired processed.
+- Script 06 replayed an actual signed test event (HTTP 200), rejected an invalid signature (400), and rejected a signed wrong-livemode event (400). Final DB checks showed one original event row, zero wrong-mode rows, and no pending/error events.
+- Ran `go test ./pkg/catalog/payments ./pkg/catalog/billing ./pkg/catalog/store`: payments and billing PASS; store reports no test files, not an integration-test pass.
+
+### Why
+A redirect alone is insufficient: payment events must project access, failed/abandoned payments must not grant access, cancel-at-period-end must preserve the paid period, and refunds must remove only the affected entitlement. All transitions were observed through the deployed browser/API/database boundaries.
+
+### What worked
+All paths listed above passed. The durable sanitized receipt is sources/sandbox-billing-qualification.json, produced by script 07; webhook HTTP outcomes are sources/sandbox-webhook-checks.json. Final projections: two canceled test subscriptions, three completed purchases (one year payment refunded), one expired abandoned Checkout, and all 18 recorded event rows processed without errors (including four account-refresh events).
+
+### What didn't work
+- Stripe's card accordion button is overlaid: normal Playwright click timed out with `element is not visible`; clicking the Card text was intercepted by the accordion button. Dispatching click on that observed button expanded its normal UI. No CAPTCHA was solved or bypassed.
+- A portal locator guessed Renew subscription on the overview and timed out: actual overview link is Don't cancel subscription, followed by a Renew subscription confirmation button.
+- Enterprise is role=tab, not button; corrected the locator after inspecting the actual element.
+- Enterprise Checkout collected a full address, so the simple ZIP accessible-name locator failed. Expanded Enter address manually and filled the observed address fields.
+- A read-only GET /v1/charges using the restricted runtime key returned HTTP 403 / more_permissions_required. Did not broaden the key. Performed the test refund through the authenticated Stripe dashboard; the deployed refund webhook processed successfully with current runtime permissions.
+- Initial SQL probes used historical names: `ERROR: column "subscription_id" does not exist` and `ERROR: column "plan" does not exist`. Current columns are stripe_subscription_id and checkout_attempts.price. Inspected the deployed information schema before producing the final receipt. Script 07 now preserves SQL stderr on failure.
+
+### What I learned
+Current sandbox checkout is custom-amount support, enterprise support and year funding—not merely the initially provisioned fixed $1 plan. Each offered mode needs qualification. Year funding intentionally coexists with an existing monthly subscription; its refund must not erase that subscription's access.
+
+### What was tricky to build
+Stripe Checkout has different billing fields for the enterprise flow, and some controls use hidden overlay buttons. Portal wording differs between the overview and confirmation screen. Keeping secrets in memory and writing only bounded receipts avoids archiving Basic Auth credentials, raw Checkout/portal session URLs or complete event payloads.
+
+### What warrants a second pair of eyes
+Still untested: 3DS challenges, time-advanced renewal/dunning, partial refunds, non-card methods, payment-method replacement and adversarial cross-account Checkout access. Existing unit tests passed but are not proof those paths work in the deployed environment. Operator reports login flows working; no claim of independent browser verification of every login provider is made here.
+
+### What should be done in the future
+Inventory production test billing and prepare the separately authorized live transition. Retain the explicit real-money approval gate. Ready-gated deployment handoff remains open and was not changed during payment testing.
+
+### Code review instructions
+Review scripts 06–07 and their sanitized JSON receipts. Re-run script 07 only while this qualification state is still current; its assertions intentionally expect these test subscriptions canceled. Script 06 signs a synthetic wrong-mode probe and replays a real test event, so it is not read-only. Browser observations are recorded above; no production mutation is part of this checkpoint.
+
+### Technical details
+Test account acct_1TxEMNLpxiqBMHHi, deployment francois-sandbox/francois, database francois_sandbox, image ghcr.io/go-go-golems/francois:sha-dff295d. Individual subscription sub_1UTzsoLpxiqBMHHiwGVXsupk and enterprise sub_1UTzyZLpxiqBMHHiSJo1SinC are canceled. Year payment pi_3UTzzRLpxiqBMHHi12FVCwSX is fully refunded. No live billing cutover was performed.

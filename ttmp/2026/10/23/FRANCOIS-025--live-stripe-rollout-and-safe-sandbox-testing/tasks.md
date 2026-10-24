@@ -12,3 +12,4 @@
 - [ ] Execute backed-up pre-launch issuer migration across ZITADEL and consumers, preserving operator identities/content <!-- t:822r -->
 - [ ] Verify new-domain login, identity continuity and sandbox checkout; document recovery and restore reconciliation <!-- t:n7ob -->
 - [ ] Implement ready-gated deployment handoff: retain old serving pod until replacement is ready; address process-local runtime/signing and shared PVC constraints before enabling overlap. <!-- t:wqph -->
+- [x] Qualify sandbox individual/enterprise/year checkout, decline/abandonment, webhook validation/replay, portal cancellation/resume, refund revocation and cleanup. <!-- t:zd2s -->
