@@ -152,18 +152,17 @@ function mountFrame(
 }
 
 // openInNewTab opens the window synchronously (inside the click, so popup
-// blockers allow it) and points it at the full-screen page once the
-// instance exists.
+// blockers allow it) on the page that starts the instance, so the tab shows
+// the application starting rather than staying blank.
 async function openInNewTab(data: DOMStringMap, decision: Decision) {
-  const tab = window.open("about:blank", "_blank");
-  try {
-    const instance = await openInstance(data, decision);
-    if (tab) tab.location.href = "/instances/" + instance.id;
-    else location.assign("/instances/" + instance.id);
-  } catch (e) {
-    tab?.close();
-    throw e;
-  }
+  const q = new URLSearchParams({
+    artifact: data.artifact ?? "",
+    release: data.release ?? "",
+    title: data.title ?? "",
+  });
+  if (decision.kind === "start" && decision.demo) q.set("demo", "1");
+  const url = "/instances/new?" + q;
+  if (!window.open(url, "_blank")) location.assign(url);
 }
 
 async function renderActions(box: HTMLElement) {

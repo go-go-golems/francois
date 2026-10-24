@@ -234,9 +234,9 @@ var (
 	// AWS access key IDs are upper case and stand alone. Matching them case-
 	// insensitively, or inside a longer run of base64, flags embedded fonts and
 	// images (any few hundred KB of base64 contains "akia…" by chance).
-	awsKeyMarker = regexp.MustCompile(`(^|[^A-Za-z0-9+/])AKIA[0-9A-Z]{16}([^A-Za-z0-9+/=]|$)`)
-	sqliteMarker     = []byte("SQLite format 3\x00")
-	externalScript   = regexp.MustCompile(`(?i)<script[^>]+src=["'](https?:)?//([^/"']+)`)
+	awsKeyMarker   = regexp.MustCompile(`(^|[^A-Za-z0-9+/])AKIA[0-9A-Z]{16}([^A-Za-z0-9+/=]|$)`)
+	sqliteMarker   = []byte("SQLite format 3\x00")
+	externalScript = regexp.MustCompile(`(?i)<script[^>]+src=["'](https?:)?//([^/"']+)`)
 )
 
 // Validate inspects an upload. Errors block the draft; warnings are shown.

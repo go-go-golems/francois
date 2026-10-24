@@ -1,7 +1,7 @@
 import { bindInstanceLaunch } from "./instance-launch";
 import React, { useEffect, useRef, useState } from "react";
 import { api, errorMessage, Instance } from "./api";
-import { navigate } from "./store";
+import { navigate, store } from "./store";
 import { date, Empty, Link, loginHref, reasonLabel } from "./ui";
 
 export function Instances() {
@@ -182,6 +182,84 @@ export function Launcher({ id }: { id: string }) {
           </div>
         )}
         {denied && !inst.launchBlocked && <p className="v-denied">{denied}</p>}
+      </div>
+    </div>
+  );
+}
+
+// openedHere tells a tab the storefront opened from one opened some other
+// way. /instances/new starts an instance on load, so a link to it from
+// elsewhere must not create instances for whoever follows it.
+function openedHere() {
+  try {
+    return window.opener?.location.origin === location.origin;
+  } catch {
+    return false; // a cross-origin opener
+  }
+}
+
+// Starter is the new tab "Run" opens. It shows the application starting at
+// once, instead of a blank tab, creates (or resumes) the instance and then
+// becomes that instance's page.
+export function Starter() {
+  const q = new URLSearchParams(location.search);
+  const artifact = q.get("artifact") ?? "";
+  const release = q.get("release") ?? "";
+  const title = q.get("title") ?? "";
+  const demo = q.get("demo") === "1";
+  const back = artifact ? "/apps/" + encodeURIComponent(artifact) : "/";
+  const { data: session } = api.useSessionQuery();
+  const [openInstance] = api.useOpenInstanceMutation();
+  const [startDemo] = api.useStartDemoMutation();
+  const [failed, setFailed] = useState("");
+  const started = useRef(false);
+  const ready = !!session?.csrfToken || session?.authenticated === false;
+  useEffect(() => {
+    if (title) document.title = "Starting " + title;
+    document.body.classList.add("has-window");
+    return () => document.body.classList.remove("has-window");
+  }, [title]);
+  useEffect(() => {
+    if (!ready || started.current) return;
+    started.current = true;
+    if (!openedHere()) {
+      location.replace(back);
+      return;
+    }
+    (async () => {
+      try {
+        const { id } = demo
+          ? await startDemo({ artifactId: artifact }).unwrap()
+          : await openInstance({ releaseId: release, title }).unwrap();
+        // A first demo signs the visitor in as a guest: the launch handshake
+        // needs that session's CSRF token.
+        await store.dispatch(
+          api.endpoints.session.initiate(undefined, { forceRefetch: true }),
+        );
+        navigate("/instances/" + id, true);
+      } catch (e) {
+        setFailed(errorMessage(e));
+      }
+    })();
+  }, [ready, demo, artifact, release, title, back, openInstance, startDemo]);
+  return (
+    <div className="viewer">
+      <a className="viewer-close u" href={back} aria-label="Close application">
+        Close
+      </a>
+      <div className="v-table">
+        <div className="v-blocked">
+          {failed ? (
+            <>
+              <p>{failed}</p>
+              <a className="u" href={back}>
+                Back to the application
+              </a>
+            </>
+          ) : (
+            <p>Starting {title || "the application"}…</p>
+          )}
+        </div>
       </div>
     </div>
   );

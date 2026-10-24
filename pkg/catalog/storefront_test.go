@@ -174,10 +174,11 @@ func TestArtifactPageLatestDownload(t *testing.T) {
 		}
 	}
 	oldID, latestID := releases[1]["id"].(string), releases[0]["id"].(string)
+	// The page renders the downloads twice: beside the title and, on phones, below Run.
 	for _, who := range []*tactor{&admin, &sub} {
 		code, body, _ := e.do(who, "portal.test", "GET", "/apps/board", nil, nil)
 		s := string(body)
-		if code != 200 || strings.Count(s, ">Download ↓</a>") != 1 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
+		if code != 200 || strings.Count(s, ">Download ↓</a>") != 2 || !strings.Contains(s, "/api/releases/"+latestID+"/files/") ||
 			strings.Contains(s, "/api/releases/"+oldID+"/") || strings.Contains(s, ">Manifest</a>") {
 			t.Fatalf("expected one current HTML download: %d %s", code, body)
 		}

@@ -4,7 +4,7 @@ import { Provider } from "react-redux";
 import { Account } from "./account";
 import { Admin } from "./admin";
 import { Device } from "./device";
-import { Instances, Launcher } from "./instances";
+import { Instances, Launcher, Starter } from "./instances";
 import { store } from "./store";
 import { Studio } from "./studio";
 import { Footer, Header, Link, Notice, useRoute } from "./ui";
@@ -12,6 +12,7 @@ import { Footer, Header, Link, Notice, useRoute } from "./ui";
 function Routes() {
   const { path } = useRoute();
   const parts = path.split("/").filter(Boolean);
+  if (parts[0] === "instances" && parts[1] === "new") return <Starter />;
   if (parts[0] === "instances" && parts[1]) return <Launcher id={parts[1]} />;
   let page: React.ReactNode;
   if (parts[0] === "instances") page = <Instances />;
