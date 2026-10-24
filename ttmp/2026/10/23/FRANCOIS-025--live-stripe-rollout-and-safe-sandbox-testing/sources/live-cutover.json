@@ -1,0 +1,47 @@
+{
+  "startedAt": "20261024083807",
+  "archiveSchema": "billing_test_archive_20261024083807",
+  "phase": "live-validated-no-real-charge",
+  "runtimeRollbackVaultPath": "kv/apps/francois/prod/pre-live-20261024083807",
+  "postgresCheckpoint": "postgres/postgres-20261024T083817Z.sql.gz",
+  "protectedBefore": {
+    "users": 11,
+    "artifacts": 58,
+    "releases": 67,
+    "modelCalls": 10,
+    "dailyUsage": 0
+  },
+  "archiveResult": "BEGIN\nLOCK TABLE\nDO\nCREATE SCHEMA\nREVOKE\nSELECT 4\nSELECT 2\nSELECT 7\nSELECT 229\nSELECT 11\nDELETE 229\nDELETE 7\nDELETE 2\nDELETE 4\nINSERT 0 1\nCOMMIT",
+  "protectedAfter": {
+    "users": 11,
+    "artifacts": 58,
+    "releases": 67,
+    "modelCalls": 10,
+    "dailyUsage": 0
+  },
+  "disabledOldTestWebhooks": [
+    "we_1UT9dvLeHmcfmvuC8kc1FN7a",
+    "we_1UQ9zfLeHmcfmvuC639e6BPZ"
+  ],
+  "unpaidLiveCheckout": {
+    "id": "cs_live_a156nl5qPEjf7NR03pd8QpFze0U0TDxCukgyfm5w8DfFZ7LHwz2IdETdYY",
+    "livemode": true,
+    "status": "open",
+    "payment_status": "unpaid",
+    "amount_total": 100,
+    "subscription": null,
+    "finalStatus": "expired"
+  },
+  "livePortalSessionCreated": true,
+  "webhookEnabled": true,
+  "liveAccountChargeCountIsZero": true,
+  "completedAt": "2026-10-24T08:45:27.429500+00:00",
+  "realStripeWebhookVerified": {
+    "type": "checkout.session.expired",
+    "livemode": true,
+    "state": "processed"
+  },
+  "settingsRevision": 12,
+  "argo": "Synced/Healthy",
+  "productionStrategy": "Recreate; zero-downtime handoff still outstanding"
+}

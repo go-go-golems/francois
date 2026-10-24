@@ -1,0 +1,97 @@
+{
+  "capturedAt": "2026-10-24T08:12:15.574217+00:00",
+  "image": "ghcr.io/go-go-golems/francois:sha-dff295d",
+  "database": {
+    "subscriptions": [
+      {
+        "status": "canceled",
+        "livemode": false,
+        "support_amount_cents": 100,
+        "support_tier": "",
+        "cancel_at_period_end": false
+      },
+      {
+        "status": "canceled",
+        "livemode": false,
+        "support_amount_cents": 25600,
+        "support_tier": "enterprise",
+        "cancel_at_period_end": false
+      }
+    ],
+    "events": [
+      {
+        "type": "charge.refunded",
+        "state": "processed",
+        "error_code": null,
+        "count": 1
+      },
+      {
+        "type": "checkout.session.completed",
+        "state": "processed",
+        "error_code": null,
+        "count": 3
+      },
+      {
+        "type": "checkout.session.expired",
+        "state": "processed",
+        "error_code": null,
+        "count": 1
+      },
+      {
+        "type": "customer.subscription.created",
+        "state": "processed",
+        "error_code": null,
+        "count": 2
+      },
+      {
+        "type": "customer.subscription.deleted",
+        "state": "processed",
+        "error_code": null,
+        "count": 2
+      },
+      {
+        "type": "customer.subscription.updated",
+        "state": "processed",
+        "error_code": null,
+        "count": 2
+      },
+      {
+        "type": "francois.refresh.account",
+        "state": "processed",
+        "error_code": null,
+        "count": 4
+      },
+      {
+        "type": "invoice.paid",
+        "state": "processed",
+        "error_code": null,
+        "count": 3
+      }
+    ],
+    "checkouts": [
+      {
+        "price": "support:usd:100",
+        "state": "completed",
+        "payment_state": null
+      },
+      {
+        "price": "support:enterprise:usd:25600",
+        "state": "completed",
+        "payment_state": null
+      },
+      {
+        "price": "support:year:99999999",
+        "state": "completed",
+        "payment_state": "refunded"
+      },
+      {
+        "price": "support:usd:100",
+        "state": "expired",
+        "payment_state": null
+      }
+    ],
+    "wrongModeRows": 0,
+    "replayedEventRows": 1
+  },
+  "livePayments": false
+}

@@ -1,0 +1,42 @@
+{
+  "startedAt": "20261024000138",
+  "phase": "backed-up-mappings-migrated-awaiting-gitops",
+  "sqlite": [
+    {
+      "database": "/data/agentlogic.db",
+      "backup": "/data/agentlogic.db.before-auth-domain-20261024000138",
+      "users": 0,
+      "updated": 0,
+      "identitiesPreserved": true
+    },
+    {
+      "database": "/data/datadrop.db",
+      "backup": "/data/datadrop.db.before-auth-domain-20261024000138",
+      "users": 3,
+      "updated": 3,
+      "identitiesPreserved": true
+    }
+  ],
+  "postgres": [
+    {
+      "database": "francois",
+      "result": "BEGIN\nDO\n users_before \n--------------\n           10\n(1 row)\n\nUPDATE 5\n users_after \n-------------\n          10\n(1 row)\n\nCOMMIT"
+    },
+    {
+      "database": "francois_sandbox",
+      "result": "BEGIN\nDO\n users_before \n--------------\n            1\n(1 row)\n\nUPDATE 1\n users_after \n-------------\n           1\n(1 row)\n\nCOMMIT"
+    }
+  ],
+  "backupJobs": [
+    {
+      "namespace": "postgres",
+      "job": "auth-domain-postgres-20261024000138",
+      "object": "postgres/postgres-20261024T000201Z.sql.gz"
+    },
+    {
+      "namespace": "vault",
+      "job": "auth-domain-vault-20261024000138",
+      "object": "vault/vault-20261024T000202Z.snap.gz"
+    }
+  ]
+}

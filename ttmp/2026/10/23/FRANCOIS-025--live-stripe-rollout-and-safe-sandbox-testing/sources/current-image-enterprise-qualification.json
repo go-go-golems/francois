@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-24T08:34:09.252234+00:00",
+  "images": {
+    "francois": {
+      "image": "ghcr.io/go-go-golems/francois:sha-1317326",
+      "imageID": "ghcr.io/go-go-golems/francois@sha256:3bf109de1acc78eda7bde3486e74c1440c15322a95cb9657561bc8d1daa06838",
+      "ready": true
+    },
+    "francois-sandbox": {
+      "image": "ghcr.io/go-go-golems/francois:sha-1317326",
+      "imageID": "ghcr.io/go-go-golems/francois@sha256:3bf109de1acc78eda7bde3486e74c1440c15322a95cb9657561bc8d1daa06838",
+      "ready": true
+    }
+  },
+  "checkoutLabel": "Monthly support",
+  "amountCents": 25600,
+  "requiredFullAddress": false,
+  "taxIdField": false,
+  "projectedTier": "enterprise",
+  "livemode": false,
+  "subscription": "sub_1UU0NoLpxiqBMHHiFzQy8sAP",
+  "checkoutAndInvoiceEventsProcessed": true,
+  "cleanupSubscriptionCanceled": true,
+  "finalAccess": "Free",
+  "productionBillingChanged": false
+}
