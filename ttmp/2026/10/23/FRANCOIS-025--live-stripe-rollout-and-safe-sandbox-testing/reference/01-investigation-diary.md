@@ -276,3 +276,49 @@ Review scripts 08–09 and sources/live-stripe-preparation.json; check mode/acco
 
 ### Technical details
 Live product prod_VV0JkispMzlf9y; price price_1UU0JILpxiqBMHHixeXUFilX; portal bpc_1UU0JNLpxiqBMHHiMnAdY50K; webhook we_1UU0JLLpxiqBMHHi0cOkQRDv. Runtime remains test-only and production remains available; no charge or customer was created by preparation.
+
+
+## Step 6: Match the production image and qualify the changed enterprise Checkout
+
+Updated only sandbox to sha-1317326 and reran enterprise Checkout with a Stripe test card. The simplified flow succeeded, the enterprise entitlement remained correct, and the test subscription was canceled afterward. Production was not restarted, switched live or cleaned up.
+
+### Prompt Context
+**User prompt (verbatim):** "ok"
+**Assistant interpretation:** Proceed with the just-explained focused version-matched sandbox check; not a new authorization for destructive production cleanup.
+**Inferred user intent:** Verify the small checkout change and advance toward cutover.
+**Commit (code):** Platform 4db0f7a — sandbox image alignment; PR #393 merged after CI passed.
+
+### What I did
+- Updated sandbox image from sha-dff295d to sha-1317326 through GitOps; waited for readiness.
+- Verified running production and sandbox imageIDs (resolved digests) match, not just image tags.
+- Started enterprise support at $256/month. Stripe displayed Monthly support and only the ordinary card/name/country/ZIP fields; no enterprise-only full address or tax-ID field.
+- Completed Checkout using test card 4242424242424242. Database showed active, livemode=false, amount 25600 cents, tier enterprise. checkout.session.completed, customer.subscription.created and invoice.paid were processed without errors.
+- Account displayed Enterprise support, 256 USD a month.
+- Canceled only test subscription sub_1UU0NoLpxiqBMHHiFzQy8sAP and verified the account returned to Free.
+
+### Why
+The first qualification used an older artifact. This focused check covers the enterprise Checkout behavior changed since then without repeating the entire earlier matrix.
+
+### What worked
+All 55 GitOps packages passed invariant validation, PR CI passed, rollout completed, deployed image digests matched, Checkout and entitlement projection succeeded, and cleanup restored Free access. Receipt: sources/current-image-enterprise-qualification.json.
+
+### What didn't work
+No new failures observed.
+
+### What I learned
+The customer-facing product name is now Monthly support for both tiers; the enterprise metadata still correctly drives application entitlement and account presentation.
+
+### What was tricky to build
+Distinguishing harmless product-name simplification from accidentally losing enterprise tier metadata. Checked both the hosted page and database projection.
+
+### What warrants a second pair of eyes
+The earlier broad matrix remains evidence for the older artifact; this is specifically the changed enterprise flow plus digest parity, not a claim that every scenario was rerun on the new image.
+
+### What should be done in the future
+Proceed with the separately scoped production test-data archival approval and coordinated live cutover; no real-money smoke test is authorized by this check.
+
+### Code review instructions
+Review platform PR #393 and the new image qualification receipt. Production deployment, credentials, settings and billing rows were untouched.
+
+### Technical details
+Both deployments now run sha-1317326 with matching resolved image digests. The live Stripe configuration remains staged; live webhook remains disabled pending cutover.
