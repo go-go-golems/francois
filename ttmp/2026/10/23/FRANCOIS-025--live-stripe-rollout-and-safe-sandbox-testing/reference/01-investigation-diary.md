@@ -322,3 +322,55 @@ Review platform PR #393 and the new image qualification receipt. Production depl
 
 ### Technical details
 Both deployments now run sha-1317326 with matching resolved image digests. The live Stripe configuration remains staged; live webhook remains disabled pending cutover.
+
+
+## Step 7: Archive approved test billing and switch production to live Stripe
+
+With explicit approval, archived production's test billing namespace and changed the runtime/mode/settings to live Stripe. Production is now Synced/Healthy and serves HTTP 200. A live Checkout was opened but never paid; expiring it produced an authentic Stripe live webhook that the application processed. No real charge was made.
+
+The current Recreate deployment required a maintenance restart, and an Argo operation-ordering issue extended it. This does not complete the operator's separate always-serving deployment requirement; that remains open and is explicitly documented in the operations reference.
+
+### Prompt Context
+**User prompt (verbatim):** "go ahead"
+**Assistant interpretation:** Approval of the immediately preceding scoped proposal to archive production test billing, remove its benefits and switch live, preserving users/content/usage and making no real charge.
+**Inferred user intent:** Complete the live transition rather than continue planning.
+**Commit (code):** Platform 87a3aed, PR #394 merged — live mode enabled, old test signing-secret fallback removed.
+
+### What I did
+- Script 10 asserted the still-test runtime, verified staged live resources and exact approved counts (4/2/7/229), saved previous runtime to a dedicated Vault path, held Argo and stopped production.
+- Took successful quiesced PostgreSQL checkpoint postgres/postgres-20261024T083817Z.sql.gz.
+- In one locked transaction copied the four billing tables plus settings history into billing_test_archive_20261024083807, removed only active billing rows, and appended settings revision 12 replacing only the fixed plan's Stripe price ID.
+- Preserved counts before/after: 11 users, 58 artifacts, 67 releases, 10 model calls, zero daily usage rows. No user/content/usage/role/grant deletion or update statements were issued.
+- Disabled the two exact old Francois test webhook URLs. Kept old remote test objects for history; no mass Stripe deletion.
+- CAS-updated runtime with live key/signing secret/price metadata, cleared the old fallback secret, waited for VSO byte-equal synchronization without printing credentials, then resumed the merged live-mode deployment.
+- Enabled the live webhook and confirmed Argo Synced/Healthy and storefront HTTP 200.
+- Opened a USD 1/month live Checkout through the application's normal browser UI. API confirmed livemode=true, unpaid, no subscription. Expired it without entering card details or clicking Pay/Subscribe. Stripe delivered checkout.session.expired with livemode=true; production stored it processed with no error.
+- Created a live portal session for that same operator customer; did not persist or print its bearer URL. Verified the live account still had zero charges.
+
+### Why
+The active billing schema has no account namespace for customers/checkouts. Archiving test state avoids resolving test customer IDs against live Stripe or treating test subscriptions as paid live access. Existing independent roles/complimentary grants remain intentionally intact.
+
+### What worked
+All 55 GitOps packages and PR CI passed. Archive transaction and VSO synchronization succeeded. Runtime live-mode guard, live Checkout creation, portal creation and actual Stripe-to-production signed event delivery were verified. Final state has zero live subscriptions and one expired live Checkout, not a completed payment. Public availability and Argo health recovered fully.
+
+### What didn't work
+- `kubectl -n francois rollout status deployment/francois --timeout=120s` timed out. Logs: `Stripe key mode does not match --stripe-live-mode`. The running Deployment still had old test-mode arguments even though the merged main revision was known: Argo was waiting for the old operation's Deployment health. Applied the exact already-merged local deployment manifest using `kubectl -n francois apply -f .../gitops/kustomize/francois/deployment.yaml`; rollout then succeeded and Argo converged. No guard bypass or fallback test key was used.
+- Browser assertion that the operator account would show Free timed out; it showed Paying while billing_subscriptions was empty. This account has preserved independent access; corrected the check to verify checkout/payment state rather than assuming all operator permissions came from the archived test subscriptions.
+
+### What I learned
+A hard refresh and enabling autosync do not necessarily replace an already running old-revision sync. Mode/credential transitions need an explicit operation boundary. Expiring an unpaid live Checkout validates real signed delivery without authorizing a charge.
+
+### What was tricky to build
+Coordinating secret refresh, persistent settings and a single-mode startup guard while preserving recoverable test state. Atomic database archival prevents partial active-state cleanup; Vault CAS prevents unnoticed concurrent credential overwrites. The final live customer mapping is legitimate and newly created by the no-charge checkout check, not copied test data.
+
+### What warrants a second pair of eyes
+Real paid entitlements, receipts and real refund behavior remain untested without explicit financial approval. Zero-downtime deployment handoff remains unfinished. The before/after preservation checks are counts plus scoped SQL review, not a claim of row-by-row cryptographic identity proof. The new backup completed but was not independently restored this turn.
+
+### What should be done in the future
+Operate production in live mode; routine testing stays in sandbox. Complete ready-gated handoff separately. Obtain explicit amount/payment-method approval before any real-money smoke test. Do not rerun preparation/cutover scripts after launch.
+
+### Code review instructions
+Review script 10, sources/live-cutover.json, platform PR #394, and reference/02-live-billing-operations-and-recovery.md. The receipt identifies the archive schema, rollback secret path, backup object, protected counts and live no-charge check. Inspect current financial state before any rollback; never restore a stale whole database over new live billing.
+
+### Technical details
+Live account acct_1TxEMNLpxiqBMHHi, settings revision 12, price price_1UU0JILpxiqBMHHixeXUFilX, enabled webhook we_1UU0JLLpxiqBMHHi0cOkQRDv. Both production and sandbox remain on sha-1317326; sandbox remains test-only. Cutover receipt phase is live-validated-no-real-charge.
