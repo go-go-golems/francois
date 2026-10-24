@@ -11,3 +11,4 @@
 - [ ] Prepare auth.slop.boutique TLS, ZITADEL domain configuration and social callback allowlists <!-- t:epwe -->
 - [ ] Execute backed-up pre-launch issuer migration across ZITADEL and consumers, preserving operator identities/content <!-- t:822r -->
 - [ ] Verify new-domain login, identity continuity and sandbox checkout; document recovery and restore reconciliation <!-- t:n7ob -->
+- [ ] Implement ready-gated deployment handoff: retain old serving pod until replacement is ready; address process-local runtime/signing and shared PVC constraints before enabling overlap. <!-- t:wqph -->

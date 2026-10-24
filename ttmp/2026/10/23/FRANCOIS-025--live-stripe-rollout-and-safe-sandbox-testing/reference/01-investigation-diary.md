@@ -111,3 +111,59 @@ Review platform PRs #386–388, Terraform sandbox client, scripts 01–04, sourc
 
 ### Technical details
 Namespace/database: francois-sandbox / francois_sandbox. Vault runtime apps/francois/sandbox/runtime; key custody apps/francois/sandbox/stripe; gate apps/francois/sandbox/ingress. Stripe account acct_1TxEMNLpxiqBMHHi in test mode; API version 2026-06-24.dahlia. Readiness and TLS checked after deploy. Application-level payment completion is not yet claimed.
+
+
+## Step 3: Execute the auth-domain cutover and restore serving availability
+
+Migrated the shared identity hostname to auth.slop.boutique, preserving the ZITADEL instance and local user IDs. Stopped the active consumers for a quiesced PostgreSQL/Vault checkpoint and transactional issuer mapping updates. This deliberately caused an outage; the operator then requested deployments keep the old version serving. Slop was restored and returned HTTP 200 before pursuing deployment-policy changes.
+
+The intended sandbox payment baseline has not been completed. This entry records identity infrastructure progress, not completion of login continuity or billing qualification.
+
+### Prompt Context
+**User prompt (verbatim):** "can slop.boutique be set up to no have "no available server"? always keep one running on the previous version"
+**Assistant interpretation:** Restore availability immediately and make future deployments readiness-gated rather than stop-first.
+**Inferred user intent:** Keep the public site serving through routine upgrades.
+**Earlier execution authorization:** Compacted context records authorization to execute the pre-launch migration, commit at meaningful intervals, and keep a detailed diary; this is a summary, not a reconstructed quotation.
+**Commit (code):** Platform cfe0ebb (PR #389) changes domain/active consumers; 7ab70f6 (PR #391) corrects ingress precedence. Both PRs merged.
+
+### What I did
+- Added the new /idps/callback URI to Google and GitHub OAuth clients, retaining the existing URI. GitHub persisted values independently reloaded; Google save returned to credentials listing, independent reload still pending.
+- Added the new certificate SAN and changed ZITADEL ExternalDomain, login URLs, active consumer issuers and branding reconciler URL.
+- Script 05 held reconciliation, stopped consumers/ZITADEL, ran successful PostgreSQL and Vault backup jobs, migrated only matching users. Receipt: sources/issuer-cutover.json.
+- PostgreSQL preserved 10 production users (5 old-issuer rows updated), and 1 sandbox user (1 updated). Agentlogic had 0 users; Datadrop preserved all 3 IDs/subjects. SQLite snapshots reside on their respective PVCs and passed integrity checks; these are local rollback copies, not off-cluster backups.
+- Resumed all four active consumers. Restored prereqs reconciliation and branding CronJob scheduling.
+- Explicitly updated the persisted instance LoginV2 feature through PUT /v2/features/instance; independent GET confirmed the new baseUri. Helm DefaultInstance configuration alone did not update this persisted value.
+- Added task wqph for a ready-gated serving handoff; no deployment strategy change claimed.
+
+### Why
+Local account continuity depends on updating exact (issuer, subject) mappings, not matching email addresses. The original migration accepted downtime, but the operator now wants deployments to preserve serving capacity.
+
+### What worked
+- GitOps invariant checks: all 55 packages, zero violations; both platform PR CI validations passed.
+- Successful checkpoint objects: postgres/postgres-20261024T000201Z.sql.gz and vault/vault-20261024T000202Z.snap.gz. Backup jobs completed; this new checkpoint has not undergone an independent restore drill.
+- New discovery returns issuer https://auth.slop.boutique with valid HTTPS; existing admin token can read/update the original instance.
+- kubectl -n francois rollout status deployment/francois completed; curl https://slop.boutique/ returned HTTP 200 after resuming reconciliation.
+
+### What didn't work
+- Initial `curl -fsS https://auth.slop.boutique/.well-known/openid-configuration` returned `curl: (22) The requested URL returned error: 503`. Traefik access logs identified `websecure-francois-francois-slop-boutique-a5904d09de3219f21490@kubernetes`: the wildcard Slop router won over exact ZITADEL routes, hitting the intentionally stopped application. Explicit API priority 300 / Login priority 310 fixed it; discovery then succeeded.
+- `kubectl -n agentlogic exec deployment/agentlogic -- sh ...` and the corresponding Datadrop command failed with `exec: "sh": executable file not found in $PATH`. Inspected upstream migration schemas instead and used short-lived Python Jobs mounting each PVC for backed-up transactions.
+- A two-block edit was rejected because one oldText matched twice; no change was applied. Retried with unique newline/indentation contexts.
+- Existing instance feature readback still showed the old LoginV2 baseUri after Helm rollout. Corrected through the instance feature API and verified readback.
+
+### What I learned
+A ready identity backend is insufficient if a wildcard ingress wins routing. Also, the serving application is explicitly configured Recreate because views, rooms, worker and asset-signing keys are process-local; rolling overlap is not safely solved by changing only one YAML field. The initial promise to change strategy must be qualified by this discovered constraint.
+
+### What was tricky to build
+Migration changes span Helm bootstrap/runtime values, persisted instance features, exact local account mappings, OAuth allowlists and ingress precedence. Public availability needed restoration before expanding deployment redesign. The cutover helper intentionally leaves reconciliation held until the separate GitOps transition; it is not a safe blindly replayable reconciler.
+
+### What warrants a second pair of eyes
+Review rolling/blue-green handoff against process-local state, per-process signing keys, shared writable worker/Pi paths, PVC scheduling and schema backward compatibility. Do not treat maxUnavailable=0 as proof of application correctness. Verify actual Google/GitHub/email login and stable local IDs after migration; HTTP 200/discovery are not end-to-end authentication evidence.
+
+### What should be done in the future
+Implement ready-gated handoff (wqph); complete login/account continuity checks, independent callback readbacks, Terraform issuer-reference updates, billing inventory and sandbox purchase/webhook/portal qualification before live Stripe. No real charges or billing cleanup were performed.
+
+### Code review instructions
+Review scripts/05-issuer-cutover.py and its receipt, platform PRs #389/#391, deployment strategy and pkg/catalog/hosted/runtime.go. Recheck application health and new-host login flows. Preserve the rollback snapshots until validation is complete.
+
+### Technical details
+Active consumers: francois, francois-sandbox, agentlogic and datadrop. Todo deployments remain retired at zero replicas and were not reactivated or migrated. Current production strategy remains Recreate with one replica. The new desired behavior is to keep the serving predecessor until its replacement is ready; implementation remains open.
