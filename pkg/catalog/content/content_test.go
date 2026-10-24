@@ -114,3 +114,40 @@ func TestEditorialSectionsKeepMarkdownSafety(t *testing.T) {
 		t.Fatalf("unsafe or missing supplemental content: %s", sections[2].HTML)
 	}
 }
+
+// TestCardCrops: a card keeps the middle of the image and crops the rest
+// evenly, tall or wide.
+func TestCardCrops(t *testing.T) {
+	bands := func(w, h int, vertical bool) []byte {
+		img := image.NewRGBA(image.Rect(0, 0, w, h))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				i := y * 3 / h
+				if vertical {
+					i = x * 3 / w
+				}
+				img.Set(x, y, []color.Color{color.RGBA{255, 0, 0, 255}, color.RGBA{0, 255, 0, 255}, color.RGBA{0, 0, 255, 255}}[i])
+			}
+		}
+		var b bytes.Buffer
+		_ = png.Encode(&b, img)
+		return b.Bytes()
+	}
+	for name, src := range map[string][]byte{"tall": bands(400, 1200, false), "wide": bands(3000, 400, true)} {
+		data, err := Card(bytes.NewReader(src))
+		if err != nil {
+			t.Fatal(name, err)
+		}
+		img, format, err := image.Decode(bytes.NewReader(data))
+		if err != nil || format != "jpeg" || img.Bounds().Dx() != CardWidth || img.Bounds().Dy() != CardHeight {
+			t.Fatalf("%s: %v %s %v", name, err, format, img.Bounds())
+		}
+		// Only the green middle band survives the crop.
+		for _, p := range []image.Point{{2, 2}, {CardWidth - 3, CardHeight - 3}, {CardWidth / 2, CardHeight / 2}} {
+			r, g, b, _ := img.At(p.X, p.Y).RGBA()
+			if g>>8 < 200 || r>>8 > 60 || b>>8 > 60 {
+				t.Fatalf("%s: pixel %v is %d,%d,%d", name, p, r>>8, g>>8, b>>8)
+			}
+		}
+	}
+}

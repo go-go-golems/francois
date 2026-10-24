@@ -33,6 +33,16 @@ func VariantURL(id string, w int) string {
 	return MediaPrefix + id + "?w=" + strconv.Itoa(w) + "&v=" + strconv.Itoa(VariantVersion)
 }
 
+// CardWidth×CardHeight is the link preview (Open Graph) size. The card
+// variant fills it, cropping the overflow evenly from both sides, so every
+// platform shows the same picture instead of cropping its own.
+const CardWidth, CardHeight = 1200, 630
+
+// CardURL is the URL of media id as a share card.
+func CardURL(id string) string {
+	return MediaPrefix + id + "?card=1&v=" + strconv.Itoa(VariantVersion)
+}
+
 // maxResizePixels bounds the decoded size (4 bytes per pixel) of an image
 // the server resizes; larger images are served as uploaded.
 const maxResizePixels = 40_000_000
@@ -90,4 +100,35 @@ func Resize(r io.ReadSeeker, w int) ([]byte, string, error) {
 	}
 	err = (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&out, dst)
 	return out.Bytes(), "image/png", err
+}
+
+// Card scales and center-crops an image to CardWidth×CardHeight as JPEG,
+// enlarging smaller images. Transparent areas become black.
+func Card(r io.ReadSeeker) ([]byte, error) {
+	cfg, format, err := image.DecodeConfig(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "read image header")
+	}
+	if format == "gif" || cfg.Width*cfg.Height > maxResizePixels {
+		return nil, ErrNoVariant
+	}
+	if _, err = r.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	src, _, err := image.Decode(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "decode image")
+	}
+	b := src.Bounds()
+	cw, ch := b.Dx(), b.Dx()*CardHeight/CardWidth
+	if ch > b.Dy() {
+		cw, ch = b.Dy()*CardWidth/CardHeight, b.Dy()
+	}
+	x, y := b.Min.X+(b.Dx()-cw)/2, b.Min.Y+(b.Dy()-ch)/2
+	dst := image.NewRGBA(image.Rect(0, 0, CardWidth, CardHeight))
+	draw.Draw(dst, dst.Bounds(), image.Black, image.Point{}, draw.Src)
+	draw.CatmullRom.Scale(dst, dst.Bounds(), src, image.Rect(x, y, x+cw, y+ch), draw.Over, nil)
+	var out bytes.Buffer
+	err = jpeg.Encode(&out, dst, &jpeg.Options{Quality: variantQuality})
+	return out.Bytes(), err
 }

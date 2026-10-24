@@ -274,10 +274,19 @@ func TestMediaVariants(t *testing.T) {
 	if cfg, format, _, _ := get(transparent, "?w=160"); format != "png" || cfg.Width != 160 {
 		t.Fatalf("transparent variant: %s %d", format, cfg.Width)
 	}
+	// Share cards fill 1200×630 whatever the source size or transparency.
+	for _, m := range []string{id, transparent} {
+		if cfg, format, h, _ := get(m, "?card=1&v=2"); format != "jpeg" || cfg.Width != 1200 || cfg.Height != 630 || !strings.HasSuffix(h.Get("ETag"), `-card-v2"`) {
+			t.Fatalf("card: %s %dx%d %q", format, cfg.Width, cfg.Height, h.Get("ETag"))
+		}
+	}
 	var gif bytes.Buffer
 	_ = stdgif.Encode(&gif, image.NewPaletted(image.Rect(0, 0, 400, 300), color.Palette{color.Black, color.White}), nil)
-	if _, format, _, _ := get(upload("c.gif", gif.Bytes()), "?w=160"); format != "gif" {
-		t.Fatalf("GIF resized to %s", format)
+	gifID := upload("c.gif", gif.Bytes())
+	for _, q := range []string{"?w=160", "?card=1"} {
+		if _, format, _, _ := get(gifID, q); format != "gif" {
+			t.Fatalf("GIF %s served as %s", q, format)
+		}
 	}
 
 	want := "/media/m?w=160&v=2 160w, /media/m?w=320&v=2 320w, /media/m?w=640&v=2 640w, /media/m 800w"
@@ -307,6 +316,25 @@ func TestMediaVariants(t *testing.T) {
 	_, home, _ := e.do(nil, "portal.test", "GET", "/", nil, nil)
 	if !bytes.Contains(home, []byte(`<img src="/media/`+id+`?w=640&amp;v=2" srcset="/media/`+id+`?w=160&amp;v=2 160w, `)) || !bytes.Contains(home, []byte(`/media/`+id+` 800w" sizes="(max-width: 900px) 100vw, 402px"`)) {
 		t.Fatal("landing page thumbnail lacks its srcset")
+	}
+	// The app's link preview is its cover as a 1200×630 card.
+	_, app, _ := e.do(nil, "portal.test", "GET", "/apps/thumbs", nil, nil)
+	if !bytes.Contains(app, []byte(`<meta property="og:image" content="http://portal.test/media/`+id+`?card=1&amp;v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`)) {
+		t.Fatal("app page lacks its share card")
+	}
+	// A configured share image replaces the drawn card on other pages.
+	doc := testDoc(100)
+	doc.Storefront.ShareImage = "not-media"
+	if err := doc.Validate(); err == nil {
+		t.Fatal("invalid shareImage accepted")
+	}
+	doc.Storefront.ShareImage = id
+	if _, err := e.store.SaveSettings(context.Background(), "", doc); err != nil {
+		t.Fatal(err)
+	}
+	_, pricing, _ := e.do(nil, "portal.test", "GET", "/pricing", nil, nil)
+	if !bytes.Contains(pricing, []byte(`<meta property="og:image" content="http://portal.test/media/`+id+`?card=1&amp;v=2"><meta property="og:image:width" content="1200">`)) {
+		t.Fatal("configured share image not used")
 	}
 }
 

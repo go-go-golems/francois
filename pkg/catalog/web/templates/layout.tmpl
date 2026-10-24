@@ -10,7 +10,7 @@
 <meta property="og:title" content="{{if .Title}}{{.Title}}{{else}}{{.Brand}}{{end}}">
 {{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
 <meta property="og:url" content="{{.Canonical}}">
-{{if .Image}}<meta property="og:image" content="{{.Image}}">{{if .DefaultImage}}<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{{.Brand}}">{{end}}<meta name="twitter:card" content="summary_large_image">{{else}}<meta name="twitter:card" content="summary">{{end}}
+{{if .Image}}<meta property="og:image" content="{{.Image}}">{{if .CardImage}}<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{{if .ImageAlt}}<meta property="og:image:alt" content="{{.ImageAlt}}">{{end}}{{end}}<meta name="twitter:card" content="summary_large_image">{{else}}<meta name="twitter:card" content="summary">{{end}}
 <link rel="canonical" href="{{.Canonical}}">
 <link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{{asset "apple-touch-icon.png"}}">

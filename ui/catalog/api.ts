@@ -348,6 +348,8 @@ export type SettingsDoc = {
     title: string;
     tagline: string;
     intro: string;
+    // Media ID of the default link preview image; empty draws one.
+    shareImage?: string;
     journalEnabled: boolean;
     // Overrides of registered site text; see CopyKey.
     copy?: Record<string, string>;
