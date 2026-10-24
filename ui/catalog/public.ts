@@ -153,7 +153,9 @@ function mountFrame(
 
 // openInNewTab opens the window synchronously (inside the click, so popup
 // blockers allow it) on the page that starts the instance, so the tab shows
-// the application starting rather than staying blank.
+// the application starting rather than staying blank. That page starts only
+// for a tab the storefront opened; when the popup is blocked, this tab
+// creates the instance and then goes to it.
 async function openInNewTab(data: DOMStringMap, decision: Decision) {
   const q = new URLSearchParams({
     artifact: data.artifact ?? "",
@@ -161,8 +163,9 @@ async function openInNewTab(data: DOMStringMap, decision: Decision) {
     title: data.title ?? "",
   });
   if (decision.kind === "start" && decision.demo) q.set("demo", "1");
-  const url = "/instances/new?" + q;
-  if (!window.open(url, "_blank")) location.assign(url);
+  if (window.open("/instances/new?" + q, "_blank")) return;
+  const instance = await openInstance(data, decision);
+  location.assign("/instances/" + instance.id);
 }
 
 async function renderActions(box: HTMLElement) {
