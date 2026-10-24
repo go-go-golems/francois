@@ -1,6 +1,6 @@
 {{define "content"}}{{with .Body}}<main class="experiment">
 <header class="experiment-header"><p class="experiment-meta">{{if .Card.Number}}{{ordinal .Card.Number}} · {{end}}{{longDate .Card.FirstPublished}}{{if .Card.Tags}} · {{join .Card.Tags " · "}}{{end}}</p>
-<div class="experiment-title-row"><h1>{{.Card.Title}}</h1><div class="experiment-download">{{range .Releases}}{{range .Downloads}}<a class="site-button" href="{{.Href}}"{{if not .Signin}} download="{{.Name}}"{{end}}>{{.Label}}</a><span class="file-meta">{{.Name}}, {{size .Size}}{{if .Signin}} · sign in to download{{end}}</span>{{end}}{{end}}</div></div>
+<div class="experiment-title-row"><h1>{{.Card.Title}}</h1><div class="experiment-download">{{template "downloads" .}}</div></div>
 {{if .Card.Description}}<p class="experiment-description">{{.Card.Description}}</p>{{end}}
 {{if .Card.Creators}}<p class="byline">by {{range $i, $c := .Card.Creators}}{{if $i}}, {{end}}<a class="u" href="/creators/{{$c.Slug}}">{{$c.Name}}</a>{{end}}</p>{{end}}
 </header>
@@ -11,9 +11,12 @@
  data-label-start="{{$.Copy.Text "runner.start"}}" data-label-demo="{{$.Copy.Text "runner.demo"}}" data-label-signin="{{$.Copy.Text "runner.signin"}}" data-label-early="{{$.Copy.Date "earlyaccess.runner" .EarlyAccessUntil}}" data-label-subscribe="{{$.Copy.Text "earlyaccess.button"}}">
 {{if .EarlyBlocked}}<p class="runner-early">{{$.Copy.Date "earlyaccess.runner" .EarlyAccessUntil}}</p><a class="site-button is-primary" href="/pricing">{{$.Copy.Text "earlyaccess.button"}}</a>{{else}}<a class="site-button" href="/signin?return=/apps/{{.Card.ID}}">{{$.Copy.Text "runner.signin"}}</a>{{end}}<noscript><p>Enable JavaScript to run this artifact in your browser.</p></noscript></div>
 <a class="u runner-link" data-runner-link data-runner-control hidden>Open full screen ↗</a>
+<div class="experiment-download runner-downloads">{{template "downloads" .}}</div>
 </section>
 <div class="experiment-editorial">{{range .Sections}}<section class="editorial-row">{{if .Label}}<h2 class="editorial-label">{{.Label}}</h2>{{else}}<div class="editorial-label" aria-hidden="true"></div>{{end}}<div class="md editorial-body">{{.HTML}}</div></section>{{end}}</div>
 {{if .Gallery}}<section class="gallery experiment-gallery" aria-label="Gallery">{{range .Gallery}}<figure>{{if isVideo .MediaType}}{{template "media" .}}{{else}}<a class="gallery-zoom" href="/media/{{.ID}}" data-zoom aria-label="View full size{{with .Alt}}: {{.}}{{end}}">{{template "media" .}}</a>{{end}}{{if .Alt}}<figcaption>{{.Alt}}</figcaption>{{end}}</figure>{{end}}</section>{{end}}
 {{range .Releases}}{{if .Attached}}<section class="editorial-row experiment-attachments"><h2 class="editorial-label">Attachments</h2><div><ul class="attachments" aria-label="Attachments">{{range .Attached}}<li>{{if .Href}}<a class="u" href="{{.Href}}" download="{{.Name}}">{{.Title}}</a>{{else}}<span>{{.Title}}</span>{{end}} <span class="muted">{{.Name}} · {{size .Size}}</span></li>{{end}}</ul>{{if .Locked}}<p class="muted small">{{if $.Body.EarlyAccess}}Paying access is required until {{$.Body.EarlyAccessUntil.Format "2 January 2006"}}.{{else}}Sign in to download attachments.{{end}}</p>{{end}}</div></section>{{end}}{{end}}
 {{template "support-callout" $}}
 </main>{{end}}{{end}}
+{{/* Download buttons: in the title row on wide screens, below the Run button on narrow ones (catalog.css). */}}
+{{define "downloads"}}{{range .Releases}}{{range .Downloads}}<a class="site-button" href="{{.Href}}"{{if not .Signin}} download="{{.Name}}"{{end}}>{{.Label}}</a><span class="file-meta">{{.Name}}, {{size .Size}}{{if .Signin}} · sign in to download{{end}}</span>{{end}}{{end}}{{end}}

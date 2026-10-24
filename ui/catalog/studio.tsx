@@ -106,8 +106,19 @@ function Thumb({ media, title }: { media?: string; title: string }) {
 function Artifacts() {
   const { data = [], isLoading } = studio.useStudioArtifactsQuery();
   const [create, { isLoading: creating }] = studio.useCreateArtifactMutation();
+  const [patch] = studio.usePatchArtifactMutation();
   const act = useAct();
   const [form, setForm] = useState({ id: "", title: "" });
+  // The row is a link to the editor; the button toggles visibility in place.
+  const toggleHidden = (e: React.MouseEvent, a: ArtifactRow) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const hide = a.visibility !== "hidden";
+    act(
+      patch({ id: a.id, visibility: hide ? "hidden" : "listed" }).unwrap(),
+      hide ? a.title + " hidden" : a.title + " listed",
+    );
+  };
   return (
     <>
       <section className="library">
@@ -178,6 +189,18 @@ function Artifacts() {
                   {a.latestVersion ? "v" + a.latestVersion : "unreleased"}
                 </span>
                 <span className="lib-added">{date(a.updatedAt)}</span>
+                <span className="lib-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={(e) => toggleHidden(e, a)}
+                    aria-label={
+                      (a.visibility === "hidden" ? "List " : "Hide ") + a.title
+                    }
+                  >
+                    {a.visibility === "hidden" ? "Unhide" : "Hide"}
+                  </button>
+                </span>
               </Link>
             ))}
           </div>

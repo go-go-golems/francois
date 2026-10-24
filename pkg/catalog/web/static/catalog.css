@@ -588,6 +588,7 @@ select.btn { appearance: none; cursor: pointer; }
 .experiment-title-row h1 { min-width:0; margin:0; font-size:96px; line-height:92px; font-weight:400; letter-spacing:-.045em; overflow-wrap:anywhere; }
 .experiment-download { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
 .experiment-download .site-button { font-size:17px; line-height:24px; }
+.runner-downloads { display:none; }
 .file-meta { font:13px/20px var(--font-mono); color:var(--color-muted); overflow-wrap:anywhere; }
 .experiment-description { max-width:1000px; margin:48px 0 0; font-size:28px; line-height:38px; }
 .experiment-header .byline { margin:20px 0 0; font-size:15px; }
@@ -630,8 +631,9 @@ html:has(.lightbox[open]) { overflow:hidden; }
  .experiment-title-row { display:contents; }
  .experiment-title-row h1 { font-size:44px; line-height:44px; font-weight:500; letter-spacing:-.035em; }
  .experiment-description { order:2; margin:-8px 0 0; font-size:22px; line-height:30px; }
- .experiment-download { order:3; width:100%; align-items:center; min-width:0; }
- .experiment-download:empty { display:none; }
+ .experiment-header .experiment-download { display:none; }
+ .runner-downloads { display:flex; width:100%; align-items:center; min-width:0; padding-top:16px; }
+ .runner-downloads:empty { display:none; }
  .experiment-download .site-button { width:100%; font-size:15px; line-height:22px; }
  .experiment-header .byline { order:4; margin:0; }
  .runner-toolbar { padding:10px 14px; font-size:14px; line-height:20px; }
