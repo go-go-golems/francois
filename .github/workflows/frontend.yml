@@ -20,4 +20,4 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Verify embedded browser bundles
-        run: git diff --exit-code -- pkg/web/static
+        run: git diff --exit-code -- pkg/web/static pkg/catalog/web/static
