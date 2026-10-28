@@ -463,17 +463,24 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tag := r.URL.Query().Get("tag")
+	access := r.URL.Query().Get("access")
+	if !archiveAccess[access] {
+		access = ""
+	}
 	order := r.URL.Query().Get("sort")
 	if !archiveOrders[order] {
 		order = "newest"
 	}
-	link := func(t string) string {
+	link := func(t, a string) string {
 		v := url.Values{}
 		if q != "" {
 			v.Set("q", q)
 		}
 		if t != "" {
 			v.Set("tag", t)
+		}
+		if a != "" {
+			v.Set("access", a)
 		}
 		v.Set("sort", order)
 		return "/?" + v.Encode()
@@ -483,25 +490,51 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		Count      int
 		Current    bool
 	}
-	tags := []category{}
+	// Tag counts follow the access filter and access counts follow the tag,
+	// so each count says what choosing it would show.
+	tags, tagTotal := []category{}, 0
+	accessCounts := map[string]int{}
 	index := map[string]int{}
 	matches, hidden := []card{}, map[string]bool{}
 	for _, c := range cards {
+		kinds := accessOf(c, rev.Document, who)
+		tagged := tag == "" || contains(c.Tags, tag)
+		if tagged {
+			accessCounts[""]++
+			for k, ok := range kinds {
+				if ok {
+					accessCounts[k]++
+				}
+			}
+		}
+		if access != "" && !kinds[access] {
+			continue
+		}
+		tagTotal++
 		for _, t := range c.Tags {
 			if i, ok := index[t]; ok {
 				tags[i].Count++
 				continue
 			}
 			index[t] = len(tags)
-			tags = append(tags, category{t, link(t), 1, t == tag})
+			tags = append(tags, category{t, link(t, access), 1, t == tag})
 		}
 		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
-		if tag == "" || contains(c.Tags, tag) {
+		if tagged {
 			matches = append(matches, c)
 			hidden[c.ID] = q != "" && !strings.Contains(haystack, strings.ToLower(q))
 		}
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
+	accesses := []category{}
+	for _, a := range archiveAccessList {
+		// Signed-out visitors and demo guests can run exactly the no-sign-up
+		// artifacts, so "Runs for you" is only offered to members.
+		if a.Value == "run" && !who.member {
+			continue
+		}
+		accesses = append(accesses, category{a.Label, link(tag, a.Value), accessCounts[a.Value], a.Value == access})
+	}
 	rows, shown := make([]archiveRow, len(matches)), 0
 	for i, c := range matches {
 		rows[i] = archiveRowOf(c, rev.Document, who)
@@ -510,8 +543,8 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	groups := groupArchive(rows, order)
-	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": len(cards), "Tags": tags, "Tag": tag,
-		"Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link(""), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": tagTotal, "Tags": tags, "Tag": tag,
+		"Access": access, "Accesses": accesses, "Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link("", access), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
 }
 
 // archiveOrderList is the landing page sort menu.
@@ -520,6 +553,27 @@ var archiveOrderList = []struct{ Value, Label string }{
 }
 
 var archiveOrders = map[string]bool{"newest": true, "oldest": true, "az": true, "small": true, "large": true}
+
+// archiveAccessList is the landing page access filter; the empty value is All.
+var archiveAccessList = []struct{ Value, Label string }{
+	{"", "All"}, {"run", "Runs for you"}, {"nosignup", "No sign-up"}, {"early", "Early access"},
+}
+
+var archiveAccess = map[string]bool{"": true, "run": true, "nosignup": true, "early": true}
+
+// accessOf classifies an artifact for the access filter, mirroring the
+// launch decision: members run what early access does not hold back, and
+// anyone may start a demo of an artifact that is not in early access.
+func accessOf(c card, doc settings.Document, who visitor) map[string]bool {
+	early := c.EarlyAccess()
+	open := !early || who.paying
+	demo := doc.Demo.Enabled && c.DemoEnabled && !early
+	return map[string]bool{
+		"run":      (who.member && open) || (demo && open),
+		"nosignup": demo,
+		"early":    early,
+	}
+}
 
 // archiveRow is one experiment in the landing page list.
 type archiveRow struct {

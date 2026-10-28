@@ -10,7 +10,8 @@
 <span class="result-count" data-browser-count aria-live="polite">{{.Body.Count}} {{if eq .Body.Count 1}}artifact{{else}}artifacts{{end}}</span>
 <noscript><button class="tlink" type="submit">Search</button></noscript>
 </div>
-{{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}
+{{if .Body.Tag}}<input type="hidden" name="tag" value="{{.Body.Tag}}">{{end}}{{if .Body.Access}}<input type="hidden" name="access" value="{{.Body.Access}}">{{end}}
+<nav class="tags tags-access" aria-label="Filter by access">{{range .Body.Accesses}}<a class="tag" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}><span class="tag-label">{{.Name}}</span> <span class="tag-count">{{.Count}}</span></a>{{end}}</nav>
 <nav class="tags" aria-label="Filter by tag"><a class="tag" href="{{.Body.AllHref}}"{{if not .Body.Tag}} aria-current="page"{{end}}><span class="tag-label">All</span> <span class="tag-count">{{.Body.Total}}</span></a>{{range .Body.Tags}}<a class="tag" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}><span class="tag-label">{{.Name}}</span> <span class="tag-count">{{.Count}}</span></a>{{end}}</nav>
 </form>
 <section class="browser-list" aria-label="Artifacts list" data-browser-list>
