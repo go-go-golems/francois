@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -321,4 +322,27 @@ func (s *Server) upgrade(w http.ResponseWriter, r *http.Request) {
 	_ = s.Store.Audit(r.Context(), principal(r.Context()).User.ID, "instance.upgrade", inst.ID, map[string]any{"from": inst.ReleaseID, "to": in.ReleaseID})
 	s.Runtime.RevokeInstance(inst.ID) // views reload with the new code
 	httpx.OK(w, map[string]bool{"ok": true})
+}
+
+// instancePage serves the full-screen instance page. Instance links get
+// shared: a visitor who cannot open the instance (signed out, not a member,
+// or it was deleted) goes to the application's public page instead of a
+// dead end, as long as that application is listed.
+func (s *Server) instancePage(spa http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, id := r.Context(), r.PathValue("id")
+		if p := principal(ctx); p != nil {
+			if _, err := s.Store.MemberInstance(ctx, p.User.ID, id); !errors.Is(err, store.ErrNotFound) {
+				spa(w, r)
+				return
+			}
+		}
+		if inst, err := s.Store.Instance(ctx, id); err == nil {
+			if a, err := s.Store.Artifact(ctx, inst.ArtifactID); err == nil && a.Visibility == "listed" {
+				http.Redirect(w, r, "/apps/"+url.PathEscape(a.ID), http.StatusFound)
+				return
+			}
+		}
+		spa(w, r)
+	}
 }

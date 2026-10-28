@@ -96,6 +96,10 @@ type Storefront struct {
 	Title          string `json:"title"`
 	Tagline        string `json:"tagline"`
 	Intro          string `json:"intro"` // Markdown
+	// ShareImage is the media ID of the link preview image for pages
+	// without one of their own, served as a 1200×630 card. Empty draws a
+	// card from the brand and tagline.
+	ShareImage string `json:"shareImage,omitempty"`
 	// Copy overrides registered site text (CopyKeys) by key.
 	Copy map[string]string `json:"copy,omitempty"`
 }
@@ -134,6 +138,8 @@ func FreePlan() Plan {
 func PayingPlan() Plan {
 	return Plan{Key: "subscriber", Name: "Paying", Prices: []PlanPrice{}, Instances: 10, MembersPerInstance: 5, DailyTokens: 100000}
 }
+
+var mediaID = regexp.MustCompile(`^med_[a-f0-9]{8,64}$`)
 
 var selector = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 var thinkingLevels = map[string]bool{"off": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true}
@@ -279,6 +285,9 @@ func (d *Document) validateDemo() error {
 	f := d.Storefront
 	if len(f.Title) > 80 || len(f.Tagline) > 240 || len(f.Intro) > 20<<10 {
 		return errors.New("storefront: title ≤80, tagline ≤240 and intro ≤20 KB")
+	}
+	if f.ShareImage != "" && !mediaID.MatchString(f.ShareImage) {
+		return errors.New("storefront: shareImage must be a media ID (med_…)")
 	}
 	if err := validateCopy(f.Copy); err != nil {
 		return err

@@ -493,6 +493,7 @@ select.btn { appearance: none; cursor: pointer; }
 .tag:hover .tag-label, .tag[aria-current] .tag-label { color:var(--color-ink); }
 .tag[aria-current] .tag-label { text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px; }
 .tag-count { font-size:13px; }
+.tags-access::before { content:"Access"; margin-right:12px; color:var(--color-ink); }
 .browser-group { display:grid; grid-template-columns:var(--label) minmax(0,1fr); gap:0 24px; border-top:1px solid var(--color-ink); }
 .group-label { display:flex; flex-direction:column; margin:0; padding-top:24px; font-size:15px; line-height:22px; }
 .group-label span + span { color:var(--color-muted); }

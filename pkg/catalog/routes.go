@@ -30,6 +30,7 @@ func (s *Server) routes() http.Handler {
 	for _, p := range []string{"GET /account", "GET /thank-you", "GET /instances/", "GET /studio", "GET /studio/", "GET /admin", "GET /admin/", "GET /device"} {
 		m.HandleFunc(p, spa)
 	}
+	m.HandleFunc("GET /instances/{id}", s.guard(public, noToken, s.instancePage(spa)))
 	// Server-rendered storefront.
 	m.HandleFunc("GET /{$}", s.guard(public, noToken, s.feedPage))
 	m.HandleFunc("GET /apps", s.guard(public, noToken, s.feedPage))

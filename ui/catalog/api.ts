@@ -348,6 +348,8 @@ export type SettingsDoc = {
     title: string;
     tagline: string;
     intro: string;
+    // Media ID of the default link preview image; empty draws one.
+    shareImage?: string;
     journalEnabled: boolean;
     // Overrides of registered site text; see CopyKey.
     copy?: Record<string, string>;
@@ -473,6 +475,19 @@ export const api = createApi({
         invalidatesTags: ["Instances"],
       },
     ),
+    // openInstance resumes the caller's instance of a release or creates one.
+    openInstance: b.mutation<
+      { id: string },
+      { releaseId: string; title?: string }
+    >({
+      query: (body) => ({ url: "api/instances/open", method: "POST", body }),
+      invalidatesTags: ["Instances"],
+    }),
+    // startDemo opens a time-limited demo; for a visitor it sets a guest
+    // session, so the session (and its CSRF token) must be fetched again.
+    startDemo: b.mutation<{ id: string }, { artifactId: string }>({
+      query: (body) => ({ url: "api/demos", method: "POST", body }),
+    }),
     renameInstance: b.mutation<unknown, { id: string; title: string }>({
       query: ({ id, title }) => ({
         url: `api/instances/${id}`,

@@ -138,9 +138,10 @@ type pageData struct {
 	// OGType is the Open Graph type: "article" for journal posts, else
 	// "website".
 	OGType string
-	// DefaultImage marks Image as the generated share card, whose size is
-	// known.
-	DefaultImage bool
+	// CardImage marks Image as a share card (content.CardWidth×CardHeight),
+	// described by ImageAlt.
+	CardImage bool
+	ImageAlt  string
 	// Contact is the configured public contact address, if any.
 	Contact string
 	// FontCSS and FontPreloads are versioned web-font URLs.
@@ -259,7 +260,10 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		d.Description = firstNonEmpty(rev.Document.Storefront.Tagline, rev.Document.CopyText("header.statement"))
 	}
 	if d.Image == "" {
-		d.Image, d.DefaultImage = s.shareURL(r, rev.Document), true
+		d.Image, d.CardImage, d.ImageAlt = s.shareURL(r, rev.Document), true, d.Brand
+		if id := rev.Document.Storefront.ShareImage; id != "" {
+			d.Image = s.site(r).PortalOrigin() + content.CardURL(id)
+		}
 	}
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout", d); err != nil {
@@ -459,17 +463,24 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tag := r.URL.Query().Get("tag")
+	access := r.URL.Query().Get("access")
+	if !archiveAccess[access] {
+		access = ""
+	}
 	order := r.URL.Query().Get("sort")
 	if !archiveOrders[order] {
 		order = "newest"
 	}
-	link := func(t string) string {
+	link := func(t, a string) string {
 		v := url.Values{}
 		if q != "" {
 			v.Set("q", q)
 		}
 		if t != "" {
 			v.Set("tag", t)
+		}
+		if a != "" {
+			v.Set("access", a)
 		}
 		v.Set("sort", order)
 		return "/?" + v.Encode()
@@ -479,25 +490,51 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		Count      int
 		Current    bool
 	}
-	tags := []category{}
+	// Tag counts follow the access filter and access counts follow the tag,
+	// so each count says what choosing it would show.
+	tags, tagTotal := []category{}, 0
+	accessCounts := map[string]int{}
 	index := map[string]int{}
 	matches, hidden := []card{}, map[string]bool{}
 	for _, c := range cards {
+		kinds := accessOf(c, rev.Document, who)
+		tagged := tag == "" || contains(c.Tags, tag)
+		if tagged {
+			accessCounts[""]++
+			for k, ok := range kinds {
+				if ok {
+					accessCounts[k]++
+				}
+			}
+		}
+		if access != "" && !kinds[access] {
+			continue
+		}
+		tagTotal++
 		for _, t := range c.Tags {
 			if i, ok := index[t]; ok {
 				tags[i].Count++
 				continue
 			}
 			index[t] = len(tags)
-			tags = append(tags, category{t, link(t), 1, t == tag})
+			tags = append(tags, category{t, link(t, access), 1, t == tag})
 		}
 		haystack := strings.ToLower(c.Title + " " + c.Description + " " + strings.Join(c.Tags, " "))
-		if tag == "" || contains(c.Tags, tag) {
+		if tagged {
 			matches = append(matches, c)
 			hidden[c.ID] = q != "" && !strings.Contains(haystack, strings.ToLower(q))
 		}
 	}
 	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
+	accesses := []category{}
+	for _, a := range archiveAccessList {
+		// Signed-out visitors and demo guests can run exactly the no-sign-up
+		// artifacts, so "Runs for you" is only offered to members.
+		if a.Value == "run" && !who.member {
+			continue
+		}
+		accesses = append(accesses, category{a.Label, link(tag, a.Value), accessCounts[a.Value], a.Value == access})
+	}
 	rows, shown := make([]archiveRow, len(matches)), 0
 	for i, c := range matches {
 		rows[i] = archiveRowOf(c, rev.Document, who)
@@ -506,8 +543,8 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	groups := groupArchive(rows, order)
-	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": len(cards), "Tags": tags, "Tag": tag,
-		"Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link(""), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
+	s.render(w, r, http.StatusOK, "home", pageData{Body: map[string]any{"Groups": groups, "Count": shown, "Total": tagTotal, "Tags": tags, "Tag": tag,
+		"Access": access, "Accesses": accesses, "Query": q, "Sort": order, "Orders": archiveOrderList, "AllHref": link("", access), "Host": s.site(r).PublicURL.Host, "LoginError": r.URL.Query().Get("login_error")}})
 }
 
 // archiveOrderList is the landing page sort menu.
@@ -516,6 +553,27 @@ var archiveOrderList = []struct{ Value, Label string }{
 }
 
 var archiveOrders = map[string]bool{"newest": true, "oldest": true, "az": true, "small": true, "large": true}
+
+// archiveAccessList is the landing page access filter; the empty value is All.
+var archiveAccessList = []struct{ Value, Label string }{
+	{"", "All"}, {"run", "Runs for you"}, {"nosignup", "No sign-up"}, {"early", "Early access"},
+}
+
+var archiveAccess = map[string]bool{"": true, "run": true, "nosignup": true, "early": true}
+
+// accessOf classifies an artifact for the access filter, mirroring the
+// launch decision: members run what early access does not hold back, and
+// anyone may start a demo of an artifact that is not in early access.
+func accessOf(c card, doc settings.Document, who visitor) map[string]bool {
+	early := c.EarlyAccess()
+	open := !early || who.paying
+	demo := doc.Demo.Enabled && c.DemoEnabled && !early
+	return map[string]bool{
+		"run":      (who.member && open) || (demo && open),
+		"nosignup": demo,
+		"early":    early,
+	}
+}
 
 // archiveRow is one experiment in the landing page list.
 type archiveRow struct {
@@ -770,9 +828,9 @@ func (s *Server) artifactPage(w http.ResponseWriter, r *http.Request) {
 			"Demo": doc.Demo.Enabled && a.DemoEnabled && len(rels) > 0, "EarlyAccessUntil": a.EarlyAccessUntil, "EarlyAccess": a.EarlyAccess(time.Now()),
 			"EarlyBlocked": a.EarlyAccess(time.Now()) && !paying}}
 	if c.Cover != nil && !content.IsVideo(c.Cover.MediaType) {
-		d.Image = s.site(r).PortalOrigin() + content.VariantURL(c.Cover.ID, 1200)
+		d.Image, d.CardImage, d.ImageAlt = s.site(r).PortalOrigin()+content.CardURL(c.Cover.ID), true, c.Cover.Alt
 	} else if c.Cover != nil && c.Cover.Poster != "" {
-		d.Image = s.site(r).PortalOrigin() + content.VariantURL(c.Cover.Poster, 1200)
+		d.Image, d.CardImage, d.ImageAlt = s.site(r).PortalOrigin()+content.CardURL(c.Cover.Poster), true, a.Title
 	}
 	s.render(w, r, http.StatusOK, "artifact", d)
 }
@@ -885,7 +943,7 @@ func (s *Server) postPage(w http.ResponseWriter, r *http.Request) {
 		if m, err := s.Store.Media(ctx, post.Cover); err == nil {
 			body["Cover"] = m
 			if !content.IsVideo(m.MediaType) {
-				d.Image = s.site(r).PortalOrigin() + content.VariantURL(m.ID, 1200)
+				d.Image, d.CardImage, d.ImageAlt = s.site(r).PortalOrigin()+content.CardURL(m.ID), true, m.Alt
 			}
 		}
 	}
@@ -994,14 +1052,23 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = f.Close() }()
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
-	if width, _ := strconv.Atoi(r.URL.Query().Get("w")); content.VariantWidth(width) && content.Resizable(m.MediaType, m.Width, m.Height) {
-		if data, err := s.variant(m, f, width); err == nil {
+	width, _ := strconv.Atoi(r.URL.Query().Get("w"))
+	card := r.URL.Query().Get("card") == "1"
+	if (card || content.VariantWidth(width)) && content.Resizable(m.MediaType, m.Width, m.Height) {
+		name, resize := variantName(m, width), func(f io.ReadSeeker) ([]byte, error) {
+			data, _, err := content.Resize(f, width)
+			return data, err
+		}
+		if card {
+			name, resize = m.SHA256+"-card-v"+strconv.Itoa(content.VariantVersion), content.Card
+		}
+		if data, err := s.variant(name, f, resize); err == nil {
 			w.Header().Set("Content-Type", http.DetectContentType(data))
-			w.Header().Set("ETag", `"`+variantName(m, width)+`"`)
+			w.Header().Set("ETag", `"`+name+`"`)
 			http.ServeContent(w, r, "", m.CreatedAt, bytes.NewReader(data))
 			return
 		} else if !errors.Is(err, content.ErrNoVariant) {
-			log.Warn().Err(err).Str("media", m.ID).Int("width", width).Msg("media variant failed; serving original")
+			log.Warn().Err(err).Str("media", m.ID).Str("variant", name).Msg("media variant failed; serving original")
 		}
 		if _, err = f.Seek(0, io.SeekStart); err != nil {
 			http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
@@ -1040,15 +1107,14 @@ func variantName(m store.Media, width int) string {
 // request. Concurrent requests for the same variant share one resize, and
 // resizes run at most two at a time, so a burst of thumbnails cannot exhaust
 // memory.
-func (s *Server) variant(m store.Media, f io.ReadSeeker, width int) ([]byte, error) {
-	name := variantName(m, width)
+func (s *Server) variant(name string, f io.ReadSeeker, resize func(io.ReadSeeker) ([]byte, error)) ([]byte, error) {
 	if data, err := s.Publisher.Blobs.Variant(name); err == nil {
 		return data, nil
 	}
 	v, err, _ := s.resizes.Do(name, func() (any, error) {
 		s.resizeSlots <- struct{}{}
 		defer func() { <-s.resizeSlots }()
-		data, _, err := content.Resize(f, width)
+		data, err := resize(f)
 		if err != nil {
 			return nil, err
 		}

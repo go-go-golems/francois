@@ -1295,6 +1295,21 @@ function Settings() {
               </label>
             </div>
             <label className="field">
+              <span>Share image (media ID)</span>
+              <input
+                value={doc.storefront.shareImage ?? ""}
+                placeholder="med_…"
+                onChange={(e) =>
+                  upd((d) => (d.storefront.shareImage = e.target.value.trim()))
+                }
+              />
+            </label>
+            <p className="muted small">
+              The link preview for pages without an image of their own, cropped
+              to 1200 × 630. Upload it in Studio → Media and paste its ID. Blank
+              draws a card from the title and tagline.
+            </p>
+            <label className="field">
               <span>Introduction (Markdown)</span>
               <textarea
                 rows={5}

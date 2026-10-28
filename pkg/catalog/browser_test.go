@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -154,5 +155,77 @@ func TestBrowser(t *testing.T) {
 	}
 	if _, early, _ = e.do(&paying, "portal.test", "GET", "/apps/early", nil, nil); bytes.Contains(early, []byte(`class="runner-early"`)) {
 		t.Error("paying visitors are invited to subscribe")
+	}
+}
+
+// TestBrowserAccessFilter covers the access row: each count is per viewer,
+// "Runs for you" is offered to members only, and the filter narrows the
+// rows and the tag counts.
+func TestBrowserAccessFilter(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	admin := e.user("editor", "admin", false)
+	free := e.user("fred", "", false)
+	paying := e.user("pat", "subscriber", true)
+	rev, err := e.store.ActiveSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev.Document.Demo.Enabled = true
+	if _, err = e.store.SaveSettings(ctx, "", rev.Document); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"demo", "plain", "early"} {
+		rel, _, err := e.srv.Publisher.CreateDraft(ctx, admin.user.ID, uploadOf(id, strings.ToUpper(id[:1])+id[1:]+" app", "1.0.0"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = e.store.PublishRelease(ctx, rel.ID, admin.user.ID, 0); err != nil {
+			t.Fatal(err)
+		}
+		a, err := e.store.Artifact(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Tags = []string{"tools"}
+		switch id {
+		case "demo":
+			a.DemoEnabled = true
+		case "early":
+			until := time.Now().Add(72 * time.Hour)
+			a.EarlyAccessUntil, a.DemoEnabled = &until, true
+		}
+		if _, err = e.store.UpdateArtifact(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	chip := func(label string, n int) string {
+		return `<span class="tag-label">` + label + `</span> <span class="tag-count">` + strconv.Itoa(n) + `</span>`
+	}
+	for _, c := range []struct {
+		who       *tactor
+		run       int // -1: not offered
+		nosignup  int
+		earlyOnly int
+	}{{nil, -1, 1, 1}, {&free, 2, 1, 1}, {&paying, 3, 1, 1}} {
+		_, page, _ := e.do(c.who, "portal.test", "GET", "/", nil, nil)
+		html := string(page)
+		if c.run < 0 && strings.Contains(html, "Runs for you") || c.run >= 0 && !strings.Contains(html, chip("Runs for you", c.run)) {
+			t.Errorf("run chip for %v: want %d", c.who, c.run)
+		}
+		if !strings.Contains(html, chip("No sign-up", c.nosignup)) || !strings.Contains(html, chip("Early access", c.earlyOnly)) {
+			t.Errorf("access chips for %v: %s", c.who, regexp.MustCompile(`<nav class="tags tags-access".*?</nav>`).FindString(html))
+		}
+	}
+	_, page, _ := e.do(nil, "portal.test", "GET", "/?access=nosignup", nil, nil)
+	html := string(page)
+	if !strings.Contains(html, `<a href="/apps/demo">`) || strings.Contains(html, `<a href="/apps/plain">`) || strings.Contains(html, `<a href="/apps/early">`) {
+		t.Errorf("nosignup rows: %s", html)
+	}
+	if !strings.Contains(html, chip("tools", 1)) || !strings.Contains(html, `<input type="hidden" name="access" value="nosignup">`) || !strings.Contains(html, `href="/?access=nosignup&amp;sort=newest" aria-current="page"`) {
+		t.Errorf("nosignup tags/state: %s", html)
+	}
+	if _, page, _ = e.do(nil, "portal.test", "GET", "/?access=bogus", nil, nil); !strings.Contains(string(page), chip("All", 3)) {
+		t.Errorf("unknown access value should show all")
 	}
 }
